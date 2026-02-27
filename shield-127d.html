@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>127D Shield Fold — Audio Fabric</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e7;font-family:'JetBrains Mono',monospace;font-size:12px}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:rgba(6,4,14,0.5)}
+::-webkit-scrollbar-thumb{background:rgba(255,215,0,0.2);border-radius:2px}
+
+/* ===== BOOT SCREEN ===== */
+#boot-screen{position:fixed;inset:0;z-index:9999;background:#06040e;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 1.2s}
+#boot-screen.hidden{opacity:0;pointer-events:none}
+.boot-logo{font-family:'Instrument Serif',serif;font-style:italic;font-size:42px;color:#ffd700;margin-bottom:8px;text-shadow:0 0 40px rgba(255,215,0,0.2)}
+.boot-sub{font-size:11px;color:rgba(255,248,231,0.3);letter-spacing:3px;text-transform:uppercase;margin-bottom:40px}
+.boot-phase{display:flex;align-items:center;gap:12px;padding:6px 0;font-size:12px;opacity:0.2;transition:opacity 0.4s,color 0.4s}
+.boot-phase.active{opacity:1;color:#0af}
+.boot-phase.done{opacity:0.8;color:#4f8}
+.boot-phase.fail{opacity:1;color:#f44}
+.boot-phase .prime{color:#ffd700;font-weight:700;width:36px;text-align:right}
+.boot-phase .label{width:240px}
+.boot-phase .status{width:20px;text-align:center;font-size:13px}
+#boot-enter{margin-top:36px;padding:12px 36px;background:transparent;border:1px solid rgba(255,215,0,0.3);color:#ffd700;font-family:'JetBrains Mono',monospace;font-size:13px;cursor:pointer;opacity:0;transition:opacity 0.6s;pointer-events:none;letter-spacing:1px}
+#boot-enter.visible{opacity:1;pointer-events:auto}
+#boot-enter:hover{background:rgba(255,215,0,0.08);border-color:#ffd700}
+.boot-fold{margin-top:24px;font-size:10px;color:rgba(255,248,231,0.15);letter-spacing:1px}
+
+/* ===== PANELS ===== */
+.panel{position:fixed;z-index:100;background:rgba(6,4,14,0.92);backdrop-filter:blur(16px);border:1px solid rgba(255,215,0,0.08)}
+#top-bar{top:0;left:0;right:0;height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid rgba(255,215,0,0.08);font-size:10px;z-index:200}
+#top-bar .sys-name{color:#ffd700;font-weight:500;letter-spacing:2px}
+#top-bar .sys-right{display:flex;gap:16px;align-items:center}
+#top-bar .clock{color:rgba(255,248,231,0.35)}
+#top-bar .dim-counter{color:#0af}
+
+/* LEFT — RING INTEGRITY */
+#left-panel{top:32px;left:0;bottom:0;width:200px;padding:14px;overflow-y:auto;border-right:1px solid rgba(255,215,0,0.08)}
+.panel-title{font-size:9px;text-transform:uppercase;letter-spacing:2.5px;color:rgba(255,248,231,0.25);margin-bottom:10px}
+.shield-bar{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:10px}
+.shield-bar .sname{width:72px;text-align:right;color:rgba(255,248,231,0.4);font-size:9px}
+.shield-bar .strack{flex:1;height:5px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden}
+.shield-bar .sfill{height:100%;border-radius:3px;transition:width 0.15s}
+.shield-bar .spct{width:28px;text-align:right;font-size:9px;color:rgba(255,248,231,0.5)}
+.ring-detail{margin-top:6px;padding:6px 0;border-top:1px solid rgba(255,255,255,0.03)}
+.ring-detail .rd-row{display:flex;justify-content:space-between;font-size:9px;padding:2px 0}
+.ring-detail .rd-label{color:rgba(255,248,231,0.25)}
+.ring-detail .rd-val{color:rgba(255,248,231,0.6)}
+.bus-section{margin-top:14px}
+.bus-bar{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:9px}
+.bus-bar .bname{width:48px;text-align:right;color:rgba(255,248,231,0.2)}
+.bus-bar .btrack{flex:1;height:3px;background:rgba(255,255,255,0.03);border-radius:2px;overflow:hidden}
+.bus-bar .bfill{height:100%;background:#ffd700;border-radius:2px;transition:width 0.2s}
+.fold-equation{margin-top:16px;padding:10px;background:rgba(255,215,0,0.03);border:1px solid rgba(255,215,0,0.06);border-radius:4px;font-size:9px;color:rgba(255,248,231,0.3);text-align:center;line-height:1.8}
+.fold-equation .eq-gold{color:#ffd700}
+
+/* RIGHT — FOLD CONTROLS & METRICS */
+#right-panel{top:32px;right:0;bottom:0;width:220px;padding:14px;overflow-y:auto;border-left:1px solid rgba(255,215,0,0.08)}
+.modes-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:14px}
+.mode-btn{padding:6px 4px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);color:rgba(255,248,231,0.4);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:8px;border-radius:3px;text-transform:uppercase;letter-spacing:1px;transition:all 0.2s;text-align:center}
+.mode-btn:hover{border-color:rgba(255,215,0,0.3);color:#ffd700}
+.mode-btn.active{background:rgba(255,215,0,0.1);border-color:rgba(255,215,0,0.4);color:#ffd700}
+.metric-block{margin-bottom:12px}
+.metric-row{display:flex;justify-content:space-between;padding:3px 0;font-size:10px;border-bottom:1px solid rgba(255,255,255,0.02)}
+.metric-row .ml{color:rgba(255,248,231,0.3)}
+.metric-row .mv{color:#ffd700;font-weight:500}
+.metric-row .mv.cyan{color:#0af}
+.metric-row .mv.red{color:#f44}
+.metric-row .mv.green{color:#4f8}
+
+/* FOLD CONTROLS */
+.fold-controls{margin-top:12px}
+.fold-slider-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.fold-slider-row label{font-size:9px;color:rgba(255,248,231,0.3);width:56px;text-align:right}
+.fold-slider-row input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:rgba(255,255,255,0.08);border-radius:2px;outline:none}
+.fold-slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:#ffd700;cursor:pointer}
+.fold-slider-row .sv{width:32px;text-align:right;font-size:9px;color:rgba(255,248,231,0.5)}
+.fold-btn{width:100%;padding:8px;margin-top:8px;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.25);color:#ffd700;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;border-radius:4px;letter-spacing:1px;transition:all 0.2s}
+.fold-btn:hover{background:rgba(255,215,0,0.15);border-color:#ffd700}
+.fold-btn.danger{border-color:rgba(255,68,68,0.3);color:#f66;background:rgba(255,68,68,0.05)}
+.fold-btn.danger:hover{background:rgba(255,68,68,0.12);border-color:#f44}
+
+/* DIM MAP */
+.dim-map{margin-top:14px}
+.dim-grid{display:grid;grid-template-columns:repeat(16,1fr);gap:1px;margin-top:6px}
+.dim-cell{width:100%;aspect-ratio:1;border-radius:1px;transition:background 0.2s;cursor:default;position:relative}
+.dim-cell:hover{outline:1px solid rgba(255,215,0,0.5)}
+.dim-cell .dim-tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:rgba(6,4,14,0.95);border:1px solid rgba(255,215,0,0.2);padding:3px 6px;font-size:8px;white-space:nowrap;z-index:10;border-radius:2px;pointer-events:none}
+.dim-cell:hover .dim-tip{display:block}
+
+/* BREACH ALERT */
+#breach-alert{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:250;font-size:16px;font-weight:700;color:#f44;text-shadow:0 0 30px rgba(255,68,68,0.6);opacity:0;transition:opacity 0.3s;pointer-events:none;text-align:center;text-transform:uppercase;letter-spacing:4px}
+
+/* CANVAS */
+#canvas-container{position:fixed;inset:0;z-index:1}
+
+/* RESPONSIVE */
+@media(max-width:800px){
+  #left-panel{width:160px;font-size:9px}
+  #right-panel{width:180px;font-size:9px}
+}
+@media(max-width:600px){
+  #left-panel,#right-panel{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== BOOT SCREEN ===== -->
+<div id="boot-screen">
+  <div class="boot-logo">127D Shield Fold</div>
+  <div class="boot-sub">Audio Fabric &middot; Prime Frequency Architecture</div>
+  <div id="boot-phases">
+    <div class="boot-phase" data-phase="2"><span class="prime">p= 2</span><span class="label">ground plane — diaphragm engine</span><span class="status">·</span></div>
+    <div class="boot-phase" data-phase="3"><span class="prime">p= 3</span><span class="label">sensory ring — laryngeal sensor</span><span class="status">·</span></div>
+    <div class="boot-phase" data-phase="5"><span class="prime">p= 5</span><span class="label">gate shield — breath gate</span><span class="status">·</span></div>
+    <div class="boot-phase" data-phase="7"><span class="prime">p= 7</span><span class="label">affect layer — thoracic resonator</span><span class="status">·</span></div>
+    <div class="boot-phase" data-phase="11"><span class="prime">p=11</span><span class="label">executive ring — nasopharyngeal ERP</span><span class="status">·</span></div>
+    <div class="boot-phase" data-phase="13"><span class="prime">p=13</span><span class="label">identity shell — oral shaper</span><span class="status">·</span></div>
+    <div class="boot-phase" data-phase="17"><span class="prime">p=17</span><span class="label">observer field — intent / silence</span><span class="status">·</span></div>
+  </div>
+  <button id="boot-enter">enter the fold →</button>
+  <div class="boot-fold">fold(voice) = 2 · 3 · 5 · 7 · 11 · 13 · 17 = 510,510</div>
+</div>
+
+<!-- ===== TOP BAR ===== -->
+<div id="top-bar" class="panel" style="display:none">
+  <span class="sys-name">127D SHIELD FOLD</span>
+  <div class="sys-right">
+    <span class="dim-counter" id="dim-active">127 / 127 dims</span>
+    <span class="clock" id="sys-clock">00:00:00</span>
+  </div>
+</div>
+
+<!-- ===== LEFT PANEL — SHIELD INTEGRITY ===== -->
+<div id="left-panel" class="panel" style="display:none">
+  <div class="panel-title">shield integrity</div>
+  <div id="shield-bars"></div>
+
+  <div class="bus-section">
+    <div class="panel-title">bus power</div>
+    <div id="bus-bars"></div>
+  </div>
+
+  <div class="fold-equation">
+    <span class="eq-gold">fold</span>(voice) =<br>
+    <span class="eq-gold">2</span> × <span class="eq-gold">3</span> × <span class="eq-gold">5</span> × <span class="eq-gold">7</span> × <span class="eq-gold">11</span> × <span class="eq-gold">13</span> × <span class="eq-gold">17</span><br>
+    = <span class="eq-gold">510,510</span>
+  </div>
+
+  <div class="dim-map">
+    <div class="panel-title">127 dimensions</div>
+    <div class="dim-grid" id="dim-grid"></div>
+  </div>
+</div>
+
+<!-- ===== RIGHT PANEL — CONTROLS & METRICS ===== -->
+<div id="right-panel" class="panel" style="display:none">
+  <div class="panel-title">shield mode</div>
+  <div class="modes-grid" id="modes-grid"></div>
+
+  <div class="panel-title">topology</div>
+  <div class="metric-block" id="metrics-block"></div>
+
+  <div class="panel-title">fold controls</div>
+  <div class="fold-controls">
+    <div class="fold-slider-row">
+      <label>rotation</label>
+      <input type="range" id="sl-rotation" min="0" max="100" value="30">
+      <span class="sv" id="sv-rotation">0.30</span>
+    </div>
+    <div class="fold-slider-row">
+      <label>expansion</label>
+      <input type="range" id="sl-expansion" min="0" max="100" value="50">
+      <span class="sv" id="sv-expansion">0.50</span>
+    </div>
+    <div class="fold-slider-row">
+      <label>dim-fold</label>
+      <input type="range" id="sl-dimfold" min="1" max="127" value="127">
+      <span class="sv" id="sv-dimfold">127</span>
+    </div>
+    <div class="fold-slider-row">
+      <label>phase-φ</label>
+      <input type="range" id="sl-phi" min="0" max="100" value="62">
+      <span class="sv" id="sv-phi">0.62</span>
+    </div>
+    <div class="fold-slider-row">
+      <label>density</label>
+      <input type="range" id="sl-density" min="10" max="100" value="80">
+      <span class="sv" id="sv-density">0.80</span>
+    </div>
+    <button class="fold-btn" onclick="triggerFold()">EXECUTE FOLD</button>
+    <button class="fold-btn" onclick="triggerUnfold()">UNFOLD → 127D</button>
+    <button class="fold-btn" onclick="triggerBloom()">BLOOM CASCADE</button>
+    <button class="fold-btn danger" onclick="triggerBreach()">SIMULATE BREACH</button>
+  </div>
+</div>
+
+<!-- ===== BREACH ALERT ===== -->
+<div id="breach-alert"></div>
+
+<!-- ===== CANVAS ===== -->
+<div id="canvas-container"></div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  127D SHIELD FOLD — Audio Fabric                                ║
+// ║  fold(voice) = 2 · 3 · 5 · 7 · 11 · 13 · 17 = 510,510        ║
+// ║                                                                  ║
+// ║  127 dimensions distributed across 7 prime rings.                ║
+// ║  Each ring is a resonance zone. Each dimension is a thread.      ║
+// ║  The fold collapses 127D → 3D through 7 prime factors.          ║
+// ║  Remove any prime and the fold collapses.                        ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+'use strict';
+
+const PHI = (1 + Math.sqrt(5)) / 2;
+const TAU = Math.PI * 2;
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const PRIMES = [2, 3, 5, 7, 11, 13, 17];
+const FOLD_PRODUCT = 510510;
+const DIM_COUNT = 127;
+const PARTICLE_COUNT = 12000;
+
+// ===== SHIELD RING DEFINITIONS =====
+const SHIELD_RINGS = [
+  { name: 'GROUND',    prime: 2,  color: '#ff2244', hex: 0xff2244, baseRadius: 1.0,  integrity: 0, target: 0, regen: 0.002, vagal: 'Diaphragm — vagal trunk' },
+  { name: 'SENSORY',   prime: 3,  color: '#ff8800', hex: 0xff8800, baseRadius: 1.45, integrity: 0, target: 0, regen: 0.002, vagal: 'Larynx — recurrent laryngeal' },
+  { name: 'GATE',      prime: 5,  color: '#ffcc00', hex: 0xffcc00, baseRadius: 1.90, integrity: 0, target: 0, regen: 0.003, vagal: 'Breath — vagal brake' },
+  { name: 'AFFECT',    prime: 7,  color: '#44ff66', hex: 0x44ff66, baseRadius: 2.35, integrity: 0, target: 0, regen: 0.002, vagal: 'Thorax — vagal trunk' },
+  { name: 'EXECUTIVE', prime: 11, color: '#00ccff', hex: 0x00ccff, baseRadius: 2.80, integrity: 0, target: 0, regen: 0.002, vagal: 'Nasopharynx — pharyngeal branch' },
+  { name: 'IDENTITY',  prime: 13, color: '#8855ff', hex: 0x8855ff, baseRadius: 3.25, integrity: 0, target: 0, regen: 0.002, vagal: 'Oral cavity — vowel shaping' },
+  { name: 'OBSERVER',  prime: 17, color: '#cc44ff', hex: 0xcc44ff, baseRadius: 3.70, integrity: 0, target: 0, regen: 0.003, vagal: 'Intent — the space between' },
+];
+
+// ===== SHIELD MODES =====
+const SHIELD_MODES = {
+  STANDBY:    { label: 'Standby',    targets: [0.30, 0.30, 0.30, 0.30, 0.30, 0.30, 0.30] },
+  PATROL:     { label: 'Patrol',     targets: [0.40, 0.75, 0.60, 0.40, 0.50, 0.40, 0.60] },
+  ALERT:      { label: 'Alert',      targets: [0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85] },
+  PRIME_LOCK: { label: 'Prime Lock', targets: [1/PHI, 1/(PHI*PHI), 1/PHI, 1/(PHI*PHI), 1/PHI, 1/(PHI*PHI), 1/PHI] },
+  FORTRESS:   { label: 'Fortress',   targets: [1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00] },
+  MIRROR:     { label: 'Mirror',     targets: [0.40, 0.40, 1.00, 0.40, 0.40, 0.40, 1.00] },
+  CASCADE:    { label: 'Cascade',    targets: [1.00, 0.86, 0.72, 0.58, 0.44, 0.30, 0.16] },
+  BLOOM:      { label: 'Bloom',      targets: [0.16, 0.30, 0.44, 0.58, 0.72, 0.86, 1.00] },
+  PHI_SPIRAL: { label: 'φ Spiral',   targets: [0] }, // computed dynamically
+  COLLAPSE:   { label: 'Collapse',   targets: [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00] },
+};
+// Compute phi spiral targets
+SHIELD_MODES.PHI_SPIRAL.targets = PRIMES.map((p, i) => (1 / Math.pow(PHI, i)) );
+
+const BUS_POWER = [
+  { name: 'BUS-α', feeds: [0, 1], power: 0 },
+  { name: 'BUS-β', feeds: [1, 2], power: 0 },
+  { name: 'BUS-γ', feeds: [2, 3], power: 0 },
+  { name: 'BUS-δ', feeds: [3, 4], power: 0 },
+  { name: 'BUS-ε', feeds: [4, 5], power: 0 },
+  { name: 'BUS-ζ', feeds: [5, 6], power: 0 },
+];
+
+// ===== STATE =====
+let currentMode = 'STANDBY';
+let foldState = 1.0;          // 1 = fully expanded (127D), 0 = fully folded
+let foldTarget = 1.0;
+let bloomCascadeActive = false;
+let bloomCascadeTime = 0;
+let breachActive = false;
+let breachRing = -1;
+let startTime = Date.now();
+let animFrame = 0;
+let activeDims = DIM_COUNT;
+
+// Fold controls
+let controls = {
+  rotation: 0.30,
+  expansion: 0.50,
+  dimFold: 127,
+  phiPhase: 0.62,
+  density: 0.80,
+};
+
+// ===== THREE.JS =====
+let scene, camera, renderer;
+let orbGroup;
+let shieldMeshes = { core: null, rings: [], particles: null, toroidals: [], dimThreads: [] };
+let orbitState = { theta: Math.PI / 4, phi: Math.PI / 3, radius: 14, autoRotate: true, lastInteraction: 0 };
+let isDragging = false, dragPrevX = 0, dragPrevY = 0;
+
+// ===== DIMENSION MAP =====
+// Each of 127 dimensions maps to a ring: dim % 7
+// Dimension energy tracks how "active" each dimension thread is
+const dimEnergy = new Float32Array(DIM_COUNT);
+const dimPhase = new Float32Array(DIM_COUNT);
+for (let i = 0; i < DIM_COUNT; i++) {
+  dimEnergy[i] = 0.3 + Math.random() * 0.2;
+  dimPhase[i] = Math.random() * TAU;
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  BOOT SEQUENCE                                                   ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+async function runBoot() {
+  const phases = document.querySelectorAll('.boot-phase');
+
+  for (let i = 0; i < PRIMES.length; i++) {
+    const el = phases[i];
+    el.classList.add('active');
+    el.querySelector('.status').textContent = '⟳';
+    await sleep(250 + Math.random() * 200);
+
+    try {
+      switch (i) {
+        case 0: initScene(); break;
+        case 1: initCore(); break;
+        case 2: initShieldRings(); break;
+        case 3: initParticleField(); break;
+        case 4: initToroidalFields(); break;
+        case 5: initDimThreads(); break;
+        case 6: initHUD(); break;
+      }
+      el.classList.remove('active');
+      el.classList.add('done');
+      el.querySelector('.status').textContent = '✓';
+    } catch(err) {
+      console.error(`Phase p=${PRIMES[i]} failed:`, err);
+      el.classList.remove('active');
+      el.classList.add('fail');
+      el.querySelector('.status').textContent = '✗';
+    }
+  }
+
+  document.getElementById('boot-enter').classList.add('visible');
+}
+
+function enterFold() {
+  document.getElementById('boot-screen').classList.add('hidden');
+  setTimeout(() => { document.getElementById('boot-screen').style.display = 'none'; }, 1200);
+  document.getElementById('top-bar').style.display = '';
+  document.getElementById('left-panel').style.display = '';
+  document.getElementById('right-panel').style.display = '';
+  setShieldMode('STANDBY');
+  animate();
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  p=2  SCENE — Ground Plane                                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function initScene() {
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x06040e, 0.02);
+
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x06040e);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+  orbGroup = new THREE.Group();
+  scene.add(orbGroup);
+
+  // Ambient
+  scene.add(new THREE.AmbientLight(0x222244, 0.4));
+
+  // Key light
+  const key = new THREE.DirectionalLight(0xffeedd, 0.5);
+  key.position.set(10, 20, 15);
+  scene.add(key);
+
+  // Stars
+  const starGeo = new THREE.BufferGeometry();
+  const starPos = new Float32Array(2000 * 3);
+  for (let i = 0; i < 2000; i++) {
+    const theta = Math.random() * TAU;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = 100 + Math.random() * 150;
+    starPos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+    starPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    starPos[i*3+2] = r * Math.cos(phi);
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
+    color: 0xffffff, size: 0.4, transparent: true, opacity: 0.6, sizeAttenuation: true
+  })));
+
+  // Events
+  renderer.domElement.addEventListener('mousedown', onMouseDown);
+  renderer.domElement.addEventListener('mousemove', onMouseMove);
+  renderer.domElement.addEventListener('mouseup', onMouseUp);
+  renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
+  renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+  renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
+  renderer.domElement.addEventListener('touchend', onTouchEnd);
+  window.addEventListener('resize', onResize);
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  p=3  CORE — Central Singularity                                ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function initCore() {
+  // Inner core: pulsing sphere
+  const coreGeo = new THREE.IcosahedronGeometry(0.35, 2);
+  const coreMat = new THREE.MeshPhongMaterial({
+    color: 0xffd700,
+    emissive: 0xaa8800,
+    emissiveIntensity: 0.6,
+    transparent: true,
+    opacity: 0.85,
+  });
+  shieldMeshes.core = new THREE.Mesh(coreGeo, coreMat);
+  orbGroup.add(shieldMeshes.core);
+
+  // Core wireframe
+  const wireGeo = new THREE.IcosahedronGeometry(0.45, 1);
+  const wireMat = new THREE.MeshBasicMaterial({
+    color: 0xffd700, wireframe: true, transparent: true, opacity: 0.25
+  });
+  const wireCore = new THREE.Mesh(wireGeo, wireMat);
+  wireCore.name = 'coreWire';
+  orbGroup.add(wireCore);
+
+  // Core point light
+  const coreLight = new THREE.PointLight(0xffd700, 2.5, 12);
+  coreLight.name = 'coreLight';
+  orbGroup.add(coreLight);
+
+  // Secondary soft light
+  const softLight = new THREE.PointLight(0x4466ff, 1.5, 20);
+  softLight.position.set(0, 0, 0);
+  softLight.name = 'softLight';
+  orbGroup.add(softLight);
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  p=5  SHIELD RINGS — 7 Concentric Layers                       ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function initShieldRings() {
+  SHIELD_RINGS.forEach((ring, i) => {
+    const ringGroup = new THREE.Group();
+
+    // Primary torus
+    const torusMat = new THREE.MeshPhongMaterial({
+      color: ring.hex,
+      emissive: ring.hex,
+      emissiveIntensity: 0.25,
+      transparent: true,
+      opacity: 0.15,
+    });
+    const torus = new THREE.Mesh(
+      new THREE.TorusGeometry(ring.baseRadius, 0.025, 12, 80),
+      torusMat
+    );
+    ringGroup.add(torus);
+
+    // Secondary torus (perpendicular)
+    const torus2Mat = new THREE.MeshPhongMaterial({
+      color: ring.hex, emissive: ring.hex, emissiveIntensity: 0.15,
+      transparent: true, opacity: 0.08,
+    });
+    const torus2 = new THREE.Mesh(
+      new THREE.TorusGeometry(ring.baseRadius, 0.018, 8, 64),
+      torus2Mat
+    );
+    torus2.rotation.x = Math.PI / 2;
+    ringGroup.add(torus2);
+
+    // Third torus (tilted)
+    const torus3Mat = new THREE.MeshPhongMaterial({
+      color: ring.hex, emissive: ring.hex, emissiveIntensity: 0.1,
+      transparent: true, opacity: 0.05,
+    });
+    const torus3 = new THREE.Mesh(
+      new THREE.TorusGeometry(ring.baseRadius, 0.012, 6, 48),
+      torus3Mat
+    );
+    torus3.rotation.x = Math.PI / 3;
+    torus3.rotation.z = Math.PI / 5;
+    ringGroup.add(torus3);
+
+    // Icosahedron wireframe shell
+    const icoMat = new THREE.MeshBasicMaterial({
+      color: ring.hex, wireframe: true, transparent: true, opacity: 0.06,
+    });
+    const icoDetail = i < 3 ? 1 : 2;
+    const ico = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(ring.baseRadius, icoDetail),
+      icoMat
+    );
+    ringGroup.add(ico);
+
+    // Transparent shell surface
+    const shellMat = new THREE.MeshPhongMaterial({
+      color: ring.hex, transparent: true, opacity: 0.02,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const shell = new THREE.Mesh(
+      new THREE.SphereGeometry(ring.baseRadius, 16, 12),
+      shellMat
+    );
+    ringGroup.add(shell);
+
+    orbGroup.add(ringGroup);
+    shieldMeshes.rings.push({
+      group: ringGroup,
+      torus, torusMat,
+      torus2, torus2Mat,
+      torus3, torus3Mat,
+      ico, icoMat,
+      shell, shellMat,
+    });
+  });
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  p=7  PARTICLE FIELD — 12,000 across 127 Dimensions             ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function initParticleField() {
+  const count = PARTICLE_COUNT;
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const sizes = new Float32Array(count);
+  const dims = new Float32Array(count);
+  const ringIndex = new Float32Array(count);
+  const seeds = new Float32Array(count);
+
+  for (let i = 0; i < count; i++) {
+    const dim = i % DIM_COUNT;
+    const ring = dim % 7;
+    const r = SHIELD_RINGS[ring].baseRadius;
+
+    // Fibonacci sphere distribution within each ring's shell
+    const goldenOff = (dim / DIM_COUNT) * TAU;
+    const theta = (i * PHI * TAU + goldenOff) % TAU;
+    const phi = Math.acos(1 - 2 * (((i * PHI) % 1 + dim * 0.0079) % 1));
+    const rVariance = r + (Math.random() - 0.5) * 0.2;
+
+    positions[i*3]   = rVariance * Math.sin(phi) * Math.cos(theta);
+    positions[i*3+1] = rVariance * Math.sin(phi) * Math.sin(theta);
+    positions[i*3+2] = rVariance * Math.cos(phi);
+
+    const col = new THREE.Color(SHIELD_RINGS[ring].hex);
+    colors[i*3]   = col.r;
+    colors[i*3+1] = col.g;
+    colors[i*3+2] = col.b;
+
+    sizes[i] = 0.8 + Math.random() * 2.5;
+    dims[i] = dim;
+    ringIndex[i] = ring;
+    seeds[i] = Math.random() * TAU;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('aColor', new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+  geo.setAttribute('aDim', new THREE.BufferAttribute(dims, 1));
+  geo.setAttribute('aRing', new THREE.BufferAttribute(ringIndex, 1));
+  geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+
+  const vertexShader = `
+    attribute float aSize;
+    attribute vec3 aColor;
+    attribute float aDim;
+    attribute float aRing;
+    attribute float aSeed;
+
+    uniform float uTime;
+    uniform float uFold;
+    uniform float uExpansion;
+    uniform float uPhiPhase;
+    uniform float uDensity;
+    uniform float uActiveDims;
+    uniform float uIntegrity[7];
+
+    varying vec3 vColor;
+    varying float vAlpha;
+    varying float vGlow;
+
+    void main() {
+      float dim = aDim;
+      float ring = aRing;
+      float integrity = uIntegrity[int(ring)];
+      float dimActive = dim < uActiveDims ? 1.0 : 0.0;
+
+      vColor = aColor;
+
+      // Each dimension rotates at its own speed based on its prime ring
+      float primeSpeed = 0.0;
+      if (ring < 0.5) primeSpeed = 2.0;
+      else if (ring < 1.5) primeSpeed = 3.0;
+      else if (ring < 2.5) primeSpeed = 5.0;
+      else if (ring < 3.5) primeSpeed = 7.0;
+      else if (ring < 4.5) primeSpeed = 11.0;
+      else if (ring < 5.5) primeSpeed = 13.0;
+      else primeSpeed = 17.0;
+
+      float orbitSpeed = 0.02 * primeSpeed / 17.0;
+      float dimOffset = dim * 0.05 + aSeed;
+      float angle = uTime * orbitSpeed + dimOffset;
+
+      // Base position
+      vec3 pos = position;
+
+      // Fold operation: collapse dimensions toward center
+      float foldFactor = mix(0.1, 1.0, uFold);
+      pos *= foldFactor;
+
+      // Expansion
+      pos *= (0.7 + uExpansion * 0.6);
+
+      // Dimensional rotation — each dim rotates in its own plane
+      float dimPlaneAngle = dim * ${GOLDEN_ANGLE.toFixed(8)};
+      float c1 = cos(angle);
+      float s1 = sin(angle);
+      float c2 = cos(dimPlaneAngle);
+      float s2 = sin(dimPlaneAngle);
+
+      // Rotate in the dim's unique plane
+      vec3 rotated;
+      rotated.x = pos.x * (c1 * c2) - pos.z * (s1 * c2) + pos.y * s2 * sin(angle * 0.3);
+      rotated.y = pos.y * cos(dimPlaneAngle * 0.5) + pos.x * s2 * 0.3 * sin(uTime * 0.1 + dim * 0.1);
+      rotated.z = pos.x * s1 + pos.z * c1;
+
+      // Phi-phase spiral perturbation
+      float phiWave = sin(uTime * 0.5 + dim * uPhiPhase * 0.1) * 0.15 * integrity;
+      rotated += normalize(rotated) * phiWave;
+
+      // Compute alpha
+      float breathe = 0.5 + 0.5 * sin(uTime * 1.5 + dim * 0.3);
+      vAlpha = integrity * dimActive * uDensity * (0.4 + 0.6 * breathe);
+      vAlpha = clamp(vAlpha, 0.0, 1.0);
+
+      // Glow for high-integrity particles
+      vGlow = integrity * dimActive;
+
+      vec4 mvPosition = modelViewMatrix * vec4(rotated, 1.0);
+      float sizeScale = integrity * dimActive * uDensity;
+      gl_PointSize = aSize * sizeScale * (180.0 / -mvPosition.z);
+      gl_PointSize = clamp(gl_PointSize, 0.5, 12.0);
+      gl_Position = projectionMatrix * mvPosition;
+    }
+  `;
+
+  const fragmentShader = `
+    varying vec3 vColor;
+    varying float vAlpha;
+    varying float vGlow;
+
+    void main() {
+      float d = length(gl_PointCoord - vec2(0.5));
+      if (d > 0.5) discard;
+
+      float core = 1.0 - smoothstep(0.0, 0.2, d);
+      float glow = 1.0 - smoothstep(0.0, 0.5, d);
+
+      vec3 color = vColor * glow + vec3(1.0) * core * vGlow * 0.3;
+      float alpha = vAlpha * glow;
+
+      gl_FragColor = vec4(color, alpha);
+    }
+  `;
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uFold: { value: 1.0 },
+      uExpansion: { value: 0.5 },
+      uPhiPhase: { value: 0.62 },
+      uDensity: { value: 0.8 },
+      uActiveDims: { value: 127.0 },
+      uIntegrity: { value: [0, 0, 0, 0, 0, 0, 0] },
+    },
+    vertexShader,
+    fragmentShader,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+
+  shieldMeshes.particles = new THREE.Points(geo, mat);
+  orbGroup.add(shieldMeshes.particles);
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  p=11  TOROIDAL FIELD LINES — Coherence Visualization           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function initToroidalFields() {
+  // 7 primary toroidal field lines (one per ring), plus 7 inter-ring bridges
+  for (let t = 0; t < 14; t++) {
+    const isInterRing = t >= 7;
+    const ringIdx = t % 7;
+    const ring = SHIELD_RINGS[ringIdx];
+    const points = [];
+
+    if (isInterRing) {
+      // Bridge between ring[i] and ring[i+1]
+      const nextRing = SHIELD_RINGS[(ringIdx + 1) % 7];
+      const r1 = ring.baseRadius;
+      const r2 = nextRing.baseRadius;
+      for (let i = 0; i <= 100; i++) {
+        const u = (i / 100) * TAU;
+        const blend = 0.5 + 0.5 * Math.sin(u * 3);
+        const r = r1 * (1 - blend) + r2 * blend;
+        const verticalAmplitude = (r2 - r1) * 0.8;
+        points.push(new THREE.Vector3(
+          r * Math.cos(u),
+          verticalAmplitude * Math.sin(u * 2) * Math.cos(u),
+          r * Math.sin(u)
+        ));
+      }
+    } else {
+      // Ring-local toroidal loop
+      const majorR = ring.baseRadius;
+      const minorR = 0.15 + ringIdx * 0.05;
+      const wraps = PRIMES[ringIdx] % 5 + 2;
+      for (let i = 0; i <= 120; i++) {
+        const u = (i / 120) * TAU;
+        const r = majorR + minorR * Math.cos(u * wraps);
+        points.push(new THREE.Vector3(
+          r * Math.cos(u),
+          minorR * Math.sin(u * wraps),
+          r * Math.sin(u)
+        ));
+      }
+    }
+
+    const curve = new THREE.CatmullRomCurve3(points, true);
+    const color = isInterRing ? 0xffd700 : ring.hex;
+    const tubeMat = new THREE.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 0.04,
+      blending: THREE.AdditiveBlending,
+    });
+    const tube = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, 80, isInterRing ? 0.008 : 0.012, 4, true),
+      tubeMat
+    );
+    orbGroup.add(tube);
+    shieldMeshes.toroidals.push({ mesh: tube, mat: tubeMat, ringIdx, isInterRing });
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  p=13  DIMENSION THREADS — 127 Thread Lines                     ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function initDimThreads() {
+  // Visible lines from core to each dimension's position on its ring
+  for (let d = 0; d < DIM_COUNT; d++) {
+    const ring = d % 7;
+    const r = SHIELD_RINGS[ring].baseRadius;
+    const theta = d * GOLDEN_ANGLE;
+    const phi = Math.acos(1 - 2 * ((d * PHI) % 1));
+
+    const endPoint = new THREE.Vector3(
+      r * Math.sin(phi) * Math.cos(theta),
+      r * Math.sin(phi) * Math.sin(theta),
+      r * Math.cos(phi)
+    );
+
+    const geo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      endPoint
+    ]);
+    const mat = new THREE.LineBasicMaterial({
+      color: SHIELD_RINGS[ring].hex,
+      transparent: true,
+      opacity: 0.03,
+      blending: THREE.AdditiveBlending,
+    });
+    const line = new THREE.Line(geo, mat);
+    orbGroup.add(line);
+    shieldMeshes.dimThreads.push({ line, mat, dim: d, ring, endPoint });
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  p=17  HUD — Build Interface                                    ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function initHUD() {
+  // Shield bars
+  const barsEl = document.getElementById('shield-bars');
+  barsEl.innerHTML = SHIELD_RINGS.map((r, i) => `
+    <div class="shield-bar">
+      <span class="sname">${r.name}</span>
+      <div class="strack"><div class="sfill" id="sfill-${i}" style="width:0%;background:${r.color}"></div></div>
+      <span class="spct" id="spct-${i}">0%</span>
+    </div>
+  `).join('') + `
+    <div class="ring-detail" id="ring-detail">
+      <div class="rd-row"><span class="rd-label">avg integrity</span><span class="rd-val" id="rd-avg">0%</span></div>
+      <div class="rd-row"><span class="rd-label">fold state</span><span class="rd-val" id="rd-fold">1.00</span></div>
+      <div class="rd-row"><span class="rd-label">coherence</span><span class="rd-val" id="rd-coh">0.00</span></div>
+      <div class="rd-row"><span class="rd-label">ψ level</span><span class="rd-val" id="rd-psi">0.00</span></div>
+    </div>
+  `;
+
+  // Bus bars
+  const busEl = document.getElementById('bus-bars');
+  busEl.innerHTML = BUS_POWER.map((b, i) => `
+    <div class="bus-bar">
+      <span class="bname">${b.name}</span>
+      <div class="btrack"><div class="bfill" id="bfill-${i}" style="width:0%"></div></div>
+    </div>
+  `).join('');
+
+  // Mode buttons
+  const modesEl = document.getElementById('modes-grid');
+  modesEl.innerHTML = Object.entries(SHIELD_MODES).map(([key, mode]) => `
+    <button class="mode-btn${key === 'STANDBY' ? ' active' : ''}" data-mode="${key}" onclick="setShieldMode('${key}')">${mode.label}</button>
+  `).join('');
+
+  // Metrics block
+  const metricsEl = document.getElementById('metrics-block');
+  metricsEl.innerHTML = `
+    <div class="metric-row"><span class="ml">integrity</span><span class="mv" id="mv-integrity">0%</span></div>
+    <div class="metric-row"><span class="ml">coherence</span><span class="mv cyan" id="mv-coherence">0.00</span></div>
+    <div class="metric-row"><span class="ml">fold state</span><span class="mv" id="mv-fold">1.00</span></div>
+    <div class="metric-row"><span class="ml">dimensions</span><span class="mv cyan" id="mv-dims">127 / 127</span></div>
+    <div class="metric-row"><span class="ml">bus power</span><span class="mv" id="mv-buspower">0.0</span></div>
+    <div class="metric-row"><span class="ml">ψ level</span><span class="mv" id="mv-psi">0.000</span></div>
+    <div class="metric-row"><span class="ml">φ ratio</span><span class="mv cyan" id="mv-phi">1.618</span></div>
+    <div class="metric-row"><span class="ml">threat</span><span class="mv green" id="mv-threat">none</span></div>
+    <div class="metric-row"><span class="ml">mode</span><span class="mv" id="mv-mode">STANDBY</span></div>
+  `;
+
+  // Dimension grid
+  const dimGridEl = document.getElementById('dim-grid');
+  let html = '';
+  for (let d = 0; d < DIM_COUNT; d++) {
+    const ring = d % 7;
+    html += `<div class="dim-cell" id="dc-${d}" style="background:${SHIELD_RINGS[ring].color}20"><span class="dim-tip">D${d} → R${ring} (p=${PRIMES[ring]})</span></div>`;
+  }
+  // Fill remaining cells to complete the grid row (127 isn't divisible by 16)
+  const remainder = 16 - (DIM_COUNT % 16);
+  if (remainder < 16) {
+    for (let i = 0; i < remainder; i++) html += `<div class="dim-cell" style="background:transparent"></div>`;
+  }
+  dimGridEl.innerHTML = html;
+
+  // Slider listeners
+  setupSlider('rotation');
+  setupSlider('expansion');
+  setupSlider('dimfold', (v) => {
+    controls.dimFold = Math.round(v * 126 + 1);
+    document.getElementById('sv-dimfold').textContent = controls.dimFold;
+    activeDims = controls.dimFold;
+    document.getElementById('dim-active').textContent = `${controls.dimFold} / 127 dims`;
+  });
+  setupSlider('phi', (v) => {
+    controls.phiPhase = v;
+    document.getElementById('sv-phi').textContent = v.toFixed(2);
+  });
+  setupSlider('density');
+}
+
+function setupSlider(name, customFn) {
+  const el = document.getElementById('sl-' + name);
+  if (!el) return;
+  el.addEventListener('input', () => {
+    const v = el.value / 100;
+    if (customFn) {
+      customFn(v);
+    } else {
+      controls[name] = v;
+      const svEl = document.getElementById('sv-' + name);
+      if (svEl) svEl.textContent = v.toFixed(2);
+    }
+  });
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  SHIELD MODES & FOLD OPERATIONS                                  ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function setShieldMode(mode) {
+  currentMode = mode;
+  const targets = SHIELD_MODES[mode].targets;
+  SHIELD_RINGS.forEach((r, i) => { r.target = targets[i]; });
+
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+
+  const modeEl = document.getElementById('mv-mode');
+  if (modeEl) modeEl.textContent = mode;
+}
+
+function triggerFold() {
+  foldTarget = 0.0;
+  bloomCascadeActive = false;
+}
+
+function triggerUnfold() {
+  foldTarget = 1.0;
+  bloomCascadeActive = false;
+}
+
+function triggerBloom() {
+  bloomCascadeActive = true;
+  bloomCascadeTime = 0;
+  // Bloom = unfold from center outward, ring by ring
+  SHIELD_RINGS.forEach((r, i) => {
+    r.target = 0;
+  });
+}
+
+function triggerBreach() {
+  breachActive = true;
+  breachRing = 2; // GATE is always the breach point
+
+  // Drop GATE integrity
+  SHIELD_RINGS[2].integrity = Math.max(0, SHIELD_RINGS[2].integrity - 0.5);
+  SHIELD_RINGS[3].integrity = Math.max(0, SHIELD_RINGS[3].integrity - 0.25);
+  SHIELD_RINGS[1].integrity = Math.max(0, SHIELD_RINGS[1].integrity - 0.15);
+
+  const alertEl = document.getElementById('breach-alert');
+  alertEl.textContent = '⚠ BREACH — R2 GATE COMPROMISED ⚠';
+  alertEl.style.opacity = '1';
+
+  const threatEl = document.getElementById('mv-threat');
+  if (threatEl) { threatEl.textContent = 'BREACH'; threatEl.className = 'mv red'; }
+
+  setTimeout(() => {
+    alertEl.style.opacity = '0';
+    breachActive = false;
+    if (threatEl) { threatEl.textContent = 'none'; threatEl.className = 'mv green'; }
+  }, 6000);
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ORBIT CONTROLS                                                  ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function onMouseDown(e) {
+  isDragging = true;
+  dragPrevX = e.clientX;
+  dragPrevY = e.clientY;
+  orbitState.autoRotate = false;
+  orbitState.lastInteraction = Date.now();
+}
+function onMouseUp() { isDragging = false; }
+function onMouseMove(e) {
+  if (!isDragging) return;
+  orbitState.theta -= (e.clientX - dragPrevX) * 0.005;
+  orbitState.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbitState.phi - (e.clientY - dragPrevY) * 0.005));
+  dragPrevX = e.clientX;
+  dragPrevY = e.clientY;
+  orbitState.lastInteraction = Date.now();
+}
+function onWheel(e) {
+  e.preventDefault();
+  orbitState.radius = Math.max(3, Math.min(60, orbitState.radius + e.deltaY * 0.03));
+  orbitState.lastInteraction = Date.now();
+  orbitState.autoRotate = false;
+}
+
+let touchStartDist = 0, touchStartRadius = 0;
+function onTouchStart(e) {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    dragPrevX = e.touches[0].clientX;
+    dragPrevY = e.touches[0].clientY;
+    orbitState.autoRotate = false;
+    orbitState.lastInteraction = Date.now();
+  } else if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    touchStartDist = Math.sqrt(dx*dx + dy*dy);
+    touchStartRadius = orbitState.radius;
+  }
+  e.preventDefault();
+}
+function onTouchMove(e) {
+  if (e.touches.length === 1 && isDragging) {
+    const dx = e.touches[0].clientX - dragPrevX;
+    const dy = e.touches[0].clientY - dragPrevY;
+    orbitState.theta -= dx * 0.005;
+    orbitState.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbitState.phi - dy * 0.005));
+    dragPrevX = e.touches[0].clientX;
+    dragPrevY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const scale = touchStartDist / Math.max(dist, 1);
+    orbitState.radius = Math.max(3, Math.min(60, touchStartRadius * scale));
+  }
+  orbitState.lastInteraction = Date.now();
+  e.preventDefault();
+}
+function onTouchEnd() { isDragging = false; }
+
+function updateOrbitCamera() {
+  if (Date.now() - orbitState.lastInteraction > 5000) orbitState.autoRotate = true;
+  if (orbitState.autoRotate) orbitState.theta += 0.001 + controls.rotation * 0.003;
+
+  camera.position.set(
+    orbitState.radius * Math.sin(orbitState.phi) * Math.cos(orbitState.theta),
+    orbitState.radius * Math.cos(orbitState.phi),
+    orbitState.radius * Math.sin(orbitState.phi) * Math.sin(orbitState.theta)
+  );
+  camera.lookAt(0, 0, 0);
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ANIMATION LOOP                                                  ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function animate() {
+  requestAnimationFrame(animate);
+  animFrame++;
+  const time = (Date.now() - startTime) * 0.001;
+
+  updateOrbitCamera();
+
+  // ----- Update fold state -----
+  foldState += (foldTarget - foldState) * 0.02;
+
+  // ----- Bloom cascade -----
+  if (bloomCascadeActive) {
+    bloomCascadeTime += 0.016;
+    // Sequentially activate rings from inside out
+    for (let i = 0; i < 7; i++) {
+      const delay = i * 0.6;
+      if (bloomCascadeTime > delay) {
+        const progress = Math.min(1, (bloomCascadeTime - delay) / 1.5);
+        SHIELD_RINGS[i].target = progress;
+      }
+    }
+    if (bloomCascadeTime > 7 * 0.6 + 1.5) {
+      bloomCascadeActive = false;
+      foldTarget = 1.0;
+    }
+  }
+
+  // ----- Update shield integrity -----
+  let totalIntegrity = 0;
+  const integrityArr = [];
+
+  SHIELD_RINGS.forEach((ring, i) => {
+    ring.integrity += (ring.target - ring.integrity) * 0.04;
+    ring.integrity += ring.regen;
+    ring.integrity = Math.max(0, Math.min(1, ring.integrity));
+
+    // Breach flicker
+    let displayInt = ring.integrity;
+    if (breachActive && (i === breachRing || i === breachRing - 1 || i === breachRing + 1)) {
+      displayInt += (Math.random() - 0.5) * 0.2;
+      displayInt = Math.max(0, displayInt);
+    }
+
+    totalIntegrity += ring.integrity;
+    integrityArr.push(ring.integrity);
+
+    // ----- Update ring visuals -----
+    const rm = shieldMeshes.rings[i];
+    if (!rm) return;
+
+    const baseOpacity = displayInt;
+
+    // Torus 1: primary
+    rm.torusMat.opacity = 0.05 + baseOpacity * 0.55;
+    rm.torusMat.emissiveIntensity = baseOpacity * 0.4;
+
+    // Torus 2: perpendicular
+    rm.torus2Mat.opacity = 0.02 + baseOpacity * 0.25;
+    rm.torus.rotation.x += (0.002 + baseOpacity * 0.008) * (i % 2 === 0 ? 1 : -1);
+    rm.torus.rotation.z += (0.001 + baseOpacity * 0.004) * (i % 3 === 0 ? 1 : -1);
+    rm.torus2.rotation.y += (0.003 + baseOpacity * 0.006) * (i % 2 === 0 ? -1 : 1);
+    rm.torus2.rotation.z += 0.001;
+
+    // Torus 3: tilted
+    rm.torus3Mat.opacity = 0.01 + baseOpacity * 0.15;
+    rm.torus3.rotation.x += 0.001 * (i + 1);
+    rm.torus3.rotation.y -= 0.0005 * (i + 1);
+
+    // Ico wireframe
+    rm.icoMat.opacity = 0.02 + baseOpacity * 0.12;
+    rm.ico.rotation.y += 0.0008 * (i + 1) * displayInt;
+    rm.ico.rotation.x += 0.0003 * (7 - i) * displayInt;
+
+    // Shell
+    rm.shellMat.opacity = baseOpacity * 0.04;
+
+    // Scale by fold state
+    const scaleFactor = 0.3 + foldState * 0.7;
+    rm.group.scale.setScalar(scaleFactor);
+
+    // Expansion control
+    const expansionFactor = 0.8 + controls.expansion * 0.4;
+    rm.group.scale.multiplyScalar(expansionFactor);
+  });
+
+  // ----- Core -----
+  if (shieldMeshes.core) {
+    const avgInt = totalIntegrity / 7;
+    const pulse = 0.9 + Math.sin(time * 2) * 0.1 * avgInt;
+    shieldMeshes.core.scale.setScalar(pulse);
+    shieldMeshes.core.material.emissiveIntensity = 0.3 + avgInt * 0.5;
+    shieldMeshes.core.material.opacity = 0.5 + avgInt * 0.4;
+
+    const wire = orbGroup.getObjectByName('coreWire');
+    if (wire) {
+      wire.rotation.y += 0.003;
+      wire.rotation.x += 0.001;
+      wire.scale.setScalar(pulse * 1.1);
+      wire.material.opacity = 0.1 + avgInt * 0.2;
+    }
+
+    const coreLight = orbGroup.getObjectByName('coreLight');
+    if (coreLight) coreLight.intensity = 1 + avgInt * 3;
+
+    const softLight = orbGroup.getObjectByName('softLight');
+    if (softLight) softLight.intensity = 0.5 + avgInt * 2;
+  }
+
+  // ----- Particles -----
+  if (shieldMeshes.particles) {
+    const u = shieldMeshes.particles.material.uniforms;
+    u.uTime.value = time;
+    u.uFold.value = foldState;
+    u.uExpansion.value = controls.expansion;
+    u.uPhiPhase.value = controls.phiPhase;
+    u.uDensity.value = controls.density;
+    u.uActiveDims.value = controls.dimFold;
+    u.uIntegrity.value = integrityArr;
+  }
+
+  // ----- Toroidal field lines -----
+  const coherence = computeCoherence(integrityArr);
+  shieldMeshes.toroidals.forEach((t) => {
+    const ringInt = integrityArr[t.ringIdx];
+    if (t.isInterRing) {
+      t.mat.opacity = coherence * 0.08;
+    } else {
+      t.mat.opacity = 0.01 + ringInt * 0.06;
+    }
+    t.mesh.rotation.y += 0.0005 * (t.ringIdx + 1);
+  });
+
+  // ----- Dimension threads -----
+  shieldMeshes.dimThreads.forEach((dt) => {
+    const isActive = dt.dim < controls.dimFold;
+    const ringInt = integrityArr[dt.ring];
+    dt.mat.opacity = isActive ? (0.01 + ringInt * 0.04) * foldState : 0;
+  });
+
+  // ----- Dimension energy -----
+  for (let d = 0; d < DIM_COUNT; d++) {
+    const ring = d % 7;
+    dimEnergy[d] += (integrityArr[ring] - dimEnergy[d]) * 0.05;
+    dimPhase[d] += 0.02 * PRIMES[ring] / 17;
+  }
+
+  // ----- Update HUD (every 3rd frame) -----
+  if (animFrame % 3 === 0) {
+    updateHUD(totalIntegrity, integrityArr, coherence, time);
+  }
+
+  // ----- Clock (every 30 frames) -----
+  if (animFrame % 30 === 0) {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+    const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+    const s = String(elapsed % 60).padStart(2, '0');
+    document.getElementById('sys-clock').textContent = `${h}:${m}:${s}`;
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  METRICS & HUD                                                   ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function computeCoherence(integrityArr) {
+  let coherence = 0;
+  for (let i = 0; i < 6; i++) {
+    const a = Math.max(integrityArr[i], 0.001);
+    const b = Math.max(integrityArr[i+1], 0.001);
+    const ratio = Math.max(a, b) / Math.min(a, b);
+    coherence += 1 - Math.min(1, Math.abs(ratio - PHI) / PHI);
+  }
+  return Math.max(0, coherence / 6);
+}
+
+function updateHUD(totalIntegrity, integrityArr, coherence, time) {
+  const avgInt = totalIntegrity / 7;
+
+  // Shield bars
+  SHIELD_RINGS.forEach((ring, i) => {
+    const pct = Math.round(ring.integrity * 100);
+    const fillEl = document.getElementById('sfill-' + i);
+    const pctEl = document.getElementById('spct-' + i);
+    if (fillEl) fillEl.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+  });
+
+  // Bus bars
+  BUS_POWER.forEach((bus, i) => {
+    bus.power += ((integrityArr[bus.feeds[0]] + integrityArr[bus.feeds[1]]) / 2 - bus.power) * 0.08;
+    const fillEl = document.getElementById('bfill-' + i);
+    if (fillEl) fillEl.style.width = Math.round(bus.power * 100) + '%';
+  });
+
+  // Ring detail
+  const rdAvg = document.getElementById('rd-avg');
+  const rdFold = document.getElementById('rd-fold');
+  const rdCoh = document.getElementById('rd-coh');
+  const rdPsi = document.getElementById('rd-psi');
+  if (rdAvg) rdAvg.textContent = Math.round(avgInt * 100) + '%';
+  if (rdFold) rdFold.textContent = foldState.toFixed(2);
+  if (rdCoh) rdCoh.textContent = coherence.toFixed(3);
+
+  const psiLevel = integrityArr[6] * 0.3 + integrityArr[5] * 0.3 + integrityArr[4] * 0.2 + coherence * 0.2;
+  if (rdPsi) rdPsi.textContent = psiLevel.toFixed(3);
+
+  // Right panel metrics
+  const mvIntegrity = document.getElementById('mv-integrity');
+  const mvCoherence = document.getElementById('mv-coherence');
+  const mvFold = document.getElementById('mv-fold');
+  const mvDims = document.getElementById('mv-dims');
+  const mvBus = document.getElementById('mv-buspower');
+  const mvPsi = document.getElementById('mv-psi');
+  const mvPhi = document.getElementById('mv-phi');
+
+  if (mvIntegrity) mvIntegrity.textContent = Math.round(avgInt * 100) + '%';
+  if (mvCoherence) mvCoherence.textContent = coherence.toFixed(3);
+  if (mvFold) mvFold.textContent = foldState.toFixed(2);
+  if (mvDims) mvDims.textContent = `${controls.dimFold} / 127`;
+  if (mvBus) mvBus.textContent = BUS_POWER.reduce((s, b) => s + b.power, 0).toFixed(2);
+  if (mvPsi) mvPsi.textContent = psiLevel.toFixed(3);
+  if (mvPhi) mvPhi.textContent = (avgInt * PHI).toFixed(3);
+
+  // Dimension grid (every 9th frame for perf)
+  if (animFrame % 9 === 0) {
+    for (let d = 0; d < DIM_COUNT; d++) {
+      const cell = document.getElementById('dc-' + d);
+      if (!cell) continue;
+      const ring = d % 7;
+      const isActive = d < controls.dimFold;
+      const energy = isActive ? dimEnergy[d] : 0;
+      const hex = SHIELD_RINGS[ring].color;
+      // Parse hex to rgb and apply alpha
+      const alpha = Math.round(energy * 0.7 * 255).toString(16).padStart(2, '0');
+      cell.style.background = isActive ? hex + alpha : 'rgba(255,255,255,0.01)';
+    }
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  UTILITIES                                                       ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  LAUNCH                                                          ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+document.getElementById('boot-enter').addEventListener('click', enterFold);
+runBoot().catch(err => console.error('Boot failed:', err));
+</script>
+</body>
+</html>
