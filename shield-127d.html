@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>127D Shield Fold — Audio Fabric</title>
+<title>127D Shield Fold — Voice Controlled — Audio Fabric</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
@@ -23,7 +23,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
 .boot-phase.done{opacity:0.8;color:#4f8}
 .boot-phase.fail{opacity:1;color:#f44}
 .boot-phase .prime{color:#ffd700;font-weight:700;width:36px;text-align:right}
-.boot-phase .label{width:240px}
+.boot-phase .label{width:260px}
 .boot-phase .status{width:20px;text-align:center;font-size:13px}
 #boot-enter{margin-top:36px;padding:12px 36px;background:transparent;border:1px solid rgba(255,215,0,0.3);color:#ffd700;font-family:'JetBrains Mono',monospace;font-size:13px;cursor:pointer;opacity:0;transition:opacity 0.6s;pointer-events:none;letter-spacing:1px}
 #boot-enter.visible{opacity:1;pointer-events:auto}
@@ -37,6 +37,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
 #top-bar .sys-right{display:flex;gap:16px;align-items:center}
 #top-bar .clock{color:rgba(255,248,231,0.35)}
 #top-bar .dim-counter{color:#0af}
+#top-bar .voice-mode{font-weight:700;letter-spacing:1px}
+#top-bar .voice-mode.sustained{color:#00ccff}
+#top-bar .voice-mode.pulsed{color:#ff6600}
+#top-bar .voice-mode.silent{color:#cc44ff}
 
 /* LEFT — RING INTEGRITY */
 #left-panel{top:32px;left:0;bottom:0;width:200px;padding:14px;overflow-y:auto;border-right:1px solid rgba(255,215,0,0.08)}
@@ -44,7 +48,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
 .shield-bar{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:10px}
 .shield-bar .sname{width:72px;text-align:right;color:rgba(255,248,231,0.4);font-size:9px}
 .shield-bar .strack{flex:1;height:5px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden}
-.shield-bar .sfill{height:100%;border-radius:3px;transition:width 0.15s}
+.shield-bar .sfill{height:100%;border-radius:3px;transition:width 0.1s}
 .shield-bar .spct{width:28px;text-align:right;font-size:9px;color:rgba(255,248,231,0.5)}
 .ring-detail{margin-top:6px;padding:6px 0;border-top:1px solid rgba(255,255,255,0.03)}
 .ring-detail .rd-row{display:flex;justify-content:space-between;font-size:9px;padding:2px 0}
@@ -54,9 +58,18 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
 .bus-bar{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:9px}
 .bus-bar .bname{width:48px;text-align:right;color:rgba(255,248,231,0.2)}
 .bus-bar .btrack{flex:1;height:3px;background:rgba(255,255,255,0.03);border-radius:2px;overflow:hidden}
-.bus-bar .bfill{height:100%;background:#ffd700;border-radius:2px;transition:width 0.2s}
+.bus-bar .bfill{height:100%;background:#ffd700;border-radius:2px;transition:width 0.15s}
 .fold-equation{margin-top:16px;padding:10px;background:rgba(255,215,0,0.03);border:1px solid rgba(255,215,0,0.06);border-radius:4px;font-size:9px;color:rgba(255,248,231,0.3);text-align:center;line-height:1.8}
 .fold-equation .eq-gold{color:#ffd700}
+
+/* VOICE SECTION */
+.voice-section{margin-top:14px}
+.voice-meter{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.voice-meter .vm-label{width:48px;text-align:right;font-size:9px;color:rgba(255,248,231,0.25)}
+.voice-meter .vm-track{flex:1;height:4px;background:rgba(255,255,255,0.04);border-radius:2px;overflow:hidden}
+.voice-meter .vm-fill{height:100%;border-radius:2px;transition:width 0.08s}
+.waveform-box{margin-top:8px;height:40px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);border-radius:3px;overflow:hidden}
+.waveform-box canvas{width:100%;height:100%}
 
 /* RIGHT — FOLD CONTROLS & METRICS */
 #right-panel{top:32px;right:0;bottom:0;width:220px;padding:14px;overflow-y:auto;border-left:1px solid rgba(255,215,0,0.08)}
@@ -64,6 +77,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
 .mode-btn{padding:6px 4px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);color:rgba(255,248,231,0.4);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:8px;border-radius:3px;text-transform:uppercase;letter-spacing:1px;transition:all 0.2s;text-align:center}
 .mode-btn:hover{border-color:rgba(255,215,0,0.3);color:#ffd700}
 .mode-btn.active{background:rgba(255,215,0,0.1);border-color:rgba(255,215,0,0.4);color:#ffd700}
+.mode-btn.voice-active{background:rgba(0,204,255,0.1);border-color:rgba(0,204,255,0.4);color:#0cf}
 .metric-block{margin-bottom:12px}
 .metric-row{display:flex;justify-content:space-between;padding:3px 0;font-size:10px;border-bottom:1px solid rgba(255,255,255,0.02)}
 .metric-row .ml{color:rgba(255,248,231,0.3)}
@@ -87,7 +101,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
 /* DIM MAP */
 .dim-map{margin-top:14px}
 .dim-grid{display:grid;grid-template-columns:repeat(16,1fr);gap:1px;margin-top:6px}
-.dim-cell{width:100%;aspect-ratio:1;border-radius:1px;transition:background 0.2s;cursor:default;position:relative}
+.dim-cell{width:100%;aspect-ratio:1;border-radius:1px;transition:background 0.15s;cursor:default;position:relative}
 .dim-cell:hover{outline:1px solid rgba(255,215,0,0.5)}
 .dim-cell .dim-tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:rgba(6,4,14,0.95);border:1px solid rgba(255,215,0,0.2);padding:3px 6px;font-size:8px;white-space:nowrap;z-index:10;border-radius:2px;pointer-events:none}
 .dim-cell:hover .dim-tip{display:block}
@@ -113,30 +127,31 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
 <!-- ===== BOOT SCREEN ===== -->
 <div id="boot-screen">
   <div class="boot-logo">127D Shield Fold</div>
-  <div class="boot-sub">Audio Fabric &middot; Prime Frequency Architecture</div>
+  <div class="boot-sub">Voice-Controlled &middot; Prime Frequency Architecture</div>
   <div id="boot-phases">
-    <div class="boot-phase" data-phase="2"><span class="prime">p= 2</span><span class="label">ground plane — diaphragm engine</span><span class="status">·</span></div>
-    <div class="boot-phase" data-phase="3"><span class="prime">p= 3</span><span class="label">sensory ring — laryngeal sensor</span><span class="status">·</span></div>
-    <div class="boot-phase" data-phase="5"><span class="prime">p= 5</span><span class="label">gate shield — breath gate</span><span class="status">·</span></div>
-    <div class="boot-phase" data-phase="7"><span class="prime">p= 7</span><span class="label">affect layer — thoracic resonator</span><span class="status">·</span></div>
-    <div class="boot-phase" data-phase="11"><span class="prime">p=11</span><span class="label">executive ring — nasopharyngeal ERP</span><span class="status">·</span></div>
-    <div class="boot-phase" data-phase="13"><span class="prime">p=13</span><span class="label">identity shell — oral shaper</span><span class="status">·</span></div>
-    <div class="boot-phase" data-phase="17"><span class="prime">p=17</span><span class="label">observer field — intent / silence</span><span class="status">·</span></div>
+    <div class="boot-phase" data-phase="2"><span class="prime">p= 2</span><span class="label">diaphragm engine — request microphone</span><span class="status">&middot;</span></div>
+    <div class="boot-phase" data-phase="3"><span class="prime">p= 3</span><span class="label">laryngeal sensor — init FFT analyser</span><span class="status">&middot;</span></div>
+    <div class="boot-phase" data-phase="5"><span class="prime">p= 5</span><span class="label">breath gate — calibrate noise floor</span><span class="status">&middot;</span></div>
+    <div class="boot-phase" data-phase="7"><span class="prime">p= 7</span><span class="label">thoracic resonator — init formant tracker</span><span class="status">&middot;</span></div>
+    <div class="boot-phase" data-phase="11"><span class="prime">p=11</span><span class="label">nasopharyngeal ERP — init shield geometry</span><span class="status">&middot;</span></div>
+    <div class="boot-phase" data-phase="13"><span class="prime">p=13</span><span class="label">oral shaper — init harmonic engine</span><span class="status">&middot;</span></div>
+    <div class="boot-phase" data-phase="17"><span class="prime">p=17</span><span class="label">intent observer — deploy interface</span><span class="status">&middot;</span></div>
   </div>
-  <button id="boot-enter">enter the fold →</button>
-  <div class="boot-fold">fold(voice) = 2 · 3 · 5 · 7 · 11 · 13 · 17 = 510,510</div>
+  <button id="boot-enter">enter the fold &rarr;</button>
+  <div class="boot-fold">fold(voice) = 2 &middot; 3 &middot; 5 &middot; 7 &middot; 11 &middot; 13 &middot; 17 = 510,510</div>
 </div>
 
 <!-- ===== TOP BAR ===== -->
 <div id="top-bar" class="panel" style="display:none">
   <span class="sys-name">127D SHIELD FOLD</span>
   <div class="sys-right">
+    <span class="voice-mode silent" id="voice-mode">SILENT</span>
     <span class="dim-counter" id="dim-active">127 / 127 dims</span>
     <span class="clock" id="sys-clock">00:00:00</span>
   </div>
 </div>
 
-<!-- ===== LEFT PANEL — SHIELD INTEGRITY ===== -->
+<!-- ===== LEFT PANEL ===== -->
 <div id="left-panel" class="panel" style="display:none">
   <div class="panel-title">shield integrity</div>
   <div id="shield-bars"></div>
@@ -146,9 +161,19 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
     <div id="bus-bars"></div>
   </div>
 
+  <div class="voice-section">
+    <div class="panel-title">voice analysis</div>
+    <div class="voice-meter"><span class="vm-label">F0</span><div class="vm-track"><div class="vm-fill" id="vm-f0" style="background:#ff8800;width:0%"></div></div></div>
+    <div class="voice-meter"><span class="vm-label">centroid</span><div class="vm-track"><div class="vm-fill" id="vm-centroid" style="background:#ffcc00;width:0%"></div></div></div>
+    <div class="voice-meter"><span class="vm-label">F1</span><div class="vm-track"><div class="vm-fill" id="vm-f1" style="background:#44ff66;width:0%"></div></div></div>
+    <div class="voice-meter"><span class="vm-label">F2</span><div class="vm-track"><div class="vm-fill" id="vm-f2" style="background:#00ccff;width:0%"></div></div></div>
+    <div class="voice-meter"><span class="vm-label">RMS</span><div class="vm-track"><div class="vm-fill" id="vm-rms" style="background:#ffd700;width:0%"></div></div></div>
+    <div class="waveform-box"><canvas id="waveform-canvas"></canvas></div>
+  </div>
+
   <div class="fold-equation">
     <span class="eq-gold">fold</span>(voice) =<br>
-    <span class="eq-gold">2</span> × <span class="eq-gold">3</span> × <span class="eq-gold">5</span> × <span class="eq-gold">7</span> × <span class="eq-gold">11</span> × <span class="eq-gold">13</span> × <span class="eq-gold">17</span><br>
+    <span class="eq-gold">2</span> &times; <span class="eq-gold">3</span> &times; <span class="eq-gold">5</span> &times; <span class="eq-gold">7</span> &times; <span class="eq-gold">11</span> &times; <span class="eq-gold">13</span> &times; <span class="eq-gold">17</span><br>
     = <span class="eq-gold">510,510</span>
   </div>
 
@@ -158,7 +183,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
   </div>
 </div>
 
-<!-- ===== RIGHT PANEL — CONTROLS & METRICS ===== -->
+<!-- ===== RIGHT PANEL ===== -->
 <div id="right-panel" class="panel" style="display:none">
   <div class="panel-title">shield mode</div>
   <div class="modes-grid" id="modes-grid"></div>
@@ -184,7 +209,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
       <span class="sv" id="sv-dimfold">127</span>
     </div>
     <div class="fold-slider-row">
-      <label>phase-φ</label>
+      <label>phase-&phi;</label>
       <input type="range" id="sl-phi" min="0" max="100" value="62">
       <span class="sv" id="sv-phi">0.62</span>
     </div>
@@ -194,7 +219,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
       <span class="sv" id="sv-density">0.80</span>
     </div>
     <button class="fold-btn" onclick="triggerFold()">EXECUTE FOLD</button>
-    <button class="fold-btn" onclick="triggerUnfold()">UNFOLD → 127D</button>
+    <button class="fold-btn" onclick="triggerUnfold()">UNFOLD &rarr; 127D</button>
     <button class="fold-btn" onclick="triggerBloom()">BLOOM CASCADE</button>
     <button class="fold-btn danger" onclick="triggerBreach()">SIMULATE BREACH</button>
   </div>
@@ -208,13 +233,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
 
 <script>
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  127D SHIELD FOLD — Audio Fabric                                ║
+// ║  127D SHIELD FOLD — VOICE CONTROLLED                            ║
 // ║  fold(voice) = 2 · 3 · 5 · 7 · 11 · 13 · 17 = 510,510        ║
 // ║                                                                  ║
-// ║  127 dimensions distributed across 7 prime rings.                ║
-// ║  Each ring is a resonance zone. Each dimension is a thread.      ║
-// ║  The fold collapses 127D → 3D through 7 prime factors.          ║
-// ║  Remove any prime and the fold collapses.                        ║
+// ║  The vocal tract IS the fold operator.                           ║
+// ║  127 dimensions. 7 prime rings. Your voice controls all of it.   ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
 'use strict';
@@ -226,20 +249,23 @@ const PRIMES = [2, 3, 5, 7, 11, 13, 17];
 const FOLD_PRODUCT = 510510;
 const DIM_COUNT = 127;
 const PARTICLE_COUNT = 12000;
+const FFT_SIZE = 2048;
+const SAMPLE_RATE = 44100;
 
 // ===== SHIELD RING DEFINITIONS =====
 const SHIELD_RINGS = [
-  { name: 'GROUND',    prime: 2,  color: '#ff2244', hex: 0xff2244, baseRadius: 1.0,  integrity: 0, target: 0, regen: 0.002, vagal: 'Diaphragm — vagal trunk' },
-  { name: 'SENSORY',   prime: 3,  color: '#ff8800', hex: 0xff8800, baseRadius: 1.45, integrity: 0, target: 0, regen: 0.002, vagal: 'Larynx — recurrent laryngeal' },
-  { name: 'GATE',      prime: 5,  color: '#ffcc00', hex: 0xffcc00, baseRadius: 1.90, integrity: 0, target: 0, regen: 0.003, vagal: 'Breath — vagal brake' },
-  { name: 'AFFECT',    prime: 7,  color: '#44ff66', hex: 0x44ff66, baseRadius: 2.35, integrity: 0, target: 0, regen: 0.002, vagal: 'Thorax — vagal trunk' },
-  { name: 'EXECUTIVE', prime: 11, color: '#00ccff', hex: 0x00ccff, baseRadius: 2.80, integrity: 0, target: 0, regen: 0.002, vagal: 'Nasopharynx — pharyngeal branch' },
-  { name: 'IDENTITY',  prime: 13, color: '#8855ff', hex: 0x8855ff, baseRadius: 3.25, integrity: 0, target: 0, regen: 0.002, vagal: 'Oral cavity — vowel shaping' },
-  { name: 'OBSERVER',  prime: 17, color: '#cc44ff', hex: 0xcc44ff, baseRadius: 3.70, integrity: 0, target: 0, regen: 0.003, vagal: 'Intent — the space between' },
+  { name: 'GROUND',    prime: 2,  color: '#ff2244', hex: 0xff2244, baseRadius: 1.0,  integrity: 0, target: 0, regen: 0.001, vagal: 'Diaphragm' },
+  { name: 'SENSORY',   prime: 3,  color: '#ff8800', hex: 0xff8800, baseRadius: 1.45, integrity: 0, target: 0, regen: 0.001, vagal: 'Larynx' },
+  { name: 'GATE',      prime: 5,  color: '#ffcc00', hex: 0xffcc00, baseRadius: 1.90, integrity: 0, target: 0, regen: 0.001, vagal: 'Breath' },
+  { name: 'AFFECT',    prime: 7,  color: '#44ff66', hex: 0x44ff66, baseRadius: 2.35, integrity: 0, target: 0, regen: 0.001, vagal: 'Thorax' },
+  { name: 'EXECUTIVE', prime: 11, color: '#00ccff', hex: 0x00ccff, baseRadius: 2.80, integrity: 0, target: 0, regen: 0.001, vagal: 'Nasopharynx' },
+  { name: 'IDENTITY',  prime: 13, color: '#8855ff', hex: 0x8855ff, baseRadius: 3.25, integrity: 0, target: 0, regen: 0.001, vagal: 'Oral cavity' },
+  { name: 'OBSERVER',  prime: 17, color: '#cc44ff', hex: 0xcc44ff, baseRadius: 3.70, integrity: 0, target: 0, regen: 0.001, vagal: 'Intent' },
 ];
 
 // ===== SHIELD MODES =====
 const SHIELD_MODES = {
+  VOICE:      { label: 'Voice',      targets: null }, // driven by mic
   STANDBY:    { label: 'Standby',    targets: [0.30, 0.30, 0.30, 0.30, 0.30, 0.30, 0.30] },
   PATROL:     { label: 'Patrol',     targets: [0.40, 0.75, 0.60, 0.40, 0.50, 0.40, 0.60] },
   ALERT:      { label: 'Alert',      targets: [0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85] },
@@ -248,24 +274,23 @@ const SHIELD_MODES = {
   MIRROR:     { label: 'Mirror',     targets: [0.40, 0.40, 1.00, 0.40, 0.40, 0.40, 1.00] },
   CASCADE:    { label: 'Cascade',    targets: [1.00, 0.86, 0.72, 0.58, 0.44, 0.30, 0.16] },
   BLOOM:      { label: 'Bloom',      targets: [0.16, 0.30, 0.44, 0.58, 0.72, 0.86, 1.00] },
-  PHI_SPIRAL: { label: 'φ Spiral',   targets: [0] }, // computed dynamically
+  PHI_SPIRAL: { label: 'Phi Spiral', targets: [0] },
   COLLAPSE:   { label: 'Collapse',   targets: [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00] },
 };
-// Compute phi spiral targets
-SHIELD_MODES.PHI_SPIRAL.targets = PRIMES.map((p, i) => (1 / Math.pow(PHI, i)) );
+SHIELD_MODES.PHI_SPIRAL.targets = PRIMES.map(function(p, i) { return 1 / Math.pow(PHI, i); });
 
 const BUS_POWER = [
-  { name: 'BUS-α', feeds: [0, 1], power: 0 },
-  { name: 'BUS-β', feeds: [1, 2], power: 0 },
-  { name: 'BUS-γ', feeds: [2, 3], power: 0 },
-  { name: 'BUS-δ', feeds: [3, 4], power: 0 },
-  { name: 'BUS-ε', feeds: [4, 5], power: 0 },
-  { name: 'BUS-ζ', feeds: [5, 6], power: 0 },
+  { name: 'BUS-a', feeds: [0, 1], power: 0 },
+  { name: 'BUS-b', feeds: [1, 2], power: 0 },
+  { name: 'BUS-g', feeds: [2, 3], power: 0 },
+  { name: 'BUS-d', feeds: [3, 4], power: 0 },
+  { name: 'BUS-e', feeds: [4, 5], power: 0 },
+  { name: 'BUS-z', feeds: [5, 6], power: 0 },
 ];
 
-// ===== STATE =====
-let currentMode = 'STANDBY';
-let foldState = 1.0;          // 1 = fully expanded (127D), 0 = fully folded
+// ===== GLOBAL STATE =====
+let currentMode = 'VOICE';   // default to voice control
+let foldState = 1.0;
 let foldTarget = 1.0;
 let bloomCascadeActive = false;
 let bloomCascadeTime = 0;
@@ -275,13 +300,53 @@ let startTime = Date.now();
 let animFrame = 0;
 let activeDims = DIM_COUNT;
 
-// Fold controls
 let controls = {
   rotation: 0.30,
   expansion: 0.50,
   dimFold: 127,
   phiPhase: 0.62,
   density: 0.80,
+};
+
+// ===== AUDIO STATE =====
+let audioCtx, analyser, micStream, micSource;
+let timeData, freqData;
+let oscillators = [];
+let oscGains = [];
+let masterGain;
+
+const voice = {
+  ringActivity: new Float32Array(7),
+  ringSmoothed: new Float32Array(7),
+  mode: 'SILENT',
+  f0: 0,
+  spectralCentroid: 0,
+  formants: { f1: 0, f2: 0 },
+  rms: 0,
+  noiseFloor: 0.008,
+  isSounding: false,
+  soundStartTime: 0,
+  silenceStartTime: Date.now(),
+  silenceDuration: 0,
+  pulseRate: 0,
+  onsetTimes: [],
+  lastAmplitude: 0,
+  amplitudeHistory: [],
+  breathPhase: 'exhale',
+  breathCycleStart: 0,
+  inhaleTime: 0,
+  exhaleTime: 0,
+  exhaleRatio: 1.0,
+  breathCount: 0,
+  breathStartTime: 0,
+  breathRate: 0,
+  currentVowel: '',
+  vowelHistory: new Set(),
+  vowelHistoryTimer: null,
+  sweep: 0,
+  vagalTone: 0,
+  coherence: 0,
+  psiLevel: 0,
 };
 
 // ===== THREE.JS =====
@@ -292,72 +357,579 @@ let orbitState = { theta: Math.PI / 4, phi: Math.PI / 3, radius: 14, autoRotate:
 let isDragging = false, dragPrevX = 0, dragPrevY = 0;
 
 // ===== DIMENSION MAP =====
-// Each of 127 dimensions maps to a ring: dim % 7
-// Dimension energy tracks how "active" each dimension thread is
 const dimEnergy = new Float32Array(DIM_COUNT);
 const dimPhase = new Float32Array(DIM_COUNT);
-for (let i = 0; i < DIM_COUNT; i++) {
-  dimEnergy[i] = 0.3 + Math.random() * 0.2;
-  dimPhase[i] = Math.random() * TAU;
+for (var _i = 0; _i < DIM_COUNT; _i++) {
+  dimEnergy[_i] = 0.1 + Math.random() * 0.1;
+  dimPhase[_i] = Math.random() * TAU;
 }
+
+// Waveform canvas
+let waveformCtx = null;
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  BOOT SEQUENCE                                                   ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
 async function runBoot() {
-  const phases = document.querySelectorAll('.boot-phase');
+  var phases = document.querySelectorAll('.boot-phase');
 
-  for (let i = 0; i < PRIMES.length; i++) {
-    const el = phases[i];
+  for (var i = 0; i < PRIMES.length; i++) {
+    var el = phases[i];
     el.classList.add('active');
-    el.querySelector('.status').textContent = '⟳';
-    await sleep(250 + Math.random() * 200);
+    el.querySelector('.status').textContent = '\u27F3';
+    await sleep(200 + Math.random() * 200);
 
     try {
       switch (i) {
-        case 0: initScene(); break;
-        case 1: initCore(); break;
-        case 2: initShieldRings(); break;
-        case 3: initParticleField(); break;
-        case 4: initToroidalFields(); break;
-        case 5: initDimThreads(); break;
+        case 0: await initMicrophone(); break;
+        case 1: initAudioAnalyser(); break;
+        case 2: await calibrateNoiseFloor(); break;
+        case 3: initScene(); break;
+        case 4: initCore(); initShieldRings(); initParticleField(); initToroidalFields(); initDimThreads(); break;
+        case 5: initHarmonicEngine(); break;
         case 6: initHUD(); break;
       }
       el.classList.remove('active');
       el.classList.add('done');
-      el.querySelector('.status').textContent = '✓';
+      el.querySelector('.status').textContent = '\u2713';
     } catch(err) {
-      console.error(`Phase p=${PRIMES[i]} failed:`, err);
+      console.error('Phase p=' + PRIMES[i] + ' failed:', err);
       el.classList.remove('active');
       el.classList.add('fail');
-      el.querySelector('.status').textContent = '✗';
+      el.querySelector('.status').textContent = '\u2717';
     }
   }
 
   document.getElementById('boot-enter').classList.add('visible');
 }
 
+async function initMicrophone() {
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+  });
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
+}
+
+function initAudioAnalyser() {
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = FFT_SIZE;
+  analyser.smoothingTimeConstant = 0.8;
+  micSource = audioCtx.createMediaStreamSource(micStream);
+  micSource.connect(analyser);
+  timeData = new Float32Array(analyser.fftSize);
+  freqData = new Float32Array(analyser.frequencyBinCount);
+}
+
+async function calibrateNoiseFloor() {
+  return new Promise(function(resolve) {
+    var samples = 0, sum = 0;
+    var interval = setInterval(function() {
+      analyser.getFloatTimeDomainData(timeData);
+      var rms = 0;
+      for (var j = 0; j < timeData.length; j++) rms += timeData[j] * timeData[j];
+      rms = Math.sqrt(rms / timeData.length);
+      sum += rms;
+      samples++;
+      if (samples >= 12) {
+        clearInterval(interval);
+        voice.noiseFloor = (sum / samples) * 1.5 + 0.003;
+        resolve();
+      }
+    }, 50);
+  });
+}
+
 function enterFold() {
   document.getElementById('boot-screen').classList.add('hidden');
-  setTimeout(() => { document.getElementById('boot-screen').style.display = 'none'; }, 1200);
+  setTimeout(function() { document.getElementById('boot-screen').style.display = 'none'; }, 1200);
   document.getElementById('top-bar').style.display = '';
   document.getElementById('left-panel').style.display = '';
   document.getElementById('right-panel').style.display = '';
-  setShieldMode('STANDBY');
+
+  // Init waveform canvas
+  var wc = document.getElementById('waveform-canvas');
+  wc.width = wc.parentElement.clientWidth;
+  wc.height = wc.parentElement.clientHeight;
+  waveformCtx = wc.getContext('2d');
+
+  voice.breathStartTime = Date.now();
+  voice.silenceStartTime = Date.now();
+  setShieldMode('VOICE');
   animate();
 }
 
+
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  p=2  SCENE — Ground Plane                                      ║
+// ║  VOICE ANALYSIS PIPELINE                                         ║
+// ║  Mic -> FFT -> 7 Detection Pipelines -> Ring Activity Vector     ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function analyzeVoice() {
+  analyser.getFloatTimeDomainData(timeData);
+  analyser.getFloatFrequencyData(freqData);
+
+  // RMS amplitude
+  var rms = 0;
+  for (var i = 0; i < timeData.length; i++) rms += timeData[i] * timeData[i];
+  rms = Math.sqrt(rms / timeData.length);
+  voice.rms = rms;
+
+  var isSounding = rms > voice.noiseFloor;
+  var now = Date.now();
+
+  // Sound/silence transitions
+  if (isSounding && !voice.isSounding) {
+    voice.isSounding = true;
+    voice.soundStartTime = now;
+    voice.silenceDuration = (now - voice.silenceStartTime) / 1000;
+  } else if (!isSounding && voice.isSounding) {
+    voice.isSounding = false;
+    voice.silenceStartTime = now;
+  }
+  if (!isSounding) {
+    voice.silenceDuration = (now - voice.silenceStartTime) / 1000;
+  }
+
+  // F0 detection
+  voice.f0 = detectF0(timeData, audioCtx.sampleRate);
+
+  // Spectral centroid
+  voice.spectralCentroid = computeSpectralCentroid(freqData, audioCtx.sampleRate);
+
+  // Formants
+  voice.formants = estimateFormants(freqData, audioCtx.sampleRate);
+
+  // Onset detection
+  detectOnsets(rms, now);
+
+  // Breath phase
+  detectBreathPhase(rms, now);
+
+  // ===== 7 RING DETECTION PIPELINES =====
+  computeR0(rms, now);  // GROUND — diaphragm
+  computeR1();          // SENSORY — laryngeal
+  computeR2();          // GATE — breath
+  computeR3();          // AFFECT — thoracic
+  computeR4();          // EXECUTIVE — nasopharyngeal
+  computeR5();          // IDENTITY — oral shaper
+  computeR6();          // OBSERVER — silence
+
+  // Smooth ring activities
+  for (var j = 0; j < 7; j++) {
+    voice.ringSmoothed[j] += (voice.ringActivity[j] - voice.ringSmoothed[j]) * 0.15;
+  }
+
+  // Voice mode
+  if (voice.pulseRate > 4) voice.mode = 'PULSED';
+  else if (voice.isSounding && (now - voice.soundStartTime) > 1000) voice.mode = 'SUSTAINED';
+  else if (!voice.isSounding && voice.silenceDuration > 0.5) voice.mode = 'SILENT';
+
+  // Composite metrics
+  computeVoiceMetrics();
+
+  // Voice-driven fold: sound unfolds, silence folds
+  if (currentMode === 'VOICE') {
+    var totalActivity = 0;
+    for (var k = 0; k < 7; k++) totalActivity += voice.ringSmoothed[k];
+    var avgActivity = totalActivity / 7;
+
+    // Fold target: more voice = more unfolded
+    foldTarget = 0.2 + avgActivity * 0.8;
+
+    // Set ring targets from voice
+    for (var m = 0; m < 7; m++) {
+      SHIELD_RINGS[m].target = voice.ringSmoothed[m];
+    }
+
+    // Voice-driven expansion: louder = more expanded
+    controls.expansion = 0.3 + avgActivity * 0.5;
+
+    // Voice-driven phi phase: vowel sweep drives phi
+    controls.phiPhase = 0.3 + voice.sweep * 0.7;
+
+    // Vowel sweep triggers bloom
+    if (voice.sweep >= 0.8 && !bloomCascadeActive) {
+      triggerBloom();
+    }
+  }
+}
+
+// ----- F0 via Autocorrelation -----
+function detectF0(buf, sr) {
+  var size = buf.length;
+  var rmsCheck = 0;
+  for (var i = 0; i < size; i++) rmsCheck += buf[i] * buf[i];
+  rmsCheck = Math.sqrt(rmsCheck / size);
+  if (rmsCheck < voice.noiseFloor) return 0;
+
+  var bestCorr = 0, bestLag = 0;
+  var minLag = Math.floor(sr / 1000);
+  var maxLag = Math.floor(sr / 50);
+
+  for (var lag = minLag; lag < maxLag && lag < size; lag++) {
+    var corr = 0;
+    for (var j = 0; j < size - lag; j++) {
+      corr += buf[j] * buf[j + lag];
+    }
+    if (corr > bestCorr) {
+      bestCorr = corr;
+      bestLag = lag;
+    }
+  }
+  return bestLag > 0 ? sr / bestLag : 0;
+}
+
+// ----- Spectral Centroid -----
+function computeSpectralCentroid(freq, sr) {
+  var numSum = 0, denSum = 0;
+  var binWidth = sr / (freq.length * 2);
+  for (var i = 1; i < freq.length; i++) {
+    var mag = Math.pow(10, freq[i] / 20);
+    numSum += i * binWidth * mag;
+    denSum += mag;
+  }
+  return denSum > 0 ? numSum / denSum : 0;
+}
+
+// ----- Formant Estimation -----
+function estimateFormants(freq, sr) {
+  var binWidth = sr / (freq.length * 2);
+  var smooth = new Float32Array(freq.length);
+  for (var i = 2; i < freq.length - 2; i++) {
+    smooth[i] = (freq[i-2] + freq[i-1] + freq[i] + freq[i+1] + freq[i+2]) / 5;
+  }
+
+  var peaks = [];
+  var minBin = Math.floor(200 / binWidth);
+  var maxBin = Math.min(Math.floor(3500 / binWidth), smooth.length - 2);
+
+  for (var j = minBin + 1; j < maxBin; j++) {
+    if (smooth[j] > smooth[j-1] && smooth[j] > smooth[j+1] && smooth[j] > -60) {
+      peaks.push({ freq: j * binWidth, mag: smooth[j] });
+    }
+  }
+  peaks.sort(function(a, b) { return b.mag - a.mag; });
+
+  var f1 = 0, f2 = 0;
+  if (peaks.length >= 1) f1 = peaks[0].freq;
+  if (peaks.length >= 2) {
+    for (var k = 1; k < peaks.length; k++) {
+      if (Math.abs(peaks[k].freq - f1) > 200) { f2 = peaks[k].freq; break; }
+    }
+  }
+  if (f1 > f2 && f2 > 0) { var tmp = f1; f1 = f2; f2 = tmp; }
+  return { f1: f1, f2: f2 };
+}
+
+// ----- Onset Detection -----
+function detectOnsets(rms, now) {
+  var prev = voice.lastAmplitude;
+  voice.lastAmplitude = rms;
+  if (rms > prev * 1.8 && rms > voice.noiseFloor * 2) {
+    voice.onsetTimes.push(now);
+  }
+  while (voice.onsetTimes.length > 0 && now - voice.onsetTimes[0] > 2000) {
+    voice.onsetTimes.shift();
+  }
+  voice.pulseRate = voice.onsetTimes.length / 2;
+}
+
+// ----- Breath Phase -----
+function detectBreathPhase(rms, now) {
+  voice.amplitudeHistory.push({ rms: rms, time: now });
+  while (voice.amplitudeHistory.length > 0 && now - voice.amplitudeHistory[0].time > 5000) {
+    voice.amplitudeHistory.shift();
+  }
+
+  if (voice.amplitudeHistory.length > 10) {
+    var recent = voice.amplitudeHistory.slice(-20);
+    var avgRecent = recent.reduce(function(s, x) { return s + x.rms; }, 0) / recent.length;
+    var older = voice.amplitudeHistory.slice(0, Math.max(1, voice.amplitudeHistory.length - 20));
+    var avgOlder = older.reduce(function(s, x) { return s + x.rms; }, 0) / older.length;
+
+    if (avgRecent > avgOlder * 1.3 && voice.breathPhase === 'exhale') {
+      voice.breathPhase = 'inhale';
+      voice.exhaleTime += (now - voice.breathCycleStart) / 1000;
+      voice.breathCycleStart = now;
+      voice.breathCount++;
+    } else if (avgRecent < avgOlder * 0.7 && voice.breathPhase === 'inhale') {
+      voice.breathPhase = 'exhale';
+      voice.inhaleTime += (now - voice.breathCycleStart) / 1000;
+      voice.breathCycleStart = now;
+    }
+  }
+
+  var elapsed = (now - voice.breathStartTime) / 60000;
+  voice.breathRate = elapsed > 0.05 ? voice.breathCount / elapsed : 0;
+  voice.exhaleRatio = voice.inhaleTime > 0.1 ? voice.exhaleTime / voice.inhaleTime : 1.0;
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  7 RING DETECTION PIPELINES — Voice -> Shield                    ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// R0: GROUND / DIAPHRAGM (p=2) — amplitude envelope, pulsed vs sustained
+function computeR0(rms, now) {
+  var activity = 0;
+  if (voice.pulseRate > 4) {
+    activity = Math.min(1, voice.pulseRate / 8);
+  } else if (voice.isSounding && (now - voice.soundStartTime) > 2000) {
+    activity = Math.min(1, rms / (voice.noiseFloor * 8));
+  }
+  // Sigh detection
+  if (voice.amplitudeHistory.length > 30) {
+    var tail = voice.amplitudeHistory.slice(-30);
+    var peak = -Infinity;
+    for (var i = 0; i < tail.length; i++) { if (tail[i].rms > peak) peak = tail[i].rms; }
+    var last = tail[tail.length - 1].rms;
+    if (peak > voice.noiseFloor * 5 && last < peak * 0.3) {
+      activity = Math.max(activity, 0.6);
+    }
+  }
+  voice.ringActivity[0] = clamp01(activity);
+}
+
+// R1: SENSORY / LARYNGEAL (p=3) — voiced vs unvoiced
+function computeR1() {
+  if (!voice.isSounding) { voice.ringActivity[1] *= 0.9; return; }
+  var activity = 0;
+  if (voice.f0 > 50 && voice.spectralCentroid < 2000) {
+    activity = Math.min(1, (2000 - voice.spectralCentroid) / 1500);
+  } else if (voice.spectralCentroid > 3000) {
+    activity = Math.min(1, (voice.spectralCentroid - 3000) / 3000);
+  } else {
+    activity = 0.2;
+  }
+  voice.ringActivity[1] = clamp01(activity);
+}
+
+// R2: GATE / BREATH (p=5) — fricatives sh, ss, wh
+function computeR2() {
+  if (!voice.isSounding) { voice.ringActivity[2] *= 0.92; return; }
+  var binWidth = audioCtx.sampleRate / (freqData.length * 2);
+  var shEnergy = bandEnergy(freqData, 2500, 6000, binWidth);
+  var ssEnergy = bandEnergy(freqData, 4000, 8000, binWidth);
+  var whEnergy = bandEnergy(freqData, 500, 2000, binWidth);
+  var totalEnergy = bandEnergy(freqData, 100, 8000, binWidth);
+
+  var fricScore = 0;
+  if (totalEnergy > 0) {
+    fricScore = (shEnergy + ssEnergy * 0.8 + whEnergy * 0.4) / totalEnergy;
+  }
+  var exhaleBoost = Math.min(1, Math.max(0, (voice.exhaleRatio - 1) * 0.5));
+  var activity = Math.min(1, fricScore * 2 + exhaleBoost * 0.3);
+  if (voice.f0 > 100 && voice.spectralCentroid < 2000) activity *= 0.3;
+  voice.ringActivity[2] = clamp01(activity);
+}
+
+// R3: AFFECT / THORACIC (p=7) — chest voice, oh, ah
+function computeR3() {
+  if (!voice.isSounding) { voice.ringActivity[3] *= 0.9; return; }
+  var f1 = voice.formants.f1, f2 = voice.formants.f2;
+  var activity = 0;
+
+  if (f1 > 400 && f1 < 600 && f2 > 700 && f2 < 1100) activity = Math.max(activity, 0.8);
+  if (f1 > 600 && f1 < 900 && f2 > 1000 && f2 < 1400) activity = Math.max(activity, 0.9);
+
+  var binWidth = audioCtx.sampleRate / (freqData.length * 2);
+  var lowE = bandEnergy(freqData, 80, 500, binWidth);
+  var highE = bandEnergy(freqData, 500, 4000, binWidth);
+  if (highE > 0) activity = Math.max(activity, Math.min(1, (lowE / highE) * 0.6));
+
+  voice.ringActivity[3] = clamp01(activity);
+}
+
+// R4: EXECUTIVE / NASOPHARYNGEAL (p=11) — ee, nasal
+function computeR4() {
+  if (!voice.isSounding) { voice.ringActivity[4] *= 0.9; return; }
+  var f2 = voice.formants.f2;
+  var activity = 0;
+
+  if (f2 > 2000 && f2 < 2700) activity = Math.max(activity, 0.8);
+
+  var binWidth = audioCtx.sampleRate / (freqData.length * 2);
+  var nasalE = bandEnergy(freqData, 200, 300, binWidth);
+  var antiE = bandEnergy(freqData, 450, 550, binWidth);
+  if (nasalE > antiE * 1.5) activity = Math.max(activity, 0.6);
+
+  if (voice.pulseRate > 3 && f2 > 2000) activity = Math.max(activity, 0.7);
+
+  voice.ringActivity[4] = clamp01(activity);
+}
+
+// R5: IDENTITY / ORAL SHAPER (p=13) — vowel identity
+function computeR5() {
+  if (!voice.isSounding) { voice.ringActivity[5] *= 0.92; return; }
+  var f1 = voice.formants.f1, f2 = voice.formants.f2;
+  var vowel = classifyVowel(f1, f2);
+  voice.currentVowel = vowel;
+
+  if (vowel) {
+    voice.vowelHistory.add(vowel);
+    clearTimeout(voice.vowelHistoryTimer);
+    voice.vowelHistoryTimer = setTimeout(function() { voice.vowelHistory.clear(); }, 30000);
+  }
+
+  var possibleVowels = ['ee', 'eh', 'ah', 'oh', 'oo', 'mm'];
+  voice.sweep = voice.vowelHistory.size / possibleVowels.length;
+
+  var activity = vowel ? 0.7 + voice.sweep * 0.3 : 0;
+  voice.ringActivity[5] = clamp01(activity);
+}
+
+// R6: OBSERVER / INTENT (p=17) — silence
+function computeR6() {
+  var silenceFactor = 0;
+  if (!voice.isSounding) {
+    silenceFactor = Math.min(1, voice.silenceDuration / 5);
+  }
+  var microSilence = 0;
+  if (!voice.isSounding && voice.silenceDuration > 0.2 && voice.silenceDuration < 1) {
+    microSilence = 0.3;
+  }
+  voice.ringActivity[6] = clamp01(Math.max(silenceFactor, microSilence));
+}
+
+function classifyVowel(f1, f2) {
+  if (f1 === 0 || f2 === 0) return '';
+  if (f1 < 400 && f2 > 2000) return 'ee';
+  if (f1 > 400 && f1 < 650 && f2 > 1600) return 'eh';
+  if (f1 > 600 && f2 > 900 && f2 < 1500) return 'ah';
+  if (f1 > 350 && f1 < 600 && f2 < 1100) return 'oh';
+  if (f1 < 400 && f2 < 1000) return 'oo';
+  if (f1 < 350 && f2 < 1200) return 'mm';
+  return '';
+}
+
+function computeVoiceMetrics() {
+  var r = voice.ringSmoothed;
+  voice.vagalTone = r[0]*0.2 + r[1]*0.15 + r[2]*0.15 + r[3]*0.15 + r[4]*0.1 + r[5]*0.1 + r[6]*0.15;
+
+  var cohSum = 0;
+  for (var i = 0; i < 6; i++) {
+    var a = Math.max(r[i], 0.001);
+    var b = Math.max(r[i+1], 0.001);
+    var ratio = Math.max(a, b) / Math.min(a, b);
+    cohSum += 1 - Math.abs(ratio - PHI) / PHI;
+  }
+  voice.coherence = clamp01(cohSum / 6);
+  voice.psiLevel = r[6]*0.3 + r[5]*0.3 + r[4]*0.2 + voice.coherence*0.2;
+}
+
+function bandEnergy(freqData, lowHz, highHz, binWidth) {
+  var low = Math.floor(lowHz / binWidth);
+  var high = Math.min(Math.floor(highHz / binWidth), freqData.length - 1);
+  var energy = 0;
+  for (var i = low; i <= high; i++) energy += Math.pow(10, freqData[i] / 10);
+  return energy;
+}
+
+function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  HARMONIC ENGINE — 7 Prime Drones Following Voice                ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function initHarmonicEngine() {
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.10;
+  masterGain.connect(audioCtx.destination);
+
+  var ringFreqs = [110, 165, 275, 385, 605, 715, 935]; // prime * 55Hz
+
+  for (var i = 0; i < 7; i++) {
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    gain.gain.value = 0;
+
+    if (i === 0) {
+      osc.type = 'sine';
+      osc.frequency.value = ringFreqs[i];
+      osc.connect(gain);
+    } else if (i === 1) {
+      osc.type = 'triangle';
+      osc.frequency.value = ringFreqs[i];
+      osc.connect(gain);
+    } else if (i === 2) {
+      osc.type = 'sawtooth';
+      osc.frequency.value = ringFreqs[i];
+      var filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 600;
+      filter.Q.value = 1;
+      osc.connect(filter);
+      filter.connect(gain);
+    } else if (i === 3) {
+      osc.type = 'sine';
+      osc.frequency.value = ringFreqs[i];
+      osc.connect(gain);
+    } else if (i === 4) {
+      // Bell: inharmonic partial
+      osc.type = 'sine';
+      osc.frequency.value = ringFreqs[i];
+      osc.connect(gain);
+      var bellOsc = audioCtx.createOscillator();
+      bellOsc.frequency.value = ringFreqs[i] * 2.76;
+      var bellGain = audioCtx.createGain();
+      bellGain.gain.value = 0.25;
+      bellOsc.connect(bellGain);
+      bellGain.connect(gain);
+      bellOsc.start();
+    } else if (i === 5) {
+      // Choir pad: detuned unison
+      osc.type = 'sine';
+      osc.frequency.value = ringFreqs[i];
+      osc.connect(gain);
+      for (var d = 0; d < 3; d++) {
+        var choirOsc = audioCtx.createOscillator();
+        choirOsc.type = 'sine';
+        choirOsc.frequency.value = ringFreqs[i] * (1 + (d - 1) * 0.003);
+        var cg = audioCtx.createGain();
+        cg.gain.value = 0.2;
+        choirOsc.connect(cg);
+        cg.connect(gain);
+        choirOsc.start();
+      }
+    } else {
+      // Crystal: shimmer
+      osc.type = 'sine';
+      osc.frequency.value = ringFreqs[i];
+      osc.connect(gain);
+      var shimmer = audioCtx.createOscillator();
+      shimmer.type = 'sine';
+      shimmer.frequency.value = ringFreqs[i] * 2;
+      var sg = audioCtx.createGain();
+      sg.gain.value = 0.12;
+      shimmer.connect(sg);
+      sg.connect(gain);
+      shimmer.start();
+    }
+
+    gain.connect(masterGain);
+    osc.start();
+    oscillators.push(osc);
+    oscGains.push(gain);
+  }
+}
+
+function updateHarmonicEngine() {
+  for (var i = 0; i < 7; i++) {
+    var target = voice.ringSmoothed[i] * 0.4;
+    oscGains[i].gain.setTargetAtTime(target, audioCtx.currentTime, 0.1);
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  THREE.JS SCENE SETUP                                            ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
 function initScene() {
   scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x06040e, 0.02);
-
   camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
-
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -369,21 +941,18 @@ function initScene() {
   orbGroup = new THREE.Group();
   scene.add(orbGroup);
 
-  // Ambient
   scene.add(new THREE.AmbientLight(0x222244, 0.4));
-
-  // Key light
-  const key = new THREE.DirectionalLight(0xffeedd, 0.5);
+  var key = new THREE.DirectionalLight(0xffeedd, 0.5);
   key.position.set(10, 20, 15);
   scene.add(key);
 
   // Stars
-  const starGeo = new THREE.BufferGeometry();
-  const starPos = new Float32Array(2000 * 3);
-  for (let i = 0; i < 2000; i++) {
-    const theta = Math.random() * TAU;
-    const phi = Math.acos(2 * Math.random() - 1);
-    const r = 100 + Math.random() * 150;
+  var starGeo = new THREE.BufferGeometry();
+  var starPos = new Float32Array(2000 * 3);
+  for (var i = 0; i < 2000; i++) {
+    var theta = Math.random() * TAU;
+    var phi = Math.acos(2 * Math.random() - 1);
+    var r = 100 + Math.random() * 150;
     starPos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
     starPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
     starPos[i*3+2] = r * Math.cos(phi);
@@ -393,7 +962,6 @@ function initScene() {
     color: 0xffffff, size: 0.4, transparent: true, opacity: 0.6, sizeAttenuation: true
   })));
 
-  // Events
   renderer.domElement.addEventListener('mousedown', onMouseDown);
   renderer.domElement.addEventListener('mousemove', onMouseMove);
   renderer.domElement.addEventListener('mouseup', onMouseUp);
@@ -404,154 +972,110 @@ function initScene() {
   window.addEventListener('resize', onResize);
 }
 
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║  p=3  CORE — Central Singularity                                ║
-// ╚══════════════════════════════════════════════════════════════════╝
-
 function initCore() {
-  // Inner core: pulsing sphere
-  const coreGeo = new THREE.IcosahedronGeometry(0.35, 2);
-  const coreMat = new THREE.MeshPhongMaterial({
-    color: 0xffd700,
-    emissive: 0xaa8800,
-    emissiveIntensity: 0.6,
-    transparent: true,
-    opacity: 0.85,
+  var coreGeo = new THREE.IcosahedronGeometry(0.35, 2);
+  var coreMat = new THREE.MeshPhongMaterial({
+    color: 0xffd700, emissive: 0xaa8800, emissiveIntensity: 0.6,
+    transparent: true, opacity: 0.85
   });
   shieldMeshes.core = new THREE.Mesh(coreGeo, coreMat);
   orbGroup.add(shieldMeshes.core);
 
-  // Core wireframe
-  const wireGeo = new THREE.IcosahedronGeometry(0.45, 1);
-  const wireMat = new THREE.MeshBasicMaterial({
-    color: 0xffd700, wireframe: true, transparent: true, opacity: 0.25
-  });
-  const wireCore = new THREE.Mesh(wireGeo, wireMat);
+  var wireCore = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.45, 1),
+    new THREE.MeshBasicMaterial({ color: 0xffd700, wireframe: true, transparent: true, opacity: 0.25 })
+  );
   wireCore.name = 'coreWire';
   orbGroup.add(wireCore);
 
-  // Core point light
-  const coreLight = new THREE.PointLight(0xffd700, 2.5, 12);
+  var coreLight = new THREE.PointLight(0xffd700, 2.5, 12);
   coreLight.name = 'coreLight';
   orbGroup.add(coreLight);
 
-  // Secondary soft light
-  const softLight = new THREE.PointLight(0x4466ff, 1.5, 20);
-  softLight.position.set(0, 0, 0);
+  var softLight = new THREE.PointLight(0x4466ff, 1.5, 20);
   softLight.name = 'softLight';
   orbGroup.add(softLight);
 }
 
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║  p=5  SHIELD RINGS — 7 Concentric Layers                       ║
-// ╚══════════════════════════════════════════════════════════════════╝
-
 function initShieldRings() {
-  SHIELD_RINGS.forEach((ring, i) => {
-    const ringGroup = new THREE.Group();
+  SHIELD_RINGS.forEach(function(ring, i) {
+    var ringGroup = new THREE.Group();
 
-    // Primary torus
-    const torusMat = new THREE.MeshPhongMaterial({
-      color: ring.hex,
-      emissive: ring.hex,
-      emissiveIntensity: 0.25,
-      transparent: true,
-      opacity: 0.15,
+    var torusMat = new THREE.MeshPhongMaterial({
+      color: ring.hex, emissive: ring.hex, emissiveIntensity: 0.25,
+      transparent: true, opacity: 0.15
     });
-    const torus = new THREE.Mesh(
-      new THREE.TorusGeometry(ring.baseRadius, 0.025, 12, 80),
-      torusMat
-    );
+    var torus = new THREE.Mesh(new THREE.TorusGeometry(ring.baseRadius, 0.025, 12, 80), torusMat);
     ringGroup.add(torus);
 
-    // Secondary torus (perpendicular)
-    const torus2Mat = new THREE.MeshPhongMaterial({
+    var torus2Mat = new THREE.MeshPhongMaterial({
       color: ring.hex, emissive: ring.hex, emissiveIntensity: 0.15,
-      transparent: true, opacity: 0.08,
+      transparent: true, opacity: 0.08
     });
-    const torus2 = new THREE.Mesh(
-      new THREE.TorusGeometry(ring.baseRadius, 0.018, 8, 64),
-      torus2Mat
-    );
+    var torus2 = new THREE.Mesh(new THREE.TorusGeometry(ring.baseRadius, 0.018, 8, 64), torus2Mat);
     torus2.rotation.x = Math.PI / 2;
     ringGroup.add(torus2);
 
-    // Third torus (tilted)
-    const torus3Mat = new THREE.MeshPhongMaterial({
+    var torus3Mat = new THREE.MeshPhongMaterial({
       color: ring.hex, emissive: ring.hex, emissiveIntensity: 0.1,
-      transparent: true, opacity: 0.05,
+      transparent: true, opacity: 0.05
     });
-    const torus3 = new THREE.Mesh(
-      new THREE.TorusGeometry(ring.baseRadius, 0.012, 6, 48),
-      torus3Mat
-    );
+    var torus3 = new THREE.Mesh(new THREE.TorusGeometry(ring.baseRadius, 0.012, 6, 48), torus3Mat);
     torus3.rotation.x = Math.PI / 3;
     torus3.rotation.z = Math.PI / 5;
     ringGroup.add(torus3);
 
-    // Icosahedron wireframe shell
-    const icoMat = new THREE.MeshBasicMaterial({
-      color: ring.hex, wireframe: true, transparent: true, opacity: 0.06,
+    var icoMat = new THREE.MeshBasicMaterial({
+      color: ring.hex, wireframe: true, transparent: true, opacity: 0.06
     });
-    const icoDetail = i < 3 ? 1 : 2;
-    const ico = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(ring.baseRadius, icoDetail),
-      icoMat
-    );
+    var ico = new THREE.Mesh(new THREE.IcosahedronGeometry(ring.baseRadius, i < 3 ? 1 : 2), icoMat);
     ringGroup.add(ico);
 
-    // Transparent shell surface
-    const shellMat = new THREE.MeshPhongMaterial({
+    var shellMat = new THREE.MeshPhongMaterial({
       color: ring.hex, transparent: true, opacity: 0.02,
-      side: THREE.DoubleSide, depthWrite: false,
+      side: THREE.DoubleSide, depthWrite: false
     });
-    const shell = new THREE.Mesh(
-      new THREE.SphereGeometry(ring.baseRadius, 16, 12),
-      shellMat
-    );
+    var shell = new THREE.Mesh(new THREE.SphereGeometry(ring.baseRadius, 16, 12), shellMat);
     ringGroup.add(shell);
 
     orbGroup.add(ringGroup);
     shieldMeshes.rings.push({
-      group: ringGroup,
-      torus, torusMat,
-      torus2, torus2Mat,
-      torus3, torus3Mat,
-      ico, icoMat,
-      shell, shellMat,
+      group: ringGroup, torus: torus, torusMat: torusMat,
+      torus2: torus2, torus2Mat: torus2Mat,
+      torus3: torus3, torus3Mat: torus3Mat,
+      ico: ico, icoMat: icoMat, shell: shell, shellMat: shellMat
     });
   });
 }
 
+
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  p=7  PARTICLE FIELD — 12,000 across 127 Dimensions             ║
+// ║  PARTICLE FIELD — 12,000 across 127 Dimensions                   ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
 function initParticleField() {
-  const count = PARTICLE_COUNT;
-  const positions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
-  const sizes = new Float32Array(count);
-  const dims = new Float32Array(count);
-  const ringIndex = new Float32Array(count);
-  const seeds = new Float32Array(count);
+  var count = PARTICLE_COUNT;
+  var positions = new Float32Array(count * 3);
+  var colors = new Float32Array(count * 3);
+  var sizes = new Float32Array(count);
+  var dims = new Float32Array(count);
+  var ringIndex = new Float32Array(count);
+  var seeds = new Float32Array(count);
 
-  for (let i = 0; i < count; i++) {
-    const dim = i % DIM_COUNT;
-    const ring = dim % 7;
-    const r = SHIELD_RINGS[ring].baseRadius;
-
-    // Fibonacci sphere distribution within each ring's shell
-    const goldenOff = (dim / DIM_COUNT) * TAU;
-    const theta = (i * PHI * TAU + goldenOff) % TAU;
-    const phi = Math.acos(1 - 2 * (((i * PHI) % 1 + dim * 0.0079) % 1));
-    const rVariance = r + (Math.random() - 0.5) * 0.2;
+  for (var i = 0; i < count; i++) {
+    var dim = i % DIM_COUNT;
+    var ring = dim % 7;
+    var r = SHIELD_RINGS[ring].baseRadius;
+    var goldenOff = (dim / DIM_COUNT) * TAU;
+    var theta = (i * PHI * TAU + goldenOff) % TAU;
+    var phi = Math.acos(1 - 2 * (((i * PHI) % 1 + dim * 0.0079) % 1));
+    var rVariance = r + (Math.random() - 0.5) * 0.2;
 
     positions[i*3]   = rVariance * Math.sin(phi) * Math.cos(theta);
     positions[i*3+1] = rVariance * Math.sin(phi) * Math.sin(theta);
     positions[i*3+2] = rVariance * Math.cos(phi);
 
-    const col = new THREE.Color(SHIELD_RINGS[ring].hex);
+    var col = new THREE.Color(SHIELD_RINGS[ring].hex);
     colors[i*3]   = col.r;
     colors[i*3+1] = col.g;
     colors[i*3+2] = col.b;
@@ -562,7 +1086,7 @@ function initParticleField() {
     seeds[i] = Math.random() * TAU;
   }
 
-  const geo = new THREE.BufferGeometry();
+  var geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('aColor', new THREE.BufferAttribute(colors, 3));
   geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
@@ -570,110 +1094,80 @@ function initParticleField() {
   geo.setAttribute('aRing', new THREE.BufferAttribute(ringIndex, 1));
   geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
 
-  const vertexShader = `
-    attribute float aSize;
-    attribute vec3 aColor;
-    attribute float aDim;
-    attribute float aRing;
-    attribute float aSeed;
+  var goldenAngleVal = GOLDEN_ANGLE.toFixed(8);
+  var vertexShader = [
+    'attribute float aSize;',
+    'attribute vec3 aColor;',
+    'attribute float aDim;',
+    'attribute float aRing;',
+    'attribute float aSeed;',
+    'uniform float uTime;',
+    'uniform float uFold;',
+    'uniform float uExpansion;',
+    'uniform float uPhiPhase;',
+    'uniform float uDensity;',
+    'uniform float uActiveDims;',
+    'uniform float uIntegrity[7];',
+    'varying vec3 vColor;',
+    'varying float vAlpha;',
+    'varying float vGlow;',
+    'void main() {',
+    '  float dim = aDim;',
+    '  float ring = aRing;',
+    '  float integrity = uIntegrity[int(ring)];',
+    '  float dimActive = dim < uActiveDims ? 1.0 : 0.0;',
+    '  vColor = aColor;',
+    '  float primeSpeed = 2.0;',
+    '  if (ring > 0.5 && ring < 1.5) primeSpeed = 3.0;',
+    '  else if (ring > 1.5 && ring < 2.5) primeSpeed = 5.0;',
+    '  else if (ring > 2.5 && ring < 3.5) primeSpeed = 7.0;',
+    '  else if (ring > 3.5 && ring < 4.5) primeSpeed = 11.0;',
+    '  else if (ring > 4.5 && ring < 5.5) primeSpeed = 13.0;',
+    '  else if (ring > 5.5) primeSpeed = 17.0;',
+    '  float orbitSpeed = 0.02 * primeSpeed / 17.0;',
+    '  float dimOffset = dim * 0.05 + aSeed;',
+    '  float angle = uTime * orbitSpeed + dimOffset;',
+    '  vec3 pos = position;',
+    '  float foldFactor = mix(0.1, 1.0, uFold);',
+    '  pos *= foldFactor;',
+    '  pos *= (0.7 + uExpansion * 0.6);',
+    '  float dimPlaneAngle = dim * ' + goldenAngleVal + ';',
+    '  float c1 = cos(angle);',
+    '  float s1 = sin(angle);',
+    '  float s2 = sin(dimPlaneAngle);',
+    '  vec3 rotated;',
+    '  rotated.x = pos.x * c1 * cos(dimPlaneAngle) - pos.z * s1 * cos(dimPlaneAngle) + pos.y * s2 * sin(angle * 0.3);',
+    '  rotated.y = pos.y * cos(dimPlaneAngle * 0.5) + pos.x * s2 * 0.3 * sin(uTime * 0.1 + dim * 0.1);',
+    '  rotated.z = pos.x * s1 + pos.z * c1;',
+    '  float phiWave = sin(uTime * 0.5 + dim * uPhiPhase * 0.1) * 0.15 * integrity;',
+    '  rotated += normalize(rotated) * phiWave;',
+    '  float breathe = 0.5 + 0.5 * sin(uTime * 1.5 + dim * 0.3);',
+    '  vAlpha = integrity * dimActive * uDensity * (0.4 + 0.6 * breathe);',
+    '  vAlpha = clamp(vAlpha, 0.0, 1.0);',
+    '  vGlow = integrity * dimActive;',
+    '  vec4 mvPosition = modelViewMatrix * vec4(rotated, 1.0);',
+    '  float sizeScale = integrity * dimActive * uDensity;',
+    '  gl_PointSize = aSize * sizeScale * (180.0 / -mvPosition.z);',
+    '  gl_PointSize = clamp(gl_PointSize, 0.5, 12.0);',
+    '  gl_Position = projectionMatrix * mvPosition;',
+    '}'
+  ].join('\n');
 
-    uniform float uTime;
-    uniform float uFold;
-    uniform float uExpansion;
-    uniform float uPhiPhase;
-    uniform float uDensity;
-    uniform float uActiveDims;
-    uniform float uIntegrity[7];
+  var fragmentShader = [
+    'varying vec3 vColor;',
+    'varying float vAlpha;',
+    'varying float vGlow;',
+    'void main() {',
+    '  float d = length(gl_PointCoord - vec2(0.5));',
+    '  if (d > 0.5) discard;',
+    '  float core = 1.0 - smoothstep(0.0, 0.2, d);',
+    '  float glow = 1.0 - smoothstep(0.0, 0.5, d);',
+    '  vec3 color = vColor * glow + vec3(1.0) * core * vGlow * 0.3;',
+    '  gl_FragColor = vec4(color, vAlpha * glow);',
+    '}'
+  ].join('\n');
 
-    varying vec3 vColor;
-    varying float vAlpha;
-    varying float vGlow;
-
-    void main() {
-      float dim = aDim;
-      float ring = aRing;
-      float integrity = uIntegrity[int(ring)];
-      float dimActive = dim < uActiveDims ? 1.0 : 0.0;
-
-      vColor = aColor;
-
-      // Each dimension rotates at its own speed based on its prime ring
-      float primeSpeed = 0.0;
-      if (ring < 0.5) primeSpeed = 2.0;
-      else if (ring < 1.5) primeSpeed = 3.0;
-      else if (ring < 2.5) primeSpeed = 5.0;
-      else if (ring < 3.5) primeSpeed = 7.0;
-      else if (ring < 4.5) primeSpeed = 11.0;
-      else if (ring < 5.5) primeSpeed = 13.0;
-      else primeSpeed = 17.0;
-
-      float orbitSpeed = 0.02 * primeSpeed / 17.0;
-      float dimOffset = dim * 0.05 + aSeed;
-      float angle = uTime * orbitSpeed + dimOffset;
-
-      // Base position
-      vec3 pos = position;
-
-      // Fold operation: collapse dimensions toward center
-      float foldFactor = mix(0.1, 1.0, uFold);
-      pos *= foldFactor;
-
-      // Expansion
-      pos *= (0.7 + uExpansion * 0.6);
-
-      // Dimensional rotation — each dim rotates in its own plane
-      float dimPlaneAngle = dim * ${GOLDEN_ANGLE.toFixed(8)};
-      float c1 = cos(angle);
-      float s1 = sin(angle);
-      float c2 = cos(dimPlaneAngle);
-      float s2 = sin(dimPlaneAngle);
-
-      // Rotate in the dim's unique plane
-      vec3 rotated;
-      rotated.x = pos.x * (c1 * c2) - pos.z * (s1 * c2) + pos.y * s2 * sin(angle * 0.3);
-      rotated.y = pos.y * cos(dimPlaneAngle * 0.5) + pos.x * s2 * 0.3 * sin(uTime * 0.1 + dim * 0.1);
-      rotated.z = pos.x * s1 + pos.z * c1;
-
-      // Phi-phase spiral perturbation
-      float phiWave = sin(uTime * 0.5 + dim * uPhiPhase * 0.1) * 0.15 * integrity;
-      rotated += normalize(rotated) * phiWave;
-
-      // Compute alpha
-      float breathe = 0.5 + 0.5 * sin(uTime * 1.5 + dim * 0.3);
-      vAlpha = integrity * dimActive * uDensity * (0.4 + 0.6 * breathe);
-      vAlpha = clamp(vAlpha, 0.0, 1.0);
-
-      // Glow for high-integrity particles
-      vGlow = integrity * dimActive;
-
-      vec4 mvPosition = modelViewMatrix * vec4(rotated, 1.0);
-      float sizeScale = integrity * dimActive * uDensity;
-      gl_PointSize = aSize * sizeScale * (180.0 / -mvPosition.z);
-      gl_PointSize = clamp(gl_PointSize, 0.5, 12.0);
-      gl_Position = projectionMatrix * mvPosition;
-    }
-  `;
-
-  const fragmentShader = `
-    varying vec3 vColor;
-    varying float vAlpha;
-    varying float vGlow;
-
-    void main() {
-      float d = length(gl_PointCoord - vec2(0.5));
-      if (d > 0.5) discard;
-
-      float core = 1.0 - smoothstep(0.0, 0.2, d);
-      float glow = 1.0 - smoothstep(0.0, 0.5, d);
-
-      vec3 color = vColor * glow + vec3(1.0) * core * vGlow * 0.3;
-      float alpha = vAlpha * glow;
-
-      gl_FragColor = vec4(color, alpha);
-    }
-  `;
-
-  const mat = new THREE.ShaderMaterial({
+  var mat = new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },
       uFold: { value: 1.0 },
@@ -681,13 +1175,13 @@ function initParticleField() {
       uPhiPhase: { value: 0.62 },
       uDensity: { value: 0.8 },
       uActiveDims: { value: 127.0 },
-      uIntegrity: { value: [0, 0, 0, 0, 0, 0, 0] },
+      uIntegrity: { value: [0,0,0,0,0,0,0] }
     },
-    vertexShader,
-    fragmentShader,
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
     transparent: true,
     blending: THREE.AdditiveBlending,
-    depthWrite: false,
+    depthWrite: false
   });
 
   shieldMeshes.particles = new THREE.Points(geo, mat);
@@ -695,175 +1189,154 @@ function initParticleField() {
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  p=11  TOROIDAL FIELD LINES — Coherence Visualization           ║
+// ║  TOROIDAL FIELD LINES                                            ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
 function initToroidalFields() {
-  // 7 primary toroidal field lines (one per ring), plus 7 inter-ring bridges
-  for (let t = 0; t < 14; t++) {
-    const isInterRing = t >= 7;
-    const ringIdx = t % 7;
-    const ring = SHIELD_RINGS[ringIdx];
-    const points = [];
+  for (var t = 0; t < 14; t++) {
+    var isInterRing = t >= 7;
+    var ringIdx = t % 7;
+    var ring = SHIELD_RINGS[ringIdx];
+    var points = [];
 
     if (isInterRing) {
-      // Bridge between ring[i] and ring[i+1]
-      const nextRing = SHIELD_RINGS[(ringIdx + 1) % 7];
-      const r1 = ring.baseRadius;
-      const r2 = nextRing.baseRadius;
-      for (let i = 0; i <= 100; i++) {
-        const u = (i / 100) * TAU;
-        const blend = 0.5 + 0.5 * Math.sin(u * 3);
-        const r = r1 * (1 - blend) + r2 * blend;
-        const verticalAmplitude = (r2 - r1) * 0.8;
-        points.push(new THREE.Vector3(
-          r * Math.cos(u),
-          verticalAmplitude * Math.sin(u * 2) * Math.cos(u),
-          r * Math.sin(u)
-        ));
+      var nextRing = SHIELD_RINGS[(ringIdx + 1) % 7];
+      var r1 = ring.baseRadius, r2 = nextRing.baseRadius;
+      for (var i = 0; i <= 100; i++) {
+        var u = (i / 100) * TAU;
+        var blend = 0.5 + 0.5 * Math.sin(u * 3);
+        var r = r1 * (1 - blend) + r2 * blend;
+        var va = (r2 - r1) * 0.8;
+        points.push(new THREE.Vector3(r * Math.cos(u), va * Math.sin(u * 2) * Math.cos(u), r * Math.sin(u)));
       }
     } else {
-      // Ring-local toroidal loop
-      const majorR = ring.baseRadius;
-      const minorR = 0.15 + ringIdx * 0.05;
-      const wraps = PRIMES[ringIdx] % 5 + 2;
-      for (let i = 0; i <= 120; i++) {
-        const u = (i / 120) * TAU;
-        const r = majorR + minorR * Math.cos(u * wraps);
-        points.push(new THREE.Vector3(
-          r * Math.cos(u),
-          minorR * Math.sin(u * wraps),
-          r * Math.sin(u)
-        ));
+      var majorR = ring.baseRadius;
+      var minorR = 0.15 + ringIdx * 0.05;
+      var wraps = PRIMES[ringIdx] % 5 + 2;
+      for (var j = 0; j <= 120; j++) {
+        var uu = (j / 120) * TAU;
+        var rr = majorR + minorR * Math.cos(uu * wraps);
+        points.push(new THREE.Vector3(rr * Math.cos(uu), minorR * Math.sin(uu * wraps), rr * Math.sin(uu)));
       }
     }
 
-    const curve = new THREE.CatmullRomCurve3(points, true);
-    const color = isInterRing ? 0xffd700 : ring.hex;
-    const tubeMat = new THREE.MeshBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.04,
-      blending: THREE.AdditiveBlending,
+    var curve = new THREE.CatmullRomCurve3(points, true);
+    var color = isInterRing ? 0xffd700 : ring.hex;
+    var tubeMat = new THREE.MeshBasicMaterial({
+      color: color, transparent: true, opacity: 0.04, blending: THREE.AdditiveBlending
     });
-    const tube = new THREE.Mesh(
+    var tube = new THREE.Mesh(
       new THREE.TubeGeometry(curve, 80, isInterRing ? 0.008 : 0.012, 4, true),
       tubeMat
     );
     orbGroup.add(tube);
-    shieldMeshes.toroidals.push({ mesh: tube, mat: tubeMat, ringIdx, isInterRing });
+    shieldMeshes.toroidals.push({ mesh: tube, mat: tubeMat, ringIdx: ringIdx, isInterRing: isInterRing });
   }
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  p=13  DIMENSION THREADS — 127 Thread Lines                     ║
+// ║  DIMENSION THREADS — 127 Lines                                   ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
 function initDimThreads() {
-  // Visible lines from core to each dimension's position on its ring
-  for (let d = 0; d < DIM_COUNT; d++) {
-    const ring = d % 7;
-    const r = SHIELD_RINGS[ring].baseRadius;
-    const theta = d * GOLDEN_ANGLE;
-    const phi = Math.acos(1 - 2 * ((d * PHI) % 1));
-
-    const endPoint = new THREE.Vector3(
+  for (var d = 0; d < DIM_COUNT; d++) {
+    var ring = d % 7;
+    var r = SHIELD_RINGS[ring].baseRadius;
+    var theta = d * GOLDEN_ANGLE;
+    var phi = Math.acos(1 - 2 * ((d * PHI) % 1));
+    var ep = new THREE.Vector3(
       r * Math.sin(phi) * Math.cos(theta),
       r * Math.sin(phi) * Math.sin(theta),
       r * Math.cos(phi)
     );
-
-    const geo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, 0, 0),
-      endPoint
-    ]);
-    const mat = new THREE.LineBasicMaterial({
-      color: SHIELD_RINGS[ring].hex,
-      transparent: true,
-      opacity: 0.03,
-      blending: THREE.AdditiveBlending,
+    var geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), ep]);
+    var mat = new THREE.LineBasicMaterial({
+      color: SHIELD_RINGS[ring].hex, transparent: true, opacity: 0.03,
+      blending: THREE.AdditiveBlending
     });
-    const line = new THREE.Line(geo, mat);
+    var line = new THREE.Line(geo, mat);
     orbGroup.add(line);
-    shieldMeshes.dimThreads.push({ line, mat, dim: d, ring, endPoint });
+    shieldMeshes.dimThreads.push({ line: line, mat: mat, dim: d, ring: ring, endPoint: ep });
   }
 }
 
+
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  p=17  HUD — Build Interface                                    ║
+// ║  HUD + CONTROLS + SHIELD MODES                                   ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
 function initHUD() {
   // Shield bars
-  const barsEl = document.getElementById('shield-bars');
-  barsEl.innerHTML = SHIELD_RINGS.map((r, i) => `
-    <div class="shield-bar">
-      <span class="sname">${r.name}</span>
-      <div class="strack"><div class="sfill" id="sfill-${i}" style="width:0%;background:${r.color}"></div></div>
-      <span class="spct" id="spct-${i}">0%</span>
-    </div>
-  `).join('') + `
-    <div class="ring-detail" id="ring-detail">
-      <div class="rd-row"><span class="rd-label">avg integrity</span><span class="rd-val" id="rd-avg">0%</span></div>
-      <div class="rd-row"><span class="rd-label">fold state</span><span class="rd-val" id="rd-fold">1.00</span></div>
-      <div class="rd-row"><span class="rd-label">coherence</span><span class="rd-val" id="rd-coh">0.00</span></div>
-      <div class="rd-row"><span class="rd-label">ψ level</span><span class="rd-val" id="rd-psi">0.00</span></div>
-    </div>
-  `;
+  var barsEl = document.getElementById('shield-bars');
+  barsEl.innerHTML = SHIELD_RINGS.map(function(r, i) {
+    return '<div class="shield-bar">' +
+      '<span class="sname">' + r.name + '</span>' +
+      '<div class="strack"><div class="sfill" id="sfill-' + i + '" style="width:0%;background:' + r.color + '"></div></div>' +
+      '<span class="spct" id="spct-' + i + '">0%</span>' +
+    '</div>';
+  }).join('') +
+    '<div class="ring-detail">' +
+    '<div class="rd-row"><span class="rd-label">vagal tone</span><span class="rd-val" id="rd-vagal">0.00</span></div>' +
+    '<div class="rd-row"><span class="rd-label">fold state</span><span class="rd-val" id="rd-fold">1.00</span></div>' +
+    '<div class="rd-row"><span class="rd-label">coherence</span><span class="rd-val" id="rd-coh">0.00</span></div>' +
+    '<div class="rd-row"><span class="rd-label">\u03C8 level</span><span class="rd-val" id="rd-psi">0.00</span></div>' +
+    '<div class="rd-row"><span class="rd-label">exhale ratio</span><span class="rd-val" id="rd-exhale">0.00</span></div>' +
+    '<div class="rd-row"><span class="rd-label">vowel sweep</span><span class="rd-val" id="rd-sweep">0%</span></div>' +
+    '</div>';
 
   // Bus bars
-  const busEl = document.getElementById('bus-bars');
-  busEl.innerHTML = BUS_POWER.map((b, i) => `
-    <div class="bus-bar">
-      <span class="bname">${b.name}</span>
-      <div class="btrack"><div class="bfill" id="bfill-${i}" style="width:0%"></div></div>
-    </div>
-  `).join('');
+  var busEl = document.getElementById('bus-bars');
+  busEl.innerHTML = BUS_POWER.map(function(b, i) {
+    return '<div class="bus-bar"><span class="bname">' + b.name + '</span><div class="btrack"><div class="bfill" id="bfill-' + i + '" style="width:0%"></div></div></div>';
+  }).join('');
 
-  // Mode buttons
-  const modesEl = document.getElementById('modes-grid');
-  modesEl.innerHTML = Object.entries(SHIELD_MODES).map(([key, mode]) => `
-    <button class="mode-btn${key === 'STANDBY' ? ' active' : ''}" data-mode="${key}" onclick="setShieldMode('${key}')">${mode.label}</button>
-  `).join('');
+  // Mode buttons — VOICE first
+  var modesEl = document.getElementById('modes-grid');
+  modesEl.innerHTML = Object.keys(SHIELD_MODES).map(function(key) {
+    var mode = SHIELD_MODES[key];
+    var cls = 'mode-btn';
+    if (key === 'VOICE') cls += ' voice-active';
+    return '<button class="' + cls + '" data-mode="' + key + '" onclick="setShieldMode(\'' + key + '\')">' + mode.label + '</button>';
+  }).join('');
 
   // Metrics block
-  const metricsEl = document.getElementById('metrics-block');
-  metricsEl.innerHTML = `
-    <div class="metric-row"><span class="ml">integrity</span><span class="mv" id="mv-integrity">0%</span></div>
-    <div class="metric-row"><span class="ml">coherence</span><span class="mv cyan" id="mv-coherence">0.00</span></div>
-    <div class="metric-row"><span class="ml">fold state</span><span class="mv" id="mv-fold">1.00</span></div>
-    <div class="metric-row"><span class="ml">dimensions</span><span class="mv cyan" id="mv-dims">127 / 127</span></div>
-    <div class="metric-row"><span class="ml">bus power</span><span class="mv" id="mv-buspower">0.0</span></div>
-    <div class="metric-row"><span class="ml">ψ level</span><span class="mv" id="mv-psi">0.000</span></div>
-    <div class="metric-row"><span class="ml">φ ratio</span><span class="mv cyan" id="mv-phi">1.618</span></div>
-    <div class="metric-row"><span class="ml">threat</span><span class="mv green" id="mv-threat">none</span></div>
-    <div class="metric-row"><span class="ml">mode</span><span class="mv" id="mv-mode">STANDBY</span></div>
-  `;
+  var metricsEl = document.getElementById('metrics-block');
+  metricsEl.innerHTML =
+    '<div class="metric-row"><span class="ml">integrity</span><span class="mv" id="mv-integrity">0%</span></div>' +
+    '<div class="metric-row"><span class="ml">coherence</span><span class="mv cyan" id="mv-coherence">0.00</span></div>' +
+    '<div class="metric-row"><span class="ml">fold state</span><span class="mv" id="mv-fold">1.00</span></div>' +
+    '<div class="metric-row"><span class="ml">dimensions</span><span class="mv cyan" id="mv-dims">127 / 127</span></div>' +
+    '<div class="metric-row"><span class="ml">vagal tone</span><span class="mv" id="mv-vagal">0.00</span></div>' +
+    '<div class="metric-row"><span class="ml">\u03C8 level</span><span class="mv" id="mv-psi">0.000</span></div>' +
+    '<div class="metric-row"><span class="ml">\u03C6 ratio</span><span class="mv cyan" id="mv-phi">1.618</span></div>' +
+    '<div class="metric-row"><span class="ml">F0</span><span class="mv" id="mv-f0">0 Hz</span></div>' +
+    '<div class="metric-row"><span class="ml">vowel</span><span class="mv cyan" id="mv-vowel">-</span></div>' +
+    '<div class="metric-row"><span class="ml">pulse rate</span><span class="mv" id="mv-pulse">0.0</span></div>' +
+    '<div class="metric-row"><span class="ml">mode</span><span class="mv" id="mv-mode">VOICE</span></div>';
 
   // Dimension grid
-  const dimGridEl = document.getElementById('dim-grid');
-  let html = '';
-  for (let d = 0; d < DIM_COUNT; d++) {
-    const ring = d % 7;
-    html += `<div class="dim-cell" id="dc-${d}" style="background:${SHIELD_RINGS[ring].color}20"><span class="dim-tip">D${d} → R${ring} (p=${PRIMES[ring]})</span></div>`;
+  var dimGridEl = document.getElementById('dim-grid');
+  var html = '';
+  for (var d = 0; d < DIM_COUNT; d++) {
+    var ring = d % 7;
+    html += '<div class="dim-cell" id="dc-' + d + '" style="background:' + SHIELD_RINGS[ring].color + '20"><span class="dim-tip">D' + d + ' \u2192 R' + ring + ' (p=' + PRIMES[ring] + ')</span></div>';
   }
-  // Fill remaining cells to complete the grid row (127 isn't divisible by 16)
-  const remainder = 16 - (DIM_COUNT % 16);
+  var remainder = 16 - (DIM_COUNT % 16);
   if (remainder < 16) {
-    for (let i = 0; i < remainder; i++) html += `<div class="dim-cell" style="background:transparent"></div>`;
+    for (var i = 0; i < remainder; i++) html += '<div class="dim-cell" style="background:transparent"></div>';
   }
   dimGridEl.innerHTML = html;
 
   // Slider listeners
   setupSlider('rotation');
   setupSlider('expansion');
-  setupSlider('dimfold', (v) => {
+  setupSlider('dimfold', function(v) {
     controls.dimFold = Math.round(v * 126 + 1);
     document.getElementById('sv-dimfold').textContent = controls.dimFold;
     activeDims = controls.dimFold;
-    document.getElementById('dim-active').textContent = `${controls.dimFold} / 127 dims`;
+    document.getElementById('dim-active').textContent = controls.dimFold + ' / 127 dims';
   });
-  setupSlider('phi', (v) => {
+  setupSlider('phi', function(v) {
     controls.phiPhase = v;
     document.getElementById('sv-phi').textContent = v.toFixed(2);
   });
@@ -871,34 +1344,32 @@ function initHUD() {
 }
 
 function setupSlider(name, customFn) {
-  const el = document.getElementById('sl-' + name);
+  var el = document.getElementById('sl-' + name);
   if (!el) return;
-  el.addEventListener('input', () => {
-    const v = el.value / 100;
-    if (customFn) {
-      customFn(v);
-    } else {
+  el.addEventListener('input', function() {
+    var v = el.value / 100;
+    if (customFn) { customFn(v); }
+    else {
       controls[name] = v;
-      const svEl = document.getElementById('sv-' + name);
+      var svEl = document.getElementById('sv-' + name);
       if (svEl) svEl.textContent = v.toFixed(2);
     }
   });
 }
 
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║  SHIELD MODES & FOLD OPERATIONS                                  ║
-// ╚══════════════════════════════════════════════════════════════════╝
-
 function setShieldMode(mode) {
   currentMode = mode;
-  const targets = SHIELD_MODES[mode].targets;
-  SHIELD_RINGS.forEach((r, i) => { r.target = targets[i]; });
-
-  document.querySelectorAll('.mode-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.mode === mode);
+  if (SHIELD_MODES[mode].targets) {
+    var targets = SHIELD_MODES[mode].targets;
+    SHIELD_RINGS.forEach(function(r, i) { r.target = targets[i]; });
+  }
+  document.querySelectorAll('.mode-btn').forEach(function(btn) {
+    btn.classList.remove('active', 'voice-active');
+    if (btn.dataset.mode === mode) {
+      btn.classList.add(mode === 'VOICE' ? 'voice-active' : 'active');
+    }
   });
-
-  const modeEl = document.getElementById('mv-mode');
+  var modeEl = document.getElementById('mv-mode');
   if (modeEl) modeEl.textContent = mode;
 }
 
@@ -915,33 +1386,20 @@ function triggerUnfold() {
 function triggerBloom() {
   bloomCascadeActive = true;
   bloomCascadeTime = 0;
-  // Bloom = unfold from center outward, ring by ring
-  SHIELD_RINGS.forEach((r, i) => {
-    r.target = 0;
-  });
+  SHIELD_RINGS.forEach(function(r) { r.target = 0; });
 }
 
 function triggerBreach() {
   breachActive = true;
-  breachRing = 2; // GATE is always the breach point
-
-  // Drop GATE integrity
+  breachRing = 2;
   SHIELD_RINGS[2].integrity = Math.max(0, SHIELD_RINGS[2].integrity - 0.5);
   SHIELD_RINGS[3].integrity = Math.max(0, SHIELD_RINGS[3].integrity - 0.25);
   SHIELD_RINGS[1].integrity = Math.max(0, SHIELD_RINGS[1].integrity - 0.15);
 
-  const alertEl = document.getElementById('breach-alert');
-  alertEl.textContent = '⚠ BREACH — R2 GATE COMPROMISED ⚠';
+  var alertEl = document.getElementById('breach-alert');
+  alertEl.textContent = '\u26A0 BREACH \u2014 R2 GATE COMPROMISED \u26A0';
   alertEl.style.opacity = '1';
-
-  const threatEl = document.getElementById('mv-threat');
-  if (threatEl) { threatEl.textContent = 'BREACH'; threatEl.className = 'mv red'; }
-
-  setTimeout(() => {
-    alertEl.style.opacity = '0';
-    breachActive = false;
-    if (threatEl) { threatEl.textContent = 'none'; threatEl.className = 'mv green'; }
-  }, 6000);
+  setTimeout(function() { alertEl.style.opacity = '0'; breachActive = false; }, 6000);
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
@@ -949,68 +1407,53 @@ function triggerBreach() {
 // ╚══════════════════════════════════════════════════════════════════╝
 
 function onMouseDown(e) {
-  isDragging = true;
-  dragPrevX = e.clientX;
-  dragPrevY = e.clientY;
-  orbitState.autoRotate = false;
-  orbitState.lastInteraction = Date.now();
+  isDragging = true; dragPrevX = e.clientX; dragPrevY = e.clientY;
+  orbitState.autoRotate = false; orbitState.lastInteraction = Date.now();
 }
 function onMouseUp() { isDragging = false; }
 function onMouseMove(e) {
   if (!isDragging) return;
   orbitState.theta -= (e.clientX - dragPrevX) * 0.005;
   orbitState.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbitState.phi - (e.clientY - dragPrevY) * 0.005));
-  dragPrevX = e.clientX;
-  dragPrevY = e.clientY;
+  dragPrevX = e.clientX; dragPrevY = e.clientY;
   orbitState.lastInteraction = Date.now();
 }
 function onWheel(e) {
   e.preventDefault();
   orbitState.radius = Math.max(3, Math.min(60, orbitState.radius + e.deltaY * 0.03));
-  orbitState.lastInteraction = Date.now();
-  orbitState.autoRotate = false;
+  orbitState.lastInteraction = Date.now(); orbitState.autoRotate = false;
 }
 
-let touchStartDist = 0, touchStartRadius = 0;
+var touchStartDist = 0, touchStartRadius = 0;
 function onTouchStart(e) {
   if (e.touches.length === 1) {
-    isDragging = true;
-    dragPrevX = e.touches[0].clientX;
-    dragPrevY = e.touches[0].clientY;
-    orbitState.autoRotate = false;
-    orbitState.lastInteraction = Date.now();
+    isDragging = true; dragPrevX = e.touches[0].clientX; dragPrevY = e.touches[0].clientY;
+    orbitState.autoRotate = false; orbitState.lastInteraction = Date.now();
   } else if (e.touches.length === 2) {
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    touchStartDist = Math.sqrt(dx*dx + dy*dy);
-    touchStartRadius = orbitState.radius;
+    var dx = e.touches[0].clientX - e.touches[1].clientX;
+    var dy = e.touches[0].clientY - e.touches[1].clientY;
+    touchStartDist = Math.sqrt(dx*dx + dy*dy); touchStartRadius = orbitState.radius;
   }
   e.preventDefault();
 }
 function onTouchMove(e) {
   if (e.touches.length === 1 && isDragging) {
-    const dx = e.touches[0].clientX - dragPrevX;
-    const dy = e.touches[0].clientY - dragPrevY;
-    orbitState.theta -= dx * 0.005;
-    orbitState.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbitState.phi - dy * 0.005));
-    dragPrevX = e.touches[0].clientX;
-    dragPrevY = e.touches[0].clientY;
+    orbitState.theta -= (e.touches[0].clientX - dragPrevX) * 0.005;
+    orbitState.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbitState.phi - (e.touches[0].clientY - dragPrevY) * 0.005));
+    dragPrevX = e.touches[0].clientX; dragPrevY = e.touches[0].clientY;
   } else if (e.touches.length === 2) {
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    const scale = touchStartDist / Math.max(dist, 1);
-    orbitState.radius = Math.max(3, Math.min(60, touchStartRadius * scale));
+    var dx = e.touches[0].clientX - e.touches[1].clientX;
+    var dy = e.touches[0].clientY - e.touches[1].clientY;
+    var dist = Math.sqrt(dx*dx + dy*dy);
+    orbitState.radius = Math.max(3, Math.min(60, touchStartRadius * (touchStartDist / Math.max(dist, 1))));
   }
-  orbitState.lastInteraction = Date.now();
-  e.preventDefault();
+  orbitState.lastInteraction = Date.now(); e.preventDefault();
 }
 function onTouchEnd() { isDragging = false; }
 
 function updateOrbitCamera() {
   if (Date.now() - orbitState.lastInteraction > 5000) orbitState.autoRotate = true;
   if (orbitState.autoRotate) orbitState.theta += 0.001 + controls.rotation * 0.003;
-
   camera.position.set(
     orbitState.radius * Math.sin(orbitState.phi) * Math.cos(orbitState.theta),
     orbitState.radius * Math.cos(orbitState.phi),
@@ -1018,128 +1461,124 @@ function updateOrbitCamera() {
   );
   camera.lookAt(0, 0, 0);
 }
-
 function onResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  ANIMATION LOOP                                                  ║
+// ║  ANIMATION LOOP — Voice Analysis + Shield Update + Render        ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
 function animate() {
   requestAnimationFrame(animate);
   animFrame++;
-  const time = (Date.now() - startTime) * 0.001;
+  var time = (Date.now() - startTime) * 0.001;
+
+  // ----- VOICE ANALYSIS (every frame) -----
+  analyzeVoice();
+  updateHarmonicEngine();
 
   updateOrbitCamera();
 
-  // ----- Update fold state -----
-  foldState += (foldTarget - foldState) * 0.02;
+  // ----- Fold state -----
+  foldState += (foldTarget - foldState) * 0.025;
 
   // ----- Bloom cascade -----
   if (bloomCascadeActive) {
     bloomCascadeTime += 0.016;
-    // Sequentially activate rings from inside out
-    for (let i = 0; i < 7; i++) {
-      const delay = i * 0.6;
+    for (var bc = 0; bc < 7; bc++) {
+      var delay = bc * 0.5;
       if (bloomCascadeTime > delay) {
-        const progress = Math.min(1, (bloomCascadeTime - delay) / 1.5);
-        SHIELD_RINGS[i].target = progress;
+        var progress = Math.min(1, (bloomCascadeTime - delay) / 1.2);
+        SHIELD_RINGS[bc].target = progress;
       }
     }
-    if (bloomCascadeTime > 7 * 0.6 + 1.5) {
+    if (bloomCascadeTime > 7 * 0.5 + 1.2) {
       bloomCascadeActive = false;
       foldTarget = 1.0;
     }
   }
 
   // ----- Update shield integrity -----
-  let totalIntegrity = 0;
-  const integrityArr = [];
+  var totalIntegrity = 0;
+  var integrityArr = [];
 
-  SHIELD_RINGS.forEach((ring, i) => {
-    ring.integrity += (ring.target - ring.integrity) * 0.04;
+  SHIELD_RINGS.forEach(function(ring, i) {
+    ring.integrity += (ring.target - ring.integrity) * 0.06;
     ring.integrity += ring.regen;
     ring.integrity = Math.max(0, Math.min(1, ring.integrity));
 
-    // Breach flicker
-    let displayInt = ring.integrity;
-    if (breachActive && (i === breachRing || i === breachRing - 1 || i === breachRing + 1)) {
+    var displayInt = ring.integrity;
+    if (breachActive && Math.abs(i - breachRing) <= 1) {
       displayInt += (Math.random() - 0.5) * 0.2;
       displayInt = Math.max(0, displayInt);
+    }
+
+    // R0 strobe in PULSED mode
+    if (i === 0 && voice.mode === 'PULSED') {
+      displayInt *= 0.5 + 0.5 * Math.abs(Math.sin(time * voice.pulseRate * Math.PI));
     }
 
     totalIntegrity += ring.integrity;
     integrityArr.push(ring.integrity);
 
-    // ----- Update ring visuals -----
-    const rm = shieldMeshes.rings[i];
+    var rm = shieldMeshes.rings[i];
     if (!rm) return;
 
-    const baseOpacity = displayInt;
+    rm.torusMat.opacity = 0.05 + displayInt * 0.55;
+    rm.torusMat.emissiveIntensity = displayInt * 0.4;
 
-    // Torus 1: primary
-    rm.torusMat.opacity = 0.05 + baseOpacity * 0.55;
-    rm.torusMat.emissiveIntensity = baseOpacity * 0.4;
-
-    // Torus 2: perpendicular
-    rm.torus2Mat.opacity = 0.02 + baseOpacity * 0.25;
-    rm.torus.rotation.x += (0.002 + baseOpacity * 0.008) * (i % 2 === 0 ? 1 : -1);
-    rm.torus.rotation.z += (0.001 + baseOpacity * 0.004) * (i % 3 === 0 ? 1 : -1);
-    rm.torus2.rotation.y += (0.003 + baseOpacity * 0.006) * (i % 2 === 0 ? -1 : 1);
+    rm.torus2Mat.opacity = 0.02 + displayInt * 0.25;
+    rm.torus.rotation.x += (0.002 + displayInt * 0.008) * (i % 2 === 0 ? 1 : -1);
+    rm.torus.rotation.z += (0.001 + displayInt * 0.004) * (i % 3 === 0 ? 1 : -1);
+    rm.torus2.rotation.y += (0.003 + displayInt * 0.006) * (i % 2 === 0 ? -1 : 1);
     rm.torus2.rotation.z += 0.001;
 
-    // Torus 3: tilted
-    rm.torus3Mat.opacity = 0.01 + baseOpacity * 0.15;
+    rm.torus3Mat.opacity = 0.01 + displayInt * 0.15;
     rm.torus3.rotation.x += 0.001 * (i + 1);
     rm.torus3.rotation.y -= 0.0005 * (i + 1);
 
-    // Ico wireframe
-    rm.icoMat.opacity = 0.02 + baseOpacity * 0.12;
+    rm.icoMat.opacity = 0.02 + displayInt * 0.12;
     rm.ico.rotation.y += 0.0008 * (i + 1) * displayInt;
     rm.ico.rotation.x += 0.0003 * (7 - i) * displayInt;
 
-    // Shell
-    rm.shellMat.opacity = baseOpacity * 0.04;
+    rm.shellMat.opacity = displayInt * 0.04;
 
-    // Scale by fold state
-    const scaleFactor = 0.3 + foldState * 0.7;
+    var scaleFactor = (0.3 + foldState * 0.7) * (0.8 + controls.expansion * 0.4);
     rm.group.scale.setScalar(scaleFactor);
-
-    // Expansion control
-    const expansionFactor = 0.8 + controls.expansion * 0.4;
-    rm.group.scale.multiplyScalar(expansionFactor);
   });
 
   // ----- Core -----
   if (shieldMeshes.core) {
-    const avgInt = totalIntegrity / 7;
-    const pulse = 0.9 + Math.sin(time * 2) * 0.1 * avgInt;
-    shieldMeshes.core.scale.setScalar(pulse);
+    var avgInt = totalIntegrity / 7;
+    var pulse = 0.9 + Math.sin(time * 2) * 0.1 * avgInt;
+    // Core pulses bigger with voice
+    var voiceBoost = 1 + voice.vagalTone * 0.3;
+    shieldMeshes.core.scale.setScalar(pulse * voiceBoost);
     shieldMeshes.core.material.emissiveIntensity = 0.3 + avgInt * 0.5;
     shieldMeshes.core.material.opacity = 0.5 + avgInt * 0.4;
 
-    const wire = orbGroup.getObjectByName('coreWire');
+    var wire = orbGroup.getObjectByName('coreWire');
     if (wire) {
       wire.rotation.y += 0.003;
       wire.rotation.x += 0.001;
-      wire.scale.setScalar(pulse * 1.1);
+      wire.scale.setScalar(pulse * voiceBoost * 1.1);
       wire.material.opacity = 0.1 + avgInt * 0.2;
     }
 
-    const coreLight = orbGroup.getObjectByName('coreLight');
+    var coreLight = orbGroup.getObjectByName('coreLight');
     if (coreLight) coreLight.intensity = 1 + avgInt * 3;
 
-    const softLight = orbGroup.getObjectByName('softLight');
+    var softLight = orbGroup.getObjectByName('softLight');
     if (softLight) softLight.intensity = 0.5 + avgInt * 2;
   }
 
   // ----- Particles -----
   if (shieldMeshes.particles) {
-    const u = shieldMeshes.particles.material.uniforms;
+    var u = shieldMeshes.particles.material.uniforms;
     u.uTime.value = time;
     u.uFold.value = foldState;
     u.uExpansion.value = controls.expansion;
@@ -1150,9 +1589,9 @@ function animate() {
   }
 
   // ----- Toroidal field lines -----
-  const coherence = computeCoherence(integrityArr);
-  shieldMeshes.toroidals.forEach((t) => {
-    const ringInt = integrityArr[t.ringIdx];
+  var coherence = voice.coherence;
+  shieldMeshes.toroidals.forEach(function(t) {
+    var ringInt = integrityArr[t.ringIdx];
     if (t.isInterRing) {
       t.mat.opacity = coherence * 0.08;
     } else {
@@ -1162,127 +1601,155 @@ function animate() {
   });
 
   // ----- Dimension threads -----
-  shieldMeshes.dimThreads.forEach((dt) => {
-    const isActive = dt.dim < controls.dimFold;
-    const ringInt = integrityArr[dt.ring];
+  shieldMeshes.dimThreads.forEach(function(dt) {
+    var isActive = dt.dim < controls.dimFold;
+    var ringInt = integrityArr[dt.ring];
     dt.mat.opacity = isActive ? (0.01 + ringInt * 0.04) * foldState : 0;
   });
 
   // ----- Dimension energy -----
-  for (let d = 0; d < DIM_COUNT; d++) {
-    const ring = d % 7;
+  for (var d = 0; d < DIM_COUNT; d++) {
+    var ring = d % 7;
     dimEnergy[d] += (integrityArr[ring] - dimEnergy[d]) * 0.05;
     dimPhase[d] += 0.02 * PRIMES[ring] / 17;
   }
 
-  // ----- Update HUD (every 3rd frame) -----
+  // ----- HUD (every 3rd frame) -----
   if (animFrame % 3 === 0) {
-    updateHUD(totalIntegrity, integrityArr, coherence, time);
+    updateHUD(totalIntegrity, integrityArr);
+  }
+
+  // ----- Waveform (every 2nd frame) -----
+  if (animFrame % 2 === 0 && waveformCtx) {
+    drawWaveform();
   }
 
   // ----- Clock (every 30 frames) -----
   if (animFrame % 30 === 0) {
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
-    const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
-    const s = String(elapsed % 60).padStart(2, '0');
-    document.getElementById('sys-clock').textContent = `${h}:${m}:${s}`;
+    var elapsed = Math.floor((Date.now() - startTime) / 1000);
+    var hh = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+    var mm = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+    var ss = String(elapsed % 60).padStart(2, '0');
+    document.getElementById('sys-clock').textContent = hh + ':' + mm + ':' + ss;
   }
 
   renderer.render(scene, camera);
 }
 
 // ╔══════════════════════════════════════════════════════════════════╗
-// ║  METRICS & HUD                                                   ║
+// ║  HUD UPDATE                                                      ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
-function computeCoherence(integrityArr) {
-  let coherence = 0;
-  for (let i = 0; i < 6; i++) {
-    const a = Math.max(integrityArr[i], 0.001);
-    const b = Math.max(integrityArr[i+1], 0.001);
-    const ratio = Math.max(a, b) / Math.min(a, b);
-    coherence += 1 - Math.min(1, Math.abs(ratio - PHI) / PHI);
-  }
-  return Math.max(0, coherence / 6);
-}
+function updateHUD(totalIntegrity, integrityArr) {
+  var avgInt = totalIntegrity / 7;
 
-function updateHUD(totalIntegrity, integrityArr, coherence, time) {
-  const avgInt = totalIntegrity / 7;
+  // Voice mode indicator
+  var vmEl = document.getElementById('voice-mode');
+  if (vmEl) {
+    vmEl.textContent = voice.mode;
+    vmEl.className = 'voice-mode ' + voice.mode.toLowerCase();
+  }
 
   // Shield bars
-  SHIELD_RINGS.forEach((ring, i) => {
-    const pct = Math.round(ring.integrity * 100);
-    const fillEl = document.getElementById('sfill-' + i);
-    const pctEl = document.getElementById('spct-' + i);
+  SHIELD_RINGS.forEach(function(ring, i) {
+    var pct = Math.round(ring.integrity * 100);
+    var fillEl = document.getElementById('sfill-' + i);
+    var pctEl = document.getElementById('spct-' + i);
     if (fillEl) fillEl.style.width = pct + '%';
     if (pctEl) pctEl.textContent = pct + '%';
   });
 
   // Bus bars
-  BUS_POWER.forEach((bus, i) => {
+  BUS_POWER.forEach(function(bus, i) {
     bus.power += ((integrityArr[bus.feeds[0]] + integrityArr[bus.feeds[1]]) / 2 - bus.power) * 0.08;
-    const fillEl = document.getElementById('bfill-' + i);
+    var fillEl = document.getElementById('bfill-' + i);
     if (fillEl) fillEl.style.width = Math.round(bus.power * 100) + '%';
   });
 
-  // Ring detail
-  const rdAvg = document.getElementById('rd-avg');
-  const rdFold = document.getElementById('rd-fold');
-  const rdCoh = document.getElementById('rd-coh');
-  const rdPsi = document.getElementById('rd-psi');
-  if (rdAvg) rdAvg.textContent = Math.round(avgInt * 100) + '%';
-  if (rdFold) rdFold.textContent = foldState.toFixed(2);
-  if (rdCoh) rdCoh.textContent = coherence.toFixed(3);
+  // Voice analysis meters
+  setMeter('vm-f0', voice.f0 / 500);
+  setMeter('vm-centroid', voice.spectralCentroid / 6000);
+  setMeter('vm-f1', voice.formants.f1 / 1000);
+  setMeter('vm-f2', voice.formants.f2 / 3000);
+  setMeter('vm-rms', voice.rms / 0.15);
 
-  const psiLevel = integrityArr[6] * 0.3 + integrityArr[5] * 0.3 + integrityArr[4] * 0.2 + coherence * 0.2;
-  if (rdPsi) rdPsi.textContent = psiLevel.toFixed(3);
+  // Ring detail
+  setText('rd-vagal', voice.vagalTone.toFixed(3));
+  setText('rd-fold', foldState.toFixed(2));
+  setText('rd-coh', voice.coherence.toFixed(3));
+  setText('rd-psi', voice.psiLevel.toFixed(3));
+  setText('rd-exhale', voice.exhaleRatio.toFixed(2));
+  setText('rd-sweep', Math.round(voice.sweep * 100) + '%');
 
   // Right panel metrics
-  const mvIntegrity = document.getElementById('mv-integrity');
-  const mvCoherence = document.getElementById('mv-coherence');
-  const mvFold = document.getElementById('mv-fold');
-  const mvDims = document.getElementById('mv-dims');
-  const mvBus = document.getElementById('mv-buspower');
-  const mvPsi = document.getElementById('mv-psi');
-  const mvPhi = document.getElementById('mv-phi');
-
-  if (mvIntegrity) mvIntegrity.textContent = Math.round(avgInt * 100) + '%';
-  if (mvCoherence) mvCoherence.textContent = coherence.toFixed(3);
-  if (mvFold) mvFold.textContent = foldState.toFixed(2);
-  if (mvDims) mvDims.textContent = `${controls.dimFold} / 127`;
-  if (mvBus) mvBus.textContent = BUS_POWER.reduce((s, b) => s + b.power, 0).toFixed(2);
-  if (mvPsi) mvPsi.textContent = psiLevel.toFixed(3);
-  if (mvPhi) mvPhi.textContent = (avgInt * PHI).toFixed(3);
+  setText('mv-integrity', Math.round(avgInt * 100) + '%');
+  setText('mv-coherence', voice.coherence.toFixed(3));
+  setText('mv-fold', foldState.toFixed(2));
+  setText('mv-dims', controls.dimFold + ' / 127');
+  setText('mv-vagal', voice.vagalTone.toFixed(3));
+  setText('mv-psi', voice.psiLevel.toFixed(3));
+  setText('mv-phi', (avgInt * PHI).toFixed(3));
+  setText('mv-f0', voice.f0 > 0 ? Math.round(voice.f0) + ' Hz' : '-');
+  setText('mv-vowel', voice.currentVowel || '-');
+  setText('mv-pulse', voice.pulseRate.toFixed(1));
 
   // Dimension grid (every 9th frame for perf)
   if (animFrame % 9 === 0) {
-    for (let d = 0; d < DIM_COUNT; d++) {
-      const cell = document.getElementById('dc-' + d);
+    for (var d = 0; d < DIM_COUNT; d++) {
+      var cell = document.getElementById('dc-' + d);
       if (!cell) continue;
-      const ring = d % 7;
-      const isActive = d < controls.dimFold;
-      const energy = isActive ? dimEnergy[d] : 0;
-      const hex = SHIELD_RINGS[ring].color;
-      // Parse hex to rgb and apply alpha
-      const alpha = Math.round(energy * 0.7 * 255).toString(16).padStart(2, '0');
-      cell.style.background = isActive ? hex + alpha : 'rgba(255,255,255,0.01)';
+      var rr = d % 7;
+      var isActive = d < controls.dimFold;
+      var energy = isActive ? dimEnergy[d] : 0;
+      var alpha = Math.round(energy * 0.7 * 255).toString(16).padStart(2, '0');
+      cell.style.background = isActive ? SHIELD_RINGS[rr].color + alpha : 'rgba(255,255,255,0.01)';
     }
   }
 }
 
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║  UTILITIES                                                       ║
-// ╚══════════════════════════════════════════════════════════════════╝
+function setMeter(id, value) {
+  var el = document.getElementById(id);
+  if (el) el.style.width = Math.min(100, Math.max(0, value * 100)) + '%';
+}
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function setText(id, text) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function drawWaveform() {
+  var w = waveformCtx.canvas.width;
+  var h = waveformCtx.canvas.height;
+  waveformCtx.clearRect(0, 0, w, h);
+
+  // Color based on voice mode
+  var color;
+  if (voice.mode === 'PULSED') color = '#ff6600';
+  else if (voice.mode === 'SUSTAINED') color = '#00ccff';
+  else color = '#cc44ff';
+
+  waveformCtx.strokeStyle = color;
+  waveformCtx.lineWidth = 1;
+  waveformCtx.globalAlpha = 0.7;
+  waveformCtx.beginPath();
+
+  var step = Math.floor(timeData.length / w);
+  for (var i = 0; i < w; i++) {
+    var val = timeData[i * step] || 0;
+    var y = (val + 1) / 2 * h;
+    if (i === 0) waveformCtx.moveTo(i, y);
+    else waveformCtx.lineTo(i, y);
+  }
+  waveformCtx.stroke();
+  waveformCtx.globalAlpha = 1;
+}
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  LAUNCH                                                          ║
 // ╚══════════════════════════════════════════════════════════════════╝
 
 document.getElementById('boot-enter').addEventListener('click', enterFold);
-runBoot().catch(err => console.error('Boot failed:', err));
+runBoot().catch(function(err) { console.error('Boot failed:', err); });
 </script>
 </body>
 </html>
