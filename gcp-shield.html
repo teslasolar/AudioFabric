@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GCP Shield — Global Consciousness Sonifier</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e7;font-family:'JetBrains Mono',monospace;font-size:11px}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:rgba(6,4,14,0.5)}
+::-webkit-scrollbar-thumb{background:rgba(255,215,0,0.2);border-radius:2px}
+
+/* BOOT */
+#boot-screen{position:fixed;inset:0;z-index:9999;background:#06040e;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 1.2s}
+#boot-screen.hidden{opacity:0;pointer-events:none}
+.boot-logo{font-family:'Instrument Serif',serif;font-style:italic;font-size:38px;color:#ffd700;margin-bottom:8px;text-shadow:0 0 40px rgba(255,215,0,0.2)}
+.boot-sub{font-size:10px;color:rgba(255,248,231,0.3);letter-spacing:3px;text-transform:uppercase;margin-bottom:32px}
+.boot-phase{display:flex;align-items:center;gap:12px;padding:5px 0;font-size:11px;opacity:0.2;transition:opacity 0.4s,color 0.4s}
+.boot-phase.active{opacity:1;color:#0af}
+.boot-phase.done{opacity:0.8;color:#4f8}
+.boot-phase .prime{color:#ffd700;font-weight:700;width:32px;text-align:right}
+.boot-phase .label{width:260px}
+.boot-phase .status{width:20px;text-align:center;font-size:13px}
+#boot-enter{margin-top:24px;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.3);color:#ffd700;padding:8px 28px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;border-radius:2px;display:none;transition:background 0.3s}
+#boot-enter:hover{background:rgba(255,215,0,0.2)}
+
+/* LAYOUT — split screen */
+#main-wrap{display:none;width:100%;height:100%;position:relative}
+#shield-left{position:absolute;left:0;top:0;width:50%;height:100%;border-right:1px solid rgba(255,215,0,0.08)}
+#shield-right{position:absolute;right:0;top:0;width:50%;height:100%}
+.shield-label{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,248,231,0.3);z-index:10;pointer-events:none}
+.shield-label.coherent{color:rgba(0,200,255,0.4)}
+.shield-label.inverted{color:rgba(255,80,120,0.4)}
+
+/* GCP CENTER PANEL */
+#gcp-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;display:flex;flex-direction:column;align-items:center;pointer-events:none;gap:6px}
+#gcp-dot{width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,#4f8 0%,rgba(79,255,136,0.1) 70%,transparent 100%);transition:background 2s,box-shadow 2s;box-shadow:0 0 40px rgba(79,255,136,0.15)}
+#gcp-dot-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,248,231,0.3)}
+#gcp-value{font-size:18px;font-weight:700;color:#fff8e7}
+#gcp-color-name{font-size:10px;color:rgba(255,248,231,0.4);letter-spacing:1px}
+#gcp-z{font-size:10px;color:rgba(0,170,255,0.6)}
+#gcp-link{font-size:9px;pointer-events:auto}
+#gcp-link a{color:rgba(255,215,0,0.4);text-decoration:none}
+#gcp-link a:hover{color:#ffd700}
+
+/* SONIFICATION DISPLAY */
+#sono-panel{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:20;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
+#sono-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,248,231,0.2)}
+.sono-row{display:flex;gap:4px;align-items:center}
+.sono-osc{width:40px;height:14px;border-radius:2px;background:rgba(255,215,0,0.05);border:1px solid rgba(255,215,0,0.1);overflow:hidden;position:relative}
+.sono-osc .fill{position:absolute;left:0;top:0;height:100%;background:rgba(255,215,0,0.3);transition:width 0.3s}
+.sono-osc .hz{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:rgba(255,248,231,0.5)}
+
+/* EGG GRID */
+#egg-grid{position:absolute;top:40px;left:50%;transform:translateX(-50%);z-index:20;display:flex;flex-wrap:wrap;justify-content:center;gap:2px;width:200px;pointer-events:none}
+.egg{width:8px;height:8px;border-radius:50%;background:rgba(79,255,136,0.15);transition:background 0.5s}
+
+/* HUD overlays */
+#hud-left{position:absolute;top:30px;left:10px;z-index:15;pointer-events:none}
+#hud-right{position:absolute;top:30px;right:10px;z-index:15;pointer-events:none;text-align:right}
+.hud-section{margin-bottom:10px}
+.hud-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,248,231,0.2);margin-bottom:3px}
+.ring-row{display:flex;align-items:center;gap:4px;padding:1px 0}
+.ring-prime{color:#ffd700;font-weight:700;width:22px;font-size:10px}
+.ring-bar{width:60px;height:6px;background:rgba(255,248,231,0.04);border-radius:1px;overflow:hidden}
+.ring-fill{height:100%;background:rgba(0,170,255,0.5);transition:width 0.3s;border-radius:1px}
+.ring-fill.inv{background:rgba(255,80,120,0.5)}
+.ring-pct{width:28px;text-align:right;font-size:9px;color:rgba(255,248,231,0.4)}
+
+/* CONTROLS */
+#ctrl-bar{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:8px;pointer-events:auto}
+.ctrl-btn{background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.15);color:rgba(255,248,231,0.5);padding:4px 12px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:2px;transition:all 0.3s}
+.ctrl-btn:hover{background:rgba(255,215,0,0.15);color:#fff8e7}
+.ctrl-btn.active{background:rgba(255,215,0,0.2);color:#ffd700;border-color:rgba(255,215,0,0.5)}
+
+#sys-clock{position:absolute;bottom:6px;right:10px;font-size:9px;color:rgba(255,248,231,0.15);z-index:15}
+</style>
+</head>
+<body>
+
+<!-- BOOT SCREEN -->
+<div id="boot-screen">
+  <div class="boot-logo">GCP Shield</div>
+  <div class="boot-sub">Global Consciousness Sonifier · 127D</div>
+  <div id="boot-phases">
+    <div class="boot-phase" id="bp-2"><span class="prime">p=2</span><span class="label">Initializing egg network (65 REGs)</span><span class="status">·</span></div>
+    <div class="boot-phase" id="bp-3"><span class="prime">p=3</span><span class="label">Calibrating random baselines</span><span class="status">·</span></div>
+    <div class="boot-phase" id="bp-5"><span class="prime">p=5</span><span class="label">Building dual shield geometry</span><span class="status">·</span></div>
+    <div class="boot-phase" id="bp-7"><span class="prime">p=7</span><span class="label">Initializing sonification engine</span><span class="status">·</span></div>
+    <div class="boot-phase" id="bp-11"><span class="prime">p=11</span><span class="label">Linking consciousness coherence</span><span class="status">·</span></div>
+    <div class="boot-phase" id="bp-13"><span class="prime">p=13</span><span class="label">Calibrating shield inversion matrix</span><span class="status">·</span></div>
+    <div class="boot-phase" id="bp-17"><span class="prime">p=17</span><span class="label">Observer lock · φ convergence</span><span class="status">·</span></div>
+  </div>
+  <button id="boot-enter">ENTER CONSCIOUSNESS FIELD</button>
+</div>
+
+<!-- MAIN -->
+<div id="main-wrap">
+  <div id="shield-left">
+    <div class="shield-label coherent">COHERENCE</div>
+    <canvas id="canvas-left"></canvas>
+  </div>
+  <div id="shield-right">
+    <div class="shield-label inverted">INVERSION</div>
+    <canvas id="canvas-right"></canvas>
+  </div>
+
+  <!-- GCP CENTER -->
+  <div id="gcp-panel">
+    <div id="gcp-dot-label">GCP DOT</div>
+    <div id="gcp-dot"></div>
+    <div id="gcp-value">0.000</div>
+    <div id="gcp-color-name">GREEN · BASELINE</div>
+    <div id="gcp-z">Z: 0.000</div>
+    <div id="gcp-link"><a href="https://gcpdot.com/" target="_blank">gcpdot.com</a></div>
+  </div>
+
+  <!-- EGG GRID -->
+  <div id="egg-grid"></div>
+
+  <!-- RING HUDs -->
+  <div id="hud-left">
+    <div class="hud-section">
+      <div class="hud-title">Coherence Rings</div>
+      <div class="ring-row"><span class="ring-prime">R0</span><div class="ring-bar"><div class="ring-fill" id="cfill-0"></div></div><span class="ring-pct" id="cpct-0">0%</span></div>
+      <div class="ring-row"><span class="ring-prime">R1</span><div class="ring-bar"><div class="ring-fill" id="cfill-1"></div></div><span class="ring-pct" id="cpct-1">0%</span></div>
+      <div class="ring-row"><span class="ring-prime">R2</span><div class="ring-bar"><div class="ring-fill" id="cfill-2"></div></div><span class="ring-pct" id="cpct-2">0%</span></div>
+      <div class="ring-row"><span class="ring-prime">R3</span><div class="ring-bar"><div class="ring-fill" id="cfill-3"></div></div><span class="ring-pct" id="cpct-3">0%</span></div>
+      <div class="ring-row"><span class="ring-prime">R4</span><div class="ring-bar"><div class="ring-fill" id="cfill-4"></div></div><span class="ring-pct" id="cpct-4">0%</span></div>
+      <div class="ring-row"><span class="ring-prime">R5</span><div class="ring-bar"><div class="ring-fill" id="cfill-5"></div></div><span class="ring-pct" id="cpct-5">0%</span></div>
+      <div class="ring-row"><span class="ring-prime">R6</span><div class="ring-bar"><div class="ring-fill" id="cfill-6"></div></div><span class="ring-pct" id="cpct-6">0%</span></div>
+    </div>
+    <div class="hud-section">
+      <div class="hud-title">Metrics</div>
+      <div style="font-size:9px;color:rgba(255,248,231,0.3);line-height:1.6">
+        <div>Variance: <span id="m-var" style="color:rgba(0,200,255,0.6)">0.000</span></div>
+        <div>Stouffer Z: <span id="m-z" style="color:rgba(0,200,255,0.6)">0.000</span></div>
+        <div>Coherence: <span id="m-coh" style="color:rgba(0,200,255,0.6)">0.000</span></div>
+        <div>Eggs Active: <span id="m-eggs" style="color:rgba(0,200,255,0.6)">0/65</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="hud-right">
+    <div class="hud-section">
+      <div class="hud-title">Inversion Rings</div>
+      <div class="ring-row"><span class="ring-pct" id="ipct-0">0%</span><div class="ring-bar"><div class="ring-fill inv" id="ifill-0"></div></div><span class="ring-prime">R0</span></div>
+      <div class="ring-row"><span class="ring-pct" id="ipct-1">0%</span><div class="ring-bar"><div class="ring-fill inv" id="ifill-1"></div></div><span class="ring-prime">R1</span></div>
+      <div class="ring-row"><span class="ring-pct" id="ipct-2">0%</span><div class="ring-bar"><div class="ring-fill inv" id="ifill-2"></div></div><span class="ring-prime">R2</span></div>
+      <div class="ring-row"><span class="ring-pct" id="ipct-3">0%</span><div class="ring-bar"><div class="ring-fill inv" id="ifill-3"></div></div><span class="ring-prime">R3</span></div>
+      <div class="ring-row"><span class="ring-pct" id="ipct-4">0%</span><div class="ring-bar"><div class="ring-fill inv" id="ifill-4"></div></div><span class="ring-prime">R4</span></div>
+      <div class="ring-row"><span class="ring-pct" id="ipct-5">0%</span><div class="ring-bar"><div class="ring-fill inv" id="ifill-5"></div></div><span class="ring-prime">R5</span></div>
+      <div class="ring-row"><span class="ring-pct" id="ipct-6">0%</span><div class="ring-bar"><div class="ring-fill inv" id="ifill-6"></div></div><span class="ring-prime">R6</span></div>
+    </div>
+    <div class="hud-section">
+      <div class="hud-title">Sonification</div>
+      <div style="font-size:9px;color:rgba(255,248,231,0.3);line-height:1.6">
+        <div>Key: <span id="m-key" style="color:rgba(255,215,0,0.6)">—</span></div>
+        <div>Harmony: <span id="m-harm" style="color:rgba(255,215,0,0.6)">0.000</span></div>
+        <div>Tempo: <span id="m-tempo" style="color:rgba(255,215,0,0.6)">60 BPM</span></div>
+        <div>Density: <span id="m-dens" style="color:rgba(255,215,0,0.6)">0.000</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div id="ctrl-bar">
+    <button class="ctrl-btn active" id="btn-sound" onclick="toggleSound()">SOUND ON</button>
+    <button class="ctrl-btn" onclick="setEggCount(32)">32 EGGS</button>
+    <button class="ctrl-btn active" onclick="setEggCount(65)">65 EGGS</button>
+    <button class="ctrl-btn" onclick="triggerCoherence()">COHERENCE SURGE</button>
+    <button class="ctrl-btn" onclick="triggerAntiCoherence()">ANTI-COHERENCE</button>
+  </div>
+
+  <!-- SONIFICATION BARS -->
+  <div id="sono-panel">
+    <div id="sono-label">PRIME HARMONICS</div>
+    <div class="sono-row">
+      <div class="sono-osc"><div class="fill" id="of-0"></div><div class="hz">110</div></div>
+      <div class="sono-osc"><div class="fill" id="of-1"></div><div class="hz">165</div></div>
+      <div class="sono-osc"><div class="fill" id="of-2"></div><div class="hz">275</div></div>
+      <div class="sono-osc"><div class="fill" id="of-3"></div><div class="hz">385</div></div>
+      <div class="sono-osc"><div class="fill" id="of-4"></div><div class="hz">605</div></div>
+      <div class="sono-osc"><div class="fill" id="of-5"></div><div class="hz">715</div></div>
+      <div class="sono-osc"><div class="fill" id="of-6"></div><div class="hz">935</div></div>
+    </div>
+  </div>
+
+  <div id="sys-clock">00:00:00</div>
+</div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CONSTANTS & PRIMES                                              ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+var PRIMES = [2,3,5,7,11,13,17];
+var PHI = (1+Math.sqrt(5))/2;
+var DIM_COUNT = 127;
+var BASE_HZ = 55;
+var PRIME_FREQS = PRIMES.map(function(p){return p*BASE_HZ;});
+var NUM_EGGS = 65;
+var TRIALS_PER_SAMPLE = 200;
+
+// GCP dot color thresholds (network variance → color)
+var DOT_COLORS = [
+  {min:-Infinity, max:-2,   color:'#2488ff', name:'DEEP BLUE · ANTI-COHERENT', r:36,g:136,b:255},
+  {min:-2,        max:-1,   color:'#48a0ff', name:'BLUE · LOW ANTI-COHERENCE', r:72,g:160,b:255},
+  {min:-1,        max:-0.5, color:'#80ccff', name:'LIGHT BLUE · SLIGHT ANTI', r:128,g:204,b:255},
+  {min:-0.5,      max:0.5,  color:'#4ff88a', name:'GREEN · BASELINE', r:79,g:248,b:138},
+  {min:0.5,       max:1,    color:'#ffe040', name:'YELLOW · SLIGHT COHERENCE', r:255,g:224,b:64},
+  {min:1,         max:2,    color:'#ffa040', name:'ORANGE · MODERATE COHERENCE', r:255,g:160,b:64},
+  {min:2,         max:Infinity, color:'#ff4060', name:'RED · STRONG COHERENCE', r:255,g:64,b:96}
+];
+
+// Shield ring definitions (same architecture as other pages)
+var RING_DEFS = [
+  {prime:2,  name:'Diaphragm', baseR:2.2, color:0xff4444},
+  {prime:3,  name:'Laryngeal', baseR:3.5, color:0xff8800},
+  {prime:5,  name:'Gate',      baseR:5.0, color:0xffdd00},
+  {prime:7,  name:'Thoracic',  baseR:6.8, color:0x44ff44},
+  {prime:11, name:'Pharyngeal',baseR:8.8, color:0x00aaff},
+  {prime:13, name:'Oral',      baseR:11.0,color:0x8844ff},
+  {prime:17, name:'Observer',  baseR:13.5,color:0xff44ff}
+];
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  STATE                                                            ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+var startTime = Date.now();
+var animFrame = 0;
+var soundEnabled = false;
+var audioCtx = null;
+var oscillators = [];
+var oscGains = [];
+var masterGain = null;
+
+// GCP simulation state
+var eggs = [];
+var gcpVariance = 0;
+var gcpZ = 0;
+var gcpCoherence = 0;
+var gcpSmoothed = 0;
+var gcpHistory = [];
+var coherenceSurge = 0;
+var antiCoherenceSurge = 0;
+
+// Shield states — coherent (left) and inverted (right)
+var cohRings = [], invRings = [];
+for(var i=0;i<7;i++){
+  cohRings.push({integrity:0, target:0.5, regen:0.001});
+  invRings.push({integrity:0, target:0.5, regen:0.001});
+}
+
+var cohFold = 0, cohFoldTarget = 0.5;
+var invFold = 0, invFoldTarget = 0.5;
+
+// Three.js — two renderers
+var sceneL, sceneR, cameraL, cameraR, rendererL, rendererR;
+var cohMeshes = {rings:[],particles:null,toroidals:[],dimThreads:[],core:null};
+var invMeshes = {rings:[],particles:null,toroidals:[],dimThreads:[],core:null};
+var orbGroupL, orbGroupR;
+var dimEnergy = new Float32Array(DIM_COUNT);
+var dimPhase = new Float32Array(DIM_COUNT);
+for(var d=0;d<DIM_COUNT;d++){dimPhase[d]=d*PHI;}
+
+// Orbit state (shared for simplicity — both cameras follow same orbit)
+var orbitState = {theta:0, phi:Math.PI*0.45, radius:22, autoRotate:true, lastInteraction:0};
+var isDragging = false, dragPrevX = 0, dragPrevY = 0;
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  GCP EGG NETWORK SIMULATION                                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function initEggs() {
+  eggs = [];
+  var grid = document.getElementById('egg-grid');
+  grid.innerHTML = '';
+  for(var i=0;i<NUM_EGGS;i++){
+    eggs.push({z:0, trialMean:100, active:true});
+    var el = document.createElement('div');
+    el.className = 'egg';
+    el.id = 'egg-'+i;
+    grid.appendChild(el);
+  }
+}
+
+function sampleEggs() {
+  // Each egg: sum of 200 random bits (binomial[200,0.5])
+  // Expected mean=100, variance=50, SD≈7.07
+  var crypto = window.crypto || window.msCrypto;
+  var zScores = [];
+  var sd = Math.sqrt(50); // theoretical SD for binomial(200,0.5)
+
+  for(var i=0;i<eggs.length;i++){
+    if(!eggs[i].active) continue;
+    var sum = 0;
+    if(crypto && crypto.getRandomValues){
+      // Use hardware RNG — just like real GCP eggs use hardware REGs
+      var bytes = new Uint8Array(25); // 200 bits = 25 bytes
+      crypto.getRandomValues(bytes);
+      for(var b=0;b<25;b++){
+        var byte = bytes[b];
+        for(var bit=0;bit<8;bit++){sum += (byte>>bit)&1;}
+      }
+    } else {
+      for(var t=0;t<TRIALS_PER_SAMPLE;t++){sum += Math.random()<0.5?1:0;}
+    }
+
+    // Apply coherence/anti-coherence surges (simulates global events)
+    if(coherenceSurge > 0){
+      sum += coherenceSurge * (2 + Math.random()*3); // bias toward same direction
+    }
+    if(antiCoherenceSurge > 0){
+      sum += antiCoherenceSurge * (Math.random()>0.5?1:-1) * 4; // increase variance
+    }
+
+    eggs[i].trialMean = sum;
+    var z = (sum - 100) / sd;
+    eggs[i].z = z;
+    zScores.push(z);
+
+    // Color egg based on z-score
+    var el = document.getElementById('egg-'+i);
+    if(el){
+      var az = Math.abs(z);
+      if(az < 1) el.style.background = 'rgba(79,248,138,'+(.15+az*.2)+')';
+      else if(z > 0) el.style.background = 'rgba(255,'+(160-Math.min(az*40,100))+','+(64)+','+(0.3+Math.min(az*.2,.7))+')';
+      else el.style.background = 'rgba('+(36+Math.min(az*30,100))+','+(136+Math.min(az*20,80))+',255,'+(0.3+Math.min(az*.2,.7))+')';
+    }
+  }
+
+  if(zScores.length === 0) return;
+
+  // Stouffer Z: sum of z-scores / sqrt(n)
+  var sumZ = 0;
+  for(var j=0;j<zScores.length;j++) sumZ += zScores[j];
+  gcpZ = sumZ / Math.sqrt(zScores.length);
+
+  // Network variance = Z²
+  gcpVariance = gcpZ * gcpZ * (gcpZ > 0 ? 1 : -1); // signed for direction
+
+  // Smooth
+  gcpSmoothed += (gcpVariance - gcpSmoothed) * 0.15;
+  gcpCoherence = Math.max(-1, Math.min(1, gcpSmoothed / 3));
+
+  // History
+  gcpHistory.push(gcpSmoothed);
+  if(gcpHistory.length > 300) gcpHistory.shift();
+
+  // Decay surges
+  coherenceSurge *= 0.97;
+  antiCoherenceSurge *= 0.97;
+  if(coherenceSurge < 0.01) coherenceSurge = 0;
+  if(antiCoherenceSurge < 0.01) antiCoherenceSurge = 0;
+}
+
+function getDotColor(val) {
+  for(var i=0;i<DOT_COLORS.length;i++){
+    if(val >= DOT_COLORS[i].min && val < DOT_COLORS[i].max) return DOT_COLORS[i];
+  }
+  return DOT_COLORS[3]; // green baseline
+}
+
+function updateDotDisplay() {
+  var dc = getDotColor(gcpSmoothed);
+  var dot = document.getElementById('gcp-dot');
+  var size = 60 + Math.min(Math.abs(gcpSmoothed)*15, 40);
+  dot.style.width = size+'px';
+  dot.style.height = size+'px';
+  dot.style.background = 'radial-gradient(circle,'+dc.color+' 0%,'+dc.color+'33 70%,transparent 100%)';
+  dot.style.boxShadow = '0 0 '+(30+Math.abs(gcpSmoothed)*20)+'px '+dc.color+'44';
+  document.getElementById('gcp-value').textContent = gcpSmoothed.toFixed(3);
+  document.getElementById('gcp-color-name').textContent = dc.name;
+  document.getElementById('gcp-z').textContent = 'Z: '+gcpZ.toFixed(3);
+  document.getElementById('m-var').textContent = gcpVariance.toFixed(3);
+  document.getElementById('m-z').textContent = gcpZ.toFixed(3);
+  document.getElementById('m-coh').textContent = gcpCoherence.toFixed(3);
+  var activeCount = eggs.filter(function(e){return e.active;}).length;
+  document.getElementById('m-eggs').textContent = activeCount+'/'+NUM_EGGS;
+}
+
+function setEggCount(n) {
+  NUM_EGGS = n;
+  initEggs();
+  document.querySelectorAll('.ctrl-btn').forEach(function(b){
+    if(b.textContent.indexOf('EGGS')>-1) b.classList.remove('active');
+    if(b.textContent === n+' EGGS') b.classList.add('active');
+  });
+}
+
+function triggerCoherence() { coherenceSurge = 1; }
+function triggerAntiCoherence() { antiCoherenceSurge = 1; }
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  GCP → SHIELD MAPPING                                            ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function mapGCPToShields() {
+  // Coherence shield: positive variance → stronger integrity
+  // Inversion shield: negative variance → stronger integrity (mirror)
+  var coh = gcpCoherence; // -1 to 1
+
+  // Map individual egg z-scores to specific rings
+  for(var r=0;r<7;r++){
+    var ringEggs = [];
+    for(var e=0;e<eggs.length;e++){
+      if(eggs[e].active && (e % 7 === r)) ringEggs.push(eggs[e].z);
+    }
+    var avgZ = 0;
+    if(ringEggs.length > 0){
+      for(var j=0;j<ringEggs.length;j++) avgZ += ringEggs[j];
+      avgZ /= ringEggs.length;
+    }
+
+    // Coherent shield: responds to positive deviations
+    cohRings[r].target = Math.max(0.1, Math.min(1, 0.5 + avgZ*0.2 + coh*0.3));
+    // Inverted shield: responds to negative deviations (mirror)
+    invRings[r].target = Math.max(0.1, Math.min(1, 0.5 - avgZ*0.2 - coh*0.3));
+  }
+
+  // Fold states
+  cohFoldTarget = 0.3 + Math.max(0, coh) * 0.7; // coherence unfolds
+  invFoldTarget = 0.3 + Math.max(0, -coh) * 0.7; // anti-coherence unfolds inversion
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  SONIFICATION ENGINE                                              ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.12;
+  masterGain.connect(audioCtx.destination);
+
+  var types = ['sine','triangle','sawtooth','sine','triangle','sine','sine'];
+  for(var i=0;i<7;i++){
+    var osc = audioCtx.createOscillator();
+    osc.type = types[i];
+    osc.frequency.value = PRIME_FREQS[i];
+    var g = audioCtx.createGain();
+    g.gain.value = 0;
+    osc.connect(g);
+
+    // Add filter for richer sound
+    if(i === 2){ // sawtooth gets lowpass
+      var lp = audioCtx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 800;
+      lp.Q.value = 2;
+      g.disconnect();
+      osc.connect(lp);
+      lp.connect(g = audioCtx.createGain());
+      g.gain.value = 0;
+    }
+
+    g.connect(masterGain);
+    osc.start();
+    oscillators.push(osc);
+    oscGains.push(g);
+  }
+}
+
+function updateSonification() {
+  if(!audioCtx || !soundEnabled) return;
+  var now = audioCtx.currentTime;
+
+  for(var i=0;i<7;i++){
+    var ringInt = cohRings[i].integrity;
+    var invInt = invRings[i].integrity;
+
+    // Blend: coherence ring drives volume, inversion modulates pitch slightly
+    var vol = ringInt * 0.08;
+    var detune = (invInt - 0.5) * 30; // ±15 cents detuning from inversion
+
+    oscGains[i].gain.linearRampToValueAtTime(vol, now+0.1);
+    oscillators[i].detune.linearRampToValueAtTime(detune, now+0.1);
+
+    // Update sono display
+    var fill = document.getElementById('of-'+i);
+    if(fill) fill.style.width = Math.round(ringInt*100)+'%';
+  }
+
+  // Tempo feel: modulate master gain with GCP rhythm
+  var tempo = 60 + gcpCoherence * 40; // 20-100 BPM range
+  var beatPhase = (audioCtx.currentTime * tempo / 60) % 1;
+  var beatPulse = beatPhase < 0.1 ? 1 : 0.7 + 0.3*Math.exp(-beatPhase*5);
+  masterGain.gain.linearRampToValueAtTime(0.12 * beatPulse, now+0.05);
+
+  // Update sono HUD
+  var keyNames = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+  var keyIdx = Math.floor((gcpCoherence+1)*6) % 12;
+  document.getElementById('m-key').textContent = keyNames[keyIdx]+' '+(gcpCoherence>0?'Major':'Minor');
+  document.getElementById('m-harm').textContent = Math.abs(gcpCoherence).toFixed(3);
+  document.getElementById('m-tempo').textContent = Math.round(tempo)+' BPM';
+  document.getElementById('m-dens').textContent = (cohRings.reduce(function(s,r){return s+r.integrity;},0)/7).toFixed(3);
+}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  var btn = document.getElementById('btn-sound');
+  btn.textContent = soundEnabled ? 'SOUND ON' : 'SOUND OFF';
+  btn.classList.toggle('active', soundEnabled);
+  if(soundEnabled && !audioCtx) initAudio();
+  if(!soundEnabled && oscGains){
+    oscGains.forEach(function(g){g.gain.linearRampToValueAtTime(0, audioCtx.currentTime+0.3);});
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  THREE.JS — DUAL SHIELD SCENES                                   ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function initScenes() {
+  // LEFT — Coherence
+  var canvasL = document.getElementById('canvas-left');
+  rendererL = new THREE.WebGLRenderer({canvas:canvasL, antialias:true, alpha:true});
+  rendererL.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  sceneL = new THREE.Scene();
+  cameraL = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+
+  // RIGHT — Inversion
+  var canvasR = document.getElementById('canvas-right');
+  rendererR = new THREE.WebGLRenderer({canvas:canvasR, antialias:true, alpha:true});
+  rendererR.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  sceneR = new THREE.Scene();
+  cameraR = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+
+  orbGroupL = new THREE.Group();
+  orbGroupR = new THREE.Group();
+  sceneL.add(orbGroupL);
+  sceneR.add(orbGroupR);
+
+  buildShield(orbGroupL, cohMeshes, false);
+  buildShield(orbGroupR, invMeshes, true);
+
+  onResize();
+  window.addEventListener('resize', onResize);
+
+  // Mouse controls on left canvas
+  canvasL.addEventListener('mousedown', onMouseDown);
+  canvasL.addEventListener('mousemove', onMouseMove);
+  canvasL.addEventListener('mouseup', onMouseUp);
+  canvasL.addEventListener('wheel', onWheel, {passive:false});
+  // Right canvas too
+  canvasR.addEventListener('mousedown', onMouseDown);
+  canvasR.addEventListener('mousemove', onMouseMove);
+  canvasR.addEventListener('mouseup', onMouseUp);
+  canvasR.addEventListener('wheel', onWheel, {passive:false});
+  // Touch
+  canvasL.addEventListener('touchstart', onTouchStart, {passive:false});
+  canvasL.addEventListener('touchmove', onTouchMove, {passive:false});
+  canvasL.addEventListener('touchend', onTouchEnd);
+  canvasR.addEventListener('touchstart', onTouchStart, {passive:false});
+  canvasR.addEventListener('touchmove', onTouchMove, {passive:false});
+  canvasR.addEventListener('touchend', onTouchEnd);
+}
+
+function buildShield(group, meshes, isInverted) {
+  var hueShift = isInverted ? 0.5 : 0; // inversion = complementary colors
+
+  // Core
+  var coreGeo = new THREE.IcosahedronGeometry(1.5, 3);
+  var coreMat = new THREE.MeshPhongMaterial({
+    color: isInverted ? 0xff4488 : 0x00aaff,
+    emissive: isInverted ? 0xff2266 : 0x0088cc,
+    emissiveIntensity: 0.3,
+    transparent: true,
+    opacity: 0.6,
+    wireframe: false,
+    side: THREE.DoubleSide
+  });
+  var core = new THREE.Mesh(coreGeo, coreMat);
+  group.add(core);
+  meshes.core = core;
+
+  var coreWire = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1.7, 2),
+    new THREE.MeshBasicMaterial({color: isInverted ? 0xff6699 : 0x44ccff, wireframe:true, transparent:true, opacity:0.15})
+  );
+  coreWire.name = 'coreWire';
+  group.add(coreWire);
+
+  // Lights
+  var cl = new THREE.PointLight(isInverted ? 0xff4488 : 0x00aaff, 2, 50);
+  cl.name = 'coreLight';
+  group.add(cl);
+  var sl = new THREE.PointLight(isInverted ? 0xff2266 : 0x0066aa, 1, 80);
+  sl.position.set(0, 10, 0);
+  sl.name = 'softLight';
+  group.add(sl);
+  group.add(new THREE.AmbientLight(0x111122, 0.3));
+
+  // 7 rings
+  meshes.rings = [];
+  for(var i=0;i<7;i++){
+    var rd = RING_DEFS[i];
+    var ringGroup = new THREE.Group();
+    var ringColor = new THREE.Color(rd.color);
+    if(isInverted){
+      // Shift hue by 180°
+      var hsl = {};
+      ringColor.getHSL(hsl);
+      ringColor.setHSL((hsl.h+0.5)%1, hsl.s, hsl.l);
+    }
+
+    // Torus 1
+    var t1g = new THREE.TorusGeometry(rd.baseR, 0.08+i*0.02, 16, 64);
+    var t1m = new THREE.MeshPhongMaterial({color:ringColor, emissive:ringColor, emissiveIntensity:0.2, transparent:true, opacity:0.15, side:THREE.DoubleSide});
+    var t1 = new THREE.Mesh(t1g, t1m);
+    t1.rotation.x = Math.PI*0.5 + i*0.15;
+    ringGroup.add(t1);
+
+    // Torus 2
+    var t2g = new THREE.TorusGeometry(rd.baseR*0.95, 0.05, 12, 48);
+    var t2m = new THREE.MeshBasicMaterial({color:ringColor, transparent:true, opacity:0.06, wireframe:true});
+    var t2 = new THREE.Mesh(t2g, t2m);
+    t2.rotation.x = Math.PI*0.5 + i*0.15 + 0.4;
+    t2.rotation.z = 0.3;
+    ringGroup.add(t2);
+
+    // Torus 3
+    var t3g = new THREE.TorusGeometry(rd.baseR*1.05, 0.03, 8, 32);
+    var t3m = new THREE.MeshBasicMaterial({color:ringColor, transparent:true, opacity:0.03, wireframe:true});
+    var t3 = new THREE.Mesh(t3g, t3m);
+    t3.rotation.x = Math.PI*0.3 + i*0.2;
+    ringGroup.add(t3);
+
+    // Icosahedron wireframe
+    var icoG = new THREE.IcosahedronGeometry(rd.baseR*0.9, 1);
+    var icoM = new THREE.MeshBasicMaterial({color:ringColor, wireframe:true, transparent:true, opacity:0.05});
+    var ico = new THREE.Mesh(icoG, icoM);
+    ringGroup.add(ico);
+
+    // Shell
+    var shellG = new THREE.SphereGeometry(rd.baseR, 24, 16);
+    var shellM = new THREE.MeshPhongMaterial({color:ringColor, transparent:true, opacity:0.02, side:THREE.DoubleSide});
+    var shell = new THREE.Mesh(shellG, shellM);
+    ringGroup.add(shell);
+
+    group.add(ringGroup);
+    meshes.rings.push({
+      group:ringGroup, torus:t1, torusMat:t1m, torus2:t2, torus2Mat:t2m,
+      torus3:t3, torus3Mat:t3m, ico:ico, icoMat:icoM, shell:shell, shellMat:shellM
+    });
+  }
+
+  // Particles (6000 per shield to keep performance)
+  var pCount = 6000;
+  var pGeo = new THREE.BufferGeometry();
+  var pPos = new Float32Array(pCount*3);
+  var pDim = new Float32Array(pCount);
+  var pRing = new Float32Array(pCount);
+  for(var p=0;p<pCount;p++){
+    var dim = p % DIM_COUNT;
+    var ring = dim % 7;
+    var rd2 = RING_DEFS[ring];
+    var theta = (dim/DIM_COUNT)*Math.PI*2 + (p/pCount)*Math.PI*6;
+    var phi = Math.acos(2*((p*PHI)%1)-1);
+    var r = rd2.baseR * (0.5 + ((p*PHI*PHI)%1)*0.8);
+    pPos[p*3] = r*Math.sin(phi)*Math.cos(theta);
+    pPos[p*3+1] = r*Math.cos(phi);
+    pPos[p*3+2] = r*Math.sin(phi)*Math.sin(theta);
+    pDim[p] = dim;
+    pRing[p] = ring;
+  }
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+  pGeo.setAttribute('aDim', new THREE.BufferAttribute(pDim, 1));
+  pGeo.setAttribute('aRing', new THREE.BufferAttribute(pRing, 1));
+
+  var pMat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    uniforms: {
+      uTime: {value:0},
+      uFold: {value:0},
+      uExpansion: {value:0.5},
+      uPhiPhase: {value:0},
+      uActiveDims: {value:DIM_COUNT},
+      uIntegrity: {value:[0,0,0,0,0,0,0]},
+      uInverted: {value: isInverted ? 1.0 : 0.0}
+    },
+    vertexShader: [
+      'attribute float aDim;',
+      'attribute float aRing;',
+      'uniform float uTime;',
+      'uniform float uFold;',
+      'uniform float uExpansion;',
+      'uniform float uPhiPhase;',
+      'uniform float uActiveDims;',
+      'uniform float uIntegrity[7];',
+      'uniform float uInverted;',
+      'varying float vAlpha;',
+      'varying float vRing;',
+      'void main(){',
+      '  vRing = aRing;',
+      '  int ri = int(aRing);',
+      '  float integ = uIntegrity[ri];',
+      '  float active = aDim < uActiveDims ? 1.0 : 0.0;',
+      '  float dimAngle = aDim * 0.0495 + uPhiPhase * 6.28;',
+      '  vec3 pos = position;',
+      '  float foldScale = 0.2 + uFold * 0.8;',
+      '  pos *= foldScale * (0.7 + uExpansion * 0.6);',
+      '  float wave = sin(uTime * (2.0 + aRing) + dimAngle) * 0.3 * integ;',
+      '  pos += normalize(pos) * wave;',
+      '  if(uInverted > 0.5) pos = -pos;', // inversion = spatial reflection
+      '  vAlpha = active * integ * (0.15 + 0.6 * foldScale);',
+      '  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);',
+      '  gl_PointSize = (1.5 + integ * 2.5) * (300.0 / length(gl_Position.xyz));',
+      '}'
+    ].join('\n'),
+    fragmentShader: [
+      'varying float vAlpha;',
+      'varying float vRing;',
+      'uniform float uInverted;',
+      'void main(){',
+      '  float d = length(gl_PointCoord - 0.5) * 2.0;',
+      '  if(d > 1.0) discard;',
+      '  float a = (1.0 - d*d) * vAlpha;',
+      '  vec3 colors[7];',
+      '  colors[0]=vec3(1.0,0.27,0.27);colors[1]=vec3(1.0,0.53,0.0);',
+      '  colors[2]=vec3(1.0,0.87,0.0);colors[3]=vec3(0.27,1.0,0.27);',
+      '  colors[4]=vec3(0.0,0.67,1.0);colors[5]=vec3(0.53,0.27,1.0);',
+      '  colors[6]=vec3(1.0,0.27,1.0);',
+      '  int ri = int(vRing);',
+      '  vec3 col = colors[ri];',
+      '  if(uInverted > 0.5) col = vec3(1.0) - col;', // complement colors
+      '  gl_FragColor = vec4(col, a);',
+      '}'
+    ].join('\n')
+  });
+
+  var particles = new THREE.Points(pGeo, pMat);
+  group.add(particles);
+  meshes.particles = particles;
+
+  // Toroidal field lines
+  meshes.toroidals = [];
+  for(var ti=0;ti<14;ti++){
+    var ringIdx = ti % 7;
+    var isInterRing = ti >= 7;
+    var rd3 = RING_DEFS[ringIdx];
+    var curve = new THREE.CatmullRomCurve3([]);
+    var pts = [];
+    var majorR = isInterRing ? (rd3.baseR + RING_DEFS[(ringIdx+1)%7].baseR)*0.5 : rd3.baseR;
+    var minorR = isInterRing ? 2.5 : 1.5;
+    for(var s=0;s<=64;s++){
+      var angle = (s/64)*Math.PI*2;
+      var tx = (majorR + minorR*Math.cos(angle*3))*Math.cos(angle);
+      var ty = minorR*Math.sin(angle*3);
+      var tz = (majorR + minorR*Math.cos(angle*3))*Math.sin(angle);
+      pts.push(new THREE.Vector3(tx,ty,tz));
+    }
+    var tGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    var tColor = new THREE.Color(rd3.color);
+    if(isInverted){var hsl2={};tColor.getHSL(hsl2);tColor.setHSL((hsl2.h+0.5)%1,hsl2.s,hsl2.l);}
+    var tMat = new THREE.LineBasicMaterial({color:tColor, transparent:true, opacity:0.03});
+    var tMesh = new THREE.Line(tGeo, tMat);
+    tMesh.rotation.x = ringIdx*0.3;
+    tMesh.rotation.z = ti*0.2;
+    group.add(tMesh);
+    meshes.toroidals.push({mesh:tMesh, mat:tMat, ringIdx:ringIdx, isInterRing:isInterRing});
+  }
+
+  // Dimension threads
+  meshes.dimThreads = [];
+  for(var dt=0;dt<DIM_COUNT;dt++){
+    var ring2 = dt % 7;
+    var rd4 = RING_DEFS[ring2];
+    var angle2 = (dt/DIM_COUNT)*Math.PI*2;
+    var phi2 = Math.acos(2*((dt*PHI)%1)-1);
+    var ep = new THREE.Vector3(
+      rd4.baseR*1.1*Math.sin(phi2)*Math.cos(angle2),
+      rd4.baseR*1.1*Math.cos(phi2),
+      rd4.baseR*1.1*Math.sin(phi2)*Math.sin(angle2)
+    );
+    var dtGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), ep]);
+    var dtColor = new THREE.Color(rd4.color);
+    if(isInverted){var hsl3={};dtColor.getHSL(hsl3);dtColor.setHSL((hsl3.h+0.5)%1,hsl3.s,hsl3.l);}
+    var dtMat = new THREE.LineBasicMaterial({color:dtColor, transparent:true, opacity:0.02});
+    var dtMesh = new THREE.Line(dtGeo, dtMat);
+    group.add(dtMesh);
+    meshes.dimThreads.push({mesh:dtMesh, mat:dtMat, dim:dt, ring:ring2});
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ORBIT CONTROLS                                                   ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function onMouseDown(e){isDragging=true;dragPrevX=e.clientX;dragPrevY=e.clientY;orbitState.autoRotate=false;orbitState.lastInteraction=Date.now();}
+function onMouseUp(){isDragging=false;}
+function onMouseMove(e){if(!isDragging)return;orbitState.theta-=(e.clientX-dragPrevX)*0.005;orbitState.phi=Math.max(0.1,Math.min(Math.PI-0.1,orbitState.phi-(e.clientY-dragPrevY)*0.005));dragPrevX=e.clientX;dragPrevY=e.clientY;orbitState.lastInteraction=Date.now();}
+function onWheel(e){e.preventDefault();orbitState.radius=Math.max(3,Math.min(60,orbitState.radius+e.deltaY*0.03));orbitState.lastInteraction=Date.now();orbitState.autoRotate=false;}
+var touchSD=0,touchSR=0;
+function onTouchStart(e){if(e.touches.length===1){isDragging=true;dragPrevX=e.touches[0].clientX;dragPrevY=e.touches[0].clientY;orbitState.autoRotate=false;orbitState.lastInteraction=Date.now();}else if(e.touches.length===2){var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;touchSD=Math.sqrt(dx*dx+dy*dy);touchSR=orbitState.radius;}e.preventDefault();}
+function onTouchMove(e){if(e.touches.length===1&&isDragging){orbitState.theta-=(e.touches[0].clientX-dragPrevX)*0.005;orbitState.phi=Math.max(0.1,Math.min(Math.PI-0.1,orbitState.phi-(e.touches[0].clientY-dragPrevY)*0.005));dragPrevX=e.touches[0].clientX;dragPrevY=e.touches[0].clientY;}else if(e.touches.length===2){var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;orbitState.radius=Math.max(3,Math.min(60,touchSR*(touchSD/Math.max(Math.sqrt(dx*dx+dy*dy),1))));}orbitState.lastInteraction=Date.now();e.preventDefault();}
+function onTouchEnd(){isDragging=false;}
+
+function updateOrbitCamera() {
+  if(Date.now()-orbitState.lastInteraction>5000) orbitState.autoRotate=true;
+  if(orbitState.autoRotate) orbitState.theta+=0.0008;
+  var x = orbitState.radius*Math.sin(orbitState.phi)*Math.cos(orbitState.theta);
+  var y = orbitState.radius*Math.cos(orbitState.phi);
+  var z = orbitState.radius*Math.sin(orbitState.phi)*Math.sin(orbitState.theta);
+  cameraL.position.set(x,y,z);
+  cameraL.lookAt(0,0,0);
+  // Inverted camera mirrors X
+  cameraR.position.set(-x,y,-z);
+  cameraR.lookAt(0,0,0);
+}
+
+function onResize() {
+  var w = Math.floor(window.innerWidth/2);
+  var h = window.innerHeight;
+  cameraL.aspect = w/h;
+  cameraL.updateProjectionMatrix();
+  rendererL.setSize(w, h);
+  cameraR.aspect = w/h;
+  cameraR.updateProjectionMatrix();
+  rendererR.setSize(w, h);
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  ANIMATION LOOP                                                   ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function animate() {
+  requestAnimationFrame(animate);
+  animFrame++;
+  var time = (Date.now()-startTime)*0.001;
+
+  // Sample eggs every ~16 frames (~1 second at 60fps)
+  if(animFrame % 16 === 0) sampleEggs();
+  if(animFrame % 8 === 0) mapGCPToShields();
+  updateSonification();
+  updateOrbitCamera();
+
+  // Fold
+  cohFold += (cohFoldTarget - cohFold) * 0.02;
+  invFold += (invFoldTarget - invFold) * 0.02;
+
+  // Update coherence shield (left)
+  updateShieldMeshes(cohRings, cohMeshes, cohFold, time, false);
+  // Update inversion shield (right)
+  updateShieldMeshes(invRings, invMeshes, invFold, time, true);
+
+  // HUD
+  if(animFrame % 4 === 0) updateHUD();
+  if(animFrame % 8 === 0) updateDotDisplay();
+  if(animFrame % 30 === 0){
+    var el = Math.floor((Date.now()-startTime)/1000);
+    document.getElementById('sys-clock').textContent =
+      String(Math.floor(el/3600)).padStart(2,'0')+':'+
+      String(Math.floor((el%3600)/60)).padStart(2,'0')+':'+
+      String(el%60).padStart(2,'0');
+  }
+
+  rendererL.render(sceneL, cameraL);
+  rendererR.render(sceneR, cameraR);
+}
+
+function updateShieldMeshes(rings, meshes, foldState, time, isInverted) {
+  var intArr = [];
+  var totalInt = 0;
+
+  rings.forEach(function(ring, i){
+    ring.integrity += (ring.target - ring.integrity) * 0.06;
+    ring.integrity += ring.regen;
+    ring.integrity = Math.max(0, Math.min(1, ring.integrity));
+    var di = ring.integrity;
+    totalInt += di;
+    intArr.push(di);
+
+    var rm = meshes.rings[i];
+    if(!rm) return;
+    rm.torusMat.opacity = 0.05 + di*0.55;
+    rm.torusMat.emissiveIntensity = di*0.4;
+    rm.torus2Mat.opacity = 0.02 + di*0.25;
+    rm.torus.rotation.x += (0.002 + di*0.008)*(i%2===0?1:-1);
+    rm.torus.rotation.z += (0.001 + di*0.004)*(i%3===0?1:-1);
+    rm.torus2.rotation.y += (0.003 + di*0.006)*(i%2===0?-1:1);
+    rm.torus2.rotation.z += 0.001;
+    rm.torus3Mat.opacity = 0.01 + di*0.15;
+    rm.torus3.rotation.x += 0.001*(i+1);
+    rm.torus3.rotation.y -= 0.0005*(i+1);
+    rm.icoMat.opacity = 0.02 + di*0.12;
+    rm.ico.rotation.y += 0.0008*(i+1)*di;
+    rm.ico.rotation.x += 0.0003*(7-i)*di;
+    rm.shellMat.opacity = di*0.04;
+    rm.group.scale.setScalar((0.3 + foldState*0.7)*0.9);
+  });
+
+  if(meshes.core){
+    var ai = totalInt/7;
+    var pu = 0.9 + Math.sin(time*2)*0.1*ai;
+    meshes.core.scale.setScalar(pu);
+    meshes.core.material.emissiveIntensity = 0.3+ai*0.5;
+    meshes.core.material.opacity = 0.5+ai*0.4;
+    var orbGroup = meshes.core.parent;
+    var w = orbGroup.getObjectByName('coreWire');
+    if(w){w.rotation.y+=0.003;w.rotation.x+=0.001;w.scale.setScalar(pu*1.1);w.material.opacity=0.1+ai*0.2;}
+    var cl = orbGroup.getObjectByName('coreLight');
+    if(cl) cl.intensity = 1+ai*3;
+    var sl = orbGroup.getObjectByName('softLight');
+    if(sl) sl.intensity = 0.5+ai*2;
+  }
+
+  if(meshes.particles){
+    var u = meshes.particles.material.uniforms;
+    u.uTime.value = time;
+    u.uFold.value = foldState;
+    u.uExpansion.value = 0.5;
+    u.uPhiPhase.value = time*0.02;
+    u.uActiveDims.value = DIM_COUNT;
+    u.uIntegrity.value = intArr;
+  }
+
+  meshes.toroidals.forEach(function(t){
+    var ri = intArr[t.ringIdx];
+    t.mat.opacity = t.isInterRing ? gcpCoherence*0.08 : 0.01+ri*0.06;
+    t.mesh.rotation.y += 0.0005*(t.ringIdx+1);
+  });
+
+  meshes.dimThreads.forEach(function(dt){
+    dt.mat.opacity = (0.01+intArr[dt.ring]*0.04)*foldState;
+  });
+}
+
+function updateHUD() {
+  for(var i=0;i<7;i++){
+    var cp = Math.round(cohRings[i].integrity*100);
+    var ip = Math.round(invRings[i].integrity*100);
+    var cf = document.getElementById('cfill-'+i);
+    var cpct = document.getElementById('cpct-'+i);
+    if(cf) cf.style.width = cp+'%';
+    if(cpct) cpct.textContent = cp+'%';
+    var ivf = document.getElementById('ifill-'+i);
+    var ipct = document.getElementById('ipct-'+i);
+    if(ivf) ivf.style.width = ip+'%';
+    if(ipct) ipct.textContent = ip+'%';
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  BOOT SEQUENCE                                                    ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+async function runBoot() {
+  var phases = [
+    {id:'bp-2',  fn: function(){ initEggs(); }},
+    {id:'bp-3',  fn: function(){ /* baseline calibration — sample a few rounds */
+      for(var i=0;i<10;i++) sampleEggs();
+      gcpSmoothed = 0; gcpHistory = [];
+    }},
+    {id:'bp-5',  fn: function(){ initScenes(); }},
+    {id:'bp-7',  fn: function(){ /* audio ready — initialized on click */ }},
+    {id:'bp-11', fn: function(){ mapGCPToShields(); }},
+    {id:'bp-13', fn: function(){ /* inversion matrix is built in initScenes */ }},
+    {id:'bp-17', fn: function(){ /* observer lock */ }}
+  ];
+
+  for(var i=0;i<phases.length;i++){
+    var ph = phases[i];
+    var el = document.getElementById(ph.id);
+    el.classList.add('active');
+    el.querySelector('.status').textContent = '⟳';
+    await new Promise(function(r){setTimeout(r, 300+Math.random()*200);});
+    try {
+      ph.fn();
+      el.classList.remove('active');
+      el.classList.add('done');
+      el.querySelector('.status').textContent = '✓';
+    } catch(err) {
+      el.classList.remove('active');
+      el.classList.add('fail');
+      el.querySelector('.status').textContent = '✗';
+      console.error('Phase '+ph.id+' failed:', err);
+    }
+  }
+
+  document.getElementById('boot-enter').style.display = 'block';
+}
+
+function enterField() {
+  document.getElementById('boot-screen').classList.add('hidden');
+  document.getElementById('main-wrap').style.display = 'block';
+  setTimeout(function(){
+    document.getElementById('boot-screen').style.display = 'none';
+    onResize();
+    animate();
+  }, 1200);
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  LAUNCH                                                           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+document.getElementById('boot-enter').addEventListener('click', enterField);
+runBoot().catch(function(err){console.error('Boot failed:',err);});
+</script>
+</body>
+</html>
