@@ -185,14 +185,19 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
     <button class="yt-btn" onclick="ytStop()" title="Stop">&#9632;</button>
     <button class="yt-btn" id="yt-minimize-btn" onclick="ytToggleVideo()">hide video</button>
     <button class="yt-btn" id="yt-loop-btn" onclick="ytToggleLoop()">loop</button>
+    <button class="yt-btn" onclick="ytShuffle()">shuffle</button>
   </div>
   <div class="yt-url-row">
     <input type="text" id="yt-url-input" placeholder="paste YouTube URL or video ID...">
     <button onclick="ytAddFromInput()">+ add</button>
   </div>
+  <div style="display:flex;gap:4px;margin-bottom:8px">
+    <button class="yt-btn" id="btn-load-channel" onclick="loadChannel()" style="flex:1;padding:6px;color:#4f8;border-color:rgba(79,248,138,0.3);background:rgba(79,248,138,0.06)">&#9656; LOAD ALL CHANNEL VIDEOS</button>
+  </div>
+  <div id="channel-status" style="font-size:9px;color:rgba(255,248,231,0.25);text-align:center;margin-bottom:6px;display:none"></div>
 
-  <div class="panel-title">playlist</div>
-  <div class="playlist" id="playlist"></div>
+  <div class="panel-title">playlist <span id="pl-count" style="color:rgba(255,248,231,0.2);font-weight:400"></span></div>
+  <div class="playlist" id="playlist" style="max-height:300px"></div>
 
   <div class="panel-title">shield mode</div>
   <div class="modes-grid" id="modes-grid"></div>
@@ -309,6 +314,12 @@ var plIndex = -1;
 // ╚══════════════════════════════════════════════════════════════════╝
 
 // Called automatically by YouTube IFrame API when ready
+var channelLoaded = false;
+var channelId = null; // discovered from playing videos
+var CHANNEL_HANDLE = 'ThomasTheSolarCryptoEngine';
+var titleFetchQueue = [];
+var titleFetchBusy = false;
+
 function onYouTubeIframeAPIReady() {
   ytPlayer = new YT.Player('yt-player', {
     height: '100%', width: '100%',
@@ -317,7 +328,13 @@ function onYouTubeIframeAPIReady() {
       rel: 0, fs: 0, playsinline: 1
     },
     events: {
-      onReady: function() { ytReady = true; },
+      onReady: function() {
+        ytReady = true;
+        // Auto-load channel if no saved playlist
+        if (playlist.length === 0) {
+          setTimeout(loadChannel, 500);
+        }
+      },
       onStateChange: onYTStateChange
     }
   });
@@ -336,7 +353,24 @@ function onYTStateChange(event) {
   var btn = document.getElementById('yt-play-btn');
   if (event.data === YT.PlayerState.PLAYING) {
     btn.innerHTML = '&#10074;&#10074;';
+    // Update title for currently playing track
+    try {
+      var data = ytPlayer.getVideoData();
+      if (data && data.title && plIndex >= 0 && plIndex < playlist.length) {
+        playlist[plIndex].title = data.title;
+        renderPlaylist();
+        savePlaylist();
+      }
+      // Try to discover channel ID for uploads playlist
+      if (!channelId && data && data.channel_id) {
+        channelId = data.channel_id;
+        tryLoadUploadsPlaylist();
+      }
+    } catch(e) {}
     updateNowPlaying();
+  } else if (event.data === YT.PlayerState.CUED) {
+    // Playlist was loaded — sync
+    syncPlaylistFromPlayer();
   } else {
     btn.innerHTML = '&#9654;';
   }
@@ -457,10 +491,25 @@ function ytToggleLoop() {
   btn.classList.toggle('active', ytLoop);
 }
 
+function ytShuffle() {
+  if (playlist.length < 2) return;
+  // Fisher-Yates shuffle
+  for (var i = playlist.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = playlist[i];
+    playlist[i] = playlist[j];
+    playlist[j] = temp;
+  }
+  plIndex = 0;
+  renderPlaylist();
+  savePlaylist();
+  ytPlayIndex(0);
+}
+
 function renderPlaylist() {
   var el = document.getElementById('playlist');
   if (playlist.length === 0) {
-    el.innerHTML = '<div style="font-size:9px;color:rgba(255,248,231,0.2);padding:8px;text-align:center">paste a YouTube URL above to add tracks</div>';
+    el.innerHTML = '<div style="font-size:9px;color:rgba(255,248,231,0.2);padding:8px;text-align:center">click LOAD ALL CHANNEL VIDEOS or paste URLs</div>';
     return;
   }
   el.innerHTML = playlist.map(function(item, i) {
@@ -479,12 +528,168 @@ function savePlaylist() {
 function loadPlaylist() {
   try {
     var data = localStorage.getItem('thomas-shield-playlist');
-    if (data) { playlist = JSON.parse(data); renderPlaylist(); }
+    if (data) {
+      playlist = JSON.parse(data);
+      renderPlaylist();
+      document.getElementById('pl-count').textContent = '(' + playlist.length + ')';
+      if (playlist.length > 0) {
+        var btn = document.getElementById('btn-load-channel');
+        btn.textContent = '\u2713 ' + playlist.length + ' VIDEOS LOADED';
+        channelLoaded = true;
+      }
+    }
   } catch(e) {}
 }
 
 function escapeHtml(str) {
   var d = document.createElement('div'); d.textContent = str; return d.innerHTML;
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  CHANNEL AUTO-LOADER                                              ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function loadChannel() {
+  if (!ytReady) { setTimeout(loadChannel, 1000); return; }
+  var status = document.getElementById('channel-status');
+  var btn = document.getElementById('btn-load-channel');
+  status.style.display = 'block';
+  status.textContent = 'searching channel videos...';
+  btn.textContent = 'loading...';
+  btn.disabled = true;
+
+  // Step 1: Try loading via search for the channel name
+  // This finds videos from/about the channel
+  ytPlayer.cuePlaylist({
+    listType: 'search',
+    list: CHANNEL_HANDLE
+  });
+
+  // The CUED state will trigger syncPlaylistFromPlayer()
+  // Give it a moment to load
+  setTimeout(function() {
+    if (playlist.length === 0) {
+      // Retry with a slightly different search
+      ytPlayer.cuePlaylist({
+        listType: 'search',
+        list: 'Thomas Solar Crypto Engine'
+      });
+      setTimeout(function() {
+        syncPlaylistFromPlayer();
+        finalizeChannelLoad();
+      }, 3000);
+    } else {
+      finalizeChannelLoad();
+    }
+  }, 3000);
+}
+
+function syncPlaylistFromPlayer() {
+  try {
+    var ids = ytPlayer.getPlaylist();
+    if (!ids || ids.length === 0) return;
+
+    // Merge player playlist with our playlist (avoid duplicates)
+    var existingIds = {};
+    playlist.forEach(function(item) { existingIds[item.id] = true; });
+
+    var newCount = 0;
+    ids.forEach(function(id, idx) {
+      if (!existingIds[id]) {
+        playlist.push({ id: id, title: 'Track ' + (playlist.length + 1) + ' [' + id + ']' });
+        newCount++;
+        titleFetchQueue.push(playlist.length - 1);
+      }
+    });
+
+    if (newCount > 0) {
+      renderPlaylist();
+      savePlaylist();
+      var status = document.getElementById('channel-status');
+      status.textContent = 'loaded ' + playlist.length + ' videos';
+
+      // Start fetching titles in background
+      if (!titleFetchBusy) fetchNextTitle();
+    }
+
+    document.getElementById('pl-count').textContent = '(' + playlist.length + ')';
+  } catch(e) {
+    console.error('syncPlaylistFromPlayer:', e);
+  }
+}
+
+function finalizeChannelLoad() {
+  var btn = document.getElementById('btn-load-channel');
+  btn.textContent = playlist.length > 0 ?
+    '\u2713 ' + playlist.length + ' VIDEOS LOADED' :
+    '\u25b6 LOAD ALL CHANNEL VIDEOS';
+  btn.disabled = false;
+  channelLoaded = playlist.length > 0;
+
+  var status = document.getElementById('channel-status');
+  if (playlist.length > 0) {
+    status.textContent = playlist.length + ' videos ready \u2014 click any to play';
+  } else {
+    status.textContent = 'no videos found \u2014 try adding URLs manually';
+  }
+}
+
+function tryLoadUploadsPlaylist() {
+  // If we discovered the channel ID from a playing video,
+  // try to load the uploads playlist (UC... → UU...) for complete listing
+  if (!channelId || !ytReady) return;
+  var uploadsId = 'UU' + channelId.substring(2);
+  var status = document.getElementById('channel-status');
+  status.style.display = 'block';
+  status.textContent = 'loading uploads playlist...';
+
+  // Save current playback state
+  var wasPlaying = false;
+  var currentVideoId = null;
+  try {
+    wasPlaying = ytPlayer.getPlayerState() === YT.PlayerState.PLAYING;
+    currentVideoId = ytPlayer.getVideoData().video_id;
+  } catch(e) {}
+
+  // Load the uploads playlist
+  ytPlayer.cuePlaylist({
+    listType: 'playlist',
+    list: uploadsId
+  });
+
+  setTimeout(function() {
+    syncPlaylistFromPlayer();
+    finalizeChannelLoad();
+
+    // Resume playback of the video that was playing
+    if (currentVideoId && wasPlaying) {
+      var idx = playlist.findIndex(function(p) { return p.id === currentVideoId; });
+      if (idx >= 0) ytPlayIndex(idx);
+    }
+  }, 3000);
+}
+
+function fetchNextTitle() {
+  if (titleFetchQueue.length === 0) { titleFetchBusy = false; return; }
+  titleFetchBusy = true;
+  var idx = titleFetchQueue.shift();
+  if (idx >= playlist.length) { fetchNextTitle(); return; }
+
+  // Use oEmbed to get title (CORS-friendly)
+  var url = 'https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=' +
+    encodeURIComponent(playlist[idx].id) + '&format=json';
+
+  fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+    if (data && data.title) {
+      playlist[idx].title = data.title;
+      renderPlaylist();
+      // Save every 10 titles
+      if (titleFetchQueue.length % 10 === 0) savePlaylist();
+    }
+  }).catch(function() {}).finally(function() {
+    // Throttle: 200ms between requests to be nice
+    setTimeout(fetchNextTitle, 200);
+  });
 }
 
 
