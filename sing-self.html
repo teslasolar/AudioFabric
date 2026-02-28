@@ -125,7 +125,14 @@ var voice = {
   coherence: 0, energy: 0, totalSingTime: 0,
   silenceTime: 0, breathPhase: 0,
   pitchHistory: [], centroidSmooth: 0,
-  zone: '' // 'low', 'mid', 'high', 'crown'
+  zone: '', // 'low', 'mid', 'high', 'crown'
+  // Inflection tracking
+  prevF0: 0, pitchDelta: 0, pitchDeltaSmooth: 0,
+  prevRms: 0, rmsDelta: 0, rmsDeltaSmooth: 0,
+  prevCentroid: 0, centroidDelta: 0,
+  onsetStrength: 0, // how hard the onset was
+  inflectionDir: 0, // -1 falling, 0 steady, 1 rising
+  gestureIntent: '' // derived gesture name
 };
 
 // ===== BODY STATE =====
@@ -143,8 +150,39 @@ var body = {
   auraIntensity: 0, // aura glow strength
   height: 0.65,     // figure height (0.5-0.8)
   width: 0.24,      // figure width (shoulder span)
-  expressionSmooth: {mouthOpen:0, eyeBright:0}
+  expressionSmooth: {mouthOpen:0, eyeBright:0},
+  // Gesture / movement state
+  armLAngle: 0,     // left arm angle offset (radians from rest)
+  armRAngle: 0,     // right arm angle offset
+  armLTarget: 0,    // smoothing targets
+  armRTarget: 0,
+  armSpread: 0,     // how far arms spread outward
+  armSpreadTarget: 0,
+  headTilt: 0,      // head tilt (left/right, radians)
+  headTiltTarget: 0,
+  headNod: 0,       // head nod (up/down)
+  headNodTarget: 0,
+  torsoLean: 0,     // torso lean forward/back
+  torsoLeanTarget: 0,
+  kneeBend: 0,      // knee bend amount
+  kneeBendTarget: 0,
+  weightShift: 0,   // left/right weight shift
+  weightShiftTarget: 0,
+  gestureLabel: ''   // current gesture name for display
 };
+
+// Echo system — delayed copies of gesture states
+var gestureEchoes = []; // {armL, armR, spread, tilt, nod, lean, knee, shift, age, alpha}
+var ECHO_COUNT = 5;     // number of echo ghosts
+var ECHO_DELAY = 8;     // frames between echoes
+var echoTimer = 0;
+
+// Store rest positions for joints (copy of initial positions)
+var JOINTS_REST = {};
+var jKeys = Object.keys(JOINTS);
+for (var _jr = 0; _jr < jKeys.length; _jr++) {
+  JOINTS_REST[jKeys[_jr]] = {x: JOINTS[jKeys[_jr]].x, y: JOINTS[jKeys[_jr]].y};
+}
 
 // ===== COLOR PALETTE =====
 // Voice determines the figure's color
@@ -277,6 +315,49 @@ function analyzeVoice() {
 
   // Breath cycle (from amplitude modulation)
   voice.breathPhase += 0.016 * (voice.isSounding ? 3 : 0.5);
+
+  // ===== INFLECTION TRACKING =====
+  // Pitch delta (how fast pitch is changing)
+  if (voice.isSounding && voice.f0 > 0 && voice.prevF0 > 0) {
+    voice.pitchDelta = (voice.f0 - voice.prevF0);
+    voice.pitchDeltaSmooth += (voice.pitchDelta - voice.pitchDeltaSmooth) * 0.15;
+  } else {
+    voice.pitchDeltaSmooth *= 0.9;
+  }
+  voice.prevF0 = voice.f0;
+
+  // Volume delta (crescendo / diminuendo)
+  voice.rmsDelta = voice.rms - voice.prevRms;
+  voice.rmsDeltaSmooth += (voice.rmsDelta - voice.rmsDeltaSmooth) * 0.15;
+  voice.prevRms = voice.rms;
+
+  // Centroid delta (brightness change)
+  voice.centroidDelta = voice.centroid - voice.prevCentroid;
+  voice.prevCentroid = voice.centroid;
+
+  // Onset strength
+  if (voice.onset) {
+    voice.onsetStrength = Math.min(1, voice.rms * 10);
+  } else {
+    voice.onsetStrength *= 0.92;
+  }
+
+  // Inflection direction (-1 falling, 0 steady, 1 rising)
+  if (Math.abs(voice.pitchDeltaSmooth) < 5) voice.inflectionDir = 0;
+  else voice.inflectionDir = voice.pitchDeltaSmooth > 0 ? 1 : -1;
+
+  // Derive gesture intent from inflection patterns
+  if (voice.isSounding) {
+    if (voice.onsetStrength > 0.3) voice.gestureIntent = 'THRUST';
+    else if (voice.pitchDeltaSmooth > 20) voice.gestureIntent = 'REACH';
+    else if (voice.pitchDeltaSmooth < -20) voice.gestureIntent = 'GROUND';
+    else if (voice.rmsDeltaSmooth > 0.01) voice.gestureIntent = 'EXPAND';
+    else if (voice.rmsDeltaSmooth < -0.005) voice.gestureIntent = 'CONTRACT';
+    else if (voice.coherence > 0.6) voice.gestureIntent = 'HOLD';
+    else voice.gestureIntent = 'FLOW';
+  } else {
+    voice.gestureIntent = 'REST';
+  }
 }
 
 // ===== VOICE → BODY MAPPING =====
@@ -360,6 +441,270 @@ function voiceToBody() {
   JOINTS.crown.built += (body.crownBuilt - JOINTS.crown.built) * 0.05;
 }
 
+// ===== VOICE → GESTURE MAPPING =====
+function voiceToGesture() {
+  var dt = 0.016;
+
+  if (voice.isSounding) {
+    // ---- ARM ANGLES: pitch inflection drives raise/lower ----
+    // Rising pitch = arms raise, falling = arms lower
+    var pitchArm = voice.pitchDeltaSmooth * 0.008; // scale pitch delta to radians
+    pitchArm = Math.max(-1.2, Math.min(1.2, pitchArm));
+
+    // Pitch height also sets baseline arm angle (higher pitch = arms naturally higher)
+    var pitchBase = (voice.pitchNorm - 0.3) * 0.8;
+
+    // Left and right arms mirror but with slight asymmetry from centroid
+    var asymmetry = voice.centroidDelta * 0.00005;
+    body.armLTarget = pitchBase + pitchArm + asymmetry;
+    body.armRTarget = pitchBase + pitchArm - asymmetry;
+
+    // ---- ARM SPREAD: volume dynamics ----
+    // Getting louder = spread wide, softer = close in
+    var spreadBase = voice.rms * 3;
+    var spreadDelta = voice.rmsDeltaSmooth * 20;
+    body.armSpreadTarget = Math.max(0, Math.min(1, spreadBase + spreadDelta));
+
+    // ---- HEAD TILT: pitch direction ----
+    body.headTiltTarget = voice.pitchDeltaSmooth * 0.003;
+    body.headTiltTarget = Math.max(-0.4, Math.min(0.4, body.headTiltTarget));
+
+    // ---- HEAD NOD: volume pulses ----
+    body.headNodTarget = voice.onsetStrength * 0.3 + voice.rmsDeltaSmooth * 5;
+
+    // ---- TORSO LEAN: sustained notes lean forward, onset leans back ----
+    if (voice.sustainTime > 1) {
+      body.torsoLeanTarget = 0.15 * voice.coherence; // lean into it
+    } else {
+      body.torsoLeanTarget = -voice.onsetStrength * 0.2; // onset pushes back
+    }
+
+    // ---- KNEE BEND: volume pulses, rhythmic ----
+    body.kneeBendTarget = voice.onsetStrength * 0.15 + Math.sin(voice.breathPhase * 2) * voice.rms * 0.1;
+
+    // ---- WEIGHT SHIFT: slow sway driven by pitch direction ----
+    body.weightShiftTarget += voice.pitchDeltaSmooth * 0.0001;
+    body.weightShiftTarget = Math.max(-0.3, Math.min(0.3, body.weightShiftTarget));
+    body.weightShiftTarget *= 0.98; // decay toward center
+
+    // Gesture-specific overrides
+    switch(voice.gestureIntent) {
+      case 'THRUST':
+        body.armLTarget = Math.max(body.armLTarget, 0.6);
+        body.armRTarget = Math.max(body.armRTarget, 0.6);
+        body.armSpreadTarget = Math.max(body.armSpreadTarget, 0.7);
+        break;
+      case 'REACH':
+        body.armLTarget = Math.max(body.armLTarget, 0.8);
+        body.armRTarget = Math.max(body.armRTarget, 0.8);
+        break;
+      case 'GROUND':
+        body.armLTarget = Math.min(body.armLTarget, -0.3);
+        body.armRTarget = Math.min(body.armRTarget, -0.3);
+        body.kneeBendTarget = Math.max(body.kneeBendTarget, 0.15);
+        break;
+      case 'EXPAND':
+        body.armSpreadTarget = Math.max(body.armSpreadTarget, 0.8);
+        break;
+      case 'CONTRACT':
+        body.armSpreadTarget = Math.min(body.armSpreadTarget, 0.15);
+        break;
+    }
+
+    // Vowel-based arm character
+    switch(voice.vowel) {
+      case 'AH': // open/welcoming — arms out
+        body.armSpreadTarget = Math.max(body.armSpreadTarget, 0.5);
+        body.armLTarget = Math.max(body.armLTarget, 0.2);
+        body.armRTarget = Math.max(body.armRTarget, 0.2);
+        break;
+      case 'EE': // reaching up
+        body.armLTarget += 0.15;
+        body.armRTarget += 0.15;
+        break;
+      case 'OO': // arms in, protective
+        body.armSpreadTarget *= 0.4;
+        break;
+    }
+
+    body.gestureLabel = voice.gestureIntent;
+
+  } else {
+    // Rest: arms slowly lower, body relaxes
+    body.armLTarget *= 0.95;
+    body.armRTarget *= 0.95;
+    body.armSpreadTarget *= 0.95;
+    body.headTiltTarget *= 0.9;
+    body.headNodTarget *= 0.9;
+    body.torsoLeanTarget *= 0.9;
+    body.kneeBendTarget *= 0.9;
+    body.weightShiftTarget *= 0.95;
+    body.gestureLabel = 'REST';
+  }
+
+  // Smooth all values toward targets
+  body.armLAngle += (body.armLTarget - body.armLAngle) * 0.08;
+  body.armRAngle += (body.armRTarget - body.armRAngle) * 0.08;
+  body.armSpread += (body.armSpreadTarget - body.armSpread) * 0.08;
+  body.headTilt += (body.headTiltTarget - body.headTilt) * 0.1;
+  body.headNod += (body.headNodTarget - body.headNod) * 0.1;
+  body.torsoLean += (body.torsoLeanTarget - body.torsoLean) * 0.06;
+  body.kneeBend += (body.kneeBendTarget - body.kneeBend) * 0.1;
+  body.weightShift += (body.weightShiftTarget - body.weightShift) * 0.06;
+
+  // ===== RECORD ECHO =====
+  echoTimer++;
+  if (echoTimer >= ECHO_DELAY) {
+    echoTimer = 0;
+    gestureEchoes.push({
+      armL: body.armLAngle, armR: body.armRAngle,
+      spread: body.armSpread,
+      tilt: body.headTilt, nod: body.headNod,
+      lean: body.torsoLean,
+      knee: body.kneeBend, shift: body.weightShift,
+      age: 0, alpha: 0.7
+    });
+    // Keep only N echoes
+    while (gestureEchoes.length > ECHO_COUNT) gestureEchoes.shift();
+  }
+  // Age echoes
+  gestureEchoes.forEach(function(e) { e.age++; e.alpha = Math.max(0, 0.7 - e.age * 0.08); });
+}
+
+// ===== ANIMATE JOINTS =====
+// Apply gesture offsets to the skeleton
+function animateJoints() {
+  // Reset to rest positions
+  var keys = Object.keys(JOINTS_REST);
+  for (var i = 0; i < keys.length; i++) {
+    JOINTS[keys[i]].x = JOINTS_REST[keys[i]].x;
+    JOINTS[keys[i]].y = JOINTS_REST[keys[i]].y;
+  }
+
+  // ---- ARM ANIMATION ----
+  // Arms rotate from shoulder. angle=0 is rest (down), positive=raise
+  var armAngleL = body.armLAngle;
+  var armAngleR = body.armRAngle;
+  var spread = body.armSpread;
+
+  // Left arm chain: shoulder → elbow → hand
+  var sL = JOINTS_REST.shoulderL;
+  var upperLen = 0.10; // upper arm length in normalized coords
+  var lowerLen = 0.10; // forearm length
+
+  // Elbow position: shoulder + rotation
+  var elbAngleL = -Math.PI/2 - armAngleL * 1.2 - spread * 0.5;
+  JOINTS.elbowL.x = sL.x + Math.cos(elbAngleL) * upperLen;
+  JOINTS.elbowL.y = sL.y - Math.sin(elbAngleL) * upperLen;
+
+  // Hand position: elbow + rotation (forearm follows with lag)
+  var handAngleL = elbAngleL + 0.3 - armAngleL * 0.5;
+  JOINTS.handL.x = JOINTS.elbowL.x + Math.cos(handAngleL) * lowerLen;
+  JOINTS.handL.y = JOINTS.elbowL.y - Math.sin(handAngleL) * lowerLen;
+
+  // Right arm chain (mirrored)
+  var sR = JOINTS_REST.shoulderR;
+  var elbAngleR = -Math.PI/2 + armAngleR * 1.2 + spread * 0.5;
+  JOINTS.elbowR.x = sR.x - Math.cos(elbAngleR) * upperLen;
+  JOINTS.elbowR.y = sR.y - Math.sin(elbAngleR) * upperLen;
+
+  var handAngleR = elbAngleR + 0.3 - armAngleR * 0.5;
+  JOINTS.handR.x = JOINTS.elbowR.x - Math.cos(handAngleR) * lowerLen;
+  JOINTS.handR.y = JOINTS.elbowR.y - Math.sin(handAngleR) * lowerLen;
+
+  // ---- SHOULDER RAISE with arms ----
+  var shoulderRaise = Math.max(0, (armAngleL + armAngleR) * 0.5) * 0.015;
+  JOINTS.shoulderL.y -= shoulderRaise;
+  JOINTS.shoulderR.y -= shoulderRaise;
+
+  // ---- HEAD ANIMATION ----
+  var headJoints = ['crown','headTop','headL','headR','eyeL','eyeR','nose','mouth','chin'];
+  var headCenterX = 0.5, headCenterY = 0.19;
+  for (var h = 0; h < headJoints.length; h++) {
+    var hj = headJoints[h];
+    // Tilt (rotate around neck)
+    var dx = JOINTS[hj].x - headCenterX;
+    var dy = JOINTS[hj].y - headCenterY;
+    var cos = Math.cos(body.headTilt);
+    var sin = Math.sin(body.headTilt);
+    JOINTS[hj].x = headCenterX + dx * cos - dy * sin;
+    JOINTS[hj].y = headCenterY + dx * sin + dy * cos;
+    // Nod (vertical shift)
+    JOINTS[hj].y -= body.headNod * 0.02;
+  }
+
+  // ---- TORSO LEAN ----
+  // Lean shifts upper body forward/back (x shift proportional to height)
+  var leanJoints = ['neck','shoulderL','shoulderR','chest','elbowL','elbowR','handL','handR',
+                    'crown','headTop','headL','headR','eyeL','eyeR','nose','mouth','chin'];
+  for (var lj = 0; lj < leanJoints.length; lj++) {
+    var joint = JOINTS[leanJoints[lj]];
+    var heightFactor = 1 - (joint.y / 0.5); // higher joints lean more
+    joint.x += body.torsoLean * 0.05 * Math.max(0, heightFactor);
+  }
+
+  // ---- KNEE BEND ----
+  JOINTS.kneeL.y += body.kneeBend * 0.08;
+  JOINTS.kneeR.y += body.kneeBend * 0.08;
+  // Hips drop slightly
+  JOINTS.hipL.y += body.kneeBend * 0.03;
+  JOINTS.hipR.y += body.kneeBend * 0.03;
+  // Waist drops
+  JOINTS.waist.y += body.kneeBend * 0.02;
+
+  // ---- WEIGHT SHIFT ----
+  var shiftJoints = Object.keys(JOINTS);
+  for (var wj = 0; wj < shiftJoints.length; wj++) {
+    JOINTS[shiftJoints[wj]].x += body.weightShift * 0.03;
+  }
+}
+
+// ===== GET ANIMATED JOINT POSITIONS FOR ECHO =====
+function getEchoJoints(echo) {
+  // Compute joint positions as if the body had the echo's gesture state
+  var joints = {};
+  var keys = Object.keys(JOINTS_REST);
+  for (var i = 0; i < keys.length; i++) {
+    joints[keys[i]] = {x: JOINTS_REST[keys[i]].x, y: JOINTS_REST[keys[i]].y};
+  }
+
+  // Arms
+  var sL = JOINTS_REST.shoulderL;
+  var sR = JOINTS_REST.shoulderR;
+  var upperLen = 0.10, lowerLen = 0.10;
+
+  var elbAngleL = -Math.PI/2 - echo.armL * 1.2 - echo.spread * 0.5;
+  joints.elbowL.x = sL.x + Math.cos(elbAngleL) * upperLen;
+  joints.elbowL.y = sL.y - Math.sin(elbAngleL) * upperLen;
+  var handAngleL = elbAngleL + 0.3 - echo.armL * 0.5;
+  joints.handL.x = joints.elbowL.x + Math.cos(handAngleL) * lowerLen;
+  joints.handL.y = joints.elbowL.y - Math.sin(handAngleL) * lowerLen;
+
+  var elbAngleR = -Math.PI/2 + echo.armR * 1.2 + echo.spread * 0.5;
+  joints.elbowR.x = sR.x - Math.cos(elbAngleR) * upperLen;
+  joints.elbowR.y = sR.y - Math.sin(elbAngleR) * upperLen;
+  var handAngleR = elbAngleR + 0.3 - echo.armR * 0.5;
+  joints.handR.x = joints.elbowR.x - Math.cos(handAngleR) * lowerLen;
+  joints.handR.y = joints.elbowR.y - Math.sin(handAngleR) * lowerLen;
+
+  // Head tilt
+  var headJs = ['crown','headTop','headL','headR','eyeL','eyeR','nose','mouth','chin'];
+  for (var h = 0; h < headJs.length; h++) {
+    var dx = joints[headJs[h]].x - 0.5;
+    var dy = joints[headJs[h]].y - 0.19;
+    joints[headJs[h]].x = 0.5 + dx*Math.cos(echo.tilt) - dy*Math.sin(echo.tilt);
+    joints[headJs[h]].y = 0.19 + dx*Math.sin(echo.tilt) + dy*Math.cos(echo.tilt);
+    joints[headJs[h]].y -= echo.nod * 0.02;
+  }
+
+  // Weight shift
+  for (var w = 0; w < keys.length; w++) {
+    joints[keys[w]].x += echo.shift * 0.03;
+  }
+
+  return joints;
+}
+
 // ===== PARTICLE SPAWNING =====
 function spawnBodyParticles() {
   if (!voice.isSounding) return;
@@ -435,6 +780,8 @@ function draw() {
 
   analyzeVoice();
   voiceToBody();
+  voiceToGesture();
+  animateJoints();
   spawnBodyParticles();
 
   var figH = Math.min(W,H) * body.height;
@@ -468,6 +815,47 @@ function draw() {
     ctx.fill();
   });
   auraParticles = auraParticles.filter(function(p){return p.life > 0;});
+
+  // ===== DRAW GESTURE ECHOES (robotic delayed copies) =====
+  gestureEchoes.forEach(function(echo, echoIdx) {
+    if (echo.alpha < 0.01) return;
+    var ej = getEchoJoints(echo);
+    var echoOffset = (echoIdx - gestureEchoes.length/2) * figW * 0.6;
+    var ea = echo.alpha * body.solidity * 0.4;
+    var col = getBodyColor(voice.pitchNorm, voice.centroidSmooth);
+
+    // Draw echo skeleton
+    BONES.forEach(function(bone) {
+      var j1 = ej[bone[0]], j2 = ej[bone[1]];
+      if (!j1 || !j2) return;
+      var boneBuilt = Math.min(JOINTS[bone[0]].built, JOINTS[bone[1]].built);
+      if (boneBuilt < 0.1) return;
+
+      var x1 = baseX + echoOffset + (j1.x - 0.5) * figW * 3;
+      var y1 = baseY + j1.y * figH;
+      var x2 = baseX + echoOffset + (j2.x - 0.5) * figW * 3;
+      var y2 = baseY + j2.y * figH;
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      ctx.strokeStyle = 'rgba('+col.r+','+col.g+','+col.b+','+(ea * boneBuilt * 0.15)+')';
+      ctx.lineWidth = 0.5 + boneBuilt;
+      ctx.stroke();
+    });
+
+    // Echo joint dots
+    var echoJointKeys = ['handL','handR','elbowL','elbowR','shoulderL','shoulderR',
+                         'headTop','chin','hipL','hipR','kneeL','kneeR','footL','footR'];
+    echoJointKeys.forEach(function(jk) {
+      var j = ej[jk];
+      if (!j || JOINTS[jk].built < 0.1) return;
+      var sx = baseX + echoOffset + (j.x - 0.5) * figW * 3;
+      var sy = baseY + j.y * figH;
+      ctx.beginPath(); ctx.arc(sx, sy, 2, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba('+col.r+','+col.g+','+col.b+','+(ea * 0.12)+')';
+      ctx.fill();
+    });
+  });
 
   // ===== DRAW BONES (faint skeleton) =====
   var overallBuilt = (body.lowBuilt + body.midBuilt + body.highBuilt) / 3;
@@ -654,8 +1042,14 @@ function draw() {
   // ===== LABEL =====
   var lb = document.getElementById('label');
   if (voice.isSounding) {
+    var gestureLabels = {
+      THRUST:'projecting force', REACH:'reaching upward', GROUND:'grounding down',
+      EXPAND:'expanding outward', CONTRACT:'drawing inward', HOLD:'holding steady',
+      FLOW:'flowing gently', REST:'resting'
+    };
     var zoneNames = {low:'grounding your roots', mid:'shaping your body', high:'sculpting your mind', crown:'opening your crown'};
-    lb.innerHTML = zoneNames[voice.zone] || '';
+    var gestureText = gestureLabels[voice.gestureIntent] || '';
+    lb.innerHTML = zoneNames[voice.zone] + ' — <span style="color:rgba(247,215,148,0.25)">' + gestureText + '</span>';
     lb.classList.add('on');
   } else if (voice.silenceTime > 2 && body.solidity > 0.05) {
     lb.innerHTML = 'sing to hold your form';
@@ -674,10 +1068,13 @@ function draw() {
     'hsla(' + body.auraHue + ',60%,50%,0.15)';
 
   if (voice.isSounding) {
+    var inflDir = voice.inflectionDir > 0 ? '\u2197' : voice.inflectionDir < 0 ? '\u2198' : '\u2192';
     document.getElementById('voice-hud').innerHTML =
       'F0: ' + (voice.f0 > 0 ? Math.round(voice.f0) + ' Hz' : '—') + '<br>' +
       'zone: ' + voice.zone + '<br>' +
       'vowel: ' + (voice.vowel || '—') + '<br>' +
+      'inflection: ' + inflDir + ' ' + voice.pitchDeltaSmooth.toFixed(1) + '<br>' +
+      'gesture: ' + body.gestureLabel + '<br>' +
       'coherence: ' + voice.coherence.toFixed(2);
   }
 
@@ -687,6 +1084,8 @@ function draw() {
     'torso: ' + (body.midBuilt * 100).toFixed(0) + '%<br>' +
     'head: ' + (body.highBuilt * 100).toFixed(0) + '%<br>' +
     'crown: ' + (body.crownBuilt * 100).toFixed(0) + '%<br>' +
+    'arms: L' + (body.armLAngle*57).toFixed(0) + '\u00b0 R' + (body.armRAngle*57).toFixed(0) + '\u00b0<br>' +
+    'echoes: ' + gestureEchoes.length + '<br>' +
     'particles: ' + bodyParticles.length + '<br>' +
     'sung: ' + Math.round(voice.totalSingTime) + 's';
 }
