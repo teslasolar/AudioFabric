@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KAMEHAMEHA</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Courier New',monospace}
+canvas{display:block}
+#charge-label{position:fixed;bottom:60px;left:0;right:0;text-align:center;color:rgba(80,160,255,0);font-size:clamp(20px,5vw,48px);font-weight:900;letter-spacing:8px;transition:color 0.3s,text-shadow 0.3s;z-index:10;pointer-events:none;font-family:Impact,'Arial Black',sans-serif;text-transform:uppercase}
+#charge-label.on{color:rgba(80,160,255,0.7);text-shadow:0 0 30px rgba(80,160,255,0.4),0 0 60px rgba(80,160,255,0.2)}
+#charge-label.fire{color:rgba(255,255,255,0.9);text-shadow:0 0 40px rgba(80,200,255,0.8),0 0 80px rgba(80,160,255,0.5),0 0 120px rgba(255,255,255,0.3)}
+#power-bar{position:fixed;left:20px;top:50%;transform:translateY(-50%);width:8px;height:60%;border:1px solid rgba(80,160,255,0.15);border-radius:4px;z-index:10;overflow:hidden}
+#power-fill{position:absolute;bottom:0;left:0;right:0;height:0%;background:linear-gradient(to top,#0044ff,#00aaff,#44ddff,#ffffff);border-radius:3px;transition:height 0.15s;box-shadow:0 0 10px rgba(80,160,255,0.3)}
+#power-pct{position:fixed;left:12px;top:calc(50% + 32%);font-size:11px;color:rgba(80,160,255,0.3);z-index:10;text-align:center;width:20px}
+#status{position:fixed;top:14px;left:14px;color:rgba(255,255,255,0.06);font-size:10px;z-index:10;line-height:1.7}
+#instructions{position:fixed;top:14px;right:14px;color:rgba(80,160,255,0.06);font-size:9px;z-index:10;text-align:right;line-height:1.8}
+#start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;background:#000}
+#start h1{font-family:Impact,'Arial Black',sans-serif;font-size:clamp(36px,8vw,80px);font-weight:900;color:rgba(80,160,255,0.6);letter-spacing:6px;text-shadow:0 0 40px rgba(80,160,255,0.15)}
+#start .s{font-size:10px;color:rgba(255,255,255,0.08);letter-spacing:8px;margin:8px 0 6px;text-transform:uppercase}
+#start .desc{font-size:12px;color:rgba(80,160,255,0.12);max-width:380px;text-align:center;line-height:1.9;margin-bottom:28px}
+#start button{background:none;border:1px solid rgba(80,160,255,0.2);color:rgba(80,160,255,0.5);font-family:Impact,'Arial Black',sans-serif;font-size:18px;padding:14px 50px;cursor:pointer;letter-spacing:4px;transition:all 0.4s;text-transform:uppercase}
+#start button:hover{border-color:rgba(80,160,255,0.5);color:rgba(80,160,255,0.9);text-shadow:0 0 20px rgba(80,160,255,0.3)}
+</style>
+</head>
+<body>
+<div id="start">
+  <h1>KAMEHAMEHA</h1>
+  <div class="s">VOICE POWERED</div>
+  <div class="desc">
+    sing steady to charge your ki.<br>
+    get louder to build power.<br>
+    raise your pitch to ascend.<br>
+    YELL to fire the beam.<br>
+    the longer you charge, the bigger the blast.
+  </div>
+  <button onclick="begin()">POWER UP</button>
+</div>
+<canvas id="c"></canvas>
+<div id="charge-label"></div>
+<div id="power-bar"><div id="power-fill"></div></div>
+<div id="power-pct">0%</div>
+<div id="status"></div>
+<div id="instructions"></div>
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  KAMEHAMEHA — Voice-Powered Energy Beam                          ║
+// ║  Sing to charge. Yell to fire.                                    ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+var c = document.getElementById('c'), ctx = c.getContext('2d');
+var W, H, t = 0, running = false;
+function resize() { W = c.width = innerWidth; H = c.height = innerHeight; }
+resize(); window.onresize = resize;
+
+// ===== STATES =====
+var PHASE_IDLE = 0, PHASE_CHARGE = 1, PHASE_FIRE = 2, PHASE_COOLDOWN = 3;
+var phase = PHASE_IDLE;
+var chargeLevel = 0;      // 0-1 charge amount
+var chargePeak = 0;        // highest charge reached before fire
+var chargeTime = 0;        // seconds spent charging
+var fireTime = 0;          // seconds since beam fired
+var fireDecay = 0;         // beam fade
+var beamWidth = 0;         // current beam width
+var beamLength = 0;        // current beam length
+var screenShake = 0;       // screen shake intensity
+var flashAlpha = 0;        // white flash
+var cooldownTime = 0;
+
+// Particles
+var chargeParticles = [];  // swirling charge particles
+var beamParticles = [];    // beam trail particles
+var sparkParticles = [];   // zip/zap sparks
+var impactParticles = [];  // explosion at beam end
+var auraParticles = [];    // body aura
+
+// Character position (hands position for the beam origin)
+var charX, charY;          // set on resize
+var handX, handY;          // where the kamehameha forms
+
+// Audio
+var audioCtx, analyser, micStream, micSource;
+var freqData, timeData;
+var FFT_SIZE = 2048;
+
+// Synth sounds
+var synthNodes = [];
+var zapOsc = null, zapGain = null;
+var chargeOsc = null, chargeGain = null;
+var beamNoise = null, beamGain = null;
+var rumbleOsc = null, rumbleGain = null;
+
+var voice = {
+  rms: 0, f0: 0, pitchNorm: 0,
+  isSounding: false, noiseFloor: 0.01,
+  onset: false, sustainTime: 0,
+  prevRms: 0, rmsDelta: 0,
+  energy: 0, coherence: 0,
+  loudness: 0 // smoothed loudness for charge
+};
+
+// ===== AUDIO INIT =====
+async function initMic() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  micStream = await navigator.mediaDevices.getUserMedia({audio: true});
+  micSource = audioCtx.createMediaStreamSource(micStream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = FFT_SIZE;
+  analyser.smoothingTimeConstant = 0.8;
+  micSource.connect(analyser);
+  freqData = new Float32Array(analyser.frequencyBinCount);
+  timeData = new Float32Array(analyser.fftSize);
+  initSynths();
+}
+
+// ===== SYNTH SOUND EFFECTS =====
+function initSynths() {
+  // Master gain
+  var master = audioCtx.createGain();
+  master.gain.value = 0.3;
+  master.connect(audioCtx.destination);
+
+  // ---- Charge hum (rising sine + harmonics) ----
+  chargeOsc = audioCtx.createOscillator();
+  chargeOsc.type = 'sine';
+  chargeOsc.frequency.value = 80;
+  chargeGain = audioCtx.createGain();
+  chargeGain.gain.value = 0;
+  var chargeFilter = audioCtx.createBiquadFilter();
+  chargeFilter.type = 'lowpass';
+  chargeFilter.frequency.value = 400;
+  chargeFilter.Q.value = 5;
+  chargeOsc.connect(chargeFilter);
+  chargeFilter.connect(chargeGain);
+  chargeGain.connect(master);
+  chargeOsc.start();
+  synthNodes.push(chargeOsc);
+
+  // Charge harmonic
+  var chargeOsc2 = audioCtx.createOscillator();
+  chargeOsc2.type = 'triangle';
+  chargeOsc2.frequency.value = 160;
+  var cg2 = audioCtx.createGain();
+  cg2.gain.value = 0;
+  chargeOsc2.connect(cg2);
+  cg2.connect(master);
+  chargeOsc2.start();
+  synthNodes.push(chargeOsc2);
+
+  // ---- Zap/crackle oscillator (noise-like via detuned saws) ----
+  zapOsc = audioCtx.createOscillator();
+  zapOsc.type = 'sawtooth';
+  zapOsc.frequency.value = 2000;
+  zapGain = audioCtx.createGain();
+  zapGain.gain.value = 0;
+  var zapFilter = audioCtx.createBiquadFilter();
+  zapFilter.type = 'bandpass';
+  zapFilter.frequency.value = 3000;
+  zapFilter.Q.value = 1;
+  zapOsc.connect(zapFilter);
+  zapFilter.connect(zapGain);
+  zapGain.connect(master);
+  zapOsc.start();
+  synthNodes.push(zapOsc);
+
+  // ---- Rumble (very low) ----
+  rumbleOsc = audioCtx.createOscillator();
+  rumbleOsc.type = 'sine';
+  rumbleOsc.frequency.value = 30;
+  rumbleGain = audioCtx.createGain();
+  rumbleGain.gain.value = 0;
+  rumbleOsc.connect(rumbleGain);
+  rumbleGain.connect(master);
+  rumbleOsc.start();
+  synthNodes.push(rumbleOsc);
+
+  // ---- Beam noise (white noise through bandpass) ----
+  var bufSize = audioCtx.sampleRate * 2;
+  var noiseBuf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+  var noiseData = noiseBuf.getChannelData(0);
+  for (var i = 0; i < bufSize; i++) noiseData[i] = Math.random() * 2 - 1;
+  beamNoise = audioCtx.createBufferSource();
+  beamNoise.buffer = noiseBuf;
+  beamNoise.loop = true;
+  beamGain = audioCtx.createGain();
+  beamGain.gain.value = 0;
+  var beamFilter = audioCtx.createBiquadFilter();
+  beamFilter.type = 'bandpass';
+  beamFilter.frequency.value = 1500;
+  beamFilter.Q.value = 0.5;
+  beamNoise.connect(beamFilter);
+  beamFilter.connect(beamGain);
+  beamGain.connect(master);
+  beamNoise.start();
+}
+
+function updateSynths() {
+  if (!audioCtx) return;
+  var now = audioCtx.currentTime;
+
+  if (phase === PHASE_CHARGE) {
+    // Charge hum rises with charge level
+    var chargeFreq = 80 + chargeLevel * 400;
+    chargeOsc.frequency.linearRampToValueAtTime(chargeFreq, now + 0.1);
+    chargeGain.gain.linearRampToValueAtTime(chargeLevel * 0.15, now + 0.1);
+
+    // Zap crackles — intensity increases with charge
+    var zapFreq = 1500 + Math.random() * 3000 * chargeLevel;
+    zapOsc.frequency.linearRampToValueAtTime(zapFreq, now + 0.05);
+    // Rapid on/off for crackle effect
+    var zapVol = chargeLevel > 0.3 ? (Math.random() < chargeLevel * 0.4 ? chargeLevel * 0.08 : 0) : 0;
+    zapGain.gain.linearRampToValueAtTime(zapVol, now + 0.02);
+
+    // Rumble builds
+    rumbleGain.gain.linearRampToValueAtTime(chargeLevel * 0.2, now + 0.1);
+    rumbleOsc.frequency.linearRampToValueAtTime(20 + chargeLevel * 40, now + 0.1);
+
+    beamGain.gain.linearRampToValueAtTime(0, now + 0.1);
+
+  } else if (phase === PHASE_FIRE) {
+    // BEAM SOUND — full noise + high charge tone
+    chargeOsc.frequency.linearRampToValueAtTime(600 + chargePeak * 800, now + 0.05);
+    chargeGain.gain.linearRampToValueAtTime(0.2 * fireDecay, now + 0.05);
+
+    // Beam noise LOUD
+    beamGain.gain.linearRampToValueAtTime(0.25 * chargePeak * fireDecay, now + 0.05);
+
+    // Continuous zap
+    zapOsc.frequency.linearRampToValueAtTime(2000 + Math.random() * 4000, now + 0.02);
+    zapGain.gain.linearRampToValueAtTime(0.1 * fireDecay, now + 0.02);
+
+    // Heavy rumble
+    rumbleGain.gain.linearRampToValueAtTime(0.3 * chargePeak * fireDecay, now + 0.05);
+
+  } else {
+    // Silence
+    chargeGain.gain.linearRampToValueAtTime(0, now + 0.3);
+    zapGain.gain.linearRampToValueAtTime(0, now + 0.1);
+    rumbleGain.gain.linearRampToValueAtTime(0, now + 0.3);
+    beamGain.gain.linearRampToValueAtTime(0, now + 0.3);
+  }
+}
+
+// Trigger a zap burst sound
+function triggerZap() {
+  if (!audioCtx) return;
+  var now = audioCtx.currentTime;
+  var zO = audioCtx.createOscillator();
+  zO.type = 'sawtooth';
+  zO.frequency.value = 3000 + Math.random() * 5000;
+  var zG = audioCtx.createGain();
+  zG.gain.setValueAtTime(0.08, now);
+  zG.gain.exponentialRampToValueAtTime(0.001, now + 0.05 + Math.random() * 0.05);
+  zO.connect(zG);
+  zG.connect(audioCtx.destination);
+  zO.start(now);
+  zO.stop(now + 0.1);
+}
+
+// ===== VOICE ANALYSIS =====
+function analyzeVoice() {
+  if (!analyser) return;
+  analyser.getFloatTimeDomainData(timeData);
+  analyser.getFloatFrequencyData(freqData);
+
+  var sumSq = 0;
+  for (var i = 0; i < timeData.length; i++) sumSq += timeData[i] * timeData[i];
+  voice.rms = Math.sqrt(sumSq / timeData.length);
+
+  var wasSounding = voice.isSounding;
+  voice.isSounding = voice.rms > voice.noiseFloor * 2;
+  voice.onset = voice.isSounding && !wasSounding;
+
+  if (voice.isSounding) {
+    voice.sustainTime += 0.016;
+  } else {
+    voice.sustainTime = 0;
+  }
+
+  // F0
+  voice.f0 = 0;
+  if (voice.isSounding) {
+    var best = 0, bestLag = 0;
+    var minLag = Math.floor(audioCtx.sampleRate / 800);
+    var maxLag = Math.floor(audioCtx.sampleRate / 60);
+    for (var lag = minLag; lag < maxLag && lag < timeData.length/2; lag++) {
+      var sum = 0;
+      for (var j = 0; j < timeData.length/2; j++) sum += timeData[j] * timeData[j+lag];
+      if (sum > best) { best = sum; bestLag = lag; }
+    }
+    if (bestLag > 0) {
+      voice.f0 = audioCtx.sampleRate / bestLag;
+      voice.pitchNorm = Math.max(0, Math.min(1, (voice.f0 - 80) / 720));
+    }
+  }
+
+  voice.rmsDelta = voice.rms - voice.prevRms;
+  voice.prevRms = voice.rms;
+  voice.energy += (voice.rms - voice.energy) * 0.1;
+  voice.loudness += (voice.rms - voice.loudness) * 0.08;
+
+  if (voice.isSounding && voice.sustainTime > 0.3) {
+    voice.coherence = Math.min(1, voice.coherence + 0.01);
+  } else {
+    voice.coherence *= 0.97;
+  }
+}
+
+// ===== GAME LOGIC =====
+function updatePhase() {
+  var dt = 0.016;
+
+  if (phase === PHASE_IDLE) {
+    // Start charging when voice detected
+    if (voice.isSounding && voice.sustainTime > 0.2) {
+      phase = PHASE_CHARGE;
+      chargeTime = 0;
+      chargeLevel = 0;
+    }
+    chargeLevel *= 0.95;
+
+  } else if (phase === PHASE_CHARGE) {
+    chargeTime += dt;
+
+    if (voice.isSounding) {
+      // Charge rate depends on volume and sustain
+      var chargeRate = voice.loudness * 0.8 + voice.coherence * 0.3;
+      chargeLevel = Math.min(1, chargeLevel + chargeRate * dt * 0.5);
+
+      // Pitch affects charge "quality" — higher pitch = faster charge
+      chargeLevel = Math.min(1, chargeLevel + voice.pitchNorm * dt * 0.1);
+
+      // Spawn charge particles (swirl toward hands)
+      var spawnCount = Math.floor(3 + chargeLevel * 20);
+      for (var i = 0; i < spawnCount; i++) {
+        var angle = Math.random() * Math.PI * 2;
+        var dist = 80 + Math.random() * 200 * (1 + chargeLevel);
+        chargeParticles.push({
+          x: handX + Math.cos(angle) * dist,
+          y: handY + Math.sin(angle) * dist,
+          size: 1 + Math.random() * 3 * chargeLevel,
+          speed: 2 + Math.random() * 4 + chargeLevel * 3,
+          angle: angle + Math.PI, // toward center
+          life: 1,
+          hue: 200 + Math.random() * 40 + chargeLevel * 20 // blue → cyan
+        });
+      }
+
+      // Zap sparks around charge sphere
+      if (chargeLevel > 0.2 && Math.random() < chargeLevel * 0.3) {
+        spawnZapSpark(handX, handY, 20 + chargeLevel * 50);
+        if (Math.random() < 0.15) triggerZap();
+      }
+
+      // Screen shake increases with charge
+      screenShake = chargeLevel * 3;
+
+    } else {
+      // Stopped singing — FIRE if charged enough, otherwise decay
+      if (chargeLevel > 0.15 && chargeTime > 0.5) {
+        // FIRE!
+        phase = PHASE_FIRE;
+        chargePeak = chargeLevel;
+        fireTime = 0;
+        fireDecay = 1;
+        beamWidth = 10 + chargePeak * 80;
+        beamLength = 0;
+        flashAlpha = 0.6 + chargePeak * 0.4;
+        screenShake = chargePeak * 15;
+        // Big zap burst
+        for (var z = 0; z < 8; z++) triggerZap();
+      } else {
+        chargeLevel *= 0.96;
+        if (chargeLevel < 0.01) {
+          phase = PHASE_IDLE;
+          chargeLevel = 0;
+        }
+      }
+    }
+
+  } else if (phase === PHASE_FIRE) {
+    fireTime += dt;
+
+    // Beam extends
+    beamLength = Math.min(W * 1.5, beamLength + (20 + chargePeak * 60));
+
+    // Beam width pulsates
+    beamWidth = (10 + chargePeak * 80) * fireDecay * (0.8 + Math.sin(fireTime * 30) * 0.2);
+
+    // Screen shake decreases
+    screenShake *= 0.96;
+
+    // Spawn beam particles
+    var beamSpawn = Math.floor(5 + chargePeak * 30);
+    for (var b = 0; b < beamSpawn; b++) {
+      var bx = handX + Math.random() * beamLength;
+      var by = handY + (Math.random() - 0.5) * beamWidth * 1.5;
+      beamParticles.push({
+        x: bx, y: by,
+        vx: 5 + Math.random() * 15,
+        vy: (Math.random() - 0.5) * 4,
+        size: 1 + Math.random() * 3 * chargePeak,
+        life: 0.5 + Math.random() * 0.5,
+        hue: 190 + Math.random() * 30
+      });
+    }
+
+    // Zap sparks along beam
+    if (Math.random() < 0.5 * fireDecay) {
+      var zx = handX + Math.random() * beamLength;
+      var zy = handY + (Math.random()-0.5) * beamWidth;
+      spawnZapSpark(zx, zy, beamWidth * 0.8);
+      if (Math.random() < 0.2) triggerZap();
+    }
+
+    // Impact particles at beam end
+    if (beamLength > W * 0.5 && Math.random() < chargePeak * 0.5) {
+      var impX = handX + beamLength;
+      for (var ip = 0; ip < 5; ip++) {
+        impactParticles.push({
+          x: impX, y: handY,
+          vx: -3 - Math.random() * 10,
+          vy: (Math.random()-0.5) * 20,
+          size: 2 + Math.random() * 5 * chargePeak,
+          life: 0.5 + Math.random() * 0.5,
+          hue: 30 + Math.random() * 30 // orange/yellow
+        });
+      }
+    }
+
+    // Decay
+    fireDecay = Math.max(0, fireDecay - dt * (0.3 + (1-chargePeak) * 0.5));
+    flashAlpha *= 0.95;
+
+    if (fireDecay <= 0) {
+      phase = PHASE_COOLDOWN;
+      cooldownTime = 0;
+    }
+
+  } else if (phase === PHASE_COOLDOWN) {
+    cooldownTime += dt;
+    screenShake *= 0.9;
+    chargeLevel *= 0.9;
+    if (cooldownTime > 2) {
+      phase = PHASE_IDLE;
+    }
+  }
+}
+
+function spawnZapSpark(cx, cy, radius) {
+  // Electric arc — a series of connected points
+  var points = [];
+  var segments = 4 + Math.floor(Math.random() * 6);
+  var angle = Math.random() * Math.PI * 2;
+  var px = cx, py = cy;
+  for (var s = 0; s <= segments; s++) {
+    points.push({x: px, y: py});
+    var len = radius * (0.2 + Math.random() * 0.4) / segments;
+    angle += (Math.random() - 0.5) * 2;
+    px += Math.cos(angle) * len;
+    py += Math.sin(angle) * len;
+  }
+  sparkParticles.push({
+    points: points,
+    life: 0.1 + Math.random() * 0.15,
+    width: 0.5 + Math.random() * 2,
+    hue: 200 + Math.random() * 60
+  });
+}
+
+// ===== DRAW =====
+function draw() {
+  requestAnimationFrame(draw);
+  if (!running) { ctx.fillStyle = '#000'; ctx.fillRect(0,0,W,H); return; }
+  t += 0.016;
+
+  // Screen shake offset
+  var shX = (Math.random()-0.5) * screenShake * 2;
+  var shY = (Math.random()-0.5) * screenShake * 2;
+  ctx.save();
+  ctx.translate(shX, shY);
+
+  // Fade
+  ctx.fillStyle = phase === PHASE_FIRE ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.08)';
+  ctx.fillRect(-10,-10,W+20,H+20);
+
+  analyzeVoice();
+  updatePhase();
+  updateSynths();
+
+  // Update positions
+  charX = W * 0.18;
+  charY = H * 0.5;
+  handX = charX + 60;
+  handY = charY;
+
+  // ===== DRAW CHARACTER (stick figure) =====
+  var figAlpha = 0.3 + chargeLevel * 0.3;
+  var figColor = phase === PHASE_FIRE ?
+    'rgba(200,220,255,' + figAlpha + ')' :
+    'rgba(80,160,255,' + figAlpha + ')';
+
+  // Body aura
+  if (chargeLevel > 0.1 || phase === PHASE_FIRE) {
+    var auraSize = 60 + chargeLevel * 100;
+    var ag = ctx.createRadialGradient(charX, charY, 0, charX, charY, auraSize);
+    var auraAlpha = chargeLevel * 0.08;
+    if (phase === PHASE_FIRE) auraAlpha = chargePeak * fireDecay * 0.12;
+    ag.addColorStop(0, 'rgba(80,180,255,' + auraAlpha + ')');
+    ag.addColorStop(0.5, 'rgba(40,100,255,' + auraAlpha*0.5 + ')');
+    ag.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = ag;
+    ctx.fillRect(charX-auraSize, charY-auraSize, auraSize*2, auraSize*2);
+
+    // Aura flicker particles
+    if (Math.random() < chargeLevel * 0.5) {
+      var aa = Math.random() * Math.PI * 2;
+      auraParticles.push({
+        x: charX + Math.cos(aa) * (20 + Math.random()*40),
+        y: charY + Math.sin(aa) * (30 + Math.random()*50),
+        vy: -1 - Math.random()*3,
+        size: 1 + Math.random() * 3,
+        life: 0.3 + Math.random() * 0.4,
+        hue: 200 + Math.random() * 40
+      });
+    }
+  }
+
+  // Stick figure
+  ctx.strokeStyle = figColor;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+
+  // Head
+  ctx.beginPath(); ctx.arc(charX, charY - 55, 12, 0, Math.PI*2);
+  ctx.stroke();
+
+  // Body
+  ctx.beginPath(); ctx.moveTo(charX, charY - 43); ctx.lineTo(charX, charY + 10);
+  ctx.stroke();
+
+  // Legs
+  ctx.beginPath(); ctx.moveTo(charX, charY + 10);
+  ctx.lineTo(charX - 15, charY + 50); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(charX, charY + 10);
+  ctx.lineTo(charX + 15, charY + 50); ctx.stroke();
+
+  // Arms — KAMEHAMEHA pose (both arms thrust forward)
+  var armExtend = phase === PHASE_CHARGE ? 0.5 + chargeLevel * 0.5 :
+                  phase === PHASE_FIRE ? 1.0 : 0.3;
+  var armY = charY - 15;
+  var elbowX = charX + 15 + armExtend * 15;
+  var elbowY = armY + 5 - armExtend * 5;
+
+  // Left arm
+  ctx.beginPath(); ctx.moveTo(charX, charY - 30);
+  ctx.lineTo(elbowX, elbowY);
+  ctx.lineTo(handX, handY); ctx.stroke();
+  // Right arm
+  ctx.beginPath(); ctx.moveTo(charX, charY - 30);
+  ctx.lineTo(elbowX, elbowY + 10);
+  ctx.lineTo(handX, handY); ctx.stroke();
+
+  // ===== CHARGE SPHERE =====
+  if (phase === PHASE_CHARGE && chargeLevel > 0.01) {
+    var sphereR = 8 + chargeLevel * 45;
+    var pulseR = sphereR + Math.sin(t * 15) * 3 * chargeLevel;
+
+    // Outer glow
+    var sg = ctx.createRadialGradient(handX, handY, 0, handX, handY, pulseR * 2.5);
+    sg.addColorStop(0, 'rgba(150,220,255,' + (chargeLevel*0.2) + ')');
+    sg.addColorStop(0.3, 'rgba(80,160,255,' + (chargeLevel*0.1) + ')');
+    sg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(handX-pulseR*3, handY-pulseR*3, pulseR*6, pulseR*6);
+
+    // Core sphere
+    var sg2 = ctx.createRadialGradient(handX, handY, 0, handX, handY, pulseR);
+    sg2.addColorStop(0, 'rgba(255,255,255,' + (0.3+chargeLevel*0.5) + ')');
+    sg2.addColorStop(0.3, 'rgba(150,220,255,' + (0.2+chargeLevel*0.4) + ')');
+    sg2.addColorStop(0.7, 'rgba(80,160,255,' + (chargeLevel*0.3) + ')');
+    sg2.addColorStop(1, 'rgba(0,20,80,0)');
+    ctx.fillStyle = sg2;
+    ctx.beginPath(); ctx.arc(handX, handY, pulseR, 0, Math.PI*2); ctx.fill();
+
+    // Inner rings
+    for (var ir = 0; ir < 3; ir++) {
+      var irR = pulseR * (0.3 + ir * 0.25);
+      ctx.beginPath(); ctx.arc(handX, handY, irR, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(200,240,255,' + (chargeLevel*0.1*(3-ir)) + ')';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+  }
+
+  // ===== BEAM =====
+  if (phase === PHASE_FIRE && fireDecay > 0) {
+    var bw = beamWidth;
+    var bl = beamLength;
+
+    // Beam core (white-blue gradient)
+    var bg = ctx.createLinearGradient(handX, handY, handX + bl, handY);
+    bg.addColorStop(0, 'rgba(255,255,255,' + (fireDecay*0.8) + ')');
+    bg.addColorStop(0.1, 'rgba(150,220,255,' + (fireDecay*0.6) + ')');
+    bg.addColorStop(0.8, 'rgba(80,160,255,' + (fireDecay*0.4) + ')');
+    bg.addColorStop(1, 'rgba(40,80,200,' + (fireDecay*0.2) + ')');
+
+    // Draw beam (with wavy edges)
+    ctx.beginPath();
+    ctx.moveTo(handX, handY - bw*0.3);
+    for (var bx = 0; bx < bl; bx += 8) {
+      var wave = Math.sin(bx*0.05 + t*20) * bw * 0.1;
+      var taper = bx < 30 ? bx/30 : 1;
+      ctx.lineTo(handX + bx, handY - bw*0.5*taper + wave);
+    }
+    for (var bx2 = bl; bx2 >= 0; bx2 -= 8) {
+      var wave2 = Math.sin(bx2*0.05 + t*20 + 1) * bw * 0.1;
+      var taper2 = bx2 < 30 ? bx2/30 : 1;
+      ctx.lineTo(handX + bx2, handY + bw*0.5*taper2 + wave2);
+    }
+    ctx.closePath();
+    ctx.fillStyle = bg;
+    ctx.fill();
+
+    // Beam inner core (brighter, narrower)
+    ctx.beginPath();
+    ctx.moveTo(handX, handY);
+    for (var bx3 = 0; bx3 < bl; bx3 += 10) {
+      var wave3 = Math.sin(bx3*0.08 + t*25) * bw * 0.03;
+      ctx.lineTo(handX + bx3, handY + wave3);
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,' + (fireDecay*0.5) + ')';
+    ctx.lineWidth = bw * 0.15;
+    ctx.stroke();
+
+    // Beam origin flash
+    var og = ctx.createRadialGradient(handX, handY, 0, handX, handY, bw);
+    og.addColorStop(0, 'rgba(255,255,255,' + (fireDecay*0.6) + ')');
+    og.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = og;
+    ctx.fillRect(handX-bw, handY-bw, bw*2, bw*2);
+  }
+
+  // ===== PARTICLES =====
+
+  // Charge particles (spiral toward hands)
+  chargeParticles.forEach(function(p) {
+    var dx = handX - p.x, dy = handY - p.y;
+    var dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > 1) {
+      p.x += (dx/dist) * p.speed;
+      p.y += (dy/dist) * p.speed;
+      // Spiral
+      var perp = Math.atan2(dy, dx) + Math.PI/2;
+      p.x += Math.cos(perp) * p.speed * 0.3;
+      p.y += Math.sin(perp) * p.speed * 0.3;
+    }
+    p.life -= 0.015;
+    if (dist < 15) p.life -= 0.1; // absorbed
+
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+    ctx.fillStyle = 'hsla('+p.hue+',80%,70%,'+(p.life*0.5)+')';
+    ctx.fill();
+  });
+  chargeParticles = chargeParticles.filter(function(p){return p.life > 0;});
+
+  // Beam particles
+  beamParticles.forEach(function(p) {
+    p.x += p.vx; p.y += p.vy;
+    p.life -= 0.02;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+    ctx.fillStyle = 'hsla('+p.hue+',80%,70%,'+(p.life*0.3)+')';
+    ctx.fill();
+  });
+  beamParticles = beamParticles.filter(function(p){return p.life > 0;});
+
+  // Impact particles
+  impactParticles.forEach(function(p) {
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.3; // gravity
+    p.life -= 0.015;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+    ctx.fillStyle = 'hsla('+p.hue+',90%,60%,'+(p.life*0.5)+')';
+    ctx.fill();
+  });
+  impactParticles = impactParticles.filter(function(p){return p.life > 0;});
+
+  // Aura particles
+  auraParticles.forEach(function(p) {
+    p.y += p.vy;
+    p.life -= 0.015;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+    ctx.fillStyle = 'hsla('+p.hue+',70%,60%,'+(p.life*0.15)+')';
+    ctx.fill();
+  });
+  auraParticles = auraParticles.filter(function(p){return p.life > 0;});
+
+  // Zap sparks (electric arcs)
+  sparkParticles.forEach(function(sp) {
+    sp.life -= 0.016;
+    if (sp.points.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(sp.points[0].x, sp.points[0].y);
+    for (var si = 1; si < sp.points.length; si++) {
+      ctx.lineTo(sp.points[si].x, sp.points[si].y);
+    }
+    ctx.strokeStyle = 'hsla('+sp.hue+',80%,80%,'+(sp.life*3)+')';
+    ctx.lineWidth = sp.width;
+    ctx.stroke();
+    // Glow
+    ctx.strokeStyle = 'hsla('+sp.hue+',60%,90%,'+(sp.life*1.5)+')';
+    ctx.lineWidth = sp.width * 3;
+    ctx.globalAlpha = 0.3;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+  sparkParticles = sparkParticles.filter(function(sp){return sp.life > 0;});
+
+  // ===== FLASH =====
+  if (flashAlpha > 0.01) {
+    ctx.fillStyle = 'rgba(200,230,255,' + flashAlpha + ')';
+    ctx.fillRect(-10,-10,W+20,H+20);
+    flashAlpha *= 0.92;
+  }
+
+  ctx.restore(); // end screen shake
+
+  // ===== HUD =====
+  var pctNum = Math.round(chargeLevel * 100);
+  document.getElementById('power-fill').style.height = pctNum + '%';
+  document.getElementById('power-pct').textContent = pctNum + '%';
+
+  var lb = document.getElementById('charge-label');
+  if (phase === PHASE_CHARGE) {
+    var syllables = ['KA','KA·ME','KA·ME·HA','KA·ME·HA·ME','KA·ME·HA·ME·HAAA'];
+    var si2 = Math.min(4, Math.floor(chargeLevel * 5));
+    lb.textContent = syllables[si2];
+    lb.className = 'on';
+  } else if (phase === PHASE_FIRE) {
+    lb.textContent = 'HAAAAA!!!';
+    lb.className = 'fire';
+  } else if (phase === PHASE_COOLDOWN) {
+    lb.textContent = '';
+    lb.className = '';
+  } else {
+    lb.textContent = '';
+    lb.className = '';
+  }
+
+  document.getElementById('status').innerHTML =
+    'phase: ' + ['IDLE','CHARGE','FIRE','COOLDOWN'][phase] + '<br>' +
+    'charge: ' + pctNum + '%<br>' +
+    'F0: ' + (voice.f0 > 0 ? Math.round(voice.f0)+'Hz' : '--') + '<br>' +
+    'loudness: ' + (voice.loudness*100).toFixed(0) + '<br>' +
+    'coherence: ' + voice.coherence.toFixed(2);
+
+  document.getElementById('instructions').innerHTML =
+    'sing steady = charge<br>' +
+    'louder = faster charge<br>' +
+    'higher pitch = ki boost<br>' +
+    'stop singing = FIRE<br>' +
+    'longer charge = bigger beam';
+
+  // Limit particles
+  if (chargeParticles.length > 3000) chargeParticles = chargeParticles.slice(-2000);
+  if (beamParticles.length > 2000) beamParticles = beamParticles.slice(-1500);
+  if (sparkParticles.length > 200) sparkParticles = sparkParticles.slice(-150);
+}
+
+// ===== BEGIN =====
+async function begin() {
+  try {
+    await initMic();
+    document.getElementById('start').style.display = 'none';
+    running = true;
+    charX = W * 0.18; charY = H * 0.5;
+    handX = charX + 60; handY = charY;
+    draw();
+  } catch(err) {
+    alert('Microphone required for voice-powered Kamehameha!\n\n' + err.message);
+  }
+}
+
+draw();
+</script>
+</body>
+</html>
