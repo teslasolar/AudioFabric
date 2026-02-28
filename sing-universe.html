@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sing a Universe</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Courier New',monospace}
+canvas{display:block}
+#label{position:fixed;bottom:30px;left:0;right:0;text-align:center;color:rgba(247,215,148,0);font-size:clamp(14px,2.5vw,24px);font-style:italic;transition:color 1.5s;z-index:10;pointer-events:none;font-family:Georgia,serif}
+#label.on{color:rgba(247,215,148,0.5)}
+#fold-info{position:fixed;top:16px;left:16px;color:rgba(255,255,255,0.1);font-size:11px;z-index:10}
+#voice-info{position:fixed;top:16px;right:16px;color:rgba(255,255,255,0.08);font-size:10px;z-index:10;text-align:right;line-height:1.6}
+#sig{position:fixed;bottom:8px;right:10px;color:rgba(247,215,148,0.06);font-size:7px;z-index:10}
+#meter{position:fixed;left:0;bottom:0;width:4px;height:0%;background:rgba(247,215,148,0.2);transition:height 0.1s;z-index:10}
+#fold-bar{position:fixed;top:0;left:0;right:0;height:2px;z-index:10}
+#fold-fill{height:100%;width:0%;background:linear-gradient(90deg,rgba(180,140,100,0.4),rgba(247,215,148,0.6),rgba(255,50,50,0.4));transition:width 0.5s}
+#vowel-display{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);font-family:Georgia,serif;font-size:48px;font-style:italic;color:rgba(247,215,148,0);transition:color 0.3s;z-index:10;pointer-events:none}
+#vowel-display.on{color:rgba(247,215,148,0.12)}
+#start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;background:#000}
+#start h1{font-family:Georgia,serif;font-size:clamp(28px,6vw,60px);font-weight:normal;font-style:italic;color:rgba(247,215,148,0.5);text-align:center;line-height:1.2}
+#start .s{font-size:10px;color:rgba(255,255,255,0.1);letter-spacing:6px;margin:12px 0 6px;text-transform:uppercase}
+#start .desc{font-family:Georgia,serif;font-style:italic;font-size:12px;color:rgba(247,215,148,0.15);max-width:400px;text-align:center;line-height:1.8;margin-bottom:30px}
+#start button{background:none;border:1px solid rgba(247,215,148,0.15);color:rgba(247,215,148,0.4);font-family:Georgia,serif;font-style:italic;font-size:16px;padding:12px 44px;cursor:pointer;letter-spacing:3px;transition:all 0.4s}
+#start button:hover{border-color:rgba(247,215,148,0.4);color:rgba(247,215,148,0.7)}
+</style>
+</head>
+<body>
+<div id="start">
+  <h1>Sing a Universe<br>into Existence</h1>
+  <div class="s">THE X BLOOM</div>
+  <div class="desc">
+    your voice is the big bang.<br>
+    how you sing determines what universe you create.<br>
+    pitch chooses the fold. volume expands space.<br>
+    vowels shape matter. silence is the void.<br>
+    sing all 21 folds from penny to cosmogenesis.
+  </div>
+  <button onclick="begin()">open the void</button>
+</div>
+<canvas id="c"></canvas>
+<div id="label"></div>
+<div id="fold-info"></div>
+<div id="voice-info"></div>
+<div id="meter"></div>
+<div id="fold-bar"><div id="fold-fill"></div></div>
+<div id="vowel-display"></div>
+<div id="sig">21 folds | voice = genesis</div>
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  SING A UNIVERSE — The X Bloom, Voice-Driven                     ║
+// ║  Your voice IS the Big Bang.                                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+var c = document.getElementById('c'), ctx = c.getContext('2d');
+var W, H, t = 0, running = false;
+function resize() { W = c.width = innerWidth; H = c.height = innerHeight; }
+resize(); window.onresize = resize;
+
+// ===== THE 21 FOLDS =====
+var FOLDS = [
+  {n:'THE PENNY',       c:[180,140,100], v:'$0.01 zinc disc 2D — the seed',           pitchRange:[0,0.05]},
+  {n:'THE CUBE',        c:[200,160,120], v:'six faces LET THERE BE 6',                pitchRange:[0.05,0.1]},
+  {n:'HEAT SINK',       c:[220,170,100], v:'surface multiplied — function emerges',    pitchRange:[0.1,0.15]},
+  {n:'EMI SHIELD',      c:[100,160,220], v:'electromagnetic barrier — fields interact',pitchRange:[0.15,0.2]},
+  {n:'PROCESSOR',       c:[120,200,160], v:'the cube thinks — information lives inside',pitchRange:[0.2,0.25]},
+  {n:'BATTERY',         c:[200,200,80],  v:'electrochemical potential becomes kinetic', pitchRange:[0.25,0.3]},
+  {n:'SEPARATION',      c:[160,120,180], v:'zinc splits from copper — the 2 divides',  pitchRange:[0.3,0.35]},
+  {n:'HYDROGEN',        c:[200,220,240], v:'gas phase — element one',                  pitchRange:[0.35,0.4]},
+  {n:'COMPRESSED',      c:[150,190,220], v:'700 atmospheres — dense potential',         pitchRange:[0.4,0.45]},
+  {n:'LIQUID H2',       c:[100,180,240], v:'20 kelvin cryogenic rocket fuel',           pitchRange:[0.45,0.5]},
+  {n:'SOLID H2',        c:[140,160,220], v:'14 kelvin crystal ordered',                 pitchRange:[0.5,0.55]},
+  {n:'HIGH PRESSURE',   c:[180,100,200], v:'220 GPa molecules polymerizing',            pitchRange:[0.55,0.6]},
+  {n:'METALLIC H',      c:[247,215,148], v:'superconductor — the holy grail',          pitchRange:[0.6,0.65]},
+  {n:'JUPITER CORE',    c:[255,140,50],  v:'planetary magnetic field generator',        pitchRange:[0.65,0.7]},
+  {n:'METATRON CUBE',   c:[200,180,240], v:'13 circles — 5 Platonic solids',           pitchRange:[0.7,0.75]},
+  {n:'YGGDRASIL',       c:[80,180,80],   v:'world tree — nine realms three roots',     pitchRange:[0.75,0.8]},
+  {n:'BLACK HOLE',      c:[60,0,80],     v:'singularity — the ultimate fold',          pitchRange:[0.8,0.85]},
+  {n:'QUASAR',          c:[255,220,100], v:'brightest from darkest — zero screams',    pitchRange:[0.85,0.9]},
+  {n:'DUAL PAIR',       c:[200,100,255], v:'two voids orbiting — binary merger',       pitchRange:[0.9,0.93]},
+  {n:'GRAVITY WAVE',    c:[100,200,200], v:'spacetime vibrating — deepest signal',     pitchRange:[0.93,0.97]},
+  {n:'THE BIG X',       c:[255,50,50],   v:'everything crosses nothing — HERE NOW',    pitchRange:[0.97,1.0]}
+];
+
+// ===== VOWEL → MATTER MAPPING =====
+// Each vowel creates different cosmic matter
+var VOWEL_MATTER = {
+  'AH': {name:'STARS',      behavior:'radial',  sizeRange:[1,4],   speed:1.5, decay:0.002, glow:true,  matterColor:[255,200,100]},
+  'EE': {name:'PLASMA',     behavior:'electric', sizeRange:[0.5,2], speed:3.0, decay:0.004, glow:true,  matterColor:[100,180,255]},
+  'OH': {name:'PLANETS',    behavior:'orbital',  sizeRange:[2,5],   speed:0.5, decay:0.001, glow:false, matterColor:[80,200,120]},
+  'OO': {name:'DARK MATTER',behavior:'drift',    sizeRange:[1,3],   speed:0.3, decay:0.0005,glow:false, matterColor:[140,80,200]},
+  'EH': {name:'NEBULAE',    behavior:'diffuse',  sizeRange:[2,6],   speed:0.8, decay:0.0015,glow:true,  matterColor:[255,120,180]}
+};
+
+// ===== STATE =====
+var phase = 'void'; // void → singularity → bloom → complete
+var particles = [];
+var universAge = 0; // total singing time in seconds
+var currentFold = -1;
+var highestFold = -1;
+var foldTimes = new Array(21).fill(0); // time spent on each fold
+var foldUnlocked = new Array(21).fill(false);
+var totalSingTime = 0;
+var silenceTime = 0;
+var expansionRadius = 0;
+var collapseRate = 0;
+var singularityPulse = 0;
+var xReborn = 0;
+var universeEntropy = 0; // increases over time, affects particle behavior
+var cosmicStructures = []; // persistent large structures
+
+// Voice
+var audioCtx, analyser, micStream, micSource;
+var freqData, timeData;
+var FFT_SIZE = 2048;
+var voice = {
+  rms: 0, f0: 0, centroid: 0, f1: 0, f2: 0,
+  vowel: '', isSounding: false, noiseFloor: 0.01,
+  pitchNorm: 0, // 0-1 normalized pitch
+  onset: false, sustainTime: 0,
+  coherence: 0, energy: 0
+};
+
+// ===== AUDIO INIT =====
+async function initMic() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  micStream = await navigator.mediaDevices.getUserMedia({audio:true});
+  micSource = audioCtx.createMediaStreamSource(micStream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = FFT_SIZE;
+  analyser.smoothingTimeConstant = 0.8;
+  micSource.connect(analyser);
+  freqData = new Float32Array(analyser.frequencyBinCount);
+  timeData = new Float32Array(analyser.fftSize);
+}
+
+// ===== VOICE ANALYSIS =====
+function analyzeVoice() {
+  if (!analyser) return;
+  analyser.getFloatTimeDomainData(timeData);
+  analyser.getFloatFrequencyData(freqData);
+
+  // RMS
+  var sumSq = 0;
+  for (var i = 0; i < timeData.length; i++) sumSq += timeData[i] * timeData[i];
+  voice.rms = Math.sqrt(sumSq / timeData.length);
+
+  // Sounding?
+  var wasSounding = voice.isSounding;
+  voice.isSounding = voice.rms > voice.noiseFloor * 2;
+  voice.onset = voice.isSounding && !wasSounding;
+
+  if (voice.isSounding) {
+    voice.sustainTime += 0.016;
+    totalSingTime += 0.016;
+    silenceTime = 0;
+  } else {
+    voice.sustainTime = 0;
+    silenceTime += 0.016;
+  }
+
+  // F0 via autocorrelation
+  voice.f0 = 0;
+  if (voice.isSounding) {
+    var best = 0, bestLag = 0;
+    var minLag = Math.floor(audioCtx.sampleRate / 800); // 800 Hz max
+    var maxLag = Math.floor(audioCtx.sampleRate / 60);  // 60 Hz min
+    for (var lag = minLag; lag < maxLag && lag < timeData.length / 2; lag++) {
+      var sum = 0;
+      for (var j = 0; j < timeData.length / 2; j++) sum += timeData[j] * timeData[j + lag];
+      if (sum > best) { best = sum; bestLag = lag; }
+    }
+    if (bestLag > 0) {
+      voice.f0 = audioCtx.sampleRate / bestLag;
+      // Normalize pitch: 80Hz = 0, 800Hz = 1
+      voice.pitchNorm = Math.max(0, Math.min(1, (voice.f0 - 80) / 720));
+    }
+  }
+
+  // Spectral centroid
+  var num = 0, den = 0;
+  var binHz = audioCtx.sampleRate / FFT_SIZE;
+  for (var k = 0; k < freqData.length; k++) {
+    var mag = Math.pow(10, freqData[k] / 20);
+    num += k * binHz * mag;
+    den += mag;
+  }
+  voice.centroid = den > 0 ? num / den : 0;
+
+  // Formant estimation (F1, F2) from spectral peaks
+  if (voice.isSounding) {
+    var peaks = [];
+    for (var m = 2; m < freqData.length - 2; m++) {
+      if (freqData[m] > freqData[m-1] && freqData[m] > freqData[m+1] &&
+          freqData[m] > freqData[m-2] && freqData[m] > freqData[m+2] &&
+          freqData[m] > -40) {
+        peaks.push({freq: m * binHz, mag: freqData[m]});
+      }
+    }
+    peaks.sort(function(a,b){return b.mag - a.mag;});
+    var f1Peaks = peaks.filter(function(p){return p.freq > 200 && p.freq < 1000;});
+    var f2Peaks = peaks.filter(function(p){return p.freq > 800 && p.freq < 3000;});
+    voice.f1 = f1Peaks.length > 0 ? f1Peaks[0].freq : voice.f1 * 0.9;
+    voice.f2 = f2Peaks.length > 0 ? f2Peaks[0].freq : voice.f2 * 0.9;
+  }
+
+  // Vowel detection
+  var prevVowel = voice.vowel;
+  if (voice.isSounding && voice.f1 > 0 && voice.f2 > 0) {
+    if (voice.f1 > 600 && voice.f2 < 1500) voice.vowel = 'AH';
+    else if (voice.f1 < 400 && voice.f2 > 2000) voice.vowel = 'EE';
+    else if (voice.f1 > 400 && voice.f1 < 700 && voice.f2 < 1200) voice.vowel = 'OH';
+    else if (voice.f1 < 400 && voice.f2 < 1200) voice.vowel = 'OO';
+    else voice.vowel = 'EH';
+  }
+
+  // Energy (smoothed volume)
+  voice.energy += (voice.rms - voice.energy) * 0.1;
+
+  // Coherence: how stable is the pitch?
+  if (voice.isSounding && voice.sustainTime > 0.3) {
+    voice.coherence = Math.min(1, voice.coherence + 0.01);
+  } else {
+    voice.coherence *= 0.98;
+  }
+}
+
+// ===== VOICE → UNIVERSE MAPPING =====
+function voiceToUniverse() {
+  if (!voice.isSounding) {
+    // Silence = void / cooling / collapse
+    collapseRate = Math.min(0.3, collapseRate + 0.002);
+    expansionRadius = Math.max(0, expansionRadius - collapseRate * 0.5);
+    return;
+  }
+
+  collapseRate = 0;
+
+  // Pitch determines which fold is active
+  var pitchFold = Math.floor(voice.pitchNorm * 21);
+  pitchFold = Math.max(0, Math.min(20, pitchFold));
+
+  // But also: you can only access folds you've "earned" through singing time
+  // Each fold needs ~1.5s of singing in its pitch range to unlock
+  foldTimes[pitchFold] += 0.016;
+  if (foldTimes[pitchFold] > 1.5) foldUnlocked[pitchFold] = true;
+
+  // Current fold = highest unlocked fold that pitch is pointing at
+  if (foldUnlocked[pitchFold]) {
+    currentFold = pitchFold;
+  } else {
+    // Show you're "reaching" for this fold
+    currentFold = pitchFold;
+  }
+  highestFold = Math.max(highestFold, currentFold);
+
+  // Volume = expansion
+  var expansionForce = voice.rms * 50;
+  expansionRadius += expansionForce * 0.016;
+
+  // Spawn particles based on voice
+  var spawnRate = Math.floor(voice.rms * 300 + 2);
+  var matter = VOWEL_MATTER[voice.vowel] || VOWEL_MATTER['EH'];
+  var fc = FOLDS[Math.min(currentFold, 20)].c;
+
+  for (var i = 0; i < spawnRate; i++) {
+    var angle = Math.random() * Math.PI * 2;
+    var baseSpeed = matter.speed * (0.5 + voice.rms * 3);
+
+    var p = {
+      x: 0, y: 0,
+      vx: Math.cos(angle) * baseSpeed,
+      vy: Math.sin(angle) * baseSpeed,
+      fold: Math.min(currentFold, 20),
+      r: matter.sizeRange[0] + Math.random() * (matter.sizeRange[1] - matter.sizeRange[0]),
+      life: 1,
+      decay: matter.decay * (0.5 + Math.random()),
+      trail: [],
+      behavior: matter.behavior,
+      glow: matter.glow,
+      vowel: voice.vowel,
+      pitch: voice.pitchNorm,
+      coherence: voice.coherence,
+      age: 0
+    };
+
+    // Behavior-specific init
+    if (matter.behavior === 'orbital') {
+      p.orbitR = 30 + Math.random() * expansionRadius * 0.3;
+      p.orbitAngle = angle;
+      p.orbitSpeed = 0.5 + Math.random() * 1.5;
+    }
+    if (matter.behavior === 'electric') {
+      p.zigPhase = Math.random() * Math.PI * 2;
+      p.zigFreq = 5 + Math.random() * 15;
+    }
+
+    particles.push(p);
+  }
+
+  // Spawn cosmic structures on sustained high-coherence notes
+  if (voice.coherence > 0.7 && voice.sustainTime > 2 && Math.random() < 0.01) {
+    cosmicStructures.push({
+      x: (Math.random() - 0.5) * expansionRadius * 0.6,
+      y: (Math.random() - 0.5) * expansionRadius * 0.6,
+      type: currentFold < 7 ? 'ring' : currentFold < 14 ? 'spiral' : 'cross',
+      fold: currentFold,
+      size: 15 + Math.random() * 30,
+      life: 1,
+      decay: 0.0003,
+      rotation: Math.random() * Math.PI * 2
+    });
+  }
+
+  // Phase transitions
+  if (phase === 'void' && voice.rms > voice.noiseFloor * 3) {
+    phase = 'singularity';
+    singularityPulse = 0;
+  }
+  if (phase === 'singularity' && totalSingTime > 1.5) {
+    phase = 'bloom';
+  }
+}
+
+// ===== PARTICLE UPDATE =====
+function updateParticle(p, cx, cy, dt) {
+  p.age += dt;
+
+  switch(p.behavior) {
+    case 'radial':
+      // Stars: expand outward with slight curve
+      var curve = 0.002 * (p.coherence > 0.5 ? 1 : -1);
+      var an = Math.atan2(p.vy, p.vx) + curve;
+      var sp = Math.sqrt(p.vx*p.vx + p.vy*p.vy) * 0.999;
+      p.vx = Math.cos(an) * sp;
+      p.vy = Math.sin(an) * sp;
+      p.x += p.vx; p.y += p.vy;
+      break;
+
+    case 'electric':
+      // Plasma: zigzag pattern
+      p.x += p.vx;
+      p.y += p.vy + Math.sin(p.age * p.zigFreq + p.zigPhase) * 2;
+      p.vx *= 0.998; p.vy *= 0.998;
+      break;
+
+    case 'orbital':
+      // Planets: orbit around center
+      p.orbitAngle += p.orbitSpeed * dt;
+      p.x = Math.cos(p.orbitAngle) * p.orbitR;
+      p.y = Math.sin(p.orbitAngle) * p.orbitR;
+      p.orbitR += 0.02; // slowly spiral out
+      break;
+
+    case 'drift':
+      // Dark matter: slow, drifting, gravitationally influenced
+      p.x += p.vx * 0.3;
+      p.y += p.vy * 0.3;
+      // Slight pull toward center
+      var dx = -p.x * 0.0001, dy = -p.y * 0.0001;
+      p.vx += dx; p.vy += dy;
+      break;
+
+    case 'diffuse':
+      // Nebulae: expanding clouds
+      p.x += p.vx * 0.7;
+      p.y += p.vy * 0.7;
+      p.r += 0.01; // grow over time
+      p.vx *= 0.998; p.vy *= 0.998;
+      break;
+  }
+
+  // Trail
+  p.trail.push({x: p.x, y: p.y, a: p.life});
+  var maxTrail = p.behavior === 'electric' ? 15 : p.behavior === 'drift' ? 5 : 20;
+  if (p.trail.length > maxTrail) p.trail.shift();
+
+  p.life -= p.decay;
+}
+
+// ===== DRAW =====
+function draw() {
+  requestAnimationFrame(draw);
+  if (!running) { ctx.fillStyle = '#000'; ctx.fillRect(0,0,W,H); return; }
+
+  // Fade
+  var fadeAlpha = phase === 'void' ? 0.15 : 0.04 + silenceTime * 0.02;
+  fadeAlpha = Math.min(0.2, fadeAlpha);
+  ctx.fillStyle = 'rgba(0,0,0,' + fadeAlpha + ')';
+  ctx.fillRect(0,0,W,H);
+
+  t += 0.016;
+
+  var cx = W/2, cy = H/2;
+  var sc = Math.min(W,H) * 0.4;
+
+  // Analyze voice
+  analyzeVoice();
+  voiceToUniverse();
+
+  // ===== VOID PHASE =====
+  if (phase === 'void') {
+    // Faint breathing dot
+    var voidPulse = 0.1 + Math.sin(t * 0.5) * 0.05;
+    ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(247,215,148,' + voidPulse + ')';
+    ctx.fill();
+
+    var lb = document.getElementById('label');
+    lb.innerHTML = 'the void awaits your voice';
+    lb.classList.add('on');
+    document.getElementById('fold-info').innerHTML = 'VOID';
+  }
+
+  // ===== SINGULARITY PHASE =====
+  if (phase === 'singularity') {
+    singularityPulse += 0.016;
+    var sp = Math.sin(singularityPulse * 15) * 0.3 + 0.7;
+    var sr = 5 + singularityPulse * 20 * voice.energy;
+
+    // Bright core
+    var gr = ctx.createRadialGradient(cx,cy,0,cx,cy,sr);
+    gr.addColorStop(0, 'rgba(255,255,255,' + sp + ')');
+    gr.addColorStop(0.3, 'rgba(247,215,148,' + sp*0.5 + ')');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gr;
+    ctx.fillRect(cx-sr*2, cy-sr*2, sr*4, sr*4);
+
+    // Collapsing X
+    var xShrink = Math.max(0, 1 - singularityPulse * 0.6);
+    if (xShrink > 0) {
+      ctx.lineWidth = 2;
+      [[-1,-1,1,1],[1,-1,-1,1]].forEach(function(l) {
+        ctx.beginPath();
+        ctx.moveTo(cx+l[0]*sc*xShrink, cy+l[1]*sc*xShrink);
+        ctx.lineTo(cx+l[2]*sc*xShrink, cy+l[3]*sc*xShrink);
+        ctx.strokeStyle = 'rgba(255,50,50,' + xShrink*0.6 + ')';
+        ctx.stroke();
+      });
+    }
+
+    var lb = document.getElementById('label');
+    lb.innerHTML = singularityPulse < 0.8 ? 'the X folds inward' : 'your voice ignites the singularity';
+    lb.classList.add('on');
+    document.getElementById('fold-info').innerHTML = 'SINGULARITY';
+  }
+
+  // ===== BLOOM PHASE =====
+  if (phase === 'bloom' || phase === 'complete') {
+    universAge += 0.016;
+
+    // Draw fold rings (earned folds shown as concentric rings)
+    for (var f = 0; f <= highestFold && f < 21; f++) {
+      var fc = FOLDS[f].c;
+      var ringR = 20 + f * (expansionRadius / 21) * 0.5;
+      var ringAlpha = foldUnlocked[f] ? 0.06 : 0.015;
+      if (f === currentFold && voice.isSounding) ringAlpha = 0.15;
+
+      ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba('+fc+','+ringAlpha+')';
+      ctx.lineWidth = f === currentFold ? 2 : 1;
+      ctx.stroke();
+
+      // Fold number label
+      if (foldUnlocked[f] && ringR > 15) {
+        ctx.save();
+        ctx.font = '7px Courier New';
+        ctx.fillStyle = 'rgba('+fc+','+(ringAlpha*2)+')';
+        ctx.fillText(f, cx + ringR + 4, cy - 2);
+        ctx.restore();
+      }
+    }
+
+    // Draw cosmic structures
+    cosmicStructures.forEach(function(s) {
+      var fc2 = FOLDS[s.fold].c;
+      var sa = s.life * 0.2;
+      ctx.save();
+      ctx.translate(cx + s.x, cy + s.y);
+      ctx.rotate(s.rotation + t * 0.001);
+      ctx.strokeStyle = 'rgba('+fc2+','+sa+')';
+      ctx.lineWidth = 0.5;
+
+      if (s.type === 'ring') {
+        ctx.beginPath(); ctx.arc(0, 0, s.size, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, s.size*0.6, 0, Math.PI*2);
+        ctx.stroke();
+      } else if (s.type === 'spiral') {
+        ctx.beginPath();
+        for (var a = 0; a < Math.PI*4; a += 0.1) {
+          var sr2 = a * s.size * 0.08;
+          var sx = Math.cos(a) * sr2, sy = Math.sin(a) * sr2;
+          if (a === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+        }
+        ctx.stroke();
+      } else { // cross
+        var cs = s.size;
+        ctx.beginPath(); ctx.moveTo(-cs,-cs); ctx.lineTo(cs,cs);
+        ctx.moveTo(cs,-cs); ctx.lineTo(-cs,cs);
+        ctx.stroke();
+      }
+      ctx.restore();
+      s.life -= s.decay;
+      s.rotation += 0.001;
+    });
+
+    // Remove dead structures
+    cosmicStructures = cosmicStructures.filter(function(s){return s.life > 0;});
+
+    // Draw particles
+    particles.forEach(function(p) {
+      if (p.life <= 0) return;
+      updateParticle(p, cx, cy, 0.016);
+
+      var fc3 = FOLDS[p.fold].c;
+      var matter = VOWEL_MATTER[p.vowel] || VOWEL_MATTER['EH'];
+
+      // Blend fold color with matter color
+      var mr = (fc3[0] + matter.matterColor[0]) * 0.5;
+      var mg = (fc3[1] + matter.matterColor[1]) * 0.5;
+      var mb = (fc3[2] + matter.matterColor[2]) * 0.5;
+      var colStr = Math.round(mr)+','+Math.round(mg)+','+Math.round(mb);
+
+      // Trail
+      for (var ti = 1; ti < p.trail.length; ti++) {
+        var t0 = p.trail[ti-1], t1 = p.trail[ti];
+        var ta = t1.a * 0.06 * (ti/p.trail.length);
+        ctx.beginPath();
+        ctx.moveTo(cx + t0.x, cy + t0.y);
+        ctx.lineTo(cx + t1.x, cy + t1.y);
+        ctx.strokeStyle = 'rgba('+colStr+','+ta+')';
+        ctx.lineWidth = p.r * 0.4;
+        ctx.stroke();
+      }
+
+      // Particle
+      ctx.beginPath();
+      ctx.arc(cx + p.x, cy + p.y, p.r, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba('+colStr+','+(p.life*0.4)+')';
+      ctx.fill();
+
+      // Glow for stars and plasma
+      if (p.glow && p.life > 0.3) {
+        var glR = p.r * 3;
+        var gl2 = ctx.createRadialGradient(cx+p.x, cy+p.y, 0, cx+p.x, cy+p.y, glR);
+        gl2.addColorStop(0, 'rgba('+colStr+','+(p.life*0.08)+')');
+        gl2.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = gl2;
+        ctx.fillRect(cx+p.x-glR, cy+p.y-glR, glR*2, glR*2);
+      }
+    });
+
+    // Remove dead particles (limit total count)
+    particles = particles.filter(function(p){return p.life > 0;});
+    if (particles.length > 8000) {
+      particles.sort(function(a,b){return a.life - b.life;});
+      particles = particles.slice(particles.length - 6000);
+    }
+
+    // The X re-emerging (after fold 17+)
+    if (highestFold >= 17) {
+      xReborn = Math.min(1, xReborn + 0.001);
+      var xr = sc * xReborn * 0.6;
+      ctx.lineWidth = 1;
+      [[-1,-1,1,1],[1,-1,-1,1]].forEach(function(l) {
+        ctx.beginPath();
+        ctx.moveTo(cx+l[0]*xr, cy+l[1]*xr);
+        ctx.lineTo(cx+l[2]*xr, cy+l[3]*xr);
+        ctx.strokeStyle = 'rgba(247,215,148,'+(xReborn*0.08)+')';
+        ctx.stroke();
+      });
+    }
+
+    // Complete check
+    if (highestFold >= 20 && foldUnlocked[20] && phase !== 'complete') {
+      phase = 'complete';
+    }
+
+    // Labels
+    var fold = FOLDS[Math.min(Math.max(currentFold,0), 20)];
+    if (voice.isSounding && fold) {
+      document.getElementById('label').innerHTML = fold.v;
+      document.getElementById('label').classList.add('on');
+      document.getElementById('fold-info').innerHTML =
+        'FOLD ' + currentFold + ' : ' + fold.n +
+        (foldUnlocked[currentFold] ? '' : ' <span style="color:rgba(255,200,100,0.2)">[singing...]</span>');
+    } else if (silenceTime > 2) {
+      document.getElementById('label').innerHTML = 'the void breathes between creation';
+      document.getElementById('label').classList.add('on');
+      document.getElementById('fold-info').innerHTML = 'SILENCE · universe cooling';
+    }
+
+    if (phase === 'complete') {
+      var finAlpha = Math.min(0.08, (universAge - 30) * 0.002);
+      ctx.font = (60 + Math.sin(t) * 5) + 'px Georgia';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(247,215,148,' + finAlpha + ')';
+      ctx.fillText('\u2715', cx, cy);
+      document.getElementById('label').innerHTML = 'your voice bloomed from penny to cosmogenesis';
+      document.getElementById('fold-info').innerHTML = 'THE BLOOM IS COMPLETE · all 21 folds sung';
+    }
+
+    // Fold progress bar
+    var foldPct = (highestFold + 1) / 21 * 100;
+    document.getElementById('fold-fill').style.width = foldPct + '%';
+  }
+
+  // Center dot (always present)
+  ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI*2);
+  var dotAlpha = phase === 'void' ? 0.2 : 0.3 + voice.energy * 2;
+  ctx.fillStyle = 'rgba(247,215,148,' + Math.min(0.8, dotAlpha) + ')';
+  ctx.fill();
+
+  // Voice meter
+  document.getElementById('meter').style.height = Math.min(100, voice.rms * 500) + '%';
+
+  // Voice info
+  if (voice.isSounding) {
+    document.getElementById('voice-info').innerHTML =
+      'F0: ' + (voice.f0 > 0 ? Math.round(voice.f0) + ' Hz' : '-') + '<br>' +
+      'vowel: ' + (voice.vowel || '-') + '<br>' +
+      'matter: ' + (VOWEL_MATTER[voice.vowel] ? VOWEL_MATTER[voice.vowel].name : '-') + '<br>' +
+      'coherence: ' + voice.coherence.toFixed(2) + '<br>' +
+      'sung: ' + Math.round(totalSingTime) + 's';
+
+    var vd = document.getElementById('vowel-display');
+    vd.textContent = voice.vowel || '';
+    vd.classList.toggle('on', !!voice.vowel);
+  } else {
+    document.getElementById('vowel-display').classList.remove('on');
+  }
+}
+
+// ===== BEGIN =====
+async function begin() {
+  try {
+    await initMic();
+    document.getElementById('start').style.display = 'none';
+    running = true;
+    phase = 'void';
+    draw();
+  } catch(err) {
+    alert('Microphone access required to sing a universe into existence.\n\n' + err.message);
+  }
+}
+
+draw();
+</script>
+</body>
+</html>
