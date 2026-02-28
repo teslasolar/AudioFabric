@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RISK Arena — Voice Conquest — Room THOMAS</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#fff;font-family:'Courier New',monospace;overflow:hidden;user-select:none}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;padding:8px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.8),transparent);pointer-events:none;
+  display:none;justify-content:space-between;align-items:flex-start}
+#hud.on{display:flex}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#turnInfo{font-size:20px;color:#ff0;text-shadow:0 0 10px #f80}
+#phaseInfo{font-size:14px;color:#4af}
+#reserves{font-size:13px;color:#0f0}
+#instruction{font-size:12px;color:#fff8}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#room{font-size:11px;color:#0ff}
+#peers{font-size:11px;color:#088}
+#llmStatus{font-size:10px;color:#555}
+#simonBar{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:55;
+  width:400px;height:32px;background:#111;border:1px solid #333;border-radius:6px;
+  display:none;overflow:hidden}
+#simonBar.on{display:block}
+#simonTarget{position:absolute;height:100%;background:rgba(255,255,0,0.15);border:1px solid #ff0;
+  border-radius:4px;transition:left 0.3s,width 0.3s}
+#simonNeedle{position:absolute;top:0;width:3px;height:100%;background:#fff;border-radius:2px;
+  transition:left 0.05s}
+#simonLabel{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:10px;
+  color:#ff0;white-space:nowrap}
+#phonemes{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:55;
+  display:none;gap:8px;pointer-events:none}
+#phonemes.on{display:flex}
+.ph{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:44px}
+.ph-label{font-size:10px;font-weight:bold;opacity:0.4;transition:opacity 0.15s}
+.ph.active .ph-label{opacity:1}
+.ph.simon .ph-label{animation:simonPulse 0.5s infinite alternate}
+.ph-bar{width:10px;height:50px;background:#111;border:1px solid #fff1;border-radius:5px;
+  position:relative;overflow:hidden}
+.ph-fill{position:absolute;bottom:0;left:0;right:0;border-radius:4px;transition:height 0.08s}
+@keyframes simonPulse{0%{opacity:0.4;text-shadow:none}100%{opacity:1;text-shadow:0 0 8px currentColor}}
+#cmt{position:fixed;bottom:120px;left:50%;transform:translateX(-50%);z-index:70;
+  background:rgba(0,0,0,0.85);border:1px solid #ff0;border-radius:12px;padding:8px 20px;
+  font-size:16px;color:#ff0;text-shadow:0 0 10px #f80;text-align:center;
+  max-width:500px;opacity:0;transition:opacity 0.3s;pointer-events:none}
+#cmt.show{opacity:1}
+#lb{position:fixed;right:8px;top:50%;transform:translateY(-50%);z-index:50;
+  background:rgba(0,0,0,0.8);border:1px solid #ff03;border-radius:8px;padding:10px;
+  min-width:160px;display:none;font-size:11px}
+#lb.on{display:block}
+#lb h3{color:#ff0;font-size:12px;margin-bottom:4px;text-align:center}
+#lb .row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #ff01}
+#lb .row .n{max-width:100px;overflow:hidden}
+#endBtn{position:fixed;bottom:120px;right:16px;z-index:55;display:none;
+  background:#222;border:1px solid #ff0;color:#ff0;padding:6px 14px;border-radius:6px;
+  font-family:inherit;font-size:12px;cursor:pointer}
+#endBtn:hover{background:#ff0;color:#000}
+#llmProg{position:fixed;bottom:2px;left:50%;transform:translateX(-50%);z-index:55;
+  font-size:9px;color:#555;display:none;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l">
+    <div id="turnInfo">—</div>
+    <div id="phaseInfo">—</div>
+    <div id="reserves"></div>
+    <div id="instruction"></div>
+  </div>
+  <div class="hud-r">
+    <div id="nick" onclick="changeNick()" title="Click to change name"></div>
+    <div id="room">THOMAS</div>
+    <div id="peers"></div>
+    <div id="llmStatus"></div>
+  </div>
+</div>
+<div id="simonBar"><div id="simonTarget"></div><div id="simonNeedle"></div><div id="simonLabel"></div></div>
+<div id="phonemes"></div>
+<div id="cmt"></div>
+<div id="lb"><h3>RISK ARENA</h3><div id="lbRows"></div></div>
+<button id="endBtn" onclick="endPhase()">END PHASE</button>
+<div id="llmProg"></div>
+
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script>
+// === TERRITORY & MAP DATA ===
+var TERR=[
+  {name:'Alaska',c:0,poly:[[.04,.10],[.13,.07],[.16,.16],[.11,.22],[.04,.20]],adj:[1,13]},
+  {name:'USA',c:0,poly:[[.11,.22],[.16,.16],[.26,.15],[.29,.24],[.26,.33],[.15,.35]],adj:[0,2,5]},
+  {name:'C.America',c:0,poly:[[.15,.35],[.22,.35],[.24,.46],[.18,.48],[.13,.42]],adj:[1,3]},
+  {name:'Brazil',c:1,poly:[[.18,.48],[.24,.46],[.31,.48],[.33,.60],[.26,.66],[.20,.60]],adj:[2,4,8]},
+  {name:'Argentina',c:1,poly:[[.20,.60],[.26,.66],[.27,.76],[.22,.84],[.17,.76],[.17,.64]],adj:[3]},
+  {name:'Britain',c:2,poly:[[.38,.12],[.44,.09],[.46,.18],[.42,.22],[.37,.18]],adj:[1,6]},
+  {name:'N.Europe',c:2,poly:[[.46,.07],[.57,.05],[.59,.15],[.53,.20],[.46,.18]],adj:[5,7,10]},
+  {name:'S.Europe',c:2,poly:[[.42,.22],[.53,.20],[.55,.30],[.49,.34],[.40,.30]],adj:[6,8,10]},
+  {name:'N.Africa',c:3,poly:[[.38,.36],[.49,.34],[.55,.38],[.55,.50],[.47,.54],[.38,.50]],adj:[3,7,9,10]},
+  {name:'S.Africa',c:3,poly:[[.38,.50],[.47,.54],[.55,.50],[.55,.64],[.47,.70],[.38,.64]],adj:[8]},
+  {name:'M.East',c:4,poly:[[.55,.22],[.65,.19],[.67,.32],[.61,.38],[.55,.34]],adj:[6,7,8,11]},
+  {name:'India',c:4,poly:[[.65,.32],[.67,.19],[.76,.24],[.78,.38],[.72,.44],[.65,.38]],adj:[10,12]},
+  {name:'China',c:4,poly:[[.67,.09],[.84,.07],[.86,.22],[.80,.30],[.76,.24],[.67,.19]],adj:[11,13,14]},
+  {name:'Japan',c:4,poly:[[.86,.09],[.94,.07],[.96,.18],[.92,.24],[.86,.20]],adj:[0,12]},
+  {name:'Indonesia',c:5,poly:[[.78,.48],[.88,.45],[.90,.55],[.84,.58],[.78,.54]],adj:[12,15]},
+  {name:'Australia',c:5,poly:[[.80,.60],[.94,.58],[.97,.68],[.91,.76],[.80,.72]],adj:[14]}
+];
+var CONT=[
+  {name:'N.America',terr:[0,1,2],bonus:3,color:'#44aa55'},
+  {name:'S.America',terr:[3,4],bonus:2,color:'#cccc44'},
+  {name:'Europe',terr:[5,6,7],bonus:3,color:'#4488dd'},
+  {name:'Africa',terr:[8,9],bonus:2,color:'#dd8844'},
+  {name:'Asia',terr:[10,11,12,13],bonus:4,color:'#dd4444'},
+  {name:'Oceania',terr:[14,15],bonus:2,color:'#aa44dd'}
+];
+var PCOL=['#4488ff','#ff4444','#44cc44','#ffaa00'];
+var PNAME=['You','Red Army','Green Force','Orange Legion'];
+
+// === GAME STATE ===
+var game={players:[],terr:[],cur:0,phase:'deploy',sel:-1,tgt:-1,reserves:0,
+  turn:1,over:false,diceAtt:[],diceDef:[],diceRolling:false,diceTimer:0,
+  diceResult:null,simonPitch:0.5,simonVowel:'ah',simonMatched:false,
+  actionReady:false,actionCooldown:0};
+var particles=[],screenShake=0;
+var W,H,ctx,mapX,mapY,mapW,mapH;
+
+// === VOICE ===
+var audioCtx,analyser,timeData,freqData,stream,SR=44100,FFT=2048;
+var voice={rms:0,f0:0,pn:0,f1:0,f2:0,vowel:'',sounding:false,
+  nf:0.01,energy:0,coherence:0,sustain:0,prevF0:0,pDelta:0,prevRms:0,
+  lastAmp:0,onsets:[],pulseRate:0,chargeLevel:0};
+var PHONEMES={ah:{label:'AH',color:'#4488ff',power:0},ee:{label:'EE',color:'#ffdd00',power:0},
+  oh:{label:'OH',color:'#ffffff',power:0},oo:{label:'OO',color:'#aa44ff',power:0},
+  eh:{label:'EH',color:'#ff8844',power:0},mm:{label:'MM',color:'#44ffaa',power:0}};
+var PH_KEYS=Object.keys(PHONEMES);
+
+// networking/LLM globals
+var mqttClient=null,mqttConnected=false,peerScores={};
+var llmSession=null,llmReady=false,llmGenerator=null;
+var playerName='',running=false;
+var synthNodes={};
+
+// === INIT ===
+function genHash(){return 'W-'+Math.random().toString(36).slice(2,8).toUpperCase();}
+function begin(){
+  playerName=genHash();
+  document.getElementById('nick').textContent=playerName;
+  document.getElementById('hud').classList.add('on');
+  document.getElementById('lb').classList.add('on');
+  document.getElementById('phonemes').classList.add('on');
+  document.getElementById('simonBar').classList.add('on');
+  buildPhonemeUI();initCanvas();initGame();initAudio();initMQTT();initWebRTC();initLLM();
+}
+function changeNick(){
+  var n=prompt('Nickname (max 16):',playerName);
+  if(n&&n.trim()){playerName=n.trim().slice(0,16);
+    document.getElementById('nick').textContent=playerName;
+    PNAME[0]=playerName;updateLB();}
+}
+window.addEventListener('load',begin);
+
+function buildPhonemeUI(){
+  var cont=document.getElementById('phonemes');
+  PH_KEYS.forEach(function(k){
+    var ph=PHONEMES[k];
+    var d=document.createElement('div');d.className='ph';d.id='ph-'+k;
+    d.innerHTML='<div class="ph-label" style="color:'+ph.color+'">'+ph.label+'</div>'+
+      '<div class="ph-bar"><div class="ph-fill" style="background:'+ph.color+';height:0%"></div></div>';
+    cont.appendChild(d);
+  });
+}
+
+// === CANVAS SETUP ===
+function initCanvas(){
+  var c=document.getElementById('c');
+  ctx=c.getContext('2d');
+  W=window.innerWidth;H=window.innerHeight;c.width=W;c.height=H;
+  mapX=W*0.02;mapY=H*0.10;mapW=W*0.72;mapH=H*0.68;
+  window.onresize=function(){W=window.innerWidth;H=window.innerHeight;
+    c.width=W;c.height=H;mapX=W*0.02;mapY=H*0.10;mapW=W*0.72;mapH=H*0.68;};
+  c.addEventListener('click',function(e){handleClick(e.clientX,e.clientY);});
+}
+
+// === GAME INIT ===
+function initGame(){
+  game.players=[];
+  for(var i=0;i<4;i++)game.players.push({name:PNAME[i],alive:true,isAI:i>0});
+  // distribute territories
+  var idx=[];for(var i=0;i<TERR.length;i++)idx.push(i);
+  shuffle(idx);
+  game.terr=[];
+  for(var i=0;i<TERR.length;i++)game.terr.push({owner:idx[i]%4,armies:3});
+  game.cur=0;game.phase='deploy';game.turn=1;game.over=false;
+  game.reserves=calcReserves(0);
+  newSimon();updateHUD();
+}
+function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}}
+function calcReserves(p){
+  var count=0;for(var i=0;i<game.terr.length;i++)if(game.terr[i].owner===p)count++;
+  var r=Math.max(3,Math.floor(count/3));
+  CONT.forEach(function(c){
+    var owns=true;c.terr.forEach(function(t){if(game.terr[t].owner!==p)owns=false;});
+    if(owns)r+=c.bonus;
+  });
+  return r;
+}
+function ownedBy(p){var c=0;for(var i=0;i<game.terr.length;i++)if(game.terr[i].owner===p)c++;return c;}
+
+// === SIMON SAYS TONE SYSTEM ===
+function newSimon(){
+  game.simonPitch=0.15+Math.random()*0.7;
+  var vowels=['ah','ee','oh','oo','eh'];
+  game.simonVowel=vowels[Math.floor(Math.random()*vowels.length)];
+  game.simonMatched=false;
+  // update simon bar UI
+  var bar=document.getElementById('simonTarget');
+  bar.style.left=(game.simonPitch*100-7)+'%';bar.style.width='14%';
+  var lbl=document.getElementById('simonLabel');
+  lbl.textContent='SIMON: Sing '+game.simonVowel.toUpperCase()+' at this pitch for DOUBLES!';
+  lbl.style.color=PHONEMES[game.simonVowel]?PHONEMES[game.simonVowel].color:'#ff0';
+  // highlight target phoneme
+  PH_KEYS.forEach(function(k){
+    var el=document.getElementById('ph-'+k);
+    if(k===game.simonVowel)el.classList.add('simon');else el.classList.remove('simon');
+  });
+}
+function checkSimon(){
+  var pitchDist=Math.abs(voice.pn-game.simonPitch);
+  var pitchMatch=pitchDist<0.08;
+  var vowelMatch=voice.vowel===game.simonVowel;
+  // update needle
+  var needle=document.getElementById('simonNeedle');
+  needle.style.left=(voice.pn*100)+'%';
+  needle.style.background=pitchMatch?(vowelMatch?'#ff0':'#0f0'):'#fff';
+  if(pitchMatch&&vowelMatch){game.simonMatched=true;return 'perfect';}
+  if(pitchMatch){return 'toneMatch';}
+  return 'none';
+}
+
+// === VOICE ANALYSIS ===
+function initAudio(){
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(s){
+    stream=s;
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)({sampleRate:SR});
+    analyser=audioCtx.createAnalyser();analyser.fftSize=FFT;analyser.smoothingTimeConstant=0.8;
+    timeData=new Float32Array(FFT);freqData=new Float32Array(analyser.frequencyBinCount);
+    audioCtx.createMediaStreamSource(s).connect(analyser);
+    setTimeout(function(){analyser.getFloatTimeDomainData(timeData);var r=0;
+      for(var i=0;i<timeData.length;i++)r+=timeData[i]*timeData[i];
+      voice.nf=Math.sqrt(r/timeData.length)*1.5+0.005;},300);
+    initSynths();running=true;animate();
+  }).catch(function(e){alert('Mic needed: '+e.message);});
+}
+function analyzeV(){
+  analyser.getFloatTimeDomainData(timeData);analyser.getFloatFrequencyData(freqData);
+  var r=0;for(var i=0;i<timeData.length;i++)r+=timeData[i]*timeData[i];
+  r=Math.sqrt(r/timeData.length);
+  voice.prevRms=voice.rms;voice.rms=r;
+  voice.sounding=r>voice.nf*2;voice.energy+=(r-voice.energy)*0.1;
+  voice.prevF0=voice.f0;voice.f0=detectF0(timeData,SR);
+  voice.pn=Math.max(0,Math.min(1,(voice.f0-80)/720));
+  if(voice.f0>0&&voice.prevF0>0)voice.pDelta=voice.f0-voice.prevF0;
+  if(voice.sounding){voice.sustain+=0.016;if(voice.sustain>0.3)voice.coherence=Math.min(1,voice.coherence+0.01);}
+  else{voice.sustain=0;voice.coherence*=0.97;}
+  var bw=SR/(freqData.length*2),sm=new Float32Array(freqData.length);
+  for(var i=2;i<freqData.length-2;i++)sm[i]=(freqData[i-2]+freqData[i-1]+freqData[i]+freqData[i+1]+freqData[i+2])/5;
+  var peaks=[],lo=Math.floor(200/bw),hi=Math.min(Math.floor(3000/bw),sm.length-1);
+  for(var i=lo+1;i<hi-1;i++)if(sm[i]>sm[i-1]&&sm[i]>sm[i+1]&&sm[i]>-60)peaks.push({f:i*bw,m:sm[i]});
+  peaks.sort(function(a,b){return b.m-a.m;});
+  var f1=peaks.length>=1?peaks[0].f:0,f2=0;
+  if(peaks.length>=2)for(var i=1;i<peaks.length;i++)if(Math.abs(peaks[i].f-f1)>200){f2=peaks[i].f;break;}
+  if(f1>f2&&f2>0){var t=f1;f1=f2;f2=t;}
+  voice.f1=f1;voice.f2=f2;voice.vowel='';
+  if(f1>0&&f2>0){
+    if(f1<400&&f2>2000)voice.vowel='ee';
+    else if(f1>400&&f1<650&&f2>1600)voice.vowel='eh';
+    else if(f1>600&&f2>900&&f2<1500)voice.vowel='ah';
+    else if(f1>350&&f1<600&&f2<1100)voice.vowel='oh';
+    else if(f1<400&&f2<1000)voice.vowel='oo';
+    else if(f1<350&&f2<1200)voice.vowel='mm';
+  }
+  var now=performance.now();
+  if(r>voice.lastAmp*1.8&&r>voice.nf*2)voice.onsets.push(now);
+  voice.lastAmp=r;
+  while(voice.onsets.length&&now-voice.onsets[0]>2000)voice.onsets.shift();
+}
+function detectF0(b,sr){
+  var sz=b.length,bc=0,bl=0,r=0;
+  for(var i=0;i<sz;i++)r+=b[i]*b[i];r=Math.sqrt(r/sz);
+  if(r<voice.nf)return 0;
+  var mn=Math.floor(sr/1000),mx=Math.floor(sr/50);
+  for(var lag=mn;lag<mx&&lag<sz;lag++){var c=0;for(var j=0;j<sz-lag;j++)c+=b[j]*b[j+lag];
+    if(c>bc){bc=c;bl=lag;}}
+  return bl===0?0:sr/bl;
+}
+
+// === CLICK HANDLING ===
+function handleClick(mx,my){
+  if(game.over||game.cur!==0||game.diceRolling)return;
+  var ti=hitTest(mx,my);
+  if(ti<0)return;
+  if(game.phase==='deploy'){
+    if(game.terr[ti].owner===0){game.sel=ti;updateHUD();}
+  }else if(game.phase==='attack'){
+    if(game.sel<0){
+      if(game.terr[ti].owner===0&&game.terr[ti].armies>1)game.sel=ti;
+    }else{
+      if(game.terr[ti].owner!==0&&TERR[game.sel].adj.indexOf(ti)!==-1)game.tgt=ti;
+      else if(game.terr[ti].owner===0){game.sel=ti;game.tgt=-1;}
+      else{game.sel=-1;game.tgt=-1;}
+    }
+    updateHUD();
+  }else if(game.phase==='fortify'){
+    if(game.sel<0){
+      if(game.terr[ti].owner===0&&game.terr[ti].armies>1)game.sel=ti;
+    }else{
+      if(game.terr[ti].owner===0&&ti!==game.sel&&TERR[game.sel].adj.indexOf(ti)!==-1)game.tgt=ti;
+      else if(game.terr[ti].owner===0){game.sel=ti;game.tgt=-1;}
+      else{game.sel=-1;game.tgt=-1;}
+    }
+    updateHUD();
+  }
+}
+function hitTest(mx,my){
+  for(var i=TERR.length-1;i>=0;i--){
+    var p=TERR[i].poly;
+    ctx.beginPath();
+    ctx.moveTo(mapX+p[0][0]*mapW,mapY+p[0][1]*mapH);
+    for(var j=1;j<p.length;j++)ctx.lineTo(mapX+p[j][0]*mapW,mapY+p[j][1]*mapH);
+    ctx.closePath();
+    if(ctx.isPointInPath(mx,my))return i;
+  }
+  return -1;
+}
+
+// === VOICE → GAME ACTIONS ===
+function checkVoiceAction(){
+  if(game.over||game.cur!==0||game.diceRolling)return;
+  if(game.actionCooldown>0){game.actionCooldown-=0.016;return;}
+  // charge while singing
+  if(voice.sounding){
+    voice.chargeLevel=Math.min(1,voice.chargeLevel+voice.rms*0.1);
+  }else{
+    voice.chargeLevel*=0.92;
+    if(voice.chargeLevel<0.01)voice.chargeLevel=0;
+  }
+  // fire action at threshold
+  if(voice.chargeLevel>0.6&&voice.sounding){
+    var simon=checkSimon();
+    if(game.phase==='deploy'&&game.sel>=0&&game.reserves>0){
+      var amt=(simon==='perfect')?3:(simon==='toneMatch')?2:1;
+      amt=Math.min(amt,game.reserves);
+      game.terr[game.sel].armies+=amt;game.reserves-=amt;
+      spawnParticles(centroid(game.sel),PCOL[0],6);
+      triggerSound(400,0.1);
+      if(simon!=='none')doCommentary('simon',simon);
+      if(game.reserves<=0)nextPhase();
+      voice.chargeLevel=0;game.actionCooldown=0.4;newSimon();updateHUD();
+    }else if(game.phase==='attack'&&game.sel>=0&&game.tgt>=0){
+      startCombat(game.sel,game.tgt,simon);
+      voice.chargeLevel=0;game.actionCooldown=0.8;newSimon();
+    }else if(game.phase==='fortify'&&game.sel>=0&&game.tgt>=0){
+      var amt=(simon==='perfect')?3:(simon==='toneMatch')?2:1;
+      amt=Math.min(amt,game.terr[game.sel].armies-1);
+      if(amt>0){
+        game.terr[game.sel].armies-=amt;game.terr[game.tgt].armies+=amt;
+        spawnParticles(centroid(game.tgt),PCOL[0],4);triggerSound(300,0.08);
+        if(simon!=='none')doCommentary('simon',simon);
+      }
+      voice.chargeLevel=0;game.actionCooldown=0.5;newSimon();updateHUD();
+    }
+  }
+}
+
+// === COMBAT (RISK DICE) ===
+function startCombat(att,def,simon){
+  var aArmies=game.terr[att].armies;
+  var dArmies=game.terr[def].armies;
+  var nAtt=Math.min(3,aArmies-1);
+  var nDef=Math.min(2,dArmies);
+  if(nAtt<1)return;
+  // roll dice
+  var attDice=rollDice(nAtt,simon);
+  var defDice=rollDice(nDef,'none');
+  game.diceAtt=attDice;game.diceDef=defDice;
+  game.diceRolling=true;game.diceTimer=1.2;
+  // resolve after animation
+  game.diceResult={att:att,def:def,simon:simon,attDice:attDice,defDice:defDice};
+}
+function rollDice(n,simon){
+  var dice=[];
+  for(var i=0;i<n;i++){
+    var v=Math.floor(Math.random()*6)+1;
+    if(simon==='toneMatch')v=Math.min(6,v+1);
+    if(simon==='perfect')v=6;
+    dice.push(v);
+  }
+  return dice.sort(function(a,b){return b-a;});
+}
+function resolveCombat(){
+  var r=game.diceResult;if(!r)return;
+  var aLoss=0,dLoss=0;
+  var comparisons=Math.min(r.attDice.length,r.defDice.length);
+  for(var i=0;i<comparisons;i++){
+    if(r.attDice[i]>r.defDice[i])dLoss++;else aLoss++;
+  }
+  game.terr[r.att].armies-=aLoss;
+  game.terr[r.def].armies-=dLoss;
+  if(dLoss>0)spawnParticles(centroid(r.def),PCOL[game.terr[r.def].owner],10);
+  if(aLoss>0)spawnParticles(centroid(r.att),PCOL[game.terr[r.att].owner],6);
+  screenShake=Math.max(screenShake,(aLoss+dLoss)*3);
+  // conquer?
+  if(game.terr[r.def].armies<=0){
+    var oldOwner=game.terr[r.def].owner;
+    game.terr[r.def].owner=game.terr[r.att].owner;
+    var move=Math.min(game.terr[r.att].armies-1,r.attDice.length);
+    game.terr[r.def].armies=Math.max(1,move);
+    game.terr[r.att].armies-=move;
+    spawnParticles(centroid(r.def),PCOL[game.terr[r.def].owner],20);
+    triggerSound(800,0.15);
+    doCommentary('conquer',TERR[r.def].name);
+    // check elimination
+    if(ownedBy(oldOwner)===0){
+      game.players[oldOwner].alive=false;
+      doCommentary('eliminate',PNAME[oldOwner]);
+    }
+    // check victory
+    if(ownedBy(game.cur)===TERR.length){
+      game.over=true;doCommentary('victory',PNAME[game.cur]);
+    }
+  }else{
+    if(r.simon==='perfect')doCommentary('doubles','ALL SIXES!');
+    else if(r.simon==='toneMatch')doCommentary('toneBonus','Tone matched!');
+    else if(aLoss>dLoss)doCommentary('lost','Lost the exchange!');
+    else doCommentary('won','Won the exchange!');
+  }
+  triggerSound(200+dLoss*200,0.1);
+  game.diceResult=null;game.sel=-1;game.tgt=-1;updateHUD();updateLB();
+}
+
+// === TURN FLOW ===
+function endPhase(){
+  if(game.over||game.cur!==0||game.diceRolling)return;
+  nextPhase();
+}
+function nextPhase(){
+  game.sel=-1;game.tgt=-1;
+  if(game.phase==='deploy'){game.phase='attack';document.getElementById('endBtn').style.display='block';}
+  else if(game.phase==='attack'){game.phase='fortify';}
+  else{game.phase='done';document.getElementById('endBtn').style.display='none';nextPlayer();}
+  updateHUD();
+}
+function nextPlayer(){
+  var start=game.cur;
+  do{game.cur=(game.cur+1)%4;}while(!game.players[game.cur].alive&&game.cur!==start);
+  if(game.cur===0){game.turn++;document.getElementById('endBtn').style.display='none';}
+  game.phase='deploy';game.reserves=calcReserves(game.cur);
+  game.sel=-1;game.tgt=-1;newSimon();updateHUD();
+  if(game.players[game.cur].isAI&&!game.over)setTimeout(aiTurn,600);
+}
+
+// === AI ===
+function aiTurn(){
+  if(game.over)return;
+  var p=game.cur;
+  // deploy: spread reserves on border territories
+  var borders=[];
+  for(var i=0;i<TERR.length;i++){
+    if(game.terr[i].owner!==p)continue;
+    var border=false;TERR[i].adj.forEach(function(a){if(game.terr[a].owner!==p)border=true;});
+    if(border)borders.push(i);
+  }
+  if(borders.length===0)for(var i=0;i<TERR.length;i++)if(game.terr[i].owner===p)borders.push(i);
+  while(game.reserves>0){
+    var t=borders[Math.floor(Math.random()*borders.length)];
+    game.terr[t].armies++;game.reserves--;
+  }
+  // attack: find advantageous attacks
+  var attacks=0;
+  for(var pass=0;pass<8&&!game.over;pass++){
+    var best=null,bestAdv=-999;
+    for(var i=0;i<TERR.length;i++){
+      if(game.terr[i].owner!==p||game.terr[i].armies<2)continue;
+      TERR[i].adj.forEach(function(a){
+        if(game.terr[a].owner===p)return;
+        var adv=game.terr[i].armies-game.terr[a].armies;
+        if(adv>bestAdv){bestAdv=adv;best={att:i,def:a};}
+      });
+    }
+    if(!best||bestAdv<1)break;
+    // execute attack
+    var nAtt=Math.min(3,game.terr[best.att].armies-1);
+    var nDef=Math.min(2,game.terr[best.def].armies);
+    var ad=rollDice(nAtt,'none').sort(function(a,b){return b-a;});
+    var dd=rollDice(nDef,'none').sort(function(a,b){return b-a;});
+    var comp=Math.min(ad.length,dd.length);
+    for(var c=0;c<comp;c++){if(ad[c]>dd[c])game.terr[best.def].armies--;else game.terr[best.att].armies--;}
+    if(game.terr[best.def].armies<=0){
+      var oldOwner=game.terr[best.def].owner;
+      game.terr[best.def].owner=p;
+      var mv=Math.min(game.terr[best.att].armies-1,nAtt);
+      game.terr[best.def].armies=Math.max(1,mv);game.terr[best.att].armies-=mv;
+      spawnParticles(centroid(best.def),PCOL[p],12);
+      if(ownedBy(oldOwner)===0)game.players[oldOwner].alive=false;
+      if(ownedBy(p)===TERR.length){game.over=true;doCommentary('victory',PNAME[p]);}
+    }
+    spawnParticles(centroid(best.att),PCOL[p],4);attacks++;
+  }
+  if(attacks>0)doCommentary('aiAttack',PNAME[p]+' attacked '+attacks+' times');
+  updateLB();
+  setTimeout(nextPlayer,800);
+}
+
+// === RENDERING ===
+var stars=[];
+for(var i=0;i<200;i++)stars.push([Math.random(),Math.random(),0.5+Math.random()*1.5]);
+
+function render(){
+  ctx.fillStyle='#000a14';ctx.fillRect(0,0,W,H);
+  // stars
+  ctx.fillStyle='#fff';
+  stars.forEach(function(s){ctx.beginPath();ctx.arc(s[0]*W,s[1]*H,s[2],0,Math.PI*2);ctx.fill();});
+  // map ocean bg
+  ctx.fillStyle='#040820';
+  ctx.fillRect(mapX-4,mapY-4,mapW+8,mapH+8);
+  // draw territories
+  for(var i=0;i<TERR.length;i++){
+    var t=TERR[i],gt=game.terr[i],p=t.poly;
+    ctx.beginPath();
+    ctx.moveTo(mapX+p[0][0]*mapW,mapY+p[0][1]*mapH);
+    for(var j=1;j<p.length;j++)ctx.lineTo(mapX+p[j][0]*mapW,mapY+p[j][1]*mapH);
+    ctx.closePath();
+    // fill
+    var col=PCOL[gt.owner];
+    ctx.fillStyle=hexToRgba(col,i===game.sel?0.6:i===game.tgt?0.5:0.3);ctx.fill();
+    // border
+    ctx.strokeStyle=i===game.sel?'#fff':i===game.tgt?'#ff4444':hexToRgba(col,0.7);
+    ctx.lineWidth=i===game.sel||i===game.tgt?3:1.5;ctx.stroke();
+    // glow for selected
+    if(i===game.sel){ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=8;ctx.stroke();}
+    if(i===game.tgt){ctx.strokeStyle='rgba(255,0,0,0.15)';ctx.lineWidth=8;ctx.stroke();}
+    // army count + name
+    var cx=0,cy=0;p.forEach(function(pt){cx+=pt[0];cy+=pt[1];});
+    cx=mapX+(cx/p.length)*mapW;cy=mapY+(cy/p.length)*mapH;
+    // army circle
+    ctx.beginPath();ctx.arc(cx,cy,12,0,Math.PI*2);
+    ctx.fillStyle=hexToRgba(col,0.8);ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='bold 11px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(gt.armies,cx,cy);
+    // territory name
+    ctx.font='8px monospace';ctx.fillStyle='#fff8';
+    ctx.fillText(t.name,cx,cy+16);
+  }
+  // adjacency lines for selected
+  if(game.sel>=0){
+    var sc=centroid(game.sel);
+    TERR[game.sel].adj.forEach(function(a){
+      var ac=centroid(a);
+      ctx.beginPath();ctx.moveTo(sc[0],sc[1]);ctx.lineTo(ac[0],ac[1]);
+      ctx.strokeStyle=game.terr[a].owner===game.terr[game.sel].owner?'rgba(0,255,0,0.15)':'rgba(255,0,0,0.15)';
+      ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.stroke();ctx.setLineDash([]);
+    });
+  }
+  // continent labels
+  CONT.forEach(function(c){
+    var cx=0,cy=0,n=0;
+    c.terr.forEach(function(ti){var p=centroid(ti);cx+=p[0];cy+=p[1];n++;});
+    cx/=n;cy/=n;
+    ctx.font='9px monospace';ctx.fillStyle=c.color+'88';ctx.textAlign='center';
+    ctx.fillText(c.name+' (+'+c.bonus+')',cx,cy-22);
+  });
+  // dice display
+  if(game.diceRolling||game.diceTimer>0){
+    drawDice();
+  }
+  // charge bar
+  if(voice.chargeLevel>0.05&&game.cur===0&&!game.diceRolling){
+    var bx=W/2-80,by=H-100,bw=160,bh=8;
+    ctx.fillStyle='#222';ctx.fillRect(bx,by,bw,bh);
+    var pct=voice.chargeLevel;
+    ctx.fillStyle=pct>0.6?'#ff0':'#4af';
+    ctx.fillRect(bx,by,bw*pct,bh);
+    ctx.strokeStyle='#fff3';ctx.strokeRect(bx,by,bw,bh);
+  }
+  // particles
+  renderParticles();
+  // screen shake offset
+  if(screenShake>0.5){screenShake*=0.92;}
+  // phoneme bars
+  PH_KEYS.forEach(function(k){
+    var ph=PHONEMES[k];
+    if(voice.vowel===k&&voice.sounding)ph.power=Math.min(1,ph.power+voice.rms*0.15);
+    else ph.power*=0.93;
+    var el=document.getElementById('ph-'+k);
+    el.querySelector('.ph-fill').style.height=(ph.power*100)+'%';
+    if(voice.vowel===k&&voice.sounding)el.classList.add('active');else el.classList.remove('active');
+  });
+}
+
+function centroid(ti){
+  var p=TERR[ti].poly,cx=0,cy=0;
+  p.forEach(function(pt){cx+=pt[0];cy+=pt[1];});
+  return[mapX+(cx/p.length)*mapW,mapY+(cy/p.length)*mapH];
+}
+function hexToRgba(hex,a){
+  var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return'rgba('+r+','+g+','+b+','+a+')';
+}
+
+// === DICE DRAWING ===
+var DOTS={1:[[.5,.5]],2:[[.25,.25],[.75,.75]],3:[[.25,.25],[.5,.5],[.75,.75]],
+  4:[[.25,.25],[.75,.25],[.25,.75],[.75,.75]],
+  5:[[.25,.25],[.75,.25],[.5,.5],[.25,.75],[.75,.75]],
+  6:[[.25,.2],[.75,.2],[.25,.5],[.75,.5],[.25,.8],[.75,.8]]};
+function drawDice(){
+  var cx=W/2,cy=H/2-20,sz=36,gap=8;
+  // attacker dice (top row)
+  var ad=game.diceRolling?null:game.diceAtt;
+  var dd=game.diceRolling?null:game.diceDef;
+  var numA=game.diceAtt.length,numD=game.diceDef.length;
+  ctx.font='10px monospace';ctx.textAlign='center';
+  ctx.fillStyle='#fff8';ctx.fillText('ATTACK',cx,cy-sz-8);
+  for(var i=0;i<numA;i++){
+    var dx=cx-((numA-1)*((sz+gap)/2))+(i*(sz+gap));
+    var val=game.diceRolling?Math.floor(Math.random()*6)+1:game.diceAtt[i];
+    drawDie(dx-sz/2,cy-sz,sz,val,PCOL[game.terr[game.diceResult?game.diceResult.att:0].owner]);
+  }
+  ctx.fillStyle='#fff8';ctx.fillText('DEFEND',cx,cy+sz+18);
+  for(var i=0;i<numD;i++){
+    var dx=cx-((numD-1)*((sz+gap)/2))+(i*(sz+gap));
+    var val=game.diceRolling?Math.floor(Math.random()*6)+1:game.diceDef[i];
+    drawDie(dx-sz/2,cy+8,sz,val,PCOL[game.terr[game.diceResult?game.diceResult.def:0].owner]);
+  }
+}
+function drawDie(x,y,sz,val,col){
+  ctx.fillStyle=col||'#fff';ctx.globalAlpha=0.9;
+  ctx.beginPath();
+  var r=4;ctx.moveTo(x+r,y);ctx.lineTo(x+sz-r,y);ctx.quadraticCurveTo(x+sz,y,x+sz,y+r);
+  ctx.lineTo(x+sz,y+sz-r);ctx.quadraticCurveTo(x+sz,y+sz,x+sz-r,y+sz);
+  ctx.lineTo(x+r,y+sz);ctx.quadraticCurveTo(x,y+sz,x,y+sz-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.fill();
+  ctx.globalAlpha=1;
+  ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.stroke();
+  // dots
+  var dots=DOTS[val]||DOTS[1];
+  ctx.fillStyle='#fff';
+  dots.forEach(function(d){
+    ctx.beginPath();ctx.arc(x+d[0]*sz,y+d[1]*sz,3,0,Math.PI*2);ctx.fill();
+  });
+}
+
+// === PARTICLES ===
+function spawnParticles(pos,col,count){
+  for(var i=0;i<count;i++){
+    var a=Math.random()*Math.PI*2,sp=1+Math.random()*3;
+    particles.push({x:pos[0],y:pos[1],vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1,
+      life:1,color:col,size:2+Math.random()*3});
+  }
+}
+function renderParticles(){
+  for(var i=particles.length-1;i>=0;i--){
+    var p=particles[i];
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.05;p.life-=0.02;
+    ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);ctx.fill();
+    if(p.life<=0)particles.splice(i,1);
+  }
+  ctx.globalAlpha=1;
+}
+
+// === SYNTH SOUNDS ===
+function initSynths(){
+  if(!audioCtx)return;
+  var m=audioCtx.createGain();m.gain.value=0.08;m.connect(audioCtx.destination);
+  synthNodes.master=m;
+}
+function triggerSound(freq,vol){
+  if(!audioCtx||!synthNodes.master)return;var now=audioCtx.currentTime;
+  var o=audioCtx.createOscillator();o.type='sine';
+  o.frequency.setValueAtTime(freq,now);o.frequency.exponentialRampToValueAtTime(freq*0.5,now+0.3);
+  var g=audioCtx.createGain();g.gain.setValueAtTime(vol,now);
+  g.gain.exponentialRampToValueAtTime(0.001,now+0.3);
+  o.connect(g);g.connect(synthNodes.master);o.start(now);o.stop(now+0.4);
+}
+
+// === HUD ===
+function updateHUD(){
+  var p=game.players[game.cur];
+  document.getElementById('turnInfo').textContent=(game.cur===0?playerName:p.name)+'\'s Turn ('+game.turn+')';
+  document.getElementById('turnInfo').style.color=PCOL[game.cur];
+  var ph=game.phase.toUpperCase();
+  var inst='';
+  if(game.cur===0){
+    if(game.phase==='deploy')inst='Click your territory, SING to deploy armies';
+    else if(game.phase==='attack')inst='Click source → target, SING to roll dice!';
+    else if(game.phase==='fortify')inst='Click source → dest, SING to move troops';
+  }else inst=p.name+' is thinking...';
+  document.getElementById('phaseInfo').textContent=ph;
+  document.getElementById('reserves').textContent=game.phase==='deploy'?'Reserves: '+game.reserves:'';
+  document.getElementById('instruction').textContent=inst;
+  if(game.over){
+    document.getElementById('turnInfo').textContent='GAME OVER';
+    document.getElementById('phaseInfo').textContent=PNAME[game.cur]+' CONQUERS THE WORLD!';
+    document.getElementById('instruction').textContent='Refresh to play again';
+  }
+}
+function updateLB(){
+  var rows=[];
+  for(var i=0;i<4;i++){
+    if(!game.players[i])continue;
+    var n=ownedBy(i);
+    rows.push({name:PNAME[i],terr:n,alive:game.players[i].alive,idx:i});
+  }
+  rows.sort(function(a,b){return b.terr-a.terr;});
+  var html='';rows.forEach(function(r,i){
+    var col=PCOL[r.idx];var alive=r.alive?'':'text-decoration:line-through;opacity:0.4;';
+    html+='<div class="row"><span class="n" style="color:'+col+';'+alive+'">'+(i+1)+'. '+r.name+'</span><span class="s" style="color:'+col+'">'+r.terr+' terr</span></div>';
+  });
+  document.getElementById('lbRows').innerHTML=html;
+}
+
+// === MQTT P2P ===
+var BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt'];
+var TOPIC_BASE='risk-arena/THOMAS/';
+function initMQTT(){
+  document.getElementById('peers').textContent='Connecting...';
+  tryBroker(0);
+}
+function tryBroker(idx){
+  if(idx>=BROKERS.length){document.getElementById('peers').textContent='Local mode';return;}
+  try{
+    var cid='risk_'+playerName+'_'+Math.random().toString(36).slice(2,8);
+    mqttClient=mqtt.connect(BROKERS[idx],{clientId:cid,clean:true,connectTimeout:8000,reconnectPeriod:5000});
+    mqttClient.on('connect',function(){
+      mqttConnected=true;document.getElementById('peers').textContent='THOMAS (worldwide)';
+      mqttClient.subscribe(TOPIC_BASE+'live/#');
+      mqttClient.publish(TOPIC_BASE+'live/'+playerName,
+        JSON.stringify({name:playerName,terr:ownedBy(0),t:Date.now()}),{qos:0});
+    });
+    mqttClient.on('message',function(topic,payload){
+      try{var d=JSON.parse(payload.toString());
+        if(d.name&&d.name!==playerName)peerScores[d.name]={name:d.name,terr:d.terr||0,time:d.t};
+      }catch(e){}
+    });
+    mqttClient.on('error',function(){mqttClient.end(true);tryBroker(idx+1);});
+  }catch(e){tryBroker(idx+1);}
+}
+
+// === WebRTC via WebTorrent Tracker ===
+var WS_TRACKER='wss://tracker.openwebtorrent.com';
+var ICE_CFG={iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
+var rtcWs=null,rtcHash=null,rtcPeerId='',rtcDCs=new Map(),rtcPending=new Map();
+function initWebRTC(){
+  rtcPeerId='-RK0001-'+Array.from(crypto.getRandomValues(new Uint8Array(6))).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+  crypto.subtle.digest('SHA-1',new TextEncoder().encode('risk-arena:THOMAS')).then(function(buf){
+    rtcHash=Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+    joinTracker();
+  });
+}
+function joinTracker(){
+  genOffers(5).then(function(offers){
+    rtcWs=new WebSocket(WS_TRACKER);
+    rtcWs.onopen=function(){
+      rtcWs.send(JSON.stringify({action:'announce',info_hash:rtcHash,peer_id:rtcPeerId,
+        numwant:10,uploaded:0,downloaded:0,left:1,offers:offers}));
+    };
+    rtcWs.onmessage=function(ev){
+      try{var m=JSON.parse(ev.data);
+        if(m.offer&&m.peer_id!==rtcPeerId)handleOffer(m);
+        if(m.answer&&m.offer_id)handleAnswer(m);
+        if(m.interval)setTimeout(reann,m.interval*1000);
+      }catch(e){}
+    };
+    rtcWs.onerror=function(){};
+    rtcWs.onclose=function(){setTimeout(joinTracker,5000);};
+  });
+}
+function genOffers(n){
+  var ps=[];for(var i=0;i<n;i++)(function(){
+    var pc=new RTCPeerConnection(ICE_CFG),dc=pc.createDataChannel('risk'),oid=crypto.randomUUID();
+    var p=new Promise(function(res){
+      pc.onicecandidate=function(e){if(!e.candidate)res({offer_id:oid,offer:{type:'offer',sdp:pc.localDescription.sdp}});};
+      pc.createOffer().then(function(o){pc.setLocalDescription(o);});
+    });
+    rtcPending.set(oid,{pc:pc,dc:dc});setupDC(pc,dc,oid);ps.push(p);
+  })();return Promise.all(ps);
+}
+function setupDC(pc,dc,id){
+  dc.onopen=function(){rtcDCs.set(id,dc);dc.send(JSON.stringify({name:playerName,terr:ownedBy(0)}));};
+  dc.onclose=function(){rtcDCs.delete(id);};
+  dc.onmessage=function(ev){try{var d=JSON.parse(ev.data);
+    if(d.name&&d.name!==playerName)peerScores[d.name]={name:d.name,terr:d.terr||0,time:Date.now()};
+  }catch(e){}};
+}
+function handleOffer(msg){
+  var pc=new RTCPeerConnection(ICE_CFG);
+  pc.ondatachannel=function(e){setupDC(pc,e.channel,msg.peer_id);};
+  pc.setRemoteDescription(msg.offer).then(function(){return pc.createAnswer();})
+    .then(function(a){return pc.setLocalDescription(a);})
+    .then(function(){return new Promise(function(r){
+      if(pc.iceGatheringState==='complete')r();else pc.onicecandidate=function(e){if(!e.candidate)r();};
+    });}).then(function(){
+      rtcWs.send(JSON.stringify({action:'announce',info_hash:rtcHash,peer_id:rtcPeerId,
+        to_peer_id:msg.peer_id,answer:{type:'answer',sdp:pc.localDescription.sdp},offer_id:msg.offer_id}));
+    });
+}
+function handleAnswer(msg){var p=rtcPending.get(msg.offer_id);if(p)p.pc.setRemoteDescription(msg.answer);}
+function reann(){if(!rtcWs||rtcWs.readyState!==1)return;
+  genOffers(5).then(function(o){rtcWs.send(JSON.stringify({action:'announce',info_hash:rtcHash,peer_id:rtcPeerId,numwant:10,offers:o}));});}
+function broadcastRTC(msg){var d=JSON.stringify(msg);rtcDCs.forEach(function(dc){if(dc.readyState==='open')dc.send(d);});}
+
+// === WEB LLM ===
+var CMT={conquer:["TERRITORY CONQUERED!","LAND SEIZED!","TOTAL DOMINATION!","THE FLAG FALLS!"],
+  eliminate:["ELIMINATED!","WIPED OFF THE MAP!","NO SURVIVORS!"],
+  victory:["SUPREME VICTOR!","WORLD CONQUERED!","ABSOLUTE DOMINATION!","LEGENDARY CONQUEST!"],
+  doubles:["DOUBLE SIXES!!!","SIMON SAYS: PERFECTION!","UNBELIEVABLE DICE!","THE VOICE OF DESTINY!"],
+  toneBonus:["TONE MATCHED!","SIMON BONUS ACTIVATED!","THE PITCH IS RIGHT!"],
+  simon:["SIMON SAYS YES!","VOICE POWER UNLOCKED!","TONAL MASTERY!"],
+  won:["DICE ADVANTAGE!","FAVORABLE ROLL!","FORTUNE SMILES!"],
+  lost:["UNLUCKY ROLL!","THE DICE BETRAY!","DEFENDED!"],
+  aiAttack:["THE ENEMY MOVES!","ARMIES MARCH!","WAR UNFOLDS!"]};
+function initLLM(){
+  var st=document.getElementById('llmStatus'),pr=document.getElementById('llmProg');
+  st.textContent='AI: loading...';pr.style.display='block';
+  pr.textContent='Loading commentary LLM...';
+  if(window.ai&&window.ai.languageModel){
+    window.ai.languageModel.create({
+      systemPrompt:"You are a RISK war game announcer. SHORT dramatic commentary (1 sentence, under 15 words). Military/strategic tone."
+    }).then(function(s){llmSession=s;llmReady=true;st.textContent='AI: WebGPU LLM';pr.style.display='none';
+    }).catch(function(){loadTfLLM();});
+  }else loadTfLLM();
+}
+function loadTfLLM(){
+  var st=document.getElementById('llmStatus'),pr=document.getElementById('llmProg');
+  import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3').then(function(mod){
+    pr.textContent='Downloading model...';
+    mod.pipeline('text-generation','onnx-community/Qwen2.5-0.5B-Instruct',{
+      dtype:'q4',device:'webgpu',
+      progress_callback:function(p){if(p.status==='progress'&&p.total)pr.textContent='DL: '+Math.round(p.loaded/p.total*100)+'%';}
+    }).then(function(gen){llmGenerator=gen;llmReady=true;st.textContent='AI: Qwen2.5';pr.style.display='none';
+    }).catch(function(){st.textContent='AI: procedural';pr.style.display='none';});
+  }).catch(function(){st.textContent='AI: procedural';pr.style.display='none';});
+}
+var cmtTimeout=null;
+function doCommentary(event,detail){
+  if(cmtTimeout)return;
+  if(llmReady&&llmSession){
+    llmSession.prompt('RISK game: '+event+' - '+detail).then(function(r){showCmt(r);}).catch(function(){showCmt(pickCmt(event));});
+  }else if(llmReady&&llmGenerator){
+    var prompt='<|system|>RISK war announcer. One dramatic sentence.<|end|><|user|>'+event+': '+detail+'<|end|><|assistant|>';
+    llmGenerator(prompt,{max_new_tokens:25,temperature:0.8}).then(function(r){
+      var t=r[0].generated_text||'';var a=t.split('<|assistant|>').pop().trim();
+      if(a.length>3)showCmt(a);else showCmt(pickCmt(event));
+    }).catch(function(){showCmt(pickCmt(event));});
+  }else showCmt(pickCmt(event));
+  cmtTimeout=setTimeout(function(){cmtTimeout=null;},2500);
+}
+function pickCmt(ev){var a=CMT[ev]||CMT.won;return a[Math.floor(Math.random()*a.length)];}
+function showCmt(text){
+  if(text.length>80)text=text.slice(0,80)+'...';
+  var el=document.getElementById('cmt');el.textContent=text;el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');},3000);
+}
+
+// === MAIN LOOP ===
+var liveTimer=0;
+function animate(){
+  if(!running)return;requestAnimationFrame(animate);
+  analyzeV();
+  if(!game.diceRolling)checkVoiceAction();
+  // dice animation timer
+  if(game.diceTimer>0){
+    game.diceTimer-=0.016;
+    if(game.diceTimer<=0){game.diceRolling=false;game.diceTimer=0.8;
+      // show result briefly, then resolve
+      setTimeout(function(){game.diceTimer=0;resolveCombat();},800);
+    }
+  }
+  render();
+  // check simon bar visibility
+  if(game.cur===0&&!game.over&&voice.sounding)checkSimon();
+  // periodic broadcast
+  liveTimer+=0.016;
+  if(liveTimer>5){liveTimer=0;
+    if(mqttClient&&mqttConnected)
+      mqttClient.publish(TOPIC_BASE+'live/'+playerName,
+        JSON.stringify({name:playerName,terr:ownedBy(0),t:Date.now()}),{qos:0});
+    broadcastRTC({name:playerName,terr:ownedBy(0)});
+  }
+}
+</script>
+</body>
+</html>
