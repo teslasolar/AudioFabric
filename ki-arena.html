@@ -21,12 +21,23 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 #room{font-size:11px;color:#0ff}
 #peers{font-size:11px;color:#088}
 #llmStatus{font-size:10px;color:#555}
+/* phoneme power bars */
+#phonemes{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:55;
+  display:none;gap:6px;pointer-events:none}
+#phonemes.on{display:flex}
+.ph{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:48px}
+.ph-label{font-size:10px;font-weight:bold;opacity:0.5;transition:opacity 0.15s}
+.ph.active .ph-label{opacity:1}
+.ph-bar{width:10px;height:60px;background:#111;border:1px solid #fff1;border-radius:5px;
+  position:relative;overflow:hidden}
+.ph-fill{position:absolute;bottom:0;left:0;right:0;border-radius:4px;transition:height 0.08s}
+.ph-blast{font-size:8px;color:#888;margin-top:1px}
 #dmgLayer{position:fixed;inset:0;z-index:60;pointer-events:none}
 .dmg{position:absolute;font-weight:bold;text-shadow:0 0 8px currentColor;
   animation:dmgUp 1.2s ease-out forwards;pointer-events:none}
 @keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}
   100%{opacity:0;transform:translateY(-120px) scale(1.8)}}
-#cmt{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:70;
+#cmt{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:70;
   background:rgba(0,0,0,0.8);border:1px solid #ff0;border-radius:12px;padding:8px 20px;
   font-size:16px;color:#ff0;text-shadow:0 0 10px #f80;text-align:center;
   max-width:500px;opacity:0;transition:opacity 0.3s;pointer-events:none}
@@ -39,6 +50,8 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 #lb .row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #ff01}
 #lb .row .n{color:#0ff}#lb .row .s{color:#ff0}
 #lb .me{color:#0f0 !important}
+#llmProg{position:fixed;bottom:4px;left:50%;transform:translateX(-50%);z-index:55;
+  font-size:9px;color:#555;display:none;pointer-events:none}
 </style>
 </head>
 <body>
@@ -57,9 +70,11 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
     <div id="llmStatus"></div>
   </div>
 </div>
+<div id="phonemes"></div>
 <div id="dmgLayer"></div>
 <div id="cmt"></div>
 <div id="lb"><h3>LEADERBOARD</h3><div id="lbRows"></div></div>
+<div id="llmProg"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -72,11 +87,46 @@ var voice={rms:0,f0:0,pn:0,centroid:0,f1:0,f2:0,vowel:'',sounding:false,
   lastAmp:0,onsets:[],pulseRate:0,chargeLevel:0};
 var playerName='',myScore=0,combo=0,lastHitTime=0,highScore=0;
 var blasts=[],explosions=[],target,targetHP=1000,maxHP=1000;
-var aura,auraGlow,chargeParticles=[];
+var aura,auraGlow,chargeParticles=[],vortexParticles=[];
 var camAngle=0,screenShake=0;
 var mqttClient=null,peerScores={},peerCount=0;
-var llmSession=null,llmReady=false;
+var llmSession=null,llmReady=false,llmGenerator=null;
 var synthNodes={},running=false;
+
+// === PHONEME POWER SYSTEM ===
+var PHONEMES={
+  ah:{label:'AH',color:'#4488ff',hex:0x4488ff,blast:'kamehameha',power:0},
+  ee:{label:'EE',color:'#ffdd00',hex:0xffdd00,blast:'finalflash',power:0},
+  oh:{label:'OH',color:'#ffffff',hex:0xffffff,blast:'spiritbomb',power:0},
+  oo:{label:'OO',color:'#aa44ff',hex:0xaa44ff,blast:'galickgun',power:0},
+  eh:{label:'EH',color:'#ff8844',hex:0xff8844,blast:'barrage',power:0},
+  mm:{label:'MM',color:'#44ffaa',hex:0x44ffaa,blast:'kiball',power:0}
+};
+var PH_KEYS=Object.keys(PHONEMES);
+
+function buildPhonemeUI(){
+  var cont=document.getElementById('phonemes');
+  PH_KEYS.forEach(function(k){
+    var ph=PHONEMES[k];
+    var div=document.createElement('div');div.className='ph';div.id='ph-'+k;
+    div.innerHTML='<div class="ph-label" style="color:'+ph.color+'">'+ph.label+'</div>'+
+      '<div class="ph-bar"><div class="ph-fill" style="background:'+ph.color+';height:0%"></div></div>'+
+      '<div class="ph-blast">'+ph.blast.slice(0,6).toUpperCase()+'</div>';
+    cont.appendChild(div);
+  });
+}
+function updatePhonemes(){
+  PH_KEYS.forEach(function(k){
+    var ph=PHONEMES[k];
+    if(voice.vowel===k&&voice.sounding) ph.power=Math.min(1,ph.power+voice.rms*0.12);
+    else ph.power*=0.985;
+    var el=document.getElementById('ph-'+k);
+    el.querySelector('.ph-fill').style.height=(ph.power*100)+'%';
+    if(voice.vowel===k&&voice.sounding)el.classList.add('active');
+    else el.classList.remove('active');
+  });
+}
+
 var BLAST_TYPES={
   kiball:{color:0x44aaff,name:'Ki Ball',dmgMul:1,speed:0.8,size:0.25},
   kamehameha:{color:0x4488ff,name:'KAMEHAMEHA',dmgMul:3,speed:0.5,size:0.4},
@@ -103,29 +153,29 @@ function begin(){
   document.getElementById('nick').textContent=playerName;
   document.getElementById('hud').classList.add('on');
   document.getElementById('lb').classList.add('on');
-  initScene();initAudio();initMQTT();initLLM();
+  document.getElementById('phonemes').classList.add('on');
+  buildPhonemeUI();
+  initScene();initAudio();initMQTT();initLLM();initWebRTC();
 }
 function changeNick(){
   var n=prompt('Enter new nickname (max 16 chars):',playerName);
   if(n&&n.trim()){
-    var old=playerName;playerName=n.trim().slice(0,16);
+    playerName=n.trim().slice(0,16);
     document.getElementById('nick').textContent=playerName;
-    // re-announce with new name
-    if(mqttClient&&mqttConnected){
+    if(mqttClient&&mqttConnected)
       mqttClient.publish(TOPIC_BASE+'live/'+playerName,
         JSON.stringify({name:playerName,score:myScore,t:Date.now()}),{qos:0,retain:false});
-    }
+    broadcastRTC({type:'nick',name:playerName,score:myScore});
     updateLeaderboard();
   }
 }
-// auto-start on load
 window.addEventListener('load',begin);
 
 // === THREE.JS SCENE ===
 function initScene(){
   W=window.innerWidth;H=window.innerHeight;
   scene=new THREE.Scene();
-  scene.fog=new THREE.FogExp2(0x000011,0.015);
+  scene.fog=new THREE.FogExp2(0x000011,0.012);
   camera=new THREE.PerspectiveCamera(60,W/H,0.1,500);
   camera.position.set(0,3.5,9);camera.lookAt(0,2,-4);
   renderer=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:true,alpha:true});
@@ -148,12 +198,10 @@ function initScene(){
   var tg=new THREE.IcosahedronGeometry(1.8,2);
   var tm=new THREE.MeshBasicMaterial({color:0xff2222,wireframe:true,transparent:true,opacity:0.8});
   target=new THREE.Mesh(tg,tm);target.position.set(0,2.5,-8);scene.add(target);
-  // target inner glow
   var tig=new THREE.SphereGeometry(1.4,16,16);
   var tim=new THREE.MeshBasicMaterial({color:0xff4444,transparent:true,opacity:0.15,
     blending:THREE.AdditiveBlending,depthWrite:false});
-  var ti=new THREE.Mesh(tig,tim);target.add(ti);
-  // target HP ring
+  target.add(new THREE.Mesh(tig,tim));
   var rg=new THREE.TorusGeometry(2.2,0.06,8,64);
   var rm=new THREE.MeshBasicMaterial({color:0xff0000,transparent:true,opacity:0.6});
   target.hpRing=new THREE.Mesh(rg,rm);target.add(target.hpRing);
@@ -162,13 +210,68 @@ function initScene(){
   var am=new THREE.MeshBasicMaterial({color:0x4488ff,transparent:true,opacity:0,
     blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
   aura=new THREE.Mesh(ag,am);aura.position.set(0,2.5,5);scene.add(aura);
-  // aura outer glow
   var ag2=new THREE.SphereGeometry(1.5,12,12);
   var am2=new THREE.MeshBasicMaterial({color:0x2244aa,transparent:true,opacity:0,
     blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
   auraGlow=new THREE.Mesh(ag2,am2);aura.add(auraGlow);
-  // ambient
+  // VORTEX RING geometry (persistent spiral particles)
+  initVortex();
   scene.add(new THREE.AmbientLight(0x222244,0.5));
+}
+
+// === VORTEX SPIRAL SYSTEM ===
+var vortexGroup,vortexPositions,vortexColors,VORTEX_COUNT=600;
+function initVortex(){
+  vortexGroup=new THREE.Group();scene.add(vortexGroup);
+  var geo=new THREE.BufferGeometry();
+  vortexPositions=new Float32Array(VORTEX_COUNT*3);
+  vortexColors=new Float32Array(VORTEX_COUNT*3);
+  for(var i=0;i<VORTEX_COUNT;i++){
+    var a=i*0.15,r=3+i*0.025;
+    vortexPositions[i*3]=Math.cos(a)*r;
+    vortexPositions[i*3+1]=(i/VORTEX_COUNT-0.5)*6;
+    vortexPositions[i*3+2]=Math.sin(a)*r;
+    vortexColors[i*3]=0.2;vortexColors[i*3+1]=0.4;vortexColors[i*3+2]=0.8;
+  }
+  geo.setAttribute('position',new THREE.BufferAttribute(vortexPositions,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(vortexColors,3));
+  var mat=new THREE.PointsMaterial({size:0.15,vertexColors:true,transparent:true,opacity:0.4,
+    blending:THREE.AdditiveBlending,depthWrite:false});
+  vortexGroup.add(new THREE.Points(geo,mat));
+  vortexGroup.position.set(0,2.5,-1.5);
+}
+function updateVortex(t){
+  var energy=voice.energy,pn=voice.pn;
+  // rotate the whole vortex
+  vortexGroup.rotation.y+=0.008+energy*0.03;
+  // animate individual particles — spiral tighter with energy
+  for(var i=0;i<VORTEX_COUNT;i++){
+    var baseA=i*0.15+t*0.5;
+    var baseR=3+i*0.025-energy*1.5;
+    if(baseR<0.5)baseR=0.5;
+    var y=(i/VORTEX_COUNT-0.5)*6+Math.sin(t*2+i*0.05)*energy*0.5;
+    vortexPositions[i*3]=Math.cos(baseA)*baseR;
+    vortexPositions[i*3+1]=y;
+    vortexPositions[i*3+2]=Math.sin(baseA)*baseR;
+    // color from active phoneme
+    var hue=(pn*360+i*0.5)%360;
+    var rgb=hslToRgb(hue/360,0.8,0.4+energy*0.3);
+    vortexColors[i*3]=rgb[0];vortexColors[i*3+1]=rgb[1];vortexColors[i*3+2]=rgb[2];
+  }
+  vortexGroup.children[0].geometry.attributes.position.needsUpdate=true;
+  vortexGroup.children[0].geometry.attributes.color.needsUpdate=true;
+  vortexGroup.children[0].material.opacity=0.2+energy*0.5;
+}
+function hslToRgb(h,s,l){
+  var r,g,b;
+  if(s===0){r=g=b=l;}else{
+    function hue2rgb(p,q,t){if(t<0)t+=1;if(t>1)t-=1;
+      if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;
+      if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;}
+    var q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
+    r=hue2rgb(p,q,h+1/3);g=hue2rgb(p,q,h);b=hue2rgb(p,q,h-1/3);
+  }
+  return[r,g,b];
 }
 
 // === VOICE ANALYSIS ===
@@ -212,6 +315,7 @@ function analyzeV(){
     else if(f1>600&&f2>900&&f2<1500)voice.vowel='ah';
     else if(f1>350&&f1<600&&f2<1100)voice.vowel='oh';
     else if(f1<400&&f2<1000)voice.vowel='oo';
+    else if(f1<350&&f2<1200)voice.vowel='mm';
   }
   var now=performance.now();
   if(r>voice.lastAmp*1.8&&r>voice.nf*2)voice.onsets.push(now);
@@ -234,56 +338,60 @@ var prevSounding=false,chargeType='kiball';
 function updateCharge(){
   if(voice.sounding){
     voice.chargeLevel=Math.min(1,voice.chargeLevel+voice.rms*0.08);
-    // detect type
     if(voice.pulseRate>3)chargeType='barrage';
     else if(voice.vowel==='ah'&&voice.pn<0.4)chargeType='kamehameha';
     else if(voice.vowel==='ee'&&voice.pn>0.6)chargeType='finalflash';
     else if(voice.vowel==='oh')chargeType='spiritbomb';
     else if(voice.vowel==='oo')chargeType='galickgun';
     else if(!voice.vowel)chargeType='kiball';
-    // barrage fires immediately
     if(chargeType==='barrage'&&voice.chargeLevel>0.15&&Math.random()<0.3)
       fireBlast('barrage',voice.chargeLevel*0.3);
   }else{
-    // fire on silence if charged
     if(prevSounding&&voice.chargeLevel>0.2&&chargeType!=='barrage')
       fireBlast(chargeType,voice.chargeLevel);
     voice.chargeLevel*=0.95;
     if(voice.chargeLevel<0.01)voice.chargeLevel=0;
   }
   prevSounding=voice.sounding;
-  // update aura
   var cl=voice.chargeLevel;
   var bt=BLAST_TYPES[chargeType]||BLAST_TYPES.kiball;
   aura.material.color.setHex(bt.color);aura.material.opacity=cl*0.25;
   aura.scale.setScalar(1+cl*2);
   auraGlow.material.opacity=cl*0.12;auraGlow.scale.setScalar(1+cl);
-  // charge particles
+  // charge particles spiral in
   if(cl>0.1&&voice.sounding){
     var pp=aura.position;
-    for(var i=0;i<Math.floor(cl*4);i++){
+    for(var i=0;i<Math.floor(cl*5);i++){
       var a=Math.random()*Math.PI*2,r=2+Math.random()*3;
-      var pg=new THREE.SphereGeometry(0.05+Math.random()*0.08,4,4);
+      var pg=new THREE.SphereGeometry(0.06+Math.random()*0.08,4,4);
       var pm=new THREE.MeshBasicMaterial({color:bt.color,transparent:true,opacity:0.7,
         blending:THREE.AdditiveBlending,depthWrite:false});
       var p=new THREE.Mesh(pg,pm);
       p.position.set(pp.x+Math.cos(a)*r,pp.y+(Math.random()-0.5)*2,pp.z+Math.sin(a)*r);
-      p.userData={tx:pp.x,ty:pp.y,tz:pp.z,life:1,speed:0.06+Math.random()*0.04};
+      p.userData={tx:pp.x,ty:pp.y,tz:pp.z,life:1,speed:0.06+Math.random()*0.04,angle:a};
       scene.add(p);chargeParticles.push(p);
     }
   }
-  // update charge particles
   for(var i=chargeParticles.length-1;i>=0;i--){
     var p=chargeParticles[i],u=p.userData;
     var dx=u.tx-p.position.x,dy=u.ty-p.position.y,dz=u.tz-p.position.z;
     var d=Math.sqrt(dx*dx+dy*dy+dz*dz);
-    if(d>0.3){p.position.x+=dx/d*u.speed;p.position.y+=dy/d*u.speed;p.position.z+=dz/d*u.speed;}
+    if(d>0.3){
+      // spiral motion
+      u.angle+=0.15;
+      var perpX=Math.cos(u.angle)*u.speed*0.5;
+      var perpZ=Math.sin(u.angle)*u.speed*0.5;
+      p.position.x+=dx/d*u.speed+perpX;
+      p.position.y+=dy/d*u.speed;
+      p.position.z+=dz/d*u.speed+perpZ;
+    }
     u.life-=0.02;p.material.opacity=u.life*0.7;
     if(u.life<=0||d<0.3){scene.remove(p);chargeParticles.splice(i,1);}
   }
-  // HUD
+  // update phoneme bars
+  updatePhonemes();
   document.getElementById('blastType').textContent=BLAST_TYPES[chargeType].name;
-  document.getElementById('blastType').style.color='#'+BLAST_TYPES[chargeType].color.toString(16).padStart(6,'0');
+  document.getElementById('blastType').style.color='#'+bt.color.toString(16).padStart(6,'0');
   document.getElementById('charge').textContent=cl>0.05?'CHARGE: '+Math.round(cl*100)+'%':'';
 }
 function fireBlast(type,power){
@@ -295,22 +403,40 @@ function fireBlast(type,power){
   var mesh=new THREE.Mesh(geo,mat);
   mesh.position.set(0,2.5,5);
   // glow halo
-  var hg=new THREE.SphereGeometry(sz*2,8,8);
-  var hm=new THREE.MeshBasicMaterial({color:bt.color,transparent:true,opacity:0.15,
+  var hg=new THREE.SphereGeometry(sz*2.5,8,8);
+  var hm=new THREE.MeshBasicMaterial({color:bt.color,transparent:true,opacity:0.12,
     blending:THREE.AdditiveBlending,depthWrite:false});
   mesh.add(new THREE.Mesh(hg,hm));
+  // trail ring
+  var trg=new THREE.TorusGeometry(sz*1.5,0.03,6,24);
+  var trm=new THREE.MeshBasicMaterial({color:bt.color,transparent:true,opacity:0.5,
+    blending:THREE.AdditiveBlending,depthWrite:false});
+  var trail=new THREE.Mesh(trg,trm);trail.rotation.x=Math.PI/2;mesh.add(trail);
   scene.add(mesh);
   var dmg=voice.energy*100*bt.dmgMul*(1+voice.coherence*0.5);
-  blasts.push({mesh:mesh,vz:-bt.speed,type:type,dmg:dmg,power:power,life:1});
+  blasts.push({mesh:mesh,vz:-bt.speed,type:type,dmg:dmg,power:power,life:1,trail:trail});
   triggerBlastSound(type,power);
   voice.chargeLevel=0;
+  // reset phoneme power for used vowel
+  PH_KEYS.forEach(function(k){if(PHONEMES[k].blast===type)PHONEMES[k].power*=0.3;});
 }
 function updateBlasts(dt){
   for(var i=blasts.length-1;i>=0;i--){
     var b=blasts[i];
     b.mesh.position.z+=b.vz;b.life-=0.005;
-    b.mesh.rotation.y+=0.1;b.mesh.rotation.x+=0.05;
-    // check hit target
+    b.mesh.rotation.y+=0.12;b.mesh.rotation.x+=0.06;
+    if(b.trail)b.trail.rotation.z+=0.2;
+    // spawn trail particles
+    if(Math.random()<0.4){
+      var tg=new THREE.SphereGeometry(0.04,3,3);
+      var tm=new THREE.MeshBasicMaterial({color:BLAST_TYPES[b.type].color,transparent:true,
+        opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false});
+      var tp=new THREE.Mesh(tg,tm);
+      tp.position.copy(b.mesh.position);
+      tp.position.x+=(Math.random()-0.5)*0.3;
+      tp.position.y+=(Math.random()-0.5)*0.3;
+      tp.userData={life:0.5};scene.add(tp);explosions.push(tp);
+    }
     var dz=b.mesh.position.z-target.position.z;
     if(Math.abs(dz)<1.5){hitTarget(b);scene.remove(b.mesh);blasts.splice(i,1);continue;}
     if(b.life<=0||b.mesh.position.z<-20){scene.remove(b.mesh);blasts.splice(i,1);}
@@ -330,27 +456,22 @@ function hitTarget(blast){
   showDmg(dmg,blast.type);
   spawnExplosion(target.position,blast.type);
   screenShake=Math.max(screenShake,dmg*0.02);
-  // hud
   document.getElementById('score').textContent=myScore.toLocaleString();
   document.getElementById('combo').textContent=combo>1?combo+'x COMBO':'';
-  // commentary triggers
   if(dmg>300)doCommentary('bigHit',dmg);
   if(combo===5||combo===10||combo===20)doCommentary('combo',combo);
-  if(blast.type!=='kiball'&&blast.type!=='barrage')doCommentary(blast.type==='kamehameha'?'kamehameha':
-    blast.type==='finalflash'?'finalflash':blast.type==='spiritbomb'?'spiritbomb':'galickgun',dmg);
-  // respawn target if dead
+  if(blast.type!=='kiball'&&blast.type!=='barrage')doCommentary(blast.type,dmg);
   if(targetHP<=0){
     doCommentary('ko',myScore);
     targetHP=maxHP;maxHP=Math.round(maxHP*1.3);
     if(myScore>highScore){highScore=myScore;doCommentary('high',myScore);}
     submitScore();
   }
-  // update target visual
   var hpPct=targetHP/maxHP;
   target.hpRing.material.color.setHSL(hpPct*0.33,1,0.5);
   target.material.opacity=0.3+hpPct*0.5;
-  // sync score to room
   publishLive();
+  broadcastRTC({type:'score',name:playerName,score:myScore});
 }
 function showDmg(amount,type){
   var el=document.createElement('div');el.className='dmg';
@@ -364,24 +485,23 @@ function showDmg(amount,type){
 }
 function spawnExplosion(pos,type){
   var bt=BLAST_TYPES[type]||BLAST_TYPES.kiball;
-  for(var i=0;i<12;i++){
-    var eg=new THREE.SphereGeometry(0.1+Math.random()*0.15,4,4);
+  for(var i=0;i<16;i++){
+    var eg=new THREE.SphereGeometry(0.08+Math.random()*0.15,4,4);
     var em=new THREE.MeshBasicMaterial({color:bt.color,transparent:true,opacity:0.8,
       blending:THREE.AdditiveBlending,depthWrite:false});
-    var e=new THREE.Mesh(eg,em);
-    e.position.copy(pos);
-    var a=Math.random()*Math.PI*2,el=Math.random()*Math.PI-Math.PI/2;
-    var sp=0.1+Math.random()*0.2;
-    e.userData={vx:Math.cos(a)*Math.cos(el)*sp,vy:Math.sin(el)*sp+0.05,
-      vz:Math.sin(a)*Math.cos(el)*sp,life:1};
+    var e=new THREE.Mesh(eg,em);e.position.copy(pos);
+    var a=Math.random()*Math.PI*2,el2=Math.random()*Math.PI-Math.PI/2;
+    var sp=0.1+Math.random()*0.25;
+    e.userData={vx:Math.cos(a)*Math.cos(el2)*sp,vy:Math.sin(el2)*sp+0.05,
+      vz:Math.sin(a)*Math.cos(el2)*sp,life:1};
     scene.add(e);explosions.push(e);
   }
 }
 function updateExplosions(){
   for(var i=explosions.length-1;i>=0;i--){
     var e=explosions[i],u=e.userData;
-    e.position.x+=u.vx;e.position.y+=u.vy;e.position.z+=u.vz;
-    u.vy-=0.002;u.life-=0.025;e.material.opacity=u.life;
+    if(u.vx!==undefined){e.position.x+=u.vx;e.position.y+=u.vy;e.position.z+=u.vz;u.vy-=0.002;}
+    u.life-=0.025;e.material.opacity=Math.max(0,u.life);
     e.scale.setScalar(1+((1-u.life)*2));
     if(u.life<=0){scene.remove(e);explosions.splice(i,1);}
   }
@@ -408,7 +528,7 @@ function initSynths(){
   synthNodes.rOsc=ro;synthNodes.rGain=rg;
 }
 function updateSynths(){
-  if(!audioCtx)return;var now=audioCtx.currentTime,cl=voice.chargeLevel,e=voice.energy;
+  if(!audioCtx)return;var now=audioCtx.currentTime,cl=voice.chargeLevel;
   synthNodes.cOsc.frequency.linearRampToValueAtTime(80+cl*400,now+0.1);
   synthNodes.cGain.gain.linearRampToValueAtTime(voice.sounding?cl*0.12:0,now+0.1);
   var zv=(cl>0.2&&voice.sounding)?(Math.random()<cl*0.4?cl*0.06:0):0;
@@ -419,13 +539,11 @@ function updateSynths(){
 function triggerBlastSound(type,power){
   if(!audioCtx)return;var now=audioCtx.currentTime;
   var o=audioCtx.createOscillator();o.type='sine';
-  var bt=BLAST_TYPES[type];
   o.frequency.setValueAtTime(200+power*600,now);
   o.frequency.exponentialRampToValueAtTime(50,now+0.5);
   var g=audioCtx.createGain();g.gain.setValueAtTime(0.15*power,now);
   g.gain.exponentialRampToValueAtTime(0.001,now+0.5);
   o.connect(g);g.connect(synthNodes.master);o.start(now);o.stop(now+0.6);
-  // zap burst
   var z=audioCtx.createOscillator();z.type='sawtooth';
   z.frequency.setValueAtTime(3000+Math.random()*4000,now);
   var zg=audioCtx.createGain();zg.gain.setValueAtTime(0.06*power,now);
@@ -433,56 +551,43 @@ function triggerBlastSound(type,power){
   z.connect(zg);zg.connect(synthNodes.master);z.start(now);z.stop(now+0.1);
 }
 
-// === MQTT P2P ROOM THOMAS (worldwide via public brokers) ===
+// === MQTT P2P ROOM THOMAS (worldwide) ===
 var BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt'];
 var TOPIC_BASE='ki-arena/THOMAS/';
 var brokerIdx=0,mqttConnected=false;
-
 function initMQTT(){
   document.getElementById('peers').textContent='Connecting to THOMAS...';
   tryBroker(0);
 }
 function tryBroker(idx){
-  if(idx>=BROKERS.length){document.getElementById('peers').textContent='Local mode (brokers unreachable)';return;}
-  brokerIdx=idx;
+  if(idx>=BROKERS.length){document.getElementById('peers').textContent='WebRTC only';return;}
   try{
-    var clientId='ki_'+playerName+'_'+Math.random().toString(36).slice(2,8);
-    mqttClient=mqtt.connect(BROKERS[idx],{clientId:clientId,clean:true,connectTimeout:8000,
+    var cid='ki_'+playerName+'_'+Math.random().toString(36).slice(2,8);
+    mqttClient=mqtt.connect(BROKERS[idx],{clientId:cid,clean:true,connectTimeout:8000,
       reconnectPeriod:5000,keepalive:30});
     mqttClient.on('connect',function(){
       mqttConnected=true;
-      document.getElementById('peers').textContent='THOMAS room (worldwide)';
+      document.getElementById('peers').textContent='THOMAS (worldwide)';
       mqttClient.subscribe(TOPIC_BASE+'scores/#');
       mqttClient.subscribe(TOPIC_BASE+'live/#');
-      // announce presence
       mqttClient.publish(TOPIC_BASE+'live/'+playerName,
         JSON.stringify({name:playerName,score:0,t:Date.now()}),{qos:0,retain:false});
-      // request existing scores
-      mqttClient.publish(TOPIC_BASE+'ping','1',{qos:0});
     });
     mqttClient.on('message',function(topic,payload){
-      try{
-        var data=JSON.parse(payload.toString());
+      try{var data=JSON.parse(payload.toString());
         if(!data||!data.name||data.name===playerName)return;
-        var key=data.name;
+        var k=data.name;
         if(topic.indexOf('/scores/')!==-1){
-          if(!peerScores[key]||data.score>peerScores[key].score)
-            peerScores[key]={name:data.name,score:data.score,time:data.t||0};
+          if(!peerScores[k]||data.score>peerScores[k].score)
+            peerScores[k]={name:data.name,score:data.score,time:data.t||0};
         }else if(topic.indexOf('/live/')!==-1){
-          peerScores[key]={name:data.name,score:data.score||data.s||0,time:data.t||0};
+          peerScores[k]={name:data.name,score:data.score||0,time:data.t||0};
         }
         updateLeaderboard();
       }catch(e){}
     });
-    mqttClient.on('error',function(){
-      mqttClient.end(true);tryBroker(idx+1);
-    });
-    mqttClient.on('offline',function(){
-      document.getElementById('peers').textContent='Reconnecting...';
-    });
-    mqttClient.on('reconnect',function(){
-      document.getElementById('peers').textContent='Reconnecting...';
-    });
+    mqttClient.on('error',function(){mqttClient.end(true);tryBroker(idx+1);});
+    mqttClient.on('offline',function(){document.getElementById('peers').textContent='Reconnecting...';});
   }catch(e){tryBroker(idx+1);}
 }
 function submitScore(){
@@ -495,6 +600,106 @@ function publishLive(){
   mqttClient.publish(TOPIC_BASE+'live/'+playerName,
     JSON.stringify({name:playerName,score:myScore,t:Date.now()}),{qos:0,retain:false});
 }
+
+// === WebRTC P2P via WebTorrent Tracker (global, no server needed) ===
+var WS_TRACKER='wss://tracker.openwebtorrent.com';
+var ICE_CFG={iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
+var rtcWs=null,rtcHash=null,rtcPeerId='';
+var rtcDataChannels=new Map(),rtcPendingOffers=new Map();
+var NUM_OFFERS=5;
+
+function initWebRTC(){
+  rtcPeerId='-KI0001-'+Array.from(crypto.getRandomValues(new Uint8Array(6))).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+  crypto.subtle.digest('SHA-1',new TextEncoder().encode('ki-arena:THOMAS')).then(function(buf){
+    rtcHash=Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+    joinTrackerRoom();
+  });
+}
+function joinTrackerRoom(){
+  generateOffers(NUM_OFFERS).then(function(offers){
+    rtcWs=new WebSocket(WS_TRACKER);
+    rtcWs.onopen=function(){
+      document.getElementById('peers').textContent='THOMAS (WebRTC global)';
+      rtcWs.send(JSON.stringify({action:'announce',info_hash:rtcHash,peer_id:rtcPeerId,
+        numwant:10,uploaded:0,downloaded:0,left:1,offers:offers}));
+    };
+    rtcWs.onmessage=function(ev){
+      try{
+        var msg=JSON.parse(ev.data);
+        if(msg.offer&&msg.peer_id!==rtcPeerId)handleRTCOffer(msg);
+        if(msg.answer&&msg.offer_id)handleRTCAnswer(msg);
+        if(msg.interval)setTimeout(reannounce,msg.interval*1000);
+      }catch(e){}
+    };
+    rtcWs.onerror=function(){document.getElementById('peers').textContent='MQTT only';};
+    rtcWs.onclose=function(){setTimeout(joinTrackerRoom,5000);};
+  });
+}
+function generateOffers(count){
+  var promises=[];
+  for(var i=0;i<count;i++)(function(){
+    var pc=new RTCPeerConnection(ICE_CFG);
+    var dc=pc.createDataChannel('ki');
+    var oid=crypto.randomUUID();
+    var p=new Promise(function(resolve){
+      pc.onicecandidate=function(e){if(!e.candidate)resolve({
+        offer_id:oid,offer:{type:'offer',sdp:pc.localDescription.sdp}});};
+      pc.createOffer().then(function(o){pc.setLocalDescription(o);});
+    });
+    rtcPendingOffers.set(oid,{pc:pc,dc:dc});
+    setupRTCPeer(pc,dc,oid);
+    promises.push(p);
+  })();
+  return Promise.all(promises);
+}
+function setupRTCPeer(pc,dc,id){
+  dc.onopen=function(){
+    rtcDataChannels.set(id,dc);
+    dc.send(JSON.stringify({type:'score',name:playerName,score:myScore}));
+    updateLeaderboard();
+  };
+  dc.onclose=function(){rtcDataChannels.delete(id);updateLeaderboard();};
+  dc.onmessage=function(ev){
+    try{var d=JSON.parse(ev.data);
+      if(d.name&&d.name!==playerName){
+        peerScores[d.name]={name:d.name,score:d.score||0,time:Date.now()};
+        updateLeaderboard();
+      }
+    }catch(e){}
+  };
+}
+function handleRTCOffer(msg){
+  var pc=new RTCPeerConnection(ICE_CFG);
+  pc.ondatachannel=function(e){setupRTCPeer(pc,e.channel,msg.peer_id);};
+  pc.setRemoteDescription(msg.offer).then(function(){
+    return pc.createAnswer();
+  }).then(function(ans){
+    return pc.setLocalDescription(ans);
+  }).then(function(){
+    return new Promise(function(resolve){
+      if(pc.iceGatheringState==='complete')resolve();
+      else pc.onicecandidate=function(e){if(!e.candidate)resolve();};
+    });
+  }).then(function(){
+    rtcWs.send(JSON.stringify({action:'announce',info_hash:rtcHash,peer_id:rtcPeerId,
+      to_peer_id:msg.peer_id,answer:{type:'answer',sdp:pc.localDescription.sdp},offer_id:msg.offer_id}));
+  });
+}
+function handleRTCAnswer(msg){
+  var p=rtcPendingOffers.get(msg.offer_id);
+  if(p)p.pc.setRemoteDescription(msg.answer);
+}
+function reannounce(){
+  if(!rtcWs||rtcWs.readyState!==1)return;
+  generateOffers(NUM_OFFERS).then(function(offers){
+    rtcWs.send(JSON.stringify({action:'announce',info_hash:rtcHash,peer_id:rtcPeerId,numwant:10,offers:offers}));
+  });
+}
+function broadcastRTC(msg){
+  var data=JSON.stringify(msg);
+  rtcDataChannels.forEach(function(dc){if(dc.readyState==='open')dc.send(data);});
+}
+
 function updateLeaderboard(){
   var all=Object.keys(peerScores).map(function(k){return peerScores[k];});
   all.push({name:playerName,score:myScore,time:Date.now()});
@@ -506,31 +711,70 @@ function updateLeaderboard(){
   });
   document.getElementById('lbRows').innerHTML=html;
   peerCount=Object.keys(best).length;
-  document.getElementById('peers').textContent=peerCount+' warrior'+(peerCount!==1?'s':'')+' in THOMAS';
+  var rtcPeers=rtcDataChannels?rtcDataChannels.size:0;
+  document.getElementById('peers').textContent=peerCount+' warrior'+(peerCount!==1?'s':'')+' in THOMAS'+(rtcPeers?' ('+rtcPeers+' WebRTC)':'');
 }
 
-// === LLM COMMENTARY ===
+// === WEB LLM (Transformers.js — open source, runs in browser via WebGPU/WASM) ===
 function initLLM(){
-  document.getElementById('llmStatus').textContent='AI: checking...';
+  var st=document.getElementById('llmStatus');
+  var pr=document.getElementById('llmProg');
+  st.textContent='AI: loading model...';pr.style.display='block';
+  pr.textContent='Downloading open-source LLM for commentary...';
+  // try Chrome built-in AI first (instant, no download)
   if(window.ai&&window.ai.languageModel){
     window.ai.languageModel.create({
-      systemPrompt:"You are a Dragon Ball Z tournament announcer. Give SHORT exciting commentary (1 sentence max, under 15 words). Be dramatic and use DBZ references."
-    }).then(function(s){llmSession=s;llmReady=true;
-      document.getElementById('llmStatus').textContent='AI: WebGPU LLM ready';
-    }).catch(function(){document.getElementById('llmStatus').textContent='AI: procedural mode';});
-  }else{document.getElementById('llmStatus').textContent='AI: procedural mode';}
+      systemPrompt:"You are a Dragon Ball Z tournament announcer. Give SHORT exciting commentary (1 sentence max, under 15 words). Be dramatic."
+    }).then(function(s){
+      llmSession=s;llmReady=true;
+      st.textContent='AI: Chrome WebGPU LLM';pr.style.display='none';
+    }).catch(function(){loadTransformersLLM();});
+  }else{loadTransformersLLM();}
+}
+function loadTransformersLLM(){
+  var st=document.getElementById('llmStatus');
+  var pr=document.getElementById('llmProg');
+  import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3').then(function(mod){
+    pr.textContent='Loading text model (first time may take a moment)...';
+    mod.pipeline('text-generation','onnx-community/Qwen2.5-0.5B-Instruct',{
+      dtype:'q4',device:'webgpu',
+      progress_callback:function(p){
+        if(p.status==='progress'&&p.total)
+          pr.textContent='Downloading: '+Math.round(p.loaded/p.total*100)+'%';
+        else if(p.status==='ready')
+          pr.textContent='Model ready!';
+      }
+    }).then(function(gen){
+      llmGenerator=gen;llmReady=true;
+      st.textContent='AI: Qwen2.5 (WebGPU)';
+      pr.style.display='none';
+    }).catch(function(e){
+      st.textContent='AI: procedural';pr.style.display='none';
+      console.log('LLM load failed:',e);
+    });
+  }).catch(function(){
+    st.textContent='AI: procedural';pr.style.display='none';
+  });
 }
 var cmtTimeout=null;
 function doCommentary(event,detail){
-  if(cmtTimeout)return; // rate limit
+  if(cmtTimeout)return;
   if(llmReady&&llmSession){
-    var prompt='React to: '+event+' (damage/score: '+Math.round(detail)+')';
-    llmSession.prompt(prompt).then(function(r){showCmt(r);}).catch(function(){showCmt(pickCmt(event));});
+    llmSession.prompt('React to: '+event+' (value:'+Math.round(detail)+')')
+      .then(function(r){showCmt(r);}).catch(function(){showCmt(pickCmt(event));});
+  }else if(llmReady&&llmGenerator){
+    var prompt='<|system|>You are a Dragon Ball Z announcer. One short sentence.<|end|><|user|>React to: '+event+'<|end|><|assistant|>';
+    llmGenerator(prompt,{max_new_tokens:30,temperature:0.8}).then(function(r){
+      var text=r[0].generated_text||'';
+      var after=text.split('<|assistant|>').pop().trim();
+      if(after.length>3)showCmt(after);else showCmt(pickCmt(event));
+    }).catch(function(){showCmt(pickCmt(event));});
   }else{showCmt(pickCmt(event));}
   cmtTimeout=setTimeout(function(){cmtTimeout=null;},2500);
 }
 function pickCmt(event){var arr=CMT[event]||CMT.bigHit;return arr[Math.floor(Math.random()*arr.length)];}
 function showCmt(text){
+  if(text.length>80)text=text.slice(0,80)+'...';
   var el=document.getElementById('cmt');el.textContent=text;el.classList.add('show');
   setTimeout(function(){el.classList.remove('show');},3000);
 }
@@ -539,23 +783,19 @@ function showCmt(text){
 var liveTimer=0;
 function animate(){
   if(!running)return;requestAnimationFrame(animate);
-  var dt=clock.getDelta();
+  var dt=clock.getDelta();var t=clock.elapsedTime;
   analyzeV();updateCharge();updateBlasts(dt);updateExplosions();updateSynths();
-  // periodic live score broadcast (every 5s)
-  liveTimer+=dt;if(liveTimer>5){liveTimer=0;publishLive();updateLeaderboard();}
-  // camera sway
+  updateVortex(t);
+  liveTimer+=dt;if(liveTimer>5){liveTimer=0;publishLive();broadcastRTC({type:'live',name:playerName,score:myScore});updateLeaderboard();}
   camAngle+=0.003;
   camera.position.x=Math.sin(camAngle)*1.5;
   camera.position.y=3.5+Math.sin(camAngle*0.7)*0.3;
   camera.lookAt(0,2.5,-4);
-  // screen shake
   if(screenShake>0.1){
     camera.position.x+=(Math.random()-0.5)*screenShake*0.3;
     camera.position.y+=(Math.random()-0.5)*screenShake*0.3;
     screenShake*=0.9;
   }
-  // target pulse
-  var t=clock.elapsedTime;
   target.rotation.y=t*0.3;target.rotation.x=Math.sin(t*0.5)*0.2;
   var hpPct=targetHP/maxHP;
   target.scale.setScalar(1+Math.sin(t*3)*(1-hpPct)*0.1);
