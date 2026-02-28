@@ -83,7 +83,7 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 <div id="lb"><h3>LEADERBOARD</h3><div id="lbRows"></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gun/gun.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
 var W,H,scene,camera,renderer,clock;
 var audioCtx,analyser,timeData,freqData,stream;
@@ -95,7 +95,7 @@ var playerName='',myScore=0,combo=0,lastHitTime=0,highScore=0;
 var blasts=[],explosions=[],target,targetHP=1000,maxHP=1000;
 var aura,auraGlow,chargeParticles=[];
 var camAngle=0,screenShake=0;
-var gun,gunRoom,peerScores={},peerCount=0;
+var mqttClient=null,peerScores={},peerCount=0;
 var llmSession=null,llmReady=false;
 var synthNodes={},running=false;
 var BLAST_TYPES={
@@ -123,7 +123,7 @@ function begin(){
   document.getElementById('start').classList.add('gone');
   document.getElementById('hud').classList.add('on');
   document.getElementById('lb').classList.add('on');
-  initScene();initAudio();initGun();initLLM();
+  initScene();initAudio();initMQTT();initLLM();
 }
 
 // === THREE.JS SCENE ===
@@ -354,8 +354,8 @@ function hitTarget(blast){
   var hpPct=targetHP/maxHP;
   target.hpRing.material.color.setHSL(hpPct*0.33,1,0.5);
   target.material.opacity=0.3+hpPct*0.5;
-  // gun sync
-  if(gunRoom)gunRoom.get('live').get(playerName).put({s:myScore,t:Date.now()});
+  // sync score to room
+  publishLive();
 }
 function showDmg(amount,type){
   var el=document.createElement('div');el.className='dmg';
@@ -438,34 +438,71 @@ function triggerBlastSound(type,power){
   z.connect(zg);zg.connect(synthNodes.master);z.start(now);z.stop(now+0.1);
 }
 
-// === GUN.JS P2P ROOM THOMAS ===
-function initGun(){
+// === MQTT P2P ROOM THOMAS (worldwide via public brokers) ===
+var BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt'];
+var TOPIC_BASE='ki-arena/THOMAS/';
+var brokerIdx=0,mqttConnected=false;
+
+function initMQTT(){
+  document.getElementById('peers').textContent='Connecting to THOMAS...';
+  tryBroker(0);
+}
+function tryBroker(idx){
+  if(idx>=BROKERS.length){document.getElementById('peers').textContent='Local mode (brokers unreachable)';return;}
+  brokerIdx=idx;
   try{
-    gun=Gun({peers:['https://gun-manhattan.herokuapp.com/gun'],localStorage:true});
-    gunRoom=gun.get('ki-arena-THOMAS');
-    // submit initial presence
-    gunRoom.get('players').get(playerName).put({name:playerName,score:0,joined:Date.now()});
-    // listen for scores
-    gunRoom.get('highscores').map().on(function(data,key){
-      if(data&&data.score!==undefined)peerScores[key]={name:data.name||key,score:data.score,time:data.time||0};
-      updateLeaderboard();
+    var clientId='ki_'+playerName+'_'+Math.random().toString(36).slice(2,8);
+    mqttClient=mqtt.connect(BROKERS[idx],{clientId:clientId,clean:true,connectTimeout:8000,
+      reconnectPeriod:5000,keepalive:30});
+    mqttClient.on('connect',function(){
+      mqttConnected=true;
+      document.getElementById('peers').textContent='THOMAS room (worldwide)';
+      mqttClient.subscribe(TOPIC_BASE+'scores/#');
+      mqttClient.subscribe(TOPIC_BASE+'live/#');
+      // announce presence
+      mqttClient.publish(TOPIC_BASE+'live/'+playerName,
+        JSON.stringify({name:playerName,score:0,t:Date.now()}),{qos:0,retain:false});
+      // request existing scores
+      mqttClient.publish(TOPIC_BASE+'ping','1',{qos:0});
     });
-    gunRoom.get('live').map().on(function(data,key){
-      if(data&&data.s!==undefined&&key!==playerName)peerScores[key]={name:key,score:data.s,time:data.t||0};
-      updateLeaderboard();
+    mqttClient.on('message',function(topic,payload){
+      try{
+        var data=JSON.parse(payload.toString());
+        if(!data||!data.name||data.name===playerName)return;
+        var key=data.name;
+        if(topic.indexOf('/scores/')!==-1){
+          if(!peerScores[key]||data.score>peerScores[key].score)
+            peerScores[key]={name:data.name,score:data.score,time:data.t||0};
+        }else if(topic.indexOf('/live/')!==-1){
+          peerScores[key]={name:data.name,score:data.score||data.s||0,time:data.t||0};
+        }
+        updateLeaderboard();
+      }catch(e){}
     });
-    document.getElementById('peers').textContent='Connected to THOMAS room';
-  }catch(e){document.getElementById('peers').textContent='Local mode';}
+    mqttClient.on('error',function(){
+      mqttClient.end(true);tryBroker(idx+1);
+    });
+    mqttClient.on('offline',function(){
+      document.getElementById('peers').textContent='Reconnecting...';
+    });
+    mqttClient.on('reconnect',function(){
+      document.getElementById('peers').textContent='Reconnecting...';
+    });
+  }catch(e){tryBroker(idx+1);}
 }
 function submitScore(){
-  if(!gunRoom)return;
-  gunRoom.get('highscores').get(playerName).put({name:playerName,score:myScore,time:Date.now()});
+  if(!mqttClient||!mqttConnected)return;
+  mqttClient.publish(TOPIC_BASE+'scores/'+playerName,
+    JSON.stringify({name:playerName,score:myScore,t:Date.now()}),{qos:1,retain:true});
+}
+function publishLive(){
+  if(!mqttClient||!mqttConnected)return;
+  mqttClient.publish(TOPIC_BASE+'live/'+playerName,
+    JSON.stringify({name:playerName,score:myScore,t:Date.now()}),{qos:0,retain:false});
 }
 function updateLeaderboard(){
   var all=Object.keys(peerScores).map(function(k){return peerScores[k];});
-  // add self
   all.push({name:playerName,score:myScore,time:Date.now()});
-  // dedupe by name, keep highest
   var best={};all.forEach(function(e){if(!best[e.name]||e.score>best[e.name].score)best[e.name]=e;});
   var sorted=Object.values(best).sort(function(a,b){return b.score-a.score;}).slice(0,10);
   var html='';sorted.forEach(function(e,i){
@@ -504,10 +541,13 @@ function showCmt(text){
 }
 
 // === MAIN LOOP ===
+var liveTimer=0;
 function animate(){
   if(!running)return;requestAnimationFrame(animate);
   var dt=clock.getDelta();
   analyzeV();updateCharge();updateBlasts(dt);updateExplosions();updateSynths();
+  // periodic live score broadcast (every 5s)
+  liveTimer+=dt;if(liveTimer>5){liveTimer=0;publishLive();updateLeaderboard();}
   // camera sway
   camAngle+=0.003;
   camera.position.x=Math.sin(camAngle)*1.5;
