@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sing Yourself into Existence</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Courier New',monospace}
+canvas{display:block}
+#label{position:fixed;bottom:24px;left:0;right:0;text-align:center;color:rgba(247,215,148,0);font-size:clamp(12px,2vw,20px);font-style:italic;transition:color 1s;z-index:10;pointer-events:none;font-family:Georgia,serif}
+#label.on{color:rgba(247,215,148,0.35)}
+#stats{position:fixed;top:14px;right:14px;color:rgba(255,255,255,0.07);font-size:10px;z-index:10;text-align:right;line-height:1.7}
+#voice-hud{position:fixed;top:14px;left:14px;color:rgba(255,255,255,0.07);font-size:10px;z-index:10;line-height:1.7}
+#meter{position:fixed;left:0;bottom:0;width:3px;height:0%;background:rgba(247,215,148,0.15);transition:height 0.08s;z-index:10}
+#body-meter{position:fixed;right:0;bottom:0;width:3px;height:0%;transition:height 0.3s;z-index:10}
+#start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;background:#000}
+#start h1{font-family:Georgia,serif;font-size:clamp(24px,5vw,52px);font-weight:normal;font-style:italic;color:rgba(247,215,148,0.5);text-align:center;line-height:1.3}
+#start .s{font-size:10px;color:rgba(255,255,255,0.08);letter-spacing:6px;margin:14px 0 6px;text-transform:uppercase}
+#start .desc{font-family:Georgia,serif;font-style:italic;font-size:12px;color:rgba(247,215,148,0.12);max-width:420px;text-align:center;line-height:1.9;margin-bottom:28px}
+#start button{background:none;border:1px solid rgba(247,215,148,0.12);color:rgba(247,215,148,0.35);font-family:Georgia,serif;font-style:italic;font-size:16px;padding:12px 44px;cursor:pointer;letter-spacing:3px;transition:all 0.4s}
+#start button:hover{border-color:rgba(247,215,148,0.4);color:rgba(247,215,148,0.7)}
+</style>
+</head>
+<body>
+<div id="start">
+  <h1>Sing Yourself<br>into Existence</h1>
+  <div class="s">VOICE &#x2192; FORM</div>
+  <div class="desc">
+    your voice builds your body.<br>
+    low notes grow legs and roots.<br>
+    mid tones shape your chest and arms.<br>
+    high notes sculpt the head and crown.<br>
+    vowels form your face. volume is your presence.<br>
+    sustained notes solidify. silence dissolves.<br>
+    sing — and watch yourself appear.
+  </div>
+  <button onclick="begin()">open the mirror</button>
+</div>
+<canvas id="c"></canvas>
+<div id="label"></div>
+<div id="voice-hud"></div>
+<div id="stats"></div>
+<div id="meter"></div>
+<div id="body-meter"></div>
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  SING YOURSELF INTO EXISTENCE                                     ║
+// ║  Voice → Form. You are what you sound like.                       ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+var c = document.getElementById('c'), ctx = c.getContext('2d');
+var W, H, t = 0, running = false;
+function resize(){ W = c.width = innerWidth; H = c.height = innerHeight; }
+resize(); window.onresize = resize;
+
+var PHI = (1 + Math.sqrt(5)) / 2;
+
+// ===== SKELETON DEFINITION =====
+// Joints defined as normalized positions (0-1 range, 0.5 = center)
+// These are the "attractors" that particles form around
+var JOINTS = {
+  crown:     {x:0.5, y:0.12, zone:'high',  built:0},
+  headTop:   {x:0.5, y:0.16, zone:'high',  built:0},
+  headL:     {x:0.47,y:0.19, zone:'high',  built:0},
+  headR:     {x:0.53,y:0.19, zone:'high',  built:0},
+  eyeL:      {x:0.48,y:0.19, zone:'high',  built:0},
+  eyeR:      {x:0.52,y:0.19, zone:'high',  built:0},
+  nose:      {x:0.5, y:0.21, zone:'high',  built:0},
+  mouth:     {x:0.5, y:0.225,zone:'high',  built:0},
+  chin:      {x:0.5, y:0.24, zone:'high',  built:0},
+  neck:      {x:0.5, y:0.27, zone:'mid',   built:0},
+  shoulderL: {x:0.38,y:0.30, zone:'mid',   built:0},
+  shoulderR: {x:0.62,y:0.30, zone:'mid',   built:0},
+  chest:     {x:0.5, y:0.35, zone:'mid',   built:0},
+  elbowL:    {x:0.32,y:0.40, zone:'mid',   built:0},
+  elbowR:    {x:0.68,y:0.40, zone:'mid',   built:0},
+  waist:     {x:0.5, y:0.45, zone:'mid',   built:0},
+  handL:     {x:0.28,y:0.50, zone:'mid',   built:0},
+  handR:     {x:0.72,y:0.50, zone:'mid',   built:0},
+  hipL:      {x:0.44,y:0.50, zone:'low',   built:0},
+  hipR:      {x:0.56,y:0.50, zone:'low',   built:0},
+  kneeL:     {x:0.43,y:0.62, zone:'low',   built:0},
+  kneeR:     {x:0.57,y:0.62, zone:'low',   built:0},
+  ankleL:    {x:0.42,y:0.74, zone:'low',   built:0},
+  ankleR:    {x:0.58,y:0.74, zone:'low',   built:0},
+  footL:     {x:0.40,y:0.77, zone:'low',   built:0},
+  footR:     {x:0.60,y:0.77, zone:'low',   built:0}
+};
+
+// Bones connect joints
+var BONES = [
+  ['crown','headTop'], ['headTop','headL'], ['headTop','headR'],
+  ['headL','chin'], ['headR','chin'],
+  ['eyeL','eyeR'], ['nose','mouth'], ['mouth','chin'],
+  ['chin','neck'],
+  ['neck','shoulderL'], ['neck','shoulderR'], ['neck','chest'],
+  ['shoulderL','elbowL'], ['shoulderR','elbowR'],
+  ['elbowL','handL'], ['elbowR','handR'],
+  ['chest','waist'],
+  ['waist','hipL'], ['waist','hipR'],
+  ['hipL','kneeL'], ['hipR','kneeR'],
+  ['kneeL','ankleL'], ['kneeR','ankleR'],
+  ['ankleL','footL'], ['ankleR','footR']
+];
+
+// Face zones (for vowel expressions)
+var FACE_JOINTS = ['eyeL','eyeR','nose','mouth','chin','headL','headR','headTop'];
+
+// ===== PARTICLES =====
+var bodyParticles = []; // particles that form the body
+var auraParticles = []; // floating aura particles
+var MAX_BODY = 6000;
+var MAX_AURA = 2000;
+
+// ===== VOICE STATE =====
+var audioCtx, analyser, micStream, micSource;
+var freqData, timeData;
+var FFT_SIZE = 2048;
+
+var voice = {
+  rms: 0, f0: 0, centroid: 0, f1: 0, f2: 0,
+  vowel: '', isSounding: false, noiseFloor: 0.01,
+  pitchNorm: 0, onset: false, sustainTime: 0,
+  coherence: 0, energy: 0, totalSingTime: 0,
+  silenceTime: 0, breathPhase: 0,
+  pitchHistory: [], centroidSmooth: 0,
+  zone: '' // 'low', 'mid', 'high', 'crown'
+};
+
+// ===== BODY STATE =====
+var body = {
+  solidity: 0,      // overall how solid the figure is (0=ghost, 1=solid)
+  lowBuilt: 0,      // legs/feet built amount
+  midBuilt: 0,      // torso/arms built amount
+  highBuilt: 0,     // head/face built amount
+  crownBuilt: 0,    // aura/crown built amount
+  breathCycle: 0,   // breathing animation
+  sway: 0,          // gentle body sway
+  mouthOpen: 0,     // mouth openness (vowel driven)
+  eyeBright: 0,     // eye brightness
+  auraHue: 0,       // aura color hue (0-360)
+  auraIntensity: 0, // aura glow strength
+  height: 0.65,     // figure height (0.5-0.8)
+  width: 0.24,      // figure width (shoulder span)
+  expressionSmooth: {mouthOpen:0, eyeBright:0}
+};
+
+// ===== COLOR PALETTE =====
+// Voice determines the figure's color
+function getBodyColor(pitchNorm, centroidNorm) {
+  // Low = warm earth (amber/copper)
+  // Mid = life (green/cyan)
+  // High = spirit (blue/violet)
+  // Crown = divine (gold/white)
+  var r, g, b;
+  if (pitchNorm < 0.25) {
+    r = 220 + pitchNorm*140; g = 140 + pitchNorm*200; b = 80;
+  } else if (pitchNorm < 0.5) {
+    var t2 = (pitchNorm - 0.25) * 4;
+    r = 120 - t2*40; g = 200 + t2*55; b = 140 + t2*60;
+  } else if (pitchNorm < 0.75) {
+    var t3 = (pitchNorm - 0.5) * 4;
+    r = 80 + t3*60; g = 160 - t3*40; b = 200 + t3*55;
+  } else {
+    var t4 = (pitchNorm - 0.75) * 4;
+    r = 200 + t4*47; g = 180 + t4*35; b = 148 + t4*30;
+  }
+  // Centroid shifts warmth
+  r = Math.min(255, r + centroidNorm * 30);
+  return {r:Math.round(r), g:Math.round(g), b:Math.round(b)};
+}
+
+// ===== AUDIO INIT =====
+async function initMic() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  micStream = await navigator.mediaDevices.getUserMedia({audio:true});
+  micSource = audioCtx.createMediaStreamSource(micStream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = FFT_SIZE;
+  analyser.smoothingTimeConstant = 0.8;
+  micSource.connect(analyser);
+  freqData = new Float32Array(analyser.frequencyBinCount);
+  timeData = new Float32Array(analyser.fftSize);
+}
+
+// ===== VOICE ANALYSIS =====
+function analyzeVoice() {
+  if (!analyser) return;
+  analyser.getFloatTimeDomainData(timeData);
+  analyser.getFloatFrequencyData(freqData);
+
+  // RMS
+  var sumSq = 0;
+  for (var i = 0; i < timeData.length; i++) sumSq += timeData[i] * timeData[i];
+  voice.rms = Math.sqrt(sumSq / timeData.length);
+
+  var wasSounding = voice.isSounding;
+  voice.isSounding = voice.rms > voice.noiseFloor * 2;
+  voice.onset = voice.isSounding && !wasSounding;
+
+  if (voice.isSounding) {
+    voice.sustainTime += 0.016;
+    voice.totalSingTime += 0.016;
+    voice.silenceTime = 0;
+  } else {
+    voice.sustainTime = 0;
+    voice.silenceTime += 0.016;
+  }
+
+  // F0 autocorrelation
+  voice.f0 = 0;
+  if (voice.isSounding) {
+    var best = 0, bestLag = 0;
+    var minLag = Math.floor(audioCtx.sampleRate / 800);
+    var maxLag = Math.floor(audioCtx.sampleRate / 60);
+    for (var lag = minLag; lag < maxLag && lag < timeData.length/2; lag++) {
+      var sum = 0;
+      for (var j = 0; j < timeData.length/2; j++) sum += timeData[j] * timeData[j+lag];
+      if (sum > best) { best = sum; bestLag = lag; }
+    }
+    if (bestLag > 0) {
+      voice.f0 = audioCtx.sampleRate / bestLag;
+      voice.pitchNorm = Math.max(0, Math.min(1, (voice.f0 - 80) / 720));
+    }
+  }
+
+  // Spectral centroid
+  var num = 0, den = 0;
+  var binHz = audioCtx.sampleRate / FFT_SIZE;
+  for (var k = 0; k < freqData.length; k++) {
+    var mag = Math.pow(10, freqData[k] / 20);
+    num += k * binHz * mag; den += mag;
+  }
+  voice.centroid = den > 0 ? num / den : 0;
+  voice.centroidSmooth += (Math.min(1, voice.centroid / 4000) - voice.centroidSmooth) * 0.1;
+
+  // Formants
+  if (voice.isSounding) {
+    var peaks = [];
+    for (var m = 2; m < freqData.length - 2; m++) {
+      if (freqData[m] > freqData[m-1] && freqData[m] > freqData[m+1] &&
+          freqData[m] > freqData[m-2] && freqData[m] > freqData[m+2] &&
+          freqData[m] > -40) {
+        peaks.push({freq: m * binHz, mag: freqData[m]});
+      }
+    }
+    peaks.sort(function(a,b){return b.mag - a.mag;});
+    var f1p = peaks.filter(function(p){return p.freq>200 && p.freq<1000;});
+    var f2p = peaks.filter(function(p){return p.freq>800 && p.freq<3000;});
+    voice.f1 = f1p.length > 0 ? f1p[0].freq : voice.f1 * 0.95;
+    voice.f2 = f2p.length > 0 ? f2p[0].freq : voice.f2 * 0.95;
+  }
+
+  // Vowel detection
+  if (voice.isSounding && voice.f1 > 0 && voice.f2 > 0) {
+    if (voice.f1 > 600 && voice.f2 < 1500) voice.vowel = 'AH';
+    else if (voice.f1 < 400 && voice.f2 > 2000) voice.vowel = 'EE';
+    else if (voice.f1 > 400 && voice.f1 < 700 && voice.f2 < 1200) voice.vowel = 'OH';
+    else if (voice.f1 < 400 && voice.f2 < 1200) voice.vowel = 'OO';
+    else voice.vowel = 'EH';
+  }
+
+  // Pitch zone
+  if (voice.pitchNorm < 0.25) voice.zone = 'low';
+  else if (voice.pitchNorm < 0.55) voice.zone = 'mid';
+  else if (voice.pitchNorm < 0.8) voice.zone = 'high';
+  else voice.zone = 'crown';
+
+  // Energy / coherence
+  voice.energy += (voice.rms - voice.energy) * 0.1;
+  if (voice.isSounding && voice.sustainTime > 0.3) {
+    voice.coherence = Math.min(1, voice.coherence + 0.008);
+  } else {
+    voice.coherence *= 0.99;
+  }
+
+  // Breath cycle (from amplitude modulation)
+  voice.breathPhase += 0.016 * (voice.isSounding ? 3 : 0.5);
+}
+
+// ===== VOICE → BODY MAPPING =====
+function voiceToBody() {
+  var dt = 0.016;
+
+  if (voice.isSounding) {
+    // Build the zones the voice is activating
+    var buildRate = 0.003 * (1 + voice.rms * 20);
+
+    if (voice.zone === 'low') {
+      body.lowBuilt = Math.min(1, body.lowBuilt + buildRate * 1.5);
+      body.midBuilt = Math.min(1, body.midBuilt + buildRate * 0.3);
+    } else if (voice.zone === 'mid') {
+      body.midBuilt = Math.min(1, body.midBuilt + buildRate * 1.5);
+      body.lowBuilt = Math.min(1, body.lowBuilt + buildRate * 0.3);
+      body.highBuilt = Math.min(1, body.highBuilt + buildRate * 0.3);
+    } else if (voice.zone === 'high') {
+      body.highBuilt = Math.min(1, body.highBuilt + buildRate * 1.5);
+      body.midBuilt = Math.min(1, body.midBuilt + buildRate * 0.3);
+    } else { // crown
+      body.crownBuilt = Math.min(1, body.crownBuilt + buildRate * 1.5);
+      body.highBuilt = Math.min(1, body.highBuilt + buildRate * 0.5);
+    }
+
+    // Overall solidity increases with singing
+    body.solidity = Math.min(1, body.solidity + 0.002 * voice.coherence);
+
+    // Aura builds with coherence
+    body.auraIntensity += (voice.coherence * 0.5 + voice.rms * 2 - body.auraIntensity) * 0.05;
+
+    // Height varies slightly with pitch
+    body.height += ((0.55 + voice.pitchNorm * 0.2) - body.height) * 0.01;
+
+    // Width from volume
+    body.width += ((0.20 + voice.rms * 0.5) - body.width) * 0.02;
+
+  } else {
+    // Silence: slowly dissolve
+    body.solidity = Math.max(0, body.solidity - 0.0008);
+    body.auraIntensity *= 0.995;
+    // Zones dissolve very slowly (you keep what you built)
+    body.lowBuilt *= 0.9998;
+    body.midBuilt *= 0.9998;
+    body.highBuilt *= 0.9998;
+    body.crownBuilt *= 0.999;
+  }
+
+  // Vowel → face expression
+  var targetMouth = 0, targetEye = 0.3;
+  if (voice.isSounding) {
+    switch(voice.vowel) {
+      case 'AH': targetMouth = 0.9; targetEye = 0.7; break;
+      case 'EE': targetMouth = 0.3; targetEye = 1.0; break;
+      case 'OH': targetMouth = 0.7; targetEye = 0.5; break;
+      case 'OO': targetMouth = 0.5; targetEye = 0.4; break;
+      case 'EH': targetMouth = 0.4; targetEye = 0.6; break;
+    }
+  }
+  body.expressionSmooth.mouthOpen += (targetMouth - body.expressionSmooth.mouthOpen) * 0.1;
+  body.expressionSmooth.eyeBright += (targetEye - body.expressionSmooth.eyeBright) * 0.1;
+  body.mouthOpen = body.expressionSmooth.mouthOpen;
+  body.eyeBright = body.expressionSmooth.eyeBright;
+
+  // Breathing animation
+  body.breathCycle += dt * (voice.isSounding ? 2 : 0.8);
+  body.sway = Math.sin(t * 0.3) * 0.005;
+
+  // Aura hue: pitch driven
+  body.auraHue = voice.pitchNorm * 300; // 0=red, 300=violet
+
+  // Update joint built levels
+  var jointKeys = Object.keys(JOINTS);
+  for (var ji = 0; ji < jointKeys.length; ji++) {
+    var jk = jointKeys[ji];
+    var jt = JOINTS[jk];
+    if (jt.zone === 'low') jt.built += (body.lowBuilt - jt.built) * 0.05;
+    else if (jt.zone === 'mid') jt.built += (body.midBuilt - jt.built) * 0.05;
+    else jt.built += (body.highBuilt - jt.built) * 0.05;
+  }
+  JOINTS.crown.built += (body.crownBuilt - JOINTS.crown.built) * 0.05;
+}
+
+// ===== PARTICLE SPAWNING =====
+function spawnBodyParticles() {
+  if (!voice.isSounding) return;
+
+  var spawnCount = Math.floor(2 + voice.rms * 80);
+  var col = getBodyColor(voice.pitchNorm, voice.centroidSmooth);
+
+  for (var i = 0; i < spawnCount && bodyParticles.length < MAX_BODY; i++) {
+    // Pick a random bone to spawn on
+    var bone = BONES[Math.floor(Math.random() * BONES.length)];
+    var j1 = JOINTS[bone[0]], j2 = JOINTS[bone[1]];
+
+    // Only spawn on built zones
+    var zoneBuilt = Math.min(j1.built, j2.built);
+    if (zoneBuilt < 0.05 || Math.random() > zoneBuilt) continue;
+
+    var lerp = Math.random();
+    var px = j1.x + (j2.x - j1.x) * lerp;
+    var py = j1.y + (j2.y - j1.y) * lerp;
+
+    // Add some organic scatter
+    var scatter = 0.015 * (1 - voice.coherence * 0.7);
+    px += (Math.random() - 0.5) * scatter;
+    py += (Math.random() - 0.5) * scatter;
+
+    bodyParticles.push({
+      x: px, y: py,
+      tx: px, ty: py, // target position
+      vx: (Math.random()-0.5) * 0.002,
+      vy: (Math.random()-0.5) * 0.002,
+      r: 0.5 + Math.random() * 2,
+      life: 0.8 + Math.random() * 0.2,
+      decay: 0.0005 + Math.random() * 0.001,
+      locked: false, // becomes true when coherence is high
+      lockStr: 0,
+      cr: col.r, cg: col.g, cb: col.b,
+      zone: j1.zone,
+      bone: bone
+    });
+  }
+
+  // Aura particles
+  if (body.auraIntensity > 0.1 && auraParticles.length < MAX_AURA) {
+    var auraCount = Math.floor(body.auraIntensity * 5);
+    for (var a = 0; a < auraCount; a++) {
+      var angle = Math.random() * Math.PI * 2;
+      var dist = 0.02 + Math.random() * 0.15;
+      auraParticles.push({
+        x: 0.5 + Math.cos(angle) * dist,
+        y: 0.4 + Math.sin(angle) * dist * 1.3,
+        vx: Math.cos(angle) * 0.0005,
+        vy: -0.001 - Math.random() * 0.002, // float upward
+        r: 1 + Math.random() * 3,
+        life: 0.5 + Math.random() * 0.5,
+        decay: 0.003 + Math.random() * 0.003,
+        cr: col.r, cg: col.g, cb: col.b
+      });
+    }
+  }
+}
+
+// ===== DRAW =====
+function draw() {
+  requestAnimationFrame(draw);
+  if (!running) { ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); return; }
+
+  t += 0.016;
+
+  // Dark fade
+  var fadeAlpha = voice.isSounding ? 0.06 : 0.03 + voice.silenceTime * 0.005;
+  ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.15, fadeAlpha) + ')';
+  ctx.fillRect(0,0,W,H);
+
+  analyzeVoice();
+  voiceToBody();
+  spawnBodyParticles();
+
+  var figH = Math.min(W,H) * body.height;
+  var figW = Math.min(W,H) * body.width;
+  var baseX = W/2;
+  var baseY = H * 0.15; // top of figure
+  var breathOff = Math.sin(body.breathCycle) * 3;
+
+  // ===== DRAW AURA =====
+  if (body.auraIntensity > 0.02) {
+    var auraR = figH * 0.7 * (1 + body.auraIntensity * 0.3);
+    var auraCx = baseX;
+    var auraCy = baseY + figH * 0.4;
+    var auraGr = ctx.createRadialGradient(auraCx, auraCy, 0, auraCx, auraCy, auraR);
+    var ah = body.auraHue;
+    auraGr.addColorStop(0, 'hsla('+ah+',60%,60%,'+(body.auraIntensity*0.04)+')');
+    auraGr.addColorStop(0.4, 'hsla('+ah+',50%,40%,'+(body.auraIntensity*0.02)+')');
+    auraGr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = auraGr;
+    ctx.fillRect(auraCx-auraR, auraCy-auraR, auraR*2, auraR*2);
+  }
+
+  // ===== DRAW AURA PARTICLES =====
+  auraParticles.forEach(function(p) {
+    p.x += p.vx; p.y += p.vy;
+    p.life -= p.decay;
+    var sx = baseX + (p.x - 0.5) * figH * 1.5;
+    var sy = baseY + p.y * figH;
+    ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba('+p.cr+','+p.cg+','+p.cb+','+(p.life*0.06)+')';
+    ctx.fill();
+  });
+  auraParticles = auraParticles.filter(function(p){return p.life > 0;});
+
+  // ===== DRAW BONES (faint skeleton) =====
+  var overallBuilt = (body.lowBuilt + body.midBuilt + body.highBuilt) / 3;
+  if (overallBuilt > 0.02) {
+    BONES.forEach(function(bone) {
+      var j1 = JOINTS[bone[0]], j2 = JOINTS[bone[1]];
+      var boneBuilt = Math.min(j1.built, j2.built);
+      if (boneBuilt < 0.02) return;
+
+      var x1 = baseX + (j1.x - 0.5) * figW * 3 + Math.sin(t*0.5 + j1.y*10) * body.sway * figW;
+      var y1 = baseY + j1.y * figH + (j1.zone==='mid' ? breathOff : 0);
+      var x2 = baseX + (j2.x - 0.5) * figW * 3 + Math.sin(t*0.5 + j2.y*10) * body.sway * figW;
+      var y2 = baseY + j2.y * figH + (j2.zone==='mid' ? breathOff : 0);
+
+      var col = getBodyColor(voice.pitchNorm, voice.centroidSmooth);
+      var alpha = boneBuilt * body.solidity * 0.08;
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      ctx.strokeStyle = 'rgba('+col.r+','+col.g+','+col.b+','+alpha+')';
+      ctx.lineWidth = 0.5 + boneBuilt * 1.5;
+      ctx.stroke();
+    });
+  }
+
+  // ===== DRAW BODY PARTICLES =====
+  bodyParticles.forEach(function(p) {
+    // Target position on skeleton
+    var j1 = JOINTS[p.bone[0]], j2 = JOINTS[p.bone[1]];
+    var lerp = 0.5; // approximate
+    p.tx = j1.x + (j2.x - j1.x) * lerp;
+    p.ty = j1.y + (j2.y - j1.y) * lerp;
+
+    // Lock behavior: high coherence = particles stick to skeleton
+    if (voice.coherence > 0.4 && voice.isSounding) {
+      p.lockStr = Math.min(1, p.lockStr + 0.02);
+    } else {
+      p.lockStr *= 0.998;
+    }
+
+    // Movement: blend between free float and locked-to-skeleton
+    var pullX = (p.tx - p.x) * p.lockStr * 0.02;
+    var pullY = (p.ty - p.y) * p.lockStr * 0.02;
+    p.vx += pullX + (Math.random()-0.5) * 0.0003;
+    p.vy += pullY + (Math.random()-0.5) * 0.0003;
+    p.vx *= 0.98; p.vy *= 0.98;
+    p.x += p.vx; p.y += p.vy;
+
+    // If not sounding, particles drift apart slowly
+    if (!voice.isSounding) {
+      p.vx += (Math.random()-0.5) * 0.0005;
+      p.vy -= 0.00005; // slight upward drift (dissolving)
+    }
+
+    p.life -= p.decay;
+
+    // Screen position
+    var sx = baseX + (p.x - 0.5) * figW * 3 + Math.sin(t*0.5 + p.y*10) * body.sway * figW;
+    var sy = baseY + p.y * figH + (p.zone==='mid' ? breathOff : 0);
+
+    var alpha = p.life * body.solidity * (0.15 + p.lockStr * 0.35);
+    ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba('+p.cr+','+p.cg+','+p.cb+','+alpha+')';
+    ctx.fill();
+
+    // Glow for locked particles
+    if (p.lockStr > 0.5) {
+      var gr = ctx.createRadialGradient(sx,sy,0, sx,sy, p.r*4);
+      gr.addColorStop(0, 'rgba('+p.cr+','+p.cg+','+p.cb+','+(alpha*0.1)+')');
+      gr.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = gr;
+      ctx.fillRect(sx-p.r*4, sy-p.r*4, p.r*8, p.r*8);
+    }
+  });
+  bodyParticles = bodyParticles.filter(function(p){return p.life > 0;});
+
+  // ===== DRAW FACE =====
+  if (body.highBuilt > 0.15) {
+    var faceAlpha = body.highBuilt * body.solidity;
+    var headCx = baseX;
+    var headCy = baseY + 0.19 * figH;
+    var headR = figW * 0.35;
+    var col2 = getBodyColor(voice.pitchNorm, voice.centroidSmooth);
+
+    // Head outline (very subtle)
+    ctx.beginPath(); ctx.arc(headCx, headCy, headR, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba('+col2.r+','+col2.g+','+col2.b+','+(faceAlpha*0.06)+')';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Eyes
+    var eyeSpread = headR * 0.4;
+    var eyeY = headCy - headR * 0.08;
+    var eyeR = headR * 0.12 * (0.5 + body.eyeBright * 0.5);
+    // Left eye
+    ctx.beginPath(); ctx.arc(headCx - eyeSpread, eyeY, eyeR, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,'+(faceAlpha * body.eyeBright * 0.25)+')';
+    ctx.fill();
+    // Right eye
+    ctx.beginPath(); ctx.arc(headCx + eyeSpread, eyeY, eyeR, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,'+(faceAlpha * body.eyeBright * 0.25)+')';
+    ctx.fill();
+
+    // Eye glow
+    if (body.eyeBright > 0.3 && faceAlpha > 0.2) {
+      [-1,1].forEach(function(side) {
+        var egr = ctx.createRadialGradient(headCx+side*eyeSpread, eyeY, 0,
+          headCx+side*eyeSpread, eyeY, eyeR*5);
+        egr.addColorStop(0, 'rgba('+col2.r+','+col2.g+','+col2.b+','+(faceAlpha*body.eyeBright*0.06)+')');
+        egr.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = egr;
+        ctx.fillRect(headCx+side*eyeSpread-eyeR*5, eyeY-eyeR*5, eyeR*10, eyeR*10);
+      });
+    }
+
+    // Mouth
+    var mouthY = headCy + headR * 0.3;
+    var mouthW = headR * 0.4 * (0.5 + body.mouthOpen * 0.5);
+    var mouthH = headR * 0.08 + body.mouthOpen * headR * 0.25;
+    ctx.beginPath();
+    ctx.ellipse(headCx, mouthY, mouthW, mouthH, 0, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba('+Math.round(col2.r*0.5)+','+Math.round(col2.g*0.3)+','+Math.round(col2.b*0.3)+','+(faceAlpha*0.15)+')';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba('+col2.r+','+col2.g+','+col2.b+','+(faceAlpha*0.08)+')';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Voice emission from mouth (particles shooting out when singing)
+    if (voice.isSounding && body.mouthOpen > 0.2) {
+      var emitCount = Math.floor(voice.rms * 30);
+      for (var ei = 0; ei < emitCount; ei++) {
+        var ea = -Math.PI/2 + (Math.random()-0.5) * body.mouthOpen * 1.5;
+        auraParticles.push({
+          x: 0.5, y: 0.225,
+          vx: Math.cos(ea) * 0.003 * voice.rms * 10,
+          vy: Math.sin(ea) * 0.003 * voice.rms * 10,
+          r: 0.5 + Math.random() * 1.5,
+          life: 0.3 + Math.random() * 0.3,
+          decay: 0.008,
+          cr: col2.r, cg: col2.g, cb: col2.b
+        });
+      }
+    }
+  }
+
+  // ===== DRAW CROWN =====
+  if (body.crownBuilt > 0.1) {
+    var crownCx = baseX;
+    var crownCy = baseY + 0.12 * figH;
+    var crownR = figW * 0.5 * body.crownBuilt;
+    var crownAlpha = body.crownBuilt * body.solidity;
+
+    // Crown rays
+    for (var cr = 0; cr < 12; cr++) {
+      var ca = (cr / 12) * Math.PI * 2 + t * 0.2;
+      var crl = crownR * (0.5 + Math.sin(t*2 + cr) * 0.3);
+      ctx.beginPath();
+      ctx.moveTo(crownCx, crownCy);
+      ctx.lineTo(crownCx + Math.cos(ca) * crl, crownCy + Math.sin(ca) * crl * 0.5 - crl*0.3);
+      ctx.strokeStyle = 'rgba(247,215,148,'+(crownAlpha*0.06)+')';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // Crown glow
+    var cgr = ctx.createRadialGradient(crownCx, crownCy-10, 0, crownCx, crownCy-10, crownR*1.5);
+    cgr.addColorStop(0, 'rgba(247,215,148,'+(crownAlpha*0.06)+')');
+    cgr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = cgr;
+    ctx.fillRect(crownCx-crownR*2, crownCy-crownR*2, crownR*4, crownR*4);
+  }
+
+  // ===== GROUND SHADOW =====
+  if (body.lowBuilt > 0.1) {
+    var groundY = baseY + 0.78 * figH;
+    var shadowW = figW * 1.5 * body.solidity;
+    var sgr = ctx.createRadialGradient(baseX, groundY, 0, baseX, groundY, shadowW);
+    sgr.addColorStop(0, 'rgba(247,215,148,'+(body.lowBuilt * body.solidity * 0.03)+')');
+    sgr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sgr;
+    ctx.fillRect(baseX-shadowW, groundY-5, shadowW*2, 20);
+  }
+
+  // ===== LABEL =====
+  var lb = document.getElementById('label');
+  if (voice.isSounding) {
+    var zoneNames = {low:'grounding your roots', mid:'shaping your body', high:'sculpting your mind', crown:'opening your crown'};
+    lb.innerHTML = zoneNames[voice.zone] || '';
+    lb.classList.add('on');
+  } else if (voice.silenceTime > 2 && body.solidity > 0.05) {
+    lb.innerHTML = 'sing to hold your form';
+    lb.classList.add('on');
+  } else if (body.solidity < 0.02) {
+    lb.innerHTML = 'sing — and watch yourself appear';
+    lb.classList.add('on');
+  }
+
+  // ===== HUD =====
+  document.getElementById('meter').style.height = Math.min(100, voice.rms * 500) + '%';
+
+  var bodyPct = ((body.lowBuilt + body.midBuilt + body.highBuilt + body.crownBuilt) / 4 * 100);
+  document.getElementById('body-meter').style.height = bodyPct + '%';
+  document.getElementById('body-meter').style.background =
+    'hsla(' + body.auraHue + ',60%,50%,0.15)';
+
+  if (voice.isSounding) {
+    document.getElementById('voice-hud').innerHTML =
+      'F0: ' + (voice.f0 > 0 ? Math.round(voice.f0) + ' Hz' : '—') + '<br>' +
+      'zone: ' + voice.zone + '<br>' +
+      'vowel: ' + (voice.vowel || '—') + '<br>' +
+      'coherence: ' + voice.coherence.toFixed(2);
+  }
+
+  document.getElementById('stats').innerHTML =
+    'solidity: ' + (body.solidity * 100).toFixed(0) + '%<br>' +
+    'legs: ' + (body.lowBuilt * 100).toFixed(0) + '%<br>' +
+    'torso: ' + (body.midBuilt * 100).toFixed(0) + '%<br>' +
+    'head: ' + (body.highBuilt * 100).toFixed(0) + '%<br>' +
+    'crown: ' + (body.crownBuilt * 100).toFixed(0) + '%<br>' +
+    'particles: ' + bodyParticles.length + '<br>' +
+    'sung: ' + Math.round(voice.totalSingTime) + 's';
+}
+
+// ===== BEGIN =====
+async function begin() {
+  try {
+    await initMic();
+    document.getElementById('start').style.display = 'none';
+    running = true;
+    draw();
+  } catch(err) {
+    alert('Microphone access required to sing yourself into existence.\n\n' + err.message);
+  }
+}
+
+draw();
+</script>
+</body>
+</html>
