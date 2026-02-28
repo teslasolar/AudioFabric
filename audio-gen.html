@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AudioFabric Generator</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#0ff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+
+/* launcher overlay */
+#launcher{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.92);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  overflow-y:auto;padding:20px}
+#launcher.hidden{display:none}
+#launcher h1{font-size:28px;margin-bottom:6px;text-shadow:0 0 20px #0ff}
+#launcher .sub{font-size:13px;color:#088;margin-bottom:24px}
+
+.preset-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:12px;max-width:900px;width:100%;margin-bottom:24px}
+.preset-card{background:rgba(0,255,255,0.05);border:1px solid #0ff3;
+  border-radius:8px;padding:14px;cursor:pointer;transition:all 0.2s}
+.preset-card:hover{background:rgba(0,255,255,0.12);border-color:#0ff;
+  transform:translateY(-2px);box-shadow:0 4px 20px #0ff4}
+.preset-card h3{font-size:15px;margin-bottom:4px;color:#0ff}
+.preset-card p{font-size:11px;color:#088;line-height:1.4}
+
+.custom-panel{max-width:900px;width:100%;background:rgba(0,255,255,0.03);
+  border:1px solid #0ff2;border-radius:8px;padding:16px}
+.custom-panel h2{font-size:16px;margin-bottom:12px;color:#0ff}
+.param-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.param-group{flex:1;min-width:180px}
+.param-group label{display:block;font-size:11px;color:#088;margin-bottom:3px}
+.param-group select,.param-group input{width:100%;background:#111;color:#0ff;
+  border:1px solid #0ff3;border-radius:4px;padding:5px 8px;font-family:inherit;font-size:12px}
+.param-group input[type=range]{padding:2px}
+.param-group input[type=color]{height:30px;padding:1px}
+.range-val{font-size:10px;color:#0ff;float:right}
+
+#btnLaunch{margin-top:14px;padding:10px 32px;background:linear-gradient(135deg,#0ff,#08f);
+  color:#000;border:none;border-radius:6px;font-size:16px;font-weight:bold;
+  font-family:inherit;cursor:pointer;transition:all 0.2s}
+#btnLaunch:hover{transform:scale(1.05);box-shadow:0 0 30px #0ff6}
+
+/* HUD */
+#hud{position:fixed;top:10px;left:10px;z-index:50;font-size:11px;
+  color:#0ff8;pointer-events:none;display:none}
+#hud.show{display:block}
+#btnBack{position:fixed;top:10px;right:10px;z-index:50;background:#0ff1;
+  color:#0ff;border:1px solid #0ff3;border-radius:4px;padding:4px 10px;
+  font-family:inherit;font-size:11px;cursor:pointer;display:none}
+#btnBack.show{display:block}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="launcher">
+  <h1>AudioFabric Generator</h1>
+  <div class="sub">Pick a preset or build custom — all voice-driven</div>
+
+  <div class="preset-grid" id="presets"></div>
+
+  <div class="custom-panel">
+    <h2>Custom Build</h2>
+    <div class="param-row">
+      <div class="param-group">
+        <label>Visual Mode</label>
+        <select id="p_visual">
+          <option value="particles">Particles</option>
+          <option value="beam">Energy Beam</option>
+          <option value="body">Body / Avatar</option>
+          <option value="waveform">Waveform</option>
+          <option value="mandala">Mandala</option>
+          <option value="nebula">Nebula Cloud</option>
+        </select>
+      </div>
+      <div class="param-group">
+        <label>Particle Behavior</label>
+        <select id="p_behavior">
+          <option value="radial">Radial Burst</option>
+          <option value="orbital">Orbital</option>
+          <option value="electric">Electric / Zigzag</option>
+          <option value="spiral">Spiral Converge</option>
+          <option value="drift">Drift / Float</option>
+          <option value="fountain">Fountain</option>
+        </select>
+      </div>
+      <div class="param-group">
+        <label>Synth Sound</label>
+        <select id="p_synth">
+          <option value="none">None (visual only)</option>
+          <option value="drone">Harmonic Drone</option>
+          <option value="charge">Charge Hum + Zaps</option>
+          <option value="choir">Vowel Choir</option>
+          <option value="bass">Sub Bass</option>
+          <option value="crystal">Crystal Chime</option>
+        </select>
+      </div>
+    </div>
+    <div class="param-row">
+      <div class="param-group">
+        <label>Voice Mapping</label>
+        <select id="p_voicemap">
+          <option value="pitch-color">Pitch → Color</option>
+          <option value="pitch-size">Pitch → Size</option>
+          <option value="pitch-speed">Pitch → Speed</option>
+          <option value="vowel-type">Vowel → Type/Shape</option>
+          <option value="volume-spawn">Volume → Spawn Rate</option>
+        </select>
+      </div>
+      <div class="param-group">
+        <label>Color Palette</label>
+        <select id="p_palette">
+          <option value="cyan">Cyan / Electric</option>
+          <option value="fire">Fire / Warm</option>
+          <option value="rainbow">Rainbow</option>
+          <option value="neon">Neon</option>
+          <option value="mono">Monochrome</option>
+          <option value="custom">Custom Hue</option>
+        </select>
+      </div>
+      <div class="param-group">
+        <label>Custom Hue <span class="range-val" id="hueVal">180</span></label>
+        <input type="range" id="p_hue" min="0" max="360" value="180">
+      </div>
+    </div>
+    <div class="param-row">
+      <div class="param-group">
+        <label>Particle Count <span class="range-val" id="countVal">3000</span></label>
+        <input type="range" id="p_count" min="500" max="10000" step="500" value="3000">
+      </div>
+      <div class="param-group">
+        <label>Decay Speed <span class="range-val" id="decayVal">0.5</span></label>
+        <input type="range" id="p_decay" min="0.1" max="1" step="0.05" value="0.5">
+      </div>
+      <div class="param-group">
+        <label>Trail / Fade <span class="range-val" id="trailVal">0.08</span></label>
+        <input type="range" id="p_trail" min="0.02" max="0.3" step="0.01" value="0.08">
+      </div>
+    </div>
+    <div class="param-row">
+      <div class="param-group">
+        <label>Screen Shake</label>
+        <select id="p_shake">
+          <option value="0">Off</option>
+          <option value="1">Subtle</option>
+          <option value="2">Medium</option>
+          <option value="3">Heavy</option>
+        </select>
+      </div>
+      <div class="param-group">
+        <label>Background</label>
+        <select id="p_bg">
+          <option value="black">Black</option>
+          <option value="dark">Dark Blue</option>
+          <option value="void">Deep Void</option>
+        </select>
+      </div>
+      <div class="param-group">
+        <label>Bloom / Glow</label>
+        <select id="p_bloom">
+          <option value="1">On</option>
+          <option value="0">Off</option>
+        </select>
+      </div>
+    </div>
+    <center><button id="btnLaunch">LAUNCH</button></center>
+  </div>
+</div>
+
+<div id="hud">
+  <div id="hudText"></div>
+</div>
+<button id="btnBack" onclick="backToLauncher()">BACK</button>
+
+<script>
+/* ============================================================
+   AudioFabric Generator — Reusable voice-driven audio/visual engine
+   ============================================================ */
+
+// ---- PRESETS ----
+var PRESETS = [
+  {
+    name: 'Cosmic Bloom',
+    desc: 'Sing particles into a radial explosion — pitch shifts color, volume drives density',
+    visual: 'particles', behavior: 'radial', synth: 'drone',
+    voicemap: 'pitch-color', palette: 'rainbow', hue: 180,
+    count: 4000, decay: 0.4, trail: 0.06, shake: '1', bg: 'black', bloom: '1'
+  },
+  {
+    name: 'Electric Storm',
+    desc: 'Zigzag lightning particles with charge zaps — louder = more bolts',
+    visual: 'particles', behavior: 'electric', synth: 'charge',
+    voicemap: 'volume-spawn', palette: 'cyan', hue: 200,
+    count: 3000, decay: 0.6, trail: 0.05, shake: '2', bg: 'dark', bloom: '1'
+  },
+  {
+    name: 'Fire Fountain',
+    desc: 'Upward fire particles — pitch controls height, vowels change flame color',
+    visual: 'particles', behavior: 'fountain', synth: 'bass',
+    voicemap: 'pitch-size', palette: 'fire', hue: 20,
+    count: 5000, decay: 0.7, trail: 0.1, shake: '0', bg: 'black', bloom: '1'
+  },
+  {
+    name: 'Orbital Choir',
+    desc: 'Particles orbit the center — vowels spawn different ring types with choir synth',
+    visual: 'particles', behavior: 'orbital', synth: 'choir',
+    voicemap: 'vowel-type', palette: 'neon', hue: 280,
+    count: 3000, decay: 0.3, trail: 0.04, shake: '0', bg: 'void', bloom: '1'
+  },
+  {
+    name: 'Spirit Body',
+    desc: 'Sing a glowing avatar into existence — pitch builds different body zones',
+    visual: 'body', behavior: 'drift', synth: 'drone',
+    voicemap: 'pitch-size', palette: 'cyan', hue: 180,
+    count: 4000, decay: 0.35, trail: 0.06, shake: '0', bg: 'black', bloom: '1'
+  },
+  {
+    name: 'Waveform Rider',
+    desc: 'Your voice as a living waveform — pitch warps the wave, volume thickens it',
+    visual: 'waveform', behavior: 'radial', synth: 'none',
+    voicemap: 'pitch-color', palette: 'neon', hue: 280,
+    count: 2000, decay: 0.5, trail: 0.03, shake: '1', bg: 'dark', bloom: '1'
+  },
+  {
+    name: 'Spiral Galaxy',
+    desc: 'Voice-driven spiral arms — sing to wind them tighter, silence lets them unravel',
+    visual: 'particles', behavior: 'spiral', synth: 'crystal',
+    voicemap: 'pitch-speed', palette: 'rainbow', hue: 200,
+    count: 5000, decay: 0.25, trail: 0.04, shake: '0', bg: 'void', bloom: '1'
+  },
+  {
+    name: 'Mandala Weave',
+    desc: 'Symmetrical patterns from your voice — pitch sets symmetry, vowels shift geometry',
+    visual: 'mandala', behavior: 'radial', synth: 'crystal',
+    voicemap: 'vowel-type', palette: 'rainbow', hue: 0,
+    count: 3000, decay: 0.4, trail: 0.03, shake: '0', bg: 'black', bloom: '1'
+  },
+  {
+    name: 'Nebula Drift',
+    desc: 'Soft glowing cloud that breathes with your voice — volume expands, pitch shifts hue',
+    visual: 'nebula', behavior: 'drift', synth: 'drone',
+    voicemap: 'pitch-color', palette: 'neon', hue: 260,
+    count: 6000, decay: 0.2, trail: 0.03, shake: '0', bg: 'void', bloom: '1'
+  }
+];
+
+// ---- BUILD PRESET CARDS ----
+var presetGrid = document.getElementById('presets');
+PRESETS.forEach(function(pr, idx) {
+  var card = document.createElement('div');
+  card.className = 'preset-card';
+  card.innerHTML = '<h3>' + pr.name + '</h3><p>' + pr.desc + '</p>';
+  card.onclick = function() { launchWithConfig(pr); };
+  presetGrid.appendChild(card);
+});
+
+// ---- UI WIRING ----
+var rangeIds = [
+  ['p_hue','hueVal'],['p_count','countVal'],
+  ['p_decay','decayVal'],['p_trail','trailVal']
+];
+rangeIds.forEach(function(pair) {
+  var el = document.getElementById(pair[0]);
+  el.oninput = function() { document.getElementById(pair[1]).textContent = el.value; };
+});
+
+document.getElementById('btnLaunch').onclick = function() {
+  launchWithConfig(readCustomConfig());
+};
+
+function readCustomConfig() {
+  return {
+    visual: document.getElementById('p_visual').value,
+    behavior: document.getElementById('p_behavior').value,
+    synth: document.getElementById('p_synth').value,
+    voicemap: document.getElementById('p_voicemap').value,
+    palette: document.getElementById('p_palette').value,
+    hue: parseInt(document.getElementById('p_hue').value),
+    count: parseInt(document.getElementById('p_count').value),
+    decay: parseFloat(document.getElementById('p_decay').value),
+    trail: parseFloat(document.getElementById('p_trail').value),
+    shake: document.getElementById('p_shake').value,
+    bg: document.getElementById('p_bg').value,
+    bloom: document.getElementById('p_bloom').value
+  };
+}
+
+// also accept URL params: ?preset=0 or ?visual=beam&synth=charge&...
+(function checkUrlParams() {
+  var u = new URLSearchParams(window.location.search);
+  if (u.has('preset')) {
+    var idx = parseInt(u.get('preset'));
+    if (PRESETS[idx]) { setTimeout(function(){ launchWithConfig(PRESETS[idx]); }, 100); return; }
+  }
+  if (u.has('visual')) {
+    var cfg = {};
+    ['visual','behavior','synth','voicemap','palette','hue','count','decay','trail','shake','bg','bloom'].forEach(function(k){
+      if (u.has(k)) cfg[k] = u.get(k);
+    });
+    cfg.hue = parseInt(cfg.hue || 180);
+    cfg.count = parseInt(cfg.count || 3000);
+    cfg.decay = parseFloat(cfg.decay || 0.5);
+    cfg.trail = parseFloat(cfg.trail || 0.08);
+    setTimeout(function(){ launchWithConfig(cfg); }, 100);
+  }
+})();
+
+// ============================================================
+//  CORE ENGINE
+// ============================================================
+
+var canvas, ctx, W, H;
+var audioCtx, analyser, timeData, freqData, stream;
+var SAMPLE_RATE = 44100, FFT_SIZE = 2048;
+var running = false;
+var config = null;
+
+// Voice state
+var voice = {
+  rms: 0, f0: 0, pitchNorm: 0,
+  centroid: 0, f1: 0, f2: 0, vowel: '',
+  isSounding: false, noiseFloor: 0.01,
+  energy: 0, coherence: 0, sustainTime: 0,
+  prevF0: 0, pitchDelta: 0, pitchDeltaSmooth: 0,
+  prevRms: 0, rmsDelta: 0, rmsDeltaSmooth: 0,
+  onsetTimes: [], pulseRate: 0, lastAmp: 0
+};
+
+// Particles
+var particles = [];
+var sparkParticles = [];
+
+// Synth nodes
+var synthNodes = {};
+
+// Screen shake
+var screenShake = 0;
+
+// Body joints (for body mode)
+var bodyJoints = null;
+var bodyBones = null;
+
+// Mandala symmetry
+var mandalaSymmetry = 6;
+
+// Animation
+var lastTime = 0;
+
+function launchWithConfig(cfg) {
+  config = cfg;
+  document.getElementById('launcher').classList.add('hidden');
+  document.getElementById('hud').classList.add('show');
+  document.getElementById('btnBack').classList.add('show');
+  initCanvas();
+  initAudio();
+}
+
+function backToLauncher() {
+  running = false;
+  if (stream) { stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+  destroySynths();
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  particles = []; sparkParticles = [];
+  bodyJoints = null; bodyBones = null;
+  document.getElementById('launcher').classList.remove('hidden');
+  document.getElementById('hud').classList.remove('show');
+  document.getElementById('btnBack').classList.remove('show');
+}
+
+// ---- CANVAS ----
+function initCanvas() {
+  canvas = document.getElementById('c');
+  ctx = canvas.getContext('2d');
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  window.onresize = resize;
+  resize();
+}
+
+// ---- AUDIO INIT ----
+function initAudio() {
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(function(s) {
+    stream = s;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = FFT_SIZE;
+    analyser.smoothingTimeConstant = 0.8;
+    timeData = new Float32Array(analyser.fftSize);
+    freqData = new Float32Array(analyser.frequencyBinCount);
+    var src = audioCtx.createMediaStreamSource(s);
+    src.connect(analyser);
+
+    // calibrate noise floor
+    setTimeout(function() {
+      analyser.getFloatTimeDomainData(timeData);
+      var r = 0;
+      for (var i = 0; i < timeData.length; i++) r += timeData[i] * timeData[i];
+      voice.noiseFloor = Math.sqrt(r / timeData.length) * 1.5 + 0.005;
+    }, 300);
+
+    initSynths();
+    if (config.visual === 'body') initBody();
+
+    running = true;
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
+  }).catch(function(e) {
+    alert('Mic access needed: ' + e.message);
+  });
+}
+
+// ============================================================
+//  VOICE ANALYSIS (reusable core)
+// ============================================================
+
+function analyzeVoice() {
+  analyser.getFloatTimeDomainData(timeData);
+  analyser.getFloatFrequencyData(freqData);
+
+  // RMS
+  var rms = 0;
+  for (var i = 0; i < timeData.length; i++) rms += timeData[i] * timeData[i];
+  rms = Math.sqrt(rms / timeData.length);
+  voice.rmsDelta = rms - voice.prevRms;
+  voice.rmsDeltaSmooth += (voice.rmsDelta - voice.rmsDeltaSmooth) * 0.15;
+  voice.prevRms = rms;
+  voice.rms = rms;
+  voice.isSounding = rms > voice.noiseFloor * 2;
+  voice.energy += (rms - voice.energy) * 0.1;
+
+  // F0
+  voice.prevF0 = voice.f0;
+  voice.f0 = detectF0(timeData, SAMPLE_RATE);
+  voice.pitchNorm = clamp01((voice.f0 - 80) / 720);
+  if (voice.f0 > 0 && voice.prevF0 > 0) {
+    voice.pitchDelta = voice.f0 - voice.prevF0;
+    voice.pitchDeltaSmooth += (voice.pitchDelta - voice.pitchDeltaSmooth) * 0.12;
+  }
+
+  // Sustain & Coherence
+  if (voice.isSounding) {
+    voice.sustainTime += 0.016;
+    if (voice.sustainTime > 0.3) voice.coherence = Math.min(1, voice.coherence + 0.01);
+  } else {
+    voice.sustainTime = 0;
+    voice.coherence *= 0.97;
+  }
+
+  // Spectral centroid
+  voice.centroid = computeCentroid(freqData, SAMPLE_RATE);
+
+  // Formants & vowel
+  var fmt = estimateFormants(freqData, SAMPLE_RATE);
+  voice.f1 = fmt.f1; voice.f2 = fmt.f2;
+  voice.vowel = classifyVowel(fmt.f1, fmt.f2);
+
+  // Onset detection
+  detectOnset(rms, performance.now());
+}
+
+function detectF0(buf, sr) {
+  var size = buf.length, bestCorr = 0, bestLag = 0;
+  var r = 0;
+  for (var i = 0; i < size; i++) r += buf[i] * buf[i];
+  r = Math.sqrt(r / size);
+  if (r < voice.noiseFloor) return 0;
+  var minLag = Math.floor(sr / 1000);
+  var maxLag = Math.floor(sr / 50);
+  for (var lag = minLag; lag < maxLag && lag < size; lag++) {
+    var corr = 0;
+    for (var j = 0; j < size - lag; j++) corr += buf[j] * buf[j + lag];
+    if (corr > bestCorr) { bestCorr = corr; bestLag = lag; }
+  }
+  return bestLag === 0 ? 0 : sr / bestLag;
+}
+
+function computeCentroid(freq, sr) {
+  var num = 0, den = 0, bw = sr / (freq.length * 2);
+  for (var i = 0; i < freq.length; i++) {
+    var mag = Math.pow(10, freq[i] / 20);
+    num += i * bw * mag; den += mag;
+  }
+  return den > 0 ? num / den : 0;
+}
+
+function estimateFormants(freq, sr) {
+  var bw = sr / (freq.length * 2);
+  var sm = new Float32Array(freq.length);
+  for (var i = 2; i < freq.length - 2; i++)
+    sm[i] = (freq[i-2]+freq[i-1]+freq[i]+freq[i+1]+freq[i+2]) / 5;
+  var peaks = [];
+  var lo = Math.floor(200/bw), hi = Math.min(Math.floor(3000/bw), sm.length-1);
+  for (var i = lo+1; i < hi-1; i++) {
+    if (sm[i] > sm[i-1] && sm[i] > sm[i+1] && sm[i] > -60)
+      peaks.push({ f: i*bw, m: sm[i] });
+  }
+  peaks.sort(function(a,b){ return b.m - a.m; });
+  var f1 = 0, f2 = 0;
+  if (peaks.length >= 1) f1 = peaks[0].f;
+  if (peaks.length >= 2) {
+    for (var i = 1; i < peaks.length; i++) {
+      if (Math.abs(peaks[i].f - f1) > 200) { f2 = peaks[i].f; break; }
+    }
+  }
+  if (f1 > f2 && f2 > 0) { var t = f1; f1 = f2; f2 = t; }
+  return { f1: f1, f2: f2 };
+}
+
+function classifyVowel(f1, f2) {
+  if (f1 === 0 || f2 === 0) return '';
+  if (f1 < 400 && f2 > 2000) return 'ee';
+  if (f1 > 400 && f1 < 650 && f2 > 1600) return 'eh';
+  if (f1 > 600 && f2 > 900 && f2 < 1500) return 'ah';
+  if (f1 > 350 && f1 < 600 && f2 < 1100) return 'oh';
+  if (f1 < 400 && f2 < 1000) return 'oo';
+  if (f1 < 350 && f2 < 1200) return 'mm';
+  return '';
+}
+
+function detectOnset(rms, now) {
+  if (rms > voice.lastAmp * 1.8 && rms > voice.noiseFloor * 2)
+    voice.onsetTimes.push(now);
+  voice.lastAmp = rms;
+  while (voice.onsetTimes.length > 0 && now - voice.onsetTimes[0] > 2000)
+    voice.onsetTimes.shift();
+  voice.pulseRate = voice.onsetTimes.length / 2;
+}
+
+function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+
+// ============================================================
+//  COLOR SYSTEM
+// ============================================================
+
+function getHue(pitchNorm) {
+  if (!config) return 180;
+  var p = config.palette;
+  if (p === 'cyan') return 180 + pitchNorm * 30;
+  if (p === 'fire') return pitchNorm * 50; // 0 = red, 50 = yellow
+  if (p === 'rainbow') return pitchNorm * 360;
+  if (p === 'neon') return 260 + pitchNorm * 100;
+  if (p === 'mono') return 0;
+  if (p === 'custom') return config.hue;
+  return 180;
+}
+
+function getSaturation() {
+  if (config && config.palette === 'mono') return 0;
+  return 80;
+}
+
+function particleColor(p) {
+  var sat = getSaturation();
+  return 'hsla(' + p.hue + ',' + sat + '%,70%,' + (p.life * 0.6) + ')';
+}
+
+// ============================================================
+//  PARTICLE SYSTEM
+// ============================================================
+
+function spawnParticles() {
+  if (!voice.isSounding && config.visual !== 'nebula') return;
+
+  var vm = config.voicemap;
+  var rate = 2;
+  if (vm === 'volume-spawn') rate = Math.floor(voice.rms * 400 + 2);
+  else rate = Math.floor(voice.energy * 200 + 3);
+
+  var cx = W / 2, cy = H / 2;
+  var baseSpeed = 1 + voice.energy * 6;
+
+  for (var i = 0; i < rate && particles.length < config.count; i++) {
+    var angle = Math.random() * Math.PI * 2;
+    var speed = baseSpeed * (0.3 + Math.random() * 0.7);
+    var hue = getHue(voice.pitchNorm);
+    var sz = 1.5 + Math.random() * 2.5;
+
+    if (vm === 'pitch-size') sz = 1 + voice.pitchNorm * 5;
+    if (vm === 'pitch-speed') speed = baseSpeed * (0.2 + voice.pitchNorm * 2);
+
+    // vowel variations
+    if (vm === 'vowel-type' && voice.vowel) {
+      var vowelHues = { ah: 0, ee: 120, oh: 200, oo: 270, eh: 50, mm: 310 };
+      hue = vowelHues[voice.vowel] || hue;
+    }
+
+    var p = {
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: sz, life: 1,
+      decay: config.decay * 0.01 * (0.5 + Math.random()),
+      hue: hue + (Math.random() - 0.5) * 20,
+      age: 0,
+      orbitAngle: angle,
+      orbitR: 30 + Math.random() * 80,
+      orbitSpeed: 0.01 + Math.random() * 0.02,
+      zigFreq: 5 + Math.random() * 10,
+      zigPhase: Math.random() * Math.PI * 2,
+      spiralTarget: { x: cx, y: cy }
+    };
+
+    // behavior-specific spawn tweaks
+    if (config.behavior === 'fountain') {
+      p.x = cx + (Math.random() - 0.5) * 60;
+      p.y = H * 0.85;
+      p.vx = (Math.random() - 0.5) * 2;
+      p.vy = -(3 + Math.random() * 5 + voice.energy * 8);
+    }
+
+    particles.push(p);
+  }
+}
+
+function updateParticles(dt) {
+  var cx = W / 2, cy = H / 2;
+  var beh = config.behavior;
+
+  for (var i = particles.length - 1; i >= 0; i--) {
+    var p = particles[i];
+    p.age += dt;
+    p.life -= p.decay;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+
+    if (beh === 'radial') {
+      var curve = 0.002 * (voice.coherence > 0.5 ? 1 : -1);
+      var an = Math.atan2(p.vy, p.vx) + curve;
+      var sp = Math.sqrt(p.vx*p.vx + p.vy*p.vy) * 0.998;
+      p.vx = Math.cos(an) * sp;
+      p.vy = Math.sin(an) * sp;
+      p.x += p.vx; p.y += p.vy;
+    }
+    else if (beh === 'orbital') {
+      p.orbitAngle += p.orbitSpeed;
+      p.orbitR += 0.15;
+      p.x = cx + Math.cos(p.orbitAngle) * p.orbitR;
+      p.y = cy + Math.sin(p.orbitAngle) * p.orbitR;
+    }
+    else if (beh === 'electric') {
+      p.x += p.vx;
+      p.y += p.vy + Math.sin(p.age * p.zigFreq + p.zigPhase) * 2;
+      p.vx *= 0.998; p.vy *= 0.998;
+    }
+    else if (beh === 'spiral') {
+      var dx = p.spiralTarget.x - p.x, dy = p.spiralTarget.y - p.y;
+      var dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist > 1) {
+        var spd = 1 + voice.energy * 3;
+        p.x += (dx/dist) * spd;
+        p.y += (dy/dist) * spd;
+        var perp = Math.atan2(dy, dx) + Math.PI / 2;
+        p.x += Math.cos(perp) * spd * 0.5;
+        p.y += Math.sin(perp) * spd * 0.5;
+      }
+      if (dist < 20) p.life -= 0.05;
+    }
+    else if (beh === 'drift') {
+      p.x += p.vx * 0.4;
+      p.y += p.vy * 0.4;
+      p.vx += (cx - p.x) * 0.00005;
+      p.vy += (cy - p.y) * 0.00005;
+      p.vx *= 0.999; p.vy *= 0.999;
+    }
+    else if (beh === 'fountain') {
+      p.vy += 0.08; // gravity
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.999;
+    }
+  }
+
+  // cap
+  if (particles.length > config.count) {
+    particles.splice(0, particles.length - config.count);
+  }
+}
+
+function drawParticles() {
+  var sat = getSaturation();
+  for (var i = 0; i < particles.length; i++) {
+    var p = particles[i];
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fillStyle = 'hsla(' + Math.floor(p.hue) + ',' + sat + '%,70%,' + (p.life * 0.6) + ')';
+    ctx.fill();
+  }
+}
+
+// ============================================================
+//  SPARK / ZAP SYSTEM
+// ============================================================
+
+function spawnSparks() {
+  if (!voice.isSounding || voice.energy < 0.05) return;
+  if (Math.random() > voice.energy * 0.6) return;
+  var cx = W/2, cy = H/2;
+  var pts = [];
+  var segs = 3 + Math.floor(Math.random() * 5);
+  var ang = Math.random() * Math.PI * 2;
+  var px = cx + (Math.random()-0.5) * 100;
+  var py = cy + (Math.random()-0.5) * 100;
+  for (var s = 0; s <= segs; s++) {
+    pts.push({x: px, y: py});
+    var len = (40 + Math.random() * 80) / segs;
+    ang += (Math.random() - 0.5) * 2;
+    px += Math.cos(ang) * len;
+    py += Math.sin(ang) * len;
+  }
+  sparkParticles.push({
+    points: pts, life: 0.1 + Math.random() * 0.15,
+    width: 0.5 + Math.random() * 2,
+    hue: getHue(voice.pitchNorm) + (Math.random()-0.5) * 40
+  });
+}
+
+function updateAndDrawSparks(dt) {
+  for (var i = sparkParticles.length - 1; i >= 0; i--) {
+    var sp = sparkParticles[i];
+    sp.life -= dt;
+    if (sp.life <= 0) { sparkParticles.splice(i, 1); continue; }
+    ctx.beginPath();
+    ctx.moveTo(sp.points[0].x, sp.points[0].y);
+    for (var j = 1; j < sp.points.length; j++)
+      ctx.lineTo(sp.points[j].x, sp.points[j].y);
+    ctx.strokeStyle = 'hsla(' + Math.floor(sp.hue) + ',80%,80%,' + (sp.life * 4) + ')';
+    ctx.lineWidth = sp.width;
+    ctx.stroke();
+  }
+}
+
+// ============================================================
+//  BEAM VISUAL
+// ============================================================
+
+function drawBeam() {
+  if (!voice.isSounding) return;
+  var cx = W/2, cy = H/2;
+  var power = voice.energy;
+  var beamW = 8 + power * 40;
+  var beamLen = W * 0.35 * power;
+  var t = performance.now() / 1000;
+  var hue = getHue(voice.pitchNorm);
+
+  // draw right beam
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  for (var bx = 0; bx < beamLen; bx += 6) {
+    var wave = Math.sin(bx * 0.06 + t * 15) * beamW * 0.15;
+    var taper = bx < 20 ? bx/20 : 1;
+    ctx.lineTo(cx + bx, cy - beamW * 0.5 * taper + wave);
+  }
+  for (var bx = beamLen; bx >= 0; bx -= 6) {
+    var wave = Math.sin(bx * 0.06 + t * 15 + 1) * beamW * 0.15;
+    var taper = bx < 20 ? bx/20 : 1;
+    ctx.lineTo(cx + bx, cy + beamW * 0.5 * taper + wave);
+  }
+  ctx.closePath();
+  var bg = ctx.createLinearGradient(cx, cy, cx + beamLen, cy);
+  bg.addColorStop(0, 'hsla(' + hue + ',90%,90%,' + power + ')');
+  bg.addColorStop(0.3, 'hsla(' + hue + ',80%,70%,' + power * 0.7 + ')');
+  bg.addColorStop(1, 'hsla(' + hue + ',70%,50%,' + power * 0.2 + ')');
+  ctx.fillStyle = bg;
+  ctx.fill();
+
+  // core glow
+  var gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, 30 + power * 30);
+  gr.addColorStop(0, 'rgba(255,255,255,' + power * 0.5 + ')');
+  gr.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = gr;
+  ctx.fillRect(cx - 80, cy - 80, 160, 160);
+
+  screenShake = Math.max(screenShake, power * parseInt(config.shake) * 3);
+}
+
+// ============================================================
+//  WAVEFORM VISUAL
+// ============================================================
+
+function drawWaveform() {
+  var hue = getHue(voice.pitchNorm);
+  var sat = getSaturation();
+  var thick = 2 + voice.energy * 8;
+  var amp = H * 0.15 * (1 + voice.energy * 3);
+
+  ctx.beginPath();
+  ctx.lineWidth = thick;
+  ctx.strokeStyle = 'hsla(' + hue + ',' + sat + '%,60%,0.8)';
+  for (var i = 0; i < timeData.length; i++) {
+    var x = (i / timeData.length) * W;
+    var y = H / 2 + timeData[i] * amp;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // mirror
+  ctx.beginPath();
+  ctx.lineWidth = thick * 0.6;
+  ctx.strokeStyle = 'hsla(' + ((hue + 60) % 360) + ',' + sat + '%,50%,0.4)';
+  for (var i = 0; i < timeData.length; i++) {
+    var x = (i / timeData.length) * W;
+    var y = H / 2 - timeData[i] * amp * 0.7;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // frequency bars at bottom
+  var barW = W / 64;
+  for (var i = 0; i < 64; i++) {
+    var mag = Math.pow(10, freqData[i * 4] / 20) * 2;
+    var bh = mag * H * 0.3;
+    ctx.fillStyle = 'hsla(' + (hue + i * 3) + ',' + sat + '%,60%,0.4)';
+    ctx.fillRect(i * barW, H - bh, barW - 1, bh);
+  }
+}
+
+// ============================================================
+//  MANDALA VISUAL
+// ============================================================
+
+function drawMandala() {
+  var cx = W/2, cy = H/2;
+  var hue = getHue(voice.pitchNorm);
+  var sat = getSaturation();
+  var t = performance.now() / 1000;
+
+  // symmetry from vowel
+  if (voice.vowel === 'ah') mandalaSymmetry = 3;
+  else if (voice.vowel === 'ee') mandalaSymmetry = 8;
+  else if (voice.vowel === 'oh') mandalaSymmetry = 6;
+  else if (voice.vowel === 'oo') mandalaSymmetry = 12;
+  else if (voice.vowel === 'eh') mandalaSymmetry = 5;
+  var sym = mandalaSymmetry;
+
+  if (!voice.isSounding && voice.energy < 0.01) return;
+
+  var layers = 4 + Math.floor(voice.energy * 6);
+  for (var L = 0; L < layers; L++) {
+    var r = 30 + L * (20 + voice.energy * 30);
+    var layerHue = (hue + L * 30) % 360;
+    var alpha = 0.3 + voice.energy * 0.5;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    for (var s = 0; s < sym; s++) {
+      ctx.rotate(Math.PI * 2 / sym);
+      var wobble = Math.sin(t * 2 + L * 0.5) * voice.energy * 10;
+
+      // petal shape
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      var cp1x = r * 0.3, cp1y = -r * 0.3 + wobble;
+      var cp2x = r * 0.6, cp2y = -r * 0.15;
+      var ex = r + wobble * 0.5, ey = 0;
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, ex, ey);
+      ctx.bezierCurveTo(cp2x, -cp2y, cp1x, -cp1y, 0, 0);
+      ctx.fillStyle = 'hsla(' + layerHue + ',' + sat + '%,60%,' + (alpha * 0.3) + ')';
+      ctx.strokeStyle = 'hsla(' + layerHue + ',' + sat + '%,70%,' + alpha + ')';
+      ctx.lineWidth = 1;
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // center glow
+  var gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, 40 + voice.energy * 40);
+  gr.addColorStop(0, 'hsla(' + hue + ',80%,80%,' + voice.energy * 0.6 + ')');
+  gr.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = gr;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 60 + voice.energy * 40, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ============================================================
+//  NEBULA VISUAL (soft cloud particles)
+// ============================================================
+
+function drawNebula() {
+  // nebula uses large soft circles
+  for (var i = 0; i < particles.length; i++) {
+    var p = particles[i];
+    var r = p.size * 8 * p.life;
+    if (r < 1) continue;
+    var gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+    gr.addColorStop(0, 'hsla(' + Math.floor(p.hue) + ',60%,50%,' + (p.life * 0.08) + ')');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gr;
+    ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+  }
+}
+
+// ============================================================
+//  BODY VISUAL
+// ============================================================
+
+var BODY_JOINT_DEFS = [
+  {n:'head',x:0,y:-0.38},{n:'neck',x:0,y:-0.3},
+  {n:'chest',x:0,y:-0.2},{n:'belly',x:0,y:-0.05},{n:'hips',x:0,y:0.05},
+  {n:'shoulderL',x:-0.12,y:-0.26},{n:'elbowL',x:-0.2,y:-0.14},
+  {n:'handL',x:-0.26,y:-0.02},
+  {n:'shoulderR',x:0.12,y:-0.26},{n:'elbowR',x:0.2,y:-0.14},
+  {n:'handR',x:0.26,y:-0.02},
+  {n:'hipL',x:-0.06,y:0.08},{n:'kneeL',x:-0.07,y:0.22},{n:'footL',x:-0.08,y:0.36},
+  {n:'hipR',x:0.06,y:0.08},{n:'kneeR',x:0.07,y:0.22},{n:'footR',x:0.08,y:0.36},
+  {n:'crown',x:0,y:-0.44},{n:'eyeL',x:-0.03,y:-0.4},{n:'eyeR',x:0.03,y:-0.4},
+  {n:'jaw',x:0,y:-0.34}
+];
+
+var BODY_BONE_DEFS = [
+  [0,1],[1,2],[2,3],[3,4], // spine
+  [2,5],[5,6],[6,7],       // left arm
+  [2,8],[8,9],[9,10],      // right arm
+  [4,11],[11,12],[12,13],  // left leg
+  [4,14],[14,15],[15,16],  // right leg
+  [0,17],[0,18],[0,19],[1,20] // head details
+];
+
+function initBody() {
+  bodyJoints = BODY_JOINT_DEFS.map(function(jd) {
+    return {
+      name: jd.n,
+      baseX: jd.x, baseY: jd.y,
+      x: W/2 + jd.x * H * 0.4,
+      y: H/2 + jd.y * H * 0.4,
+      built: 0 // 0-1 how visible
+    };
+  });
+  bodyBones = BODY_BONE_DEFS;
+}
+
+function updateBody() {
+  if (!bodyJoints) return;
+  var cx = W/2, cy = H/2, scale = H * 0.4;
+
+  // pitch zones build different parts
+  var zone = voice.pitchNorm < 0.3 ? 'low' : voice.pitchNorm < 0.6 ? 'mid' : 'high';
+  var buildRate = voice.isSounding ? 0.008 : -0.002;
+
+  for (var i = 0; i < bodyJoints.length; i++) {
+    var j = bodyJoints[i];
+    // determine which zone this joint belongs to
+    var jZone = j.baseY > 0 ? 'low' : j.baseY > -0.25 ? 'mid' : 'high';
+    if (jZone === zone && voice.isSounding) {
+      j.built = Math.min(1, j.built + Math.abs(buildRate) * 2);
+    } else if (voice.isSounding) {
+      j.built = Math.min(1, j.built + Math.abs(buildRate) * 0.3);
+    } else {
+      j.built = Math.max(0, j.built + buildRate);
+    }
+
+    // breathe / sway
+    var t = performance.now() / 1000;
+    var breathX = Math.sin(t * 0.8 + i * 0.3) * 3 * voice.energy;
+    var breathY = Math.sin(t * 1.2 + i * 0.5) * 2 * voice.energy;
+    j.x = cx + j.baseX * scale + breathX;
+    j.y = cy + j.baseY * scale + breathY;
+  }
+}
+
+function drawBody() {
+  if (!bodyJoints) return;
+  var hue = getHue(voice.pitchNorm);
+  var sat = getSaturation();
+
+  // draw bones
+  for (var i = 0; i < bodyBones.length; i++) {
+    var a = bodyJoints[bodyBones[i][0]];
+    var b = bodyJoints[bodyBones[i][1]];
+    var alpha = Math.min(a.built, b.built);
+    if (alpha < 0.05) continue;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = 'hsla(' + hue + ',' + sat + '%,60%,' + (alpha * 0.5) + ')';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // draw joints
+  for (var i = 0; i < bodyJoints.length; i++) {
+    var j = bodyJoints[i];
+    if (j.built < 0.05) continue;
+    var r = 3 + j.built * 5;
+    ctx.beginPath();
+    ctx.arc(j.x, j.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'hsla(' + hue + ',' + sat + '%,70%,' + (j.built * 0.7) + ')';
+    ctx.fill();
+
+    // glow
+    var gr = ctx.createRadialGradient(j.x, j.y, 0, j.x, j.y, r * 3);
+    gr.addColorStop(0, 'hsla(' + hue + ',' + sat + '%,80%,' + (j.built * 0.2) + ')');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gr;
+    ctx.fillRect(j.x - r*3, j.y - r*3, r*6, r*6);
+  }
+
+  // spawn body particles near built joints
+  if (voice.isSounding) {
+    for (var i = 0; i < bodyJoints.length; i++) {
+      var j = bodyJoints[i];
+      if (j.built > 0.3 && Math.random() < voice.energy * 0.3 && particles.length < config.count) {
+        particles.push({
+          x: j.x + (Math.random()-0.5) * 20,
+          y: j.y + (Math.random()-0.5) * 20,
+          vx: (Math.random()-0.5) * 1.5,
+          vy: (Math.random()-0.5) * 1.5 - 0.5,
+          size: 1 + Math.random() * 2,
+          life: 1,
+          decay: 0.015 + Math.random() * 0.01,
+          hue: hue + (Math.random()-0.5) * 30,
+          age: 0,
+          orbitAngle: 0, orbitR: 0, orbitSpeed: 0,
+          zigFreq: 0, zigPhase: 0,
+          spiralTarget: {x: W/2, y: H/2}
+        });
+      }
+    }
+  }
+}
+
+// ============================================================
+//  BLOOM / GLOW POST-PROCESS
+// ============================================================
+
+function drawBloom() {
+  if (config.bloom !== '1') return;
+  var alpha = 0.08 + voice.energy * 0.15;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.filter = 'blur(12px)';
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(canvas, 0, 0);
+  ctx.restore();
+  ctx.filter = 'none';
+}
+
+// ============================================================
+//  SYNTH ENGINE
+// ============================================================
+
+function initSynths() {
+  if (!audioCtx || config.synth === 'none') return;
+  var master = audioCtx.createGain();
+  master.gain.value = 0.12;
+  master.connect(audioCtx.destination);
+  synthNodes.master = master;
+
+  if (config.synth === 'drone') {
+    var osc1 = audioCtx.createOscillator();
+    osc1.type = 'sine'; osc1.frequency.value = 110;
+    var osc2 = audioCtx.createOscillator();
+    osc2.type = 'triangle'; osc2.frequency.value = 165;
+    var g1 = audioCtx.createGain(); g1.gain.value = 0;
+    var g2 = audioCtx.createGain(); g2.gain.value = 0;
+    osc1.connect(g1); g1.connect(master);
+    osc2.connect(g2); g2.connect(master);
+    osc1.start(); osc2.start();
+    synthNodes.droneOsc1 = osc1; synthNodes.droneOsc2 = osc2;
+    synthNodes.droneGain1 = g1; synthNodes.droneGain2 = g2;
+  }
+  else if (config.synth === 'charge') {
+    // charge hum
+    var chargeOsc = audioCtx.createOscillator();
+    chargeOsc.type = 'sine'; chargeOsc.frequency.value = 80;
+    var chargeFilt = audioCtx.createBiquadFilter();
+    chargeFilt.type = 'lowpass'; chargeFilt.frequency.value = 400; chargeFilt.Q.value = 5;
+    var chargeG = audioCtx.createGain(); chargeG.gain.value = 0;
+    chargeOsc.connect(chargeFilt); chargeFilt.connect(chargeG); chargeG.connect(master);
+    chargeOsc.start();
+    synthNodes.chargeOsc = chargeOsc; synthNodes.chargeGain = chargeG; synthNodes.chargeFilt = chargeFilt;
+
+    // zap
+    var zapOsc = audioCtx.createOscillator();
+    zapOsc.type = 'sawtooth'; zapOsc.frequency.value = 2000;
+    var zapFilt = audioCtx.createBiquadFilter();
+    zapFilt.type = 'bandpass'; zapFilt.frequency.value = 3000; zapFilt.Q.value = 1;
+    var zapG = audioCtx.createGain(); zapG.gain.value = 0;
+    zapOsc.connect(zapFilt); zapFilt.connect(zapG); zapG.connect(master);
+    zapOsc.start();
+    synthNodes.zapOsc = zapOsc; synthNodes.zapGain = zapG;
+  }
+  else if (config.synth === 'choir') {
+    // 3 oscillators for vowel-like tones
+    synthNodes.choirOscs = [];
+    synthNodes.choirGains = [];
+    var types = ['sine','triangle','sine'];
+    var freqs = [220, 330, 440];
+    for (var i = 0; i < 3; i++) {
+      var o = audioCtx.createOscillator();
+      o.type = types[i]; o.frequency.value = freqs[i];
+      var g = audioCtx.createGain(); g.gain.value = 0;
+      o.connect(g); g.connect(master);
+      o.start();
+      synthNodes.choirOscs.push(o);
+      synthNodes.choirGains.push(g);
+    }
+  }
+  else if (config.synth === 'bass') {
+    var bassOsc = audioCtx.createOscillator();
+    bassOsc.type = 'sine'; bassOsc.frequency.value = 40;
+    var bassG = audioCtx.createGain(); bassG.gain.value = 0;
+    bassOsc.connect(bassG); bassG.connect(master);
+    bassOsc.start();
+    synthNodes.bassOsc = bassOsc; synthNodes.bassGain = bassG;
+  }
+  else if (config.synth === 'crystal') {
+    // High bell-like with sharp envelope
+    synthNodes.crystalPool = []; // reusable one-shots
+    synthNodes.crystalMaster = master;
+    synthNodes.lastCrystal = 0;
+  }
+}
+
+function updateSynths() {
+  if (!audioCtx || config.synth === 'none') return;
+  var now = audioCtx.currentTime;
+  var e = voice.energy;
+  var pn = voice.pitchNorm;
+
+  if (config.synth === 'drone') {
+    var vol = voice.isSounding ? e * 0.15 : 0;
+    var f1 = 80 + pn * 200;
+    synthNodes.droneOsc1.frequency.linearRampToValueAtTime(f1, now + 0.1);
+    synthNodes.droneOsc2.frequency.linearRampToValueAtTime(f1 * 1.5, now + 0.1);
+    synthNodes.droneGain1.gain.linearRampToValueAtTime(vol, now + 0.1);
+    synthNodes.droneGain2.gain.linearRampToValueAtTime(vol * 0.6, now + 0.1);
+  }
+  else if (config.synth === 'charge') {
+    var cFreq = 80 + e * 400;
+    synthNodes.chargeOsc.frequency.linearRampToValueAtTime(cFreq, now + 0.1);
+    synthNodes.chargeGain.gain.linearRampToValueAtTime(voice.isSounding ? e * 0.15 : 0, now + 0.1);
+    // zap crackle
+    var zapVol = (e > 0.1 && voice.isSounding) ? (Math.random() < e * 0.4 ? e * 0.06 : 0) : 0;
+    synthNodes.zapGain.gain.linearRampToValueAtTime(zapVol, now + 0.02);
+    synthNodes.zapOsc.frequency.linearRampToValueAtTime(1500 + Math.random() * 3000, now + 0.05);
+  }
+  else if (config.synth === 'choir') {
+    var vol = voice.isSounding ? e * 0.08 : 0;
+    // Map vowel to chord
+    var chords = {
+      ah: [220, 275, 330], ee: [330, 415, 520],
+      oh: [165, 220, 330], oo: [110, 165, 220],
+      eh: [260, 330, 390], mm: [110, 220, 330]
+    };
+    var ch = chords[voice.vowel] || [220, 330, 440];
+    for (var i = 0; i < 3; i++) {
+      synthNodes.choirOscs[i].frequency.linearRampToValueAtTime(ch[i], now + 0.15);
+      synthNodes.choirGains[i].gain.linearRampToValueAtTime(vol, now + 0.1);
+    }
+  }
+  else if (config.synth === 'bass') {
+    var bF = 30 + pn * 50;
+    synthNodes.bassOsc.frequency.linearRampToValueAtTime(bF, now + 0.1);
+    synthNodes.bassGain.gain.linearRampToValueAtTime(voice.isSounding ? e * 0.2 : 0, now + 0.1);
+  }
+  else if (config.synth === 'crystal') {
+    // trigger chime on onsets
+    if (voice.onsetTimes.length > 0 && now - synthNodes.lastCrystal > 0.15) {
+      synthNodes.lastCrystal = now;
+      var freq = 800 + pn * 2000;
+      var o = audioCtx.createOscillator();
+      o.type = 'sine'; o.frequency.value = freq;
+      var g = audioCtx.createGain();
+      g.gain.setValueAtTime(0.1, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      o.connect(g); g.connect(synthNodes.crystalMaster);
+      o.start(now); o.stop(now + 0.5);
+    }
+  }
+}
+
+function destroySynths() {
+  // stop all oscillators
+  ['droneOsc1','droneOsc2','chargeOsc','zapOsc','bassOsc'].forEach(function(k) {
+    if (synthNodes[k]) try { synthNodes[k].stop(); } catch(e){}
+  });
+  if (synthNodes.choirOscs) {
+    synthNodes.choirOscs.forEach(function(o) { try { o.stop(); } catch(e){} });
+  }
+  synthNodes = {};
+}
+
+// ============================================================
+//  MAIN LOOP
+// ============================================================
+
+function loop(ts) {
+  if (!running) return;
+  var dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+
+  analyzeVoice();
+  updateSynths();
+
+  // background
+  var bg = config.bg;
+  if (bg === 'black') {
+    ctx.fillStyle = 'rgba(0,0,0,' + config.trail + ')';
+  } else if (bg === 'dark') {
+    ctx.fillStyle = 'rgba(5,5,20,' + config.trail + ')';
+  } else { // void
+    ctx.fillStyle = 'rgba(2,0,8,' + config.trail + ')';
+  }
+  ctx.fillRect(0, 0, W, H);
+
+  // screen shake
+  var shakeLevel = parseInt(config.shake);
+  if (voice.isSounding && voice.energy > 0.15) {
+    screenShake = Math.max(screenShake, voice.energy * shakeLevel * 2);
+  }
+  var shX = 0, shY = 0;
+  if (screenShake > 0.5) {
+    shX = (Math.random() - 0.5) * screenShake * 2;
+    shY = (Math.random() - 0.5) * screenShake * 2;
+  }
+  ctx.save();
+  ctx.translate(shX, shY);
+
+  // VISUAL MODES
+  var vis = config.visual;
+
+  if (vis === 'particles' || vis === 'nebula') {
+    spawnParticles();
+    updateParticles(dt);
+    if (vis === 'nebula') drawNebula();
+    else drawParticles();
+    if (config.behavior === 'electric') {
+      spawnSparks();
+      updateAndDrawSparks(dt);
+    }
+  }
+  else if (vis === 'beam') {
+    spawnParticles();
+    updateParticles(dt);
+    drawParticles();
+    drawBeam();
+    spawnSparks();
+    updateAndDrawSparks(dt);
+  }
+  else if (vis === 'body') {
+    updateBody();
+    drawBody();
+    updateParticles(dt);
+    drawParticles();
+  }
+  else if (vis === 'waveform') {
+    drawWaveform();
+  }
+  else if (vis === 'mandala') {
+    drawMandala();
+    // also spawn some accent particles
+    spawnParticles();
+    updateParticles(dt);
+    drawParticles();
+  }
+
+  ctx.restore();
+  screenShake *= 0.92;
+
+  // bloom
+  drawBloom();
+
+  // HUD
+  var hudText = config.visual.toUpperCase();
+  if (voice.isSounding) {
+    hudText += ' | ' + Math.round(voice.f0) + 'Hz';
+    if (voice.vowel) hudText += ' [' + voice.vowel.toUpperCase() + ']';
+    hudText += ' | E:' + voice.energy.toFixed(2);
+  }
+  hudText += ' | ' + particles.length + 'p';
+  document.getElementById('hudText').textContent = hudText;
+
+  requestAnimationFrame(loop);
+}
+
+// ============================================================
+//  PUBLIC API — AudioFabric.create() for programmatic use
+// ============================================================
+
+window.AudioFabric = {
+  /** Launch with a config object, same keys as presets */
+  create: function(cfg) {
+    // fill defaults
+    var defaults = {
+      visual: 'particles', behavior: 'radial', synth: 'none',
+      voicemap: 'pitch-color', palette: 'cyan', hue: 180,
+      count: 3000, decay: 0.5, trail: 0.08,
+      shake: '0', bg: 'black', bloom: '1'
+    };
+    for (var k in defaults) {
+      if (!(k in cfg)) cfg[k] = defaults[k];
+    }
+    launchWithConfig(cfg);
+  },
+
+  /** Stop and return to launcher */
+  stop: function() { backToLauncher(); },
+
+  /** Get current voice state (for external integrations) */
+  getVoice: function() { return voice; },
+
+  /** Get presets list */
+  getPresets: function() { return PRESETS; },
+
+  /** Launch a preset by index */
+  preset: function(idx) {
+    if (PRESETS[idx]) launchWithConfig(PRESETS[idx]);
+  }
+};
+
+</script>
+</body>
+</html>
