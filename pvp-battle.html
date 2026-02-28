@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOICE BEAM BATTLE</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Courier New',monospace}
+canvas{display:block}
+#hud-top{position:fixed;top:0;left:0;right:0;height:50px;z-index:10;display:none;pointer-events:none}
+#hp-bar-1{position:absolute;top:12px;left:20px;width:35%;height:16px;background:rgba(255,255,255,0.05);border:1px solid rgba(80,160,255,0.2);border-radius:2px;overflow:hidden}
+#hp-fill-1{height:100%;width:100%;background:linear-gradient(90deg,#0055ff,#44aaff);transition:width 0.3s;border-radius:1px}
+#hp-bar-2{position:absolute;top:12px;right:20px;width:35%;height:16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,60,60,0.2);border-radius:2px;overflow:hidden;direction:rtl}
+#hp-fill-2{height:100%;width:100%;background:linear-gradient(90deg,#ff4444,#ff8844);transition:width 0.3s;border-radius:1px}
+#p1-name{position:absolute;top:14px;left:calc(35% + 30px);font-size:11px;color:rgba(80,160,255,0.4);font-weight:700}
+#p2-name{position:absolute;top:14px;right:calc(35% + 30px);font-size:11px;color:rgba(255,80,80,0.4);font-weight:700;text-align:right}
+#score{position:absolute;top:32px;left:50%;transform:translateX(-50%);font-size:14px;color:rgba(255,255,255,0.15);font-weight:700;letter-spacing:4px}
+#clash-label{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:Impact,'Arial Black',sans-serif;font-size:clamp(30px,6vw,60px);color:rgba(255,255,255,0);z-index:15;pointer-events:none;text-align:center;letter-spacing:4px;transition:color 0.2s,text-shadow 0.2s;text-transform:uppercase}
+#clash-label.on{color:rgba(255,220,100,0.8);text-shadow:0 0 30px rgba(255,200,50,0.5),0 0 60px rgba(255,100,50,0.3)}
+#charge-bar-1{position:fixed;bottom:20px;left:20px;width:30%;height:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(80,160,255,0.1);border-radius:4px;z-index:10;overflow:hidden;display:none}
+#charge-fill-1{height:100%;width:0%;background:linear-gradient(90deg,#0044ff,#00ccff,#ffffff);border-radius:3px;transition:width 0.1s}
+#charge-bar-2{position:fixed;bottom:20px;right:20px;width:30%;height:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,60,60,0.1);border-radius:4px;z-index:10;overflow:hidden;display:none;direction:rtl}
+#charge-fill-2{height:100%;width:0%;background:linear-gradient(90deg,#ff0044,#ff8800,#ffffff);border-radius:3px;transition:width 0.1s}
+#status-line{position:fixed;bottom:6px;left:50%;transform:translateX(-50%);font-size:9px;color:rgba(255,255,255,0.08);z-index:10;letter-spacing:2px}
+#start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;background:#000}
+#start h1{font-family:Impact,'Arial Black',sans-serif;font-size:clamp(28px,6vw,56px);font-weight:900;color:rgba(255,200,50,0.6);letter-spacing:4px;text-shadow:0 0 40px rgba(255,150,0,0.15)}
+#start .s{font-size:10px;color:rgba(255,255,255,0.08);letter-spacing:6px;margin:8px 0 6px;text-transform:uppercase}
+#start .desc{font-size:11px;color:rgba(255,200,50,0.12);max-width:440px;text-align:center;line-height:1.9;margin-bottom:24px}
+.join-btns{display:flex;gap:16px;margin-bottom:16px}
+.join-btn{background:none;border:2px solid;font-family:Impact,'Arial Black',sans-serif;font-size:18px;padding:14px 36px;cursor:pointer;letter-spacing:3px;transition:all 0.3s;text-transform:uppercase}
+.join-btn.p1{border-color:rgba(80,160,255,0.3);color:rgba(80,160,255,0.6)}
+.join-btn.p1:hover{border-color:rgba(80,160,255,0.6);color:rgba(80,160,255,1);text-shadow:0 0 20px rgba(80,160,255,0.3)}
+.join-btn.p2{border-color:rgba(255,80,80,0.3);color:rgba(255,80,80,0.6)}
+.join-btn.p2:hover{border-color:rgba(255,80,80,0.6);color:rgba(255,80,80,1);text-shadow:0 0 20px rgba(255,80,80,0.3)}
+#wait-msg{font-size:11px;color:rgba(255,255,255,0.1);margin-top:12px;letter-spacing:2px;display:none}
+</style>
+</head>
+<body>
+<div id="start">
+  <h1>BEAM BATTLE</h1>
+  <div class="s">VOICE PVP</div>
+  <div class="desc">
+    two players. two tabs. one mic each.<br>
+    open this page in two browser tabs.<br>
+    sing to charge. yell to overpower.<br>
+    beams clash in the middle — push your opponent back.<br>
+    more power = the beam pushes toward them.
+  </div>
+  <div class="join-btns">
+    <button class="join-btn p1" onclick="joinAs(1)">PLAYER 1</button>
+    <button class="join-btn p2" onclick="joinAs(2)">PLAYER 2</button>
+  </div>
+  <div id="wait-msg">waiting for opponent...</div>
+</div>
+<canvas id="c"></canvas>
+<div id="hud-top">
+  <div id="hp-bar-1"><div id="hp-fill-1"></div></div>
+  <div id="hp-bar-2"><div id="hp-fill-2"></div></div>
+  <div id="p1-name">P1 BLUE</div>
+  <div id="p2-name">P2 RED</div>
+  <div id="score">0 — 0</div>
+</div>
+<div id="clash-label"></div>
+<div id="charge-bar-1"><div id="charge-fill-1"></div></div>
+<div id="charge-bar-2"><div id="charge-fill-2"></div></div>
+<div id="status-line"></div>
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  BEAM BATTLE — Voice PvP                                         ║
+// ║  Two tabs. Two mics. Beams clash.                                 ║
+// ║  BroadcastChannel for cross-tab communication.                    ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+var c = document.getElementById('c'), ctx = c.getContext('2d');
+var W, H, t = 0, running = false;
+function resize(){ W = c.width = innerWidth; H = c.height = innerHeight; }
+resize(); window.onresize = resize;
+
+// ===== NETWORKING (BroadcastChannel — same browser, cross-tab) =====
+var channel = new BroadcastChannel('beam-battle-pvp');
+var myPlayer = 0; // 1 or 2
+var opponentConnected = false;
+var lastOpponentData = null;
+var opponentTimeout = 0;
+
+// ===== GAME STATE =====
+var PHASE_WAIT = 0, PHASE_READY = 1, PHASE_FIGHT = 2, PHASE_KO = 3;
+var gamePhase = PHASE_WAIT;
+var roundCountdown = 0;
+
+// Player data (index 0=P1, 1=P2)
+var players = [
+  {hp:100, charge:0, firing:false, power:0, score:0, // P1 blue, left
+   color:{r:80,g:160,b:255}, chargeHue:210, beamHue:200,
+   x:0, y:0, handX:0, handY:0, dir:1, name:'P1'},
+  {hp:100, charge:0, firing:false, power:0, score:0, // P2 red, right
+   color:{r:255,g:80,b:80}, chargeHue:0, beamHue:10,
+   x:0, y:0, handX:0, handY:0, dir:-1, name:'P2'}
+];
+
+// Clash state
+var clashActive = false;
+var clashX = 0;        // collision point X (normalized 0-1, 0.5=center)
+var clashIntensity = 0;
+var clashWinner = -1;
+
+// Particles
+var particles = [];
+var sparks = [];
+var clashParticles = [];
+
+// Screen shake
+var screenShake = 0;
+var flashAlpha = 0;
+
+// Audio
+var audioCtx, analyser, micStream;
+var freqData, timeData;
+var FFT_SIZE = 2048;
+var chargeOsc, chargeGain, zapOsc, zapGain, rumbleOsc, rumbleGain;
+var beamNoiseNode, beamGain;
+
+var voice = {
+  rms:0, f0:0, pitchNorm:0, isSounding:false, noiseFloor:0.01,
+  sustainTime:0, energy:0, coherence:0, loudness:0, onset:false, prevRms:0
+};
+
+// ===== COMMS =====
+channel.onmessage = function(e) {
+  var d = e.data;
+  if (d.type === 'join') {
+    if (d.player !== myPlayer) {
+      opponentConnected = true;
+      opponentTimeout = 0;
+      // Send ack
+      channel.postMessage({type:'ack', player:myPlayer});
+      if (gamePhase === PHASE_WAIT) startReady();
+    }
+  } else if (d.type === 'ack') {
+    if (d.player !== myPlayer) {
+      opponentConnected = true;
+      opponentTimeout = 0;
+      if (gamePhase === PHASE_WAIT) startReady();
+    }
+  } else if (d.type === 'state') {
+    if (d.player !== myPlayer) {
+      opponentConnected = true;
+      opponentTimeout = 0;
+      lastOpponentData = d;
+    }
+  }
+};
+
+function sendState() {
+  var me = players[myPlayer-1];
+  channel.postMessage({
+    type: 'state',
+    player: myPlayer,
+    charge: me.charge,
+    firing: me.firing,
+    power: me.power,
+    hp: me.hp,
+    score: me.score,
+    rms: voice.rms,
+    pitchNorm: voice.pitchNorm
+  });
+}
+
+function applyOpponentState() {
+  if (!lastOpponentData) return;
+  var oi = lastOpponentData.player === 1 ? 0 : 1;
+  players[oi].charge = lastOpponentData.charge;
+  players[oi].firing = lastOpponentData.firing;
+  players[oi].power = lastOpponentData.power;
+  players[oi].hp = lastOpponentData.hp;
+  players[oi].score = lastOpponentData.score;
+}
+
+// ===== AUDIO =====
+async function initMic() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  var stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  var source = audioCtx.createMediaStreamSource(stream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = FFT_SIZE;
+  analyser.smoothingTimeConstant = 0.8;
+  source.connect(analyser);
+  freqData = new Float32Array(analyser.frequencyBinCount);
+  timeData = new Float32Array(analyser.fftSize);
+  initSynths();
+}
+
+function initSynths() {
+  var master = audioCtx.createGain();
+  master.gain.value = 0.25;
+  master.connect(audioCtx.destination);
+
+  chargeOsc = audioCtx.createOscillator();
+  chargeOsc.type = 'sine';
+  chargeOsc.frequency.value = 80;
+  chargeGain = audioCtx.createGain();
+  chargeGain.gain.value = 0;
+  var cf = audioCtx.createBiquadFilter();
+  cf.type='lowpass'; cf.frequency.value=500; cf.Q.value=4;
+  chargeOsc.connect(cf); cf.connect(chargeGain); chargeGain.connect(master);
+  chargeOsc.start();
+
+  zapOsc = audioCtx.createOscillator();
+  zapOsc.type = 'sawtooth';
+  zapOsc.frequency.value = 2000;
+  zapGain = audioCtx.createGain();
+  zapGain.gain.value = 0;
+  var zf = audioCtx.createBiquadFilter();
+  zf.type='bandpass'; zf.frequency.value=3000; zf.Q.value=1;
+  zapOsc.connect(zf); zf.connect(zapGain); zapGain.connect(master);
+  zapOsc.start();
+
+  rumbleOsc = audioCtx.createOscillator();
+  rumbleOsc.type = 'sine';
+  rumbleOsc.frequency.value = 25;
+  rumbleGain = audioCtx.createGain();
+  rumbleGain.gain.value = 0;
+  rumbleOsc.connect(rumbleGain); rumbleGain.connect(master);
+  rumbleOsc.start();
+
+  var bufSz = audioCtx.sampleRate * 2;
+  var nb = audioCtx.createBuffer(1, bufSz, audioCtx.sampleRate);
+  var nd = nb.getChannelData(0);
+  for(var i=0;i<bufSz;i++) nd[i]=Math.random()*2-1;
+  beamNoiseNode = audioCtx.createBufferSource();
+  beamNoiseNode.buffer = nb; beamNoiseNode.loop = true;
+  beamGain = audioCtx.createGain(); beamGain.gain.value = 0;
+  var bf = audioCtx.createBiquadFilter();
+  bf.type='bandpass'; bf.frequency.value=1500; bf.Q.value=0.5;
+  beamNoiseNode.connect(bf); bf.connect(beamGain); beamGain.connect(master);
+  beamNoiseNode.start();
+}
+
+function updateSynths() {
+  if(!audioCtx) return;
+  var now = audioCtx.currentTime;
+  var me = players[myPlayer-1];
+
+  if (me.firing || clashActive) {
+    chargeOsc.frequency.linearRampToValueAtTime(400+me.power*600, now+0.05);
+    chargeGain.gain.linearRampToValueAtTime(0.15, now+0.05);
+    beamGain.gain.linearRampToValueAtTime(0.2*me.power, now+0.05);
+    zapOsc.frequency.linearRampToValueAtTime(2000+Math.random()*4000, now+0.02);
+    zapGain.gain.linearRampToValueAtTime(clashActive?0.1:0.05, now+0.02);
+    rumbleGain.gain.linearRampToValueAtTime(0.25*(clashActive?clashIntensity:me.power), now+0.05);
+  } else if (me.charge > 0.01) {
+    chargeOsc.frequency.linearRampToValueAtTime(80+me.charge*300, now+0.1);
+    chargeGain.gain.linearRampToValueAtTime(me.charge*0.12, now+0.1);
+    var zv = me.charge>0.3?(Math.random()<me.charge*0.3?me.charge*0.06:0):0;
+    zapGain.gain.linearRampToValueAtTime(zv, now+0.02);
+    if(me.charge>0.3) zapOsc.frequency.linearRampToValueAtTime(1500+Math.random()*3000*me.charge, now+0.02);
+    rumbleGain.gain.linearRampToValueAtTime(me.charge*0.15, now+0.1);
+    beamGain.gain.linearRampToValueAtTime(0, now+0.1);
+  } else {
+    chargeGain.gain.linearRampToValueAtTime(0, now+0.2);
+    zapGain.gain.linearRampToValueAtTime(0, now+0.1);
+    rumbleGain.gain.linearRampToValueAtTime(0, now+0.2);
+    beamGain.gain.linearRampToValueAtTime(0, now+0.2);
+  }
+}
+
+function triggerZap(){
+  if(!audioCtx)return;
+  var now=audioCtx.currentTime;
+  var o=audioCtx.createOscillator(); o.type='sawtooth';
+  o.frequency.value=3000+Math.random()*5000;
+  var g=audioCtx.createGain();
+  g.gain.setValueAtTime(0.06,now);
+  g.gain.exponentialRampToValueAtTime(0.001,now+0.04+Math.random()*0.04);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(now); o.stop(now+0.08);
+}
+
+// ===== VOICE ANALYSIS =====
+function analyzeVoice() {
+  if(!analyser)return;
+  analyser.getFloatTimeDomainData(timeData);
+  analyser.getFloatFrequencyData(freqData);
+  var sq=0;
+  for(var i=0;i<timeData.length;i++) sq+=timeData[i]*timeData[i];
+  voice.rms = Math.sqrt(sq/timeData.length);
+  var was=voice.isSounding;
+  voice.isSounding = voice.rms > voice.noiseFloor*2;
+  voice.onset = voice.isSounding && !was;
+  voice.sustainTime = voice.isSounding ? voice.sustainTime+0.016 : 0;
+
+  voice.f0=0;
+  if(voice.isSounding){
+    var best=0,bestLag=0;
+    var minL=Math.floor(audioCtx.sampleRate/800);
+    var maxL=Math.floor(audioCtx.sampleRate/60);
+    for(var lag=minL;lag<maxL&&lag<timeData.length/2;lag++){
+      var s=0; for(var j=0;j<timeData.length/2;j++) s+=timeData[j]*timeData[j+lag];
+      if(s>best){best=s;bestLag=lag;}
+    }
+    if(bestLag>0){voice.f0=audioCtx.sampleRate/bestLag;voice.pitchNorm=Math.max(0,Math.min(1,(voice.f0-80)/720));}
+  }
+  voice.energy+=(voice.rms-voice.energy)*0.1;
+  voice.loudness+=(voice.rms-voice.loudness)*0.08;
+  if(voice.isSounding&&voice.sustainTime>0.3)voice.coherence=Math.min(1,voice.coherence+0.01);
+  else voice.coherence*=0.97;
+  voice.prevRms=voice.rms;
+}
+
+// ===== GAME LOGIC =====
+function startReady(){
+  gamePhase = PHASE_READY;
+  roundCountdown = 3.0;
+  document.getElementById('start').style.display='none';
+  document.getElementById('hud-top').style.display='block';
+  document.getElementById('charge-bar-1').style.display='block';
+  document.getElementById('charge-bar-2').style.display='block';
+}
+
+function resetRound(){
+  players[0].hp=100; players[1].hp=100;
+  players[0].charge=0; players[1].charge=0;
+  players[0].firing=false; players[1].firing=false;
+  players[0].power=0; players[1].power=0;
+  clashActive=false; clashX=0.5;
+  particles=[]; sparks=[]; clashParticles=[];
+}
+
+function updateGame(){
+  var dt=0.016;
+  var me = players[myPlayer-1];
+  var opp = players[myPlayer===1?1:0];
+
+  applyOpponentState();
+
+  if(gamePhase===PHASE_READY){
+    roundCountdown -= dt;
+    if(roundCountdown<=0){
+      gamePhase=PHASE_FIGHT;
+      resetRound();
+    }
+    return;
+  }
+
+  if(gamePhase===PHASE_KO){
+    roundCountdown -= dt;
+    if(roundCountdown<=0){
+      gamePhase=PHASE_READY;
+      roundCountdown=3;
+      resetRound();
+    }
+    return;
+  }
+
+  // ===== MY PLAYER LOGIC =====
+  if(voice.isSounding && !me.firing){
+    // Charging
+    var rate = voice.loudness*0.8 + voice.coherence*0.3 + voice.pitchNorm*0.15;
+    me.charge = Math.min(1, me.charge + rate*dt*0.5);
+    me.power = me.charge * (0.5 + voice.loudness*3 + voice.pitchNorm*0.5);
+    me.power = Math.min(2, me.power);
+
+    // Spawn charge particles
+    var sc = Math.floor(2+me.charge*15);
+    for(var i=0;i<sc;i++){
+      var a=Math.random()*Math.PI*2;
+      var d=60+Math.random()*150*(1+me.charge);
+      particles.push({
+        x:me.handX+Math.cos(a)*d, y:me.handY+Math.sin(a)*d,
+        tx:me.handX, ty:me.handY,
+        size:1+Math.random()*2*me.charge,
+        speed:2+Math.random()*4+me.charge*3,
+        life:1, type:'charge', hue:me.chargeHue+Math.random()*30
+      });
+    }
+    if(me.charge>0.3&&Math.random()<me.charge*0.2){spawnZap(me.handX,me.handY,20+me.charge*40,me.beamHue);if(Math.random()<0.1)triggerZap();}
+
+  } else if(!voice.isSounding && me.charge>0.15 && !me.firing){
+    // FIRE
+    me.firing = true;
+    flashAlpha = 0.3+me.charge*0.4;
+    screenShake = me.power*8;
+    for(var z=0;z<5;z++) triggerZap();
+
+  } else if(!voice.isSounding && !me.firing){
+    me.charge *= 0.96;
+    if(me.charge<0.01) me.charge=0;
+    me.power *= 0.95;
+
+  } else if(me.firing){
+    // Sustain beam with voice, decay without
+    if(voice.isSounding){
+      me.power = Math.min(2, me.power + (voice.loudness*2+voice.pitchNorm*0.3)*dt);
+    } else {
+      me.power *= 0.985;
+    }
+    if(me.power<0.05){
+      me.firing=false;
+      me.charge=0;
+      me.power=0;
+    }
+  }
+
+  // ===== CLASH DETECTION =====
+  if(me.firing && opp.firing){
+    clashActive = true;
+    var myPower = me.power;
+    var oppPower = opp.power;
+    var totalPower = myPower + oppPower;
+    clashIntensity = Math.min(1, totalPower * 0.4);
+
+    // Push: whoever has more power pushes the clash point
+    var pushForce = 0;
+    if(totalPower > 0){
+      if(myPlayer===1) pushForce = (myPower-oppPower)/totalPower*0.008;
+      else pushForce = (oppPower-myPower)/totalPower*0.008;
+    }
+    clashX = Math.max(0.08, Math.min(0.92, clashX+pushForce));
+    screenShake = Math.max(screenShake, clashIntensity*6);
+
+    // Clash sparks
+    var clashScreenX = W*clashX;
+    if(Math.random()<clashIntensity*0.6){
+      spawnZap(clashScreenX,H/2,30+clashIntensity*50,40+Math.random()*20);
+      if(Math.random()<0.15)triggerZap();
+    }
+    for(var cp=0;cp<Math.floor(clashIntensity*8);cp++){
+      clashParticles.push({
+        x:clashScreenX+(Math.random()-0.5)*20,
+        y:H/2+(Math.random()-0.5)*20,
+        vx:(Math.random()-0.5)*15,
+        vy:(Math.random()-0.5)*15,
+        size:1+Math.random()*4*clashIntensity,
+        life:0.3+Math.random()*0.4,
+        hue:30+Math.random()*30
+      });
+    }
+
+    // Win condition: push past threshold
+    if(clashX < 0.12){
+      // P1's beam pushed all the way right... but wait, clashX<0.12 means clash is near P1 side
+      // Actually: clashX is screen position. P1 is on left, P2 on right.
+      // clashX < 0.15 means P2 won (pushed to P1's side)
+      players[0].hp -= 30;
+      flashAlpha = 0.8;
+      screenShake = 20;
+      for(var z2=0;z2<10;z2++) triggerZap();
+      clashActive=false; players[0].firing=false; players[1].firing=false;
+      players[0].charge=0; players[1].charge=0;
+      players[0].power=0; players[1].power=0;
+      clashX=0.5;
+      if(players[0].hp<=0){players[1].score++;gamePhase=PHASE_KO;roundCountdown=3;clashWinner=2;}
+    } else if(clashX > 0.88){
+      players[1].hp -= 30;
+      flashAlpha = 0.8;
+      screenShake = 20;
+      for(var z3=0;z3<10;z3++) triggerZap();
+      clashActive=false; players[0].firing=false; players[1].firing=false;
+      players[0].charge=0; players[1].charge=0;
+      players[0].power=0; players[1].power=0;
+      clashX=0.5;
+      if(players[1].hp<=0){players[0].score++;gamePhase=PHASE_KO;roundCountdown=3;clashWinner=1;}
+    }
+
+  } else if(me.firing && !opp.firing){
+    // Uncontested beam hits opponent
+    opp.hp -= dt*15*me.power;
+    if(opp.hp<=0){
+      opp.hp=0;
+      me.score++;
+      gamePhase=PHASE_KO; roundCountdown=3;
+      clashWinner=myPlayer;
+      flashAlpha=0.6; screenShake=15;
+    }
+    clashActive=false;
+  } else if(!me.firing && opp.firing){
+    me.hp -= dt*15*opp.power;
+    if(me.hp<=0){
+      me.hp=0;
+      opp.score++;
+      gamePhase=PHASE_KO; roundCountdown=3;
+      clashWinner=myPlayer===1?2:1;
+      flashAlpha=0.6; screenShake=15;
+    }
+    clashActive=false;
+  } else {
+    clashActive=false;
+    clashX += (0.5-clashX)*0.03;
+  }
+
+  sendState();
+}
+
+function spawnZap(cx,cy,radius,hue){
+  var pts=[];
+  var seg=3+Math.floor(Math.random()*5);
+  var ang=Math.random()*Math.PI*2;
+  var px=cx,py=cy;
+  for(var s=0;s<=seg;s++){
+    pts.push({x:px,y:py});
+    var len=radius*(0.2+Math.random()*0.4)/seg;
+    ang+=(Math.random()-0.5)*2;
+    px+=Math.cos(ang)*len; py+=Math.sin(ang)*len;
+  }
+  sparks.push({points:pts,life:0.1+Math.random()*0.12,width:0.5+Math.random()*2,hue:hue||200});
+}
+
+// ===== DRAW =====
+function draw(){
+  requestAnimationFrame(draw);
+  if(!running){ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);return;}
+  t+=0.016;
+
+  var shX=(Math.random()-0.5)*screenShake*2;
+  var shY=(Math.random()-0.5)*screenShake*2;
+  ctx.save(); ctx.translate(shX,shY);
+  screenShake*=0.94;
+
+  ctx.fillStyle=clashActive?'rgba(0,0,0,0.1)':'rgba(0,0,0,0.07)';
+  ctx.fillRect(-10,-10,W+20,H+20);
+
+  analyzeVoice();
+  if(gamePhase===PHASE_FIGHT||gamePhase===PHASE_KO) updateGame();
+  updateSynths();
+
+  // Positions
+  players[0].x=W*0.15; players[0].y=H/2;
+  players[0].handX=players[0].x+55; players[0].handY=players[0].y;
+  players[1].x=W*0.85; players[1].y=H/2;
+  players[1].handX=players[1].x-55; players[1].handY=players[1].y;
+
+  // ===== DRAW PLAYERS =====
+  for(var pi=0;pi<2;pi++){
+    var p=players[pi];
+    var pc=p.color;
+    var alpha=0.3+(p.charge+p.power)*0.3;
+    var cs='rgba('+pc.r+','+pc.g+','+pc.b+','+alpha+')';
+
+    // Aura
+    if(p.charge>0.1||p.firing){
+      var aR=50+p.charge*80+(p.firing?p.power*40:0);
+      var ag=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,aR);
+      var aa=p.charge*0.06+(p.firing?0.08:0);
+      ag.addColorStop(0,'rgba('+pc.r+','+pc.g+','+pc.b+','+aa+')');
+      ag.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=ag;
+      ctx.fillRect(p.x-aR,p.y-aR,aR*2,aR*2);
+    }
+
+    // Stick figure
+    ctx.strokeStyle=cs; ctx.lineWidth=2; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(p.x,p.y-50,10,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.x,p.y-40); ctx.lineTo(p.x,p.y+8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.x,p.y+8); ctx.lineTo(p.x-12*p.dir,p.y+42); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.x,p.y+8); ctx.lineTo(p.x+8*p.dir,p.y+42); ctx.stroke();
+
+    // Arms in beam pose
+    var ext=p.firing?1:(0.3+p.charge*0.7);
+    ctx.beginPath(); ctx.moveTo(p.x,p.y-28);
+    ctx.lineTo(p.x+20*p.dir*ext,p.y-15);
+    ctx.lineTo(p.handX,p.handY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.x,p.y-28);
+    ctx.lineTo(p.x+20*p.dir*ext,p.y-5);
+    ctx.lineTo(p.handX,p.handY); ctx.stroke();
+
+    // Charge sphere
+    if(p.charge>0.01&&!p.firing){
+      var sr=6+p.charge*35;
+      var pr=sr+Math.sin(t*15)*2*p.charge;
+      var sg=ctx.createRadialGradient(p.handX,p.handY,0,p.handX,p.handY,pr);
+      sg.addColorStop(0,'rgba(255,255,255,'+(0.2+p.charge*0.5)+')');
+      sg.addColorStop(0.4,'rgba('+pc.r+','+pc.g+','+pc.b+','+(p.charge*0.4)+')');
+      sg.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=sg;
+      ctx.beginPath(); ctx.arc(p.handX,p.handY,pr,0,Math.PI*2); ctx.fill();
+    }
+  }
+
+  // ===== DRAW BEAMS =====
+  for(var bi=0;bi<2;bi++){
+    var bp=players[bi];
+    if(!bp.firing)continue;
+    var endX;
+    if(clashActive) endX=W*clashX;
+    else endX=bi===0?W*0.95:W*0.05;
+
+    var bw=8+bp.power*40;
+    var bl=Math.abs(endX-bp.handX);
+    var dirSign=bi===0?1:-1;
+    var startX=bp.handX;
+
+    // Beam body
+    var bg=ctx.createLinearGradient(startX,bp.handY,endX,bp.handY);
+    bg.addColorStop(0,'rgba(255,255,255,'+(bp.power*0.5)+')');
+    bg.addColorStop(0.1,'rgba('+bp.color.r+','+bp.color.g+','+bp.color.b+','+(bp.power*0.4)+')');
+    bg.addColorStop(1,'rgba('+bp.color.r+','+bp.color.g+','+bp.color.b+','+(bp.power*0.15)+')');
+
+    ctx.beginPath();
+    var steps=Math.max(10,Math.floor(bl/10));
+    for(var s=0;s<=steps;s++){
+      var frac=s/steps;
+      var bx=startX+frac*(endX-startX);
+      var wave=Math.sin(frac*20+t*25+bi*3)*bw*0.12;
+      var taper=frac<0.05?frac/0.05:1;
+      ctx.lineTo(bx,bp.handY-bw*0.5*taper+wave);
+    }
+    for(var s2=steps;s2>=0;s2--){
+      var frac2=s2/steps;
+      var bx2=startX+frac2*(endX-startX);
+      var wave2=Math.sin(frac2*20+t*25+bi*3+1)*bw*0.12;
+      var taper2=frac2<0.05?frac2/0.05:1;
+      ctx.lineTo(bx2,bp.handY+bw*0.5*taper2+wave2);
+    }
+    ctx.closePath();
+    ctx.fillStyle=bg; ctx.fill();
+
+    // Core line
+    ctx.beginPath(); ctx.moveTo(startX,bp.handY);
+    for(var s3=0;s3<=steps;s3++){
+      var frac3=s3/steps;
+      var bx3=startX+frac3*(endX-startX);
+      var wave3=Math.sin(frac3*15+t*30)*bw*0.04;
+      ctx.lineTo(bx3,bp.handY+wave3);
+    }
+    ctx.strokeStyle='rgba(255,255,255,'+(bp.power*0.3)+')';
+    ctx.lineWidth=bw*0.1;
+    ctx.stroke();
+
+    // Beam sparks
+    if(Math.random()<bp.power*0.3){
+      var zx=startX+Math.random()*(endX-startX);
+      spawnZap(zx,bp.handY+(Math.random()-0.5)*bw,bw*0.6,bp.beamHue);
+    }
+
+    // Origin glow
+    var og=ctx.createRadialGradient(startX,bp.handY,0,startX,bp.handY,bw*1.2);
+    og.addColorStop(0,'rgba(255,255,255,'+(bp.power*0.3)+')');
+    og.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=og;
+    ctx.fillRect(startX-bw*1.5,bp.handY-bw*1.5,bw*3,bw*3);
+  }
+
+  // ===== CLASH EXPLOSION =====
+  if(clashActive){
+    var csx=W*clashX, csy=H/2;
+    var cr=20+clashIntensity*60;
+    var cg2=ctx.createRadialGradient(csx,csy,0,csx,csy,cr);
+    cg2.addColorStop(0,'rgba(255,255,200,'+(clashIntensity*0.4)+')');
+    cg2.addColorStop(0.3,'rgba(255,150,50,'+(clashIntensity*0.2)+')');
+    cg2.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=cg2;
+    ctx.fillRect(csx-cr,csy-cr,cr*2,cr*2);
+  }
+
+  // ===== PARTICLES =====
+  particles.forEach(function(p){
+    if(p.type==='charge'){
+      var dx=p.tx-p.x, dy=p.ty-p.y;
+      var dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist>1){p.x+=(dx/dist)*p.speed;p.y+=(dy/dist)*p.speed;
+        var perp=Math.atan2(dy,dx)+Math.PI/2;
+        p.x+=Math.cos(perp)*p.speed*0.3;p.y+=Math.sin(perp)*p.speed*0.3;}
+      p.life-=0.015; if(dist<12)p.life-=0.1;
+    }
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+    ctx.fillStyle='hsla('+p.hue+',80%,70%,'+(p.life*0.4)+')';
+    ctx.fill();
+  });
+  particles=particles.filter(function(p){return p.life>0;});
+
+  clashParticles.forEach(function(p){
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.2; p.life-=0.015;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+    ctx.fillStyle='hsla('+p.hue+',90%,60%,'+(p.life*0.4)+')';
+    ctx.fill();
+  });
+  clashParticles=clashParticles.filter(function(p){return p.life>0;});
+
+  sparks.forEach(function(sp){
+    sp.life-=0.016;
+    if(sp.points.length<2)return;
+    ctx.beginPath(); ctx.moveTo(sp.points[0].x,sp.points[0].y);
+    for(var si=1;si<sp.points.length;si++) ctx.lineTo(sp.points[si].x,sp.points[si].y);
+    ctx.strokeStyle='hsla('+sp.hue+',80%,80%,'+(sp.life*3)+')';
+    ctx.lineWidth=sp.width; ctx.stroke();
+    ctx.strokeStyle='hsla('+sp.hue+',60%,90%,'+(sp.life*1.5)+')';
+    ctx.lineWidth=sp.width*3; ctx.globalAlpha=0.3; ctx.stroke(); ctx.globalAlpha=1;
+  });
+  sparks=sparks.filter(function(sp){return sp.life>0;});
+
+  // Flash
+  if(flashAlpha>0.01){
+    ctx.fillStyle='rgba(255,240,200,'+flashAlpha+')';
+    ctx.fillRect(-10,-10,W+20,H+20);
+    flashAlpha*=0.92;
+  }
+
+  ctx.restore();
+
+  // ===== HUD =====
+  document.getElementById('hp-fill-1').style.width=Math.max(0,players[0].hp)+'%';
+  document.getElementById('hp-fill-2').style.width=Math.max(0,players[1].hp)+'%';
+  document.getElementById('charge-fill-1').style.width=Math.round(players[0].charge*100)+'%';
+  document.getElementById('charge-fill-2').style.width=Math.round(players[1].charge*100)+'%';
+  document.getElementById('score').textContent=players[0].score+' \u2014 '+players[1].score;
+
+  var lb=document.getElementById('clash-label');
+  if(gamePhase===PHASE_READY){
+    lb.textContent=Math.ceil(roundCountdown)>0?Math.ceil(roundCountdown):'FIGHT!';
+    lb.className='on';
+  } else if(gamePhase===PHASE_KO){
+    lb.textContent='K.O.! P'+clashWinner+' WINS';
+    lb.className='on';
+  } else if(clashActive){
+    var push=Math.abs(clashX-0.5)*2;
+    if(push>0.5) lb.textContent='PUSHING!!!';
+    else lb.textContent='CLASH!';
+    lb.className='on';
+  } else {
+    lb.textContent=''; lb.className='';
+  }
+
+  var phaseNames=['WAITING','READY','FIGHT','K.O.'];
+  document.getElementById('status-line').textContent=
+    'P'+myPlayer+' \u2022 '+phaseNames[gamePhase]+
+    (opponentConnected?' \u2022 opponent connected':' \u2022 waiting for opponent');
+
+  // Particle limits
+  if(particles.length>3000) particles=particles.slice(-2000);
+  if(clashParticles.length>1000) clashParticles=clashParticles.slice(-800);
+  if(sparks.length>200) sparks=sparks.slice(-150);
+}
+
+// ===== JOIN =====
+async function joinAs(playerNum){
+  myPlayer = playerNum;
+  try{
+    await initMic();
+  }catch(e){alert('Mic required!\n\n'+e.message);return;}
+
+  document.getElementById('wait-msg').style.display='block';
+  document.getElementById('wait-msg').textContent='you are P'+myPlayer+' — waiting for opponent...';
+  running=true;
+
+  // Announce join
+  channel.postMessage({type:'join',player:myPlayer});
+  // Keep announcing until opponent found
+  var announceInt=setInterval(function(){
+    if(opponentConnected){clearInterval(announceInt);return;}
+    channel.postMessage({type:'join',player:myPlayer});
+  },1000);
+
+  draw();
+}
+
+draw();
+</script>
+</body>
+</html>
