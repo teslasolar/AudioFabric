@@ -1,1 +1,310 @@
-test content
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena ULTRA — Modular Voice Combat + Video Chat</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#nick:hover{color:#ff0}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.7),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#score{font-size:28px;color:#ff0;text-shadow:0 0 10px #f80}
+#combo{font-size:16px;color:#f80}
+#blastType{font-size:14px;color:#4af}
+#charge{font-size:12px;color:#0f0}
+#room{font-size:11px;color:#0ff}
+#peers{font-size:11px;color:#088}
+#llmStatus{font-size:10px;color:#555}
+#kanjiHUD{position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:55;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#kanjiHUD.on{opacity:1}
+#kanjiChar{font-size:72px;line-height:1;text-shadow:0 0 30px currentColor,0 0 60px currentColor}
+#kanjiName{font-size:11px;color:#fff8;margin-top:4px}
+#kanjiReading{font-size:9px;color:#fff4}
+#phonemes{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:55;
+  display:none;gap:6px;pointer-events:none}
+#phonemes.on{display:flex}
+.ph{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:48px}
+.ph-label{font-size:10px;font-weight:bold;opacity:0.5;transition:opacity 0.15s}
+.ph.active .ph-label{opacity:1}
+.ph-bar{width:10px;height:60px;background:#111;border:1px solid #fff1;border-radius:5px;
+  position:relative;overflow:hidden}
+.ph-fill{position:absolute;bottom:0;left:0;right:0;border-radius:4px;transition:height 0.08s}
+.ph-kanji{font-size:14px;opacity:0.3;transition:opacity 0.2s}
+.ph.active .ph-kanji{opacity:1}
+#dmgLayer{position:fixed;inset:0;z-index:60;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 8px currentColor;
+  animation:dmgUp 1.2s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}
+  100%{opacity:0;transform:translateY(-120px) scale(1.8)}}
+#cmt{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:70;
+  background:rgba(0,0,0,0.8);border:1px solid #ff0;border-radius:12px;padding:8px 20px;
+  font-size:16px;color:#ff0;text-shadow:0 0 10px #f80;text-align:center;
+  max-width:500px;opacity:0;transition:opacity 0.3s;pointer-events:none}
+#cmt.show{opacity:1}
+#lb{position:fixed;right:10px;top:50%;transform:translateY(-50%);z-index:50;
+  background:rgba(0,0,0,0.75);border:1px solid #ff03;border-radius:8px;padding:10px;
+  min-width:180px;display:none;font-size:11px}
+#lb.on{display:block}
+#lb h3{color:#ff0;font-size:13px;margin-bottom:6px;text-align:center}
+#lb .row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #ff01}
+#lb .row .n{color:#0ff}#lb .row .s{color:#ff0}
+#lb .me{color:#0f0 !important}
+#modBadges{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:55;
+  display:flex;gap:6px;pointer-events:none}
+.mod-badge{background:#0002;border:1px solid #0ff3;border-radius:4px;padding:2px 8px;
+  font-size:9px;color:#0ff8}
+.mod-badge.active{color:#0f0;border-color:#0f04}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l">
+    <div id="score">0</div>
+    <div id="combo"></div>
+    <div id="blastType">—</div>
+    <div id="charge"></div>
+  </div>
+  <div class="hud-r">
+    <div id="nick" onclick="changeNick()" title="Click to change name"></div>
+    <div id="room">ULTRA</div>
+    <div id="peers"></div>
+    <div id="llmStatus"></div>
+  </div>
+</div>
+<div id="kanjiHUD"><div id="kanjiChar">気</div><div id="kanjiName">Spirit</div><div id="kanjiReading">KI</div></div>
+<div id="phonemes"></div>
+<div id="dmgLayer"></div>
+<div id="cmt"></div>
+<div id="lb"><h3>KI ARENA ULTRA</h3><div id="lbRows"></div></div>
+<div id="modBadges"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+// ============================================================
+// KI ARENA ULTRA — Modular Assembly
+// Pick and choose which modules to load!
+// ============================================================
+
+import { KI } from './modules/core.js';
+import * as Scene from './modules/scene.js';
+import * as VoiceEngine from './modules/voice-engine.js';
+import * as Kanji from './modules/kanji.js';
+import * as KiBlasts from './modules/ki-blasts.js';
+import * as Vortex from './modules/vortex.js';
+import * as EmojiSystem from './modules/emoji-system.js';
+import * as FX from './modules/fx.js';
+import * as Synths from './modules/synths.js';
+import * as MqttNet from './modules/mqtt-net.js';
+import * as WebRTCNet from './modules/webrtc-net.js';
+import * as Presence from './modules/presence.js';
+import * as Camera from './modules/camera.js';
+import * as ScreenShare from './modules/screen-share.js';
+import * as Chat from './modules/chat.js';
+
+// === PLAYER SETUP ===
+KI.player.name = KI.genHash();
+window.changeNick = function() {
+  const n = prompt('Enter nickname (max 16):', KI.player.name);
+  if (n && n.trim()) {
+    KI.player.name = n.trim().slice(0, 16);
+    document.getElementById('nick').textContent = KI.player.name;
+    KI.emit('broadcast', { type: 'nick', name: KI.player.name, score: KI.player.score });
+  }
+};
+
+// === HUD WIRING ===
+KI.on('charge:update', data => {
+  document.getElementById('blastType').textContent = data.blastType.name;
+  document.getElementById('charge').textContent = data.chargeLevel > 0.05 ? 'CHARGE: ' + Math.round(data.chargeLevel * 100) + '%' : '';
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const khud = document.getElementById('kanjiHUD');
+  if (KI.voice.vowel && KI.voice.sounding && KANJI[KI.voice.vowel]) {
+    const kj = KANJI[KI.voice.vowel];
+    khud.classList.add('on');
+    document.getElementById('kanjiChar').textContent = kj.char;
+    document.getElementById('kanjiChar').style.color = kj.color;
+    document.getElementById('kanjiName').textContent = kj.name;
+    document.getElementById('kanjiReading').textContent = kj.reading;
+  } else { khud.classList.remove('on'); }
+  updatePhonemes();
+});
+
+KI.on('hit', data => {
+  document.getElementById('score').textContent = KI.player.score.toLocaleString();
+  document.getElementById('combo').textContent = KI.player.combo > 1 ? KI.player.combo + 'x COMBO' : '';
+  showDmg(data.dmg, data.type);
+  if (data.dmg > 300) showCmt(pickCmt('bigHit'));
+  if (data.combo === 5 || data.combo === 10 || data.combo === 20) showCmt(pickCmt('combo'));
+});
+
+KI.on('ko', () => showCmt(pickCmt('ko')));
+
+// === PHONEME UI ===
+function buildPhonemeUI() {
+  const kanji = KI.get('kanji');
+  if (!kanji) return;
+  const cont = document.getElementById('phonemes');
+  kanji.PH_KEYS.forEach(k => {
+    const ph = kanji.PHONEMES[k], kj = kanji.KANJI[k];
+    const d = document.createElement('div'); d.className = 'ph'; d.id = 'ph-' + k;
+    d.innerHTML = '<div class="ph-kanji" style="color:' + ph.color + '">' + kj.char + '</div>' +
+      '<div class="ph-label" style="color:' + ph.color + '">' + ph.label + '</div>' +
+      '<div class="ph-bar"><div class="ph-fill" style="background:' + ph.color + ';height:0%"></div></div>';
+    cont.appendChild(d);
+  });
+}
+
+function updatePhonemes() {
+  const kanji = KI.get('kanji');
+  if (!kanji) return;
+  kanji.PH_KEYS.forEach(k => {
+    const ph = kanji.PHONEMES[k];
+    if (KI.voice.vowel === k && KI.voice.sounding) ph.power = Math.min(1, ph.power + KI.voice.rms * 0.12);
+    else ph.power *= 0.985;
+    const el = document.getElementById('ph-' + k);
+    if (!el) return;
+    el.querySelector('.ph-fill').style.height = (ph.power * 100) + '%';
+    if (KI.voice.vowel === k && KI.voice.sounding) el.classList.add('active'); else el.classList.remove('active');
+  });
+}
+
+// === DAMAGE NUMBERS ===
+function showDmg(amount, type) {
+  const kanji = KI.get('kanji');
+  const blasts = KI.get('ki-blasts');
+  const KANJI = kanji?.KANJI || {};
+  const BLAST_TYPES = blasts?.BLAST_TYPES || {};
+  const el = document.createElement('div'); el.className = 'dmg';
+  const bt = BLAST_TYPES[type];
+  const kj = KANJI[bt?.vowel || 'mm'];
+  el.textContent = (kj ? kj.char + ' ' : '') + Math.round(amount);
+  const c = bt ? '#' + bt.color.toString(16).padStart(6, '0') : '#ff0';
+  el.style.color = c;
+  el.style.fontSize = (18 + Math.min(amount / 10, 30)) + 'px';
+  el.style.left = (KI.W/2 + (Math.random()-0.5)*120) + 'px';
+  el.style.top = (KI.H/2 - 60 + (Math.random()-0.5)*40) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+
+// === COMMENTARY ===
+const CMT = {
+  bigHit: ["INCREDIBLE POWER!", "WHAT A BLAST!", "UNBELIEVABLE FORCE!"],
+  combo: ["UNSTOPPABLE COMBO!", "RELENTLESS!", "KEEP IT GOING!"],
+  ko: ["TARGET DESTROYED!", "OBLITERATED!", "全滅 ANNIHILATION!"]
+};
+function pickCmt(ev) { const a = CMT[ev] || CMT.bigHit; return a[Math.floor(Math.random() * a.length)]; }
+let cmtTimeout = null;
+function showCmt(text) {
+  if (cmtTimeout) return;
+  if (text.length > 80) text = text.slice(0, 80) + '...';
+  const el = document.getElementById('cmt'); el.textContent = text; el.classList.add('show');
+  cmtTimeout = setTimeout(() => { el.classList.remove('show'); cmtTimeout = null; }, 3000);
+}
+
+// === MODULE BADGES ===
+function showModuleBadge(name) {
+  const b = document.createElement('div'); b.className = 'mod-badge active';
+  b.textContent = name.toUpperCase();
+  document.getElementById('modBadges').appendChild(b);
+}
+
+// ============================================================
+// BOOT SEQUENCE — Initialize all modules
+// ============================================================
+async function boot() {
+  document.getElementById('nick').textContent = KI.player.name;
+  document.getElementById('hud').classList.add('on');
+  document.getElementById('lb').classList.add('on');
+  document.getElementById('phonemes').classList.add('on');
+
+  // 1. Scene
+  Scene.init({ stars: 4000 });
+  showModuleBadge('scene');
+
+  // 2. Kanji textures
+  Kanji.init();
+  buildPhonemeUI();
+  showModuleBadge('kanji');
+
+  // 3. Vortex (1500 particles for ULTRA)
+  Vortex.init({ count: 1500, particleSize: 0.12 });
+  showModuleBadge('vortex');
+
+  // 4. Ki Blasts
+  KiBlasts.init();
+  showModuleBadge('blasts');
+
+  // 5. Emoji system
+  EmojiSystem.init();
+  showModuleBadge('emoji');
+
+  // 6. FX
+  FX.init({ aurora: true });
+  showModuleBadge('fx');
+
+  // 7. Synths
+  Synths.init();
+  showModuleBadge('synths');
+
+  // 8. Voice engine
+  try {
+    await VoiceEngine.init();
+    showModuleBadge('voice');
+  } catch (e) {
+    console.warn('Voice init failed:', e);
+  }
+
+  // 9. Networking
+  MqttNet.init({ room: 'ULTRA' });
+  showModuleBadge('mqtt');
+
+  WebRTCNet.init({ room: 'ULTRA' });
+  showModuleBadge('webrtc');
+
+  // 10. Presence
+  Presence.init();
+  showModuleBadge('presence');
+
+  // 11. Camera
+  Camera.init();
+  showModuleBadge('camera');
+
+  // 12. Screen share
+  ScreenShare.init();
+  showModuleBadge('screen');
+
+  // 13. Chat
+  Chat.init();
+  showModuleBadge('chat');
+
+  // === START MAIN LOOP ===
+  KI.running = true;
+  const clock = KI.clock;
+  function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    KI.renderer.render(KI.scene, KI.camera);
+  }
+  animate();
+
+  console.log('%c KI ARENA ULTRA BOOTED ', 'background:#000;color:#0f0;font-size:20px;padding:10px');
+  console.log('Modules loaded:', Object.keys(KI._modules).join(', '));
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
