@@ -460,20 +460,38 @@ function logToolCall(name, args, result) {
   $toolLog.prepend(div);
 }
 
-// ─── Chat ───
+// ─── Chat Formatting ───
+function formatLLMOutput(text) {
+  let s = escHtml(text);
+  // Tool-action code fences → badges (```create /path\n...\n```)
+  s = s.replace(/```\s*(create|edit|delete)\s+(\/[\w\-\.\/]+)\n([\s\S]*?)```/gi,
+    (_, action, path) => `<span class="tool-badge">${action} ${path}</span>`);
+  // Commit fences → badge
+  s = s.replace(/```\s*commit\s+([\s\S]*?)```/gi,
+    (_, msg) => `<span class="tool-badge">commit: ${msg.trim()}</span>`);
+  // List fences → badge
+  s = s.replace(/```\s*list\s*```/gi, '<span class="tool-badge">list files</span>');
+  // Legacy <tool_call> tags → badge
+  s = s.replace(/&lt;tool_call&gt;([\s\S]*?)&lt;\/tool_call&gt;/g,
+    '<span class="tool-badge">tool</span>');
+  // Fuzzy XML tags from small models → badge
+  s = s.replace(/&lt;path&gt;[\s\S]*?&lt;\/path&gt;/gi, '');
+  s = s.replace(/&lt;content&gt;[\s\S]*?&lt;\/content&gt;/gi, '');
+  // Regular code fences → pre
+  s = s.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre>$2</pre>');
+  // Inline code
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Newlines
+  s = s.replace(/\n/g, '<br>');
+  return s;
+}
+
 function addMsg(role, text, emoTag = '') {
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   let senderLabel = role === 'user' ? 'You' : role === 'ai' ? 'AI' : 'System';
   let emoHtml = emoTag ? `<span class="emo-tag" style="background:rgba(255,255,255,.08)">${emoTag}</span>` : '';
-  // Process tool badges in AI text
-  let processed = escHtml(text)
-    .replace(/&lt;tool_call&gt;/g, '<span class="tool-badge">tool_call</span><pre>')
-    .replace(/&lt;\/tool_call&gt;/g, '</pre>')
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre>$2</pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\n/g, '<br>');
-  div.innerHTML = `<div class="sender">${senderLabel}${emoHtml}</div>${processed}`;
+  div.innerHTML = `<div class="sender">${senderLabel}${emoHtml}</div>${formatLLMOutput(text)}`;
   $chatMsgs.appendChild(div);
   $chatMsgs.scrollTop = $chatMsgs.scrollHeight;
   return div;
@@ -482,14 +500,8 @@ function addMsg(role, text, emoTag = '') {
 function addSystemMsg(text) { addMsg('system', text); }
 
 function updateMsgText(div, text) {
-  let processed = escHtml(text)
-    .replace(/&lt;tool_call&gt;/g, '<span class="tool-badge">tool</span><pre>')
-    .replace(/&lt;\/tool_call&gt;/g, '</pre>')
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre>$2</pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\n/g, '<br>');
   const sender = div.querySelector('.sender').outerHTML;
-  div.innerHTML = sender + processed;
+  div.innerHTML = sender + formatLLMOutput(text);
   $chatMsgs.scrollTop = $chatMsgs.scrollHeight;
 }
 
