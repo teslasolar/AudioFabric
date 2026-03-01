@@ -277,60 +277,186 @@ export function executeTool(name, args = {}) {
 }
 
 // ─── Parse Tool Calls from LLM Output ───
-// Expects format: <tool_call>{"name":"...","args":{...}}</tool_call>
+// Robust parser that handles many messy formats from small local models
+const TOOL_NAMES = ['create_file','edit_file','patch_file','read_file','delete_file','list_files','search_files','commit','log','diff','preview'];
+
 export function parseToolCalls(text) {
   const calls = [];
-  // Pattern 1: <tool_call>JSON</tool_call>
-  const tagRe = /<tool_call>([\s\S]*?)<\/tool_call>/g;
   let m;
-  while ((m = tagRe.exec(text)) !== null) {
-    try { calls.push(JSON.parse(m[1].trim())); } catch(e) { /* skip malformed */ }
+
+  // ═══ PRIMARY: ```create /path\ncontent\n``` format (what we teach in system prompt)
+  const createRe = /```\s*create\s+(\/[\w\-\.\/]+)\s*\n([\s\S]*?)```/gi;
+  while ((m = createRe.exec(text)) !== null) {
+    calls.push({ name: 'create_file', args: { path: m[1].trim(), content: m[2].trimEnd() } });
   }
-  // Pattern 2: ```tool\nJSON\n```
-  const fenceRe = /```tool\s*\n([\s\S]*?)\n```/g;
-  while ((m = fenceRe.exec(text)) !== null) {
+  const editRe = /```\s*edit\s+(\/[\w\-\.\/]+)\s*\n([\s\S]*?)```/gi;
+  while ((m = editRe.exec(text)) !== null) {
+    calls.push({ name: 'edit_file', args: { path: m[1].trim(), content: m[2].trimEnd() } });
+  }
+  const deleteRe = /```\s*delete\s+(\/[\w\-\.\/]+)\s*```/gi;
+  while ((m = deleteRe.exec(text)) !== null) {
+    calls.push({ name: 'delete_file', args: { path: m[1].trim() } });
+  }
+  const commitRe = /```\s*commit\s+([\s\S]*?)```/gi;
+  while ((m = commitRe.exec(text)) !== null) {
+    calls.push({ name: 'commit', args: { message: m[1].trim() } });
+  }
+  const listRe = /```\s*list\s*```/gi;
+  while (listRe.exec(text) !== null) {
+    calls.push({ name: 'list_files', args: { path: '/' } });
+  }
+  if (calls.length > 0) return calls;
+
+  // ═══ FALLBACK 1: <tool_call>JSON</tool_call>
+  const tagRe = /<tool_call>([\s\S]*?)<\/tool_call>/g;
+  while ((m = tagRe.exec(text)) !== null) {
     try { calls.push(JSON.parse(m[1].trim())); } catch(e) {}
   }
-  // Pattern 3: {"name":"tool_name","args":{}} on its own line
-  if (calls.length === 0) {
-    const lineRe = /^\s*\{"name"\s*:\s*"(\w+)"\s*,\s*"args"\s*:\s*(\{[\s\S]*?\})\s*\}\s*$/gm;
-    while ((m = lineRe.exec(text)) !== null) {
-      try { calls.push({ name: m[1], args: JSON.parse(m[2]) }); } catch(e) {}
-    }
+  if (calls.length > 0) return calls;
+
+  // ═══ FALLBACK 2: ```json\n{...}\n``` or ```tool\n{...}\n```
+  const jsonFenceRe = /```(?:tool|json)?\s*\n([\s\S]*?)\n```/g;
+  while ((m = jsonFenceRe.exec(text)) !== null) {
+    try {
+      const parsed = JSON.parse(m[1].trim());
+      if (parsed.name) calls.push(parsed);
+    } catch(e) {}
   }
+  if (calls.length > 0) return calls;
+
+  // Pattern 3: {"name":"tool_name",...} on a line
+  const jsonLineRe = /\{[^{}]*"name"\s*:\s*"(\w+)"[^{}]*\}/g;
+  while ((m = jsonLineRe.exec(text)) !== null) {
+    try {
+      const parsed = JSON.parse(m[0]);
+      if (parsed.name && TOOL_NAMES.includes(parsed.name)) calls.push(parsed);
+    } catch(e) {}
+  }
+  if (calls.length > 0) return calls;
+
+  // Pattern 4: Fuzzy XML — <path>...</path> <content>...</content> near a tool name
+  // This is what small models commonly produce
+  for (const toolName of TOOL_NAMES) {
+    if (!text.includes(toolName)) continue;
+
+    // Find any <path> or path= or path: values
+    const pathMatch = text.match(/<path>\s*([\s\S]*?)\s*<\/path>/i)
+      || text.match(/path\s*[:=]\s*["']([^"']+)["']/i)
+      || text.match(/path\s*[:=]\s*(\S+\.(?:html|js|css|json|md|txt|py|ts))/i)
+      || text.match(/["'](\/[^\s"']+\.(?:html|js|css|json|md|txt|py|ts))["']/);
+
+    if (toolName === 'create_file' || toolName === 'edit_file') {
+      // Extract content from <content>...</content> or content= or code fences
+      const contentMatch = text.match(/<content>([\s\S]*?)<\/content>/i)
+        || text.match(/content\s*[:=]\s*"([\s\S]*?)(?:"\s*$|"\s*\n)/im);
+
+      // Also try to grab everything between code fences as content
+      const fenceContent = text.match(/```(?:html|css|js|javascript)?\s*\n([\s\S]*?)\n```/);
+
+      const path = pathMatch ? pathMatch[1].trim() : null;
+      const content = contentMatch ? contentMatch[1]
+        : fenceContent ? fenceContent[1]
+        : null;
+
+      if (path && content !== null) {
+        calls.push({ name: toolName, args: { path, content } });
+      } else if (path) {
+        calls.push({ name: toolName, args: { path, content: '' } });
+      }
+    } else if (toolName === 'delete_file' || toolName === 'read_file' || toolName === 'preview') {
+      const path = pathMatch ? pathMatch[1].trim() : null;
+      if (path) calls.push({ name: toolName, args: { path } });
+    } else if (toolName === 'commit') {
+      const msgMatch = text.match(/message\s*[:=]\s*["']([^"']+)["']/i)
+        || text.match(/<message>([\s\S]*?)<\/message>/i)
+        || text.match(/commit\s*[:=]\s*["']([^"']+)["']/i);
+      const message = msgMatch ? msgMatch[1] : 'Auto-commit';
+      calls.push({ name: 'commit', args: { message } });
+    } else if (toolName === 'list_files') {
+      const path = pathMatch ? pathMatch[1].trim() : '/';
+      calls.push({ name: 'list_files', args: { path } });
+    } else if (toolName === 'search_files') {
+      const queryMatch = text.match(/query\s*[:=]\s*["']([^"']+)["']/i)
+        || text.match(/<query>([\s\S]*?)<\/query>/i);
+      if (queryMatch) calls.push({ name: 'search_files', args: { query: queryMatch[1] } });
+    } else if (toolName === 'log' || toolName === 'diff') {
+      calls.push({ name: toolName, args: {} });
+    }
+    if (calls.length > 0) break; // take first matched tool
+  }
+  if (calls.length > 0) return calls;
+
+  // Pattern 5: Model just writes ```html\n...\n``` with a file path mentioned nearby
+  const htmlFenceRe = /```(?:html|htm)\s*\n([\s\S]*?)\n```/g;
+  while ((m = htmlFenceRe.exec(text)) !== null) {
+    // Look for a filename near the fence
+    const before = text.slice(Math.max(0, m.index - 200), m.index);
+    const pathHint = before.match(/["'`](\/?\w[\w\-\.\/]*\.html)["'`]/i)
+      || before.match(/(\/?\w[\w\-\.\/]*\.html)/i);
+    const path = pathHint ? pathHint[1] : '/index.html';
+    calls.push({ name: 'create_file', args: { path: path.startsWith('/') ? path : '/' + path, content: m[1] } });
+  }
+  if (calls.length > 0) return calls;
+
+  // Pattern 6: Last resort — "create/make FILE" + any code fence
+  const anyPath = text.match(/(?:create|make|write|save|here'?s?)\s+(?:a\s+)?(?:new\s+)?(?:file\s+)?(?:called\s+|named\s+)?["'`]?(\/?[\w\-\.\/]+\.(?:html|js|css|json|md|txt))["'`]?/i);
+  const anyFence = text.match(/```\w*\s*\n([\s\S]*?)\n```/);
+  if (anyPath && anyFence) {
+    const p = anyPath[1].startsWith('/') ? anyPath[1] : '/' + anyPath[1];
+    calls.push({ name: 'create_file', args: { path: p, content: anyFence[1] } });
+  }
+
   return calls;
 }
 
 // ─── Build System Prompt Describing Available Tools ───
 export function buildToolSystemPrompt() {
-  let prompt = `You are a code assistant working in a virtual repository sandbox. You can create, edit, and manage files using tools.
+  return `You are a code assistant in a browser sandbox. You create and edit files using code blocks.
 
-AVAILABLE TOOLS:
-When you want to use a tool, output it in this format:
-<tool_call>{"name": "tool_name", "args": {"param": "value"}}</tool_call>
+TO CREATE A FILE, write a code block with the filename on the first line:
 
-You can use multiple tool calls in one response. After each tool call, you will receive the result before continuing.
+\`\`\`create /hello.html
+<!DOCTYPE html>
+<html>
+<head><title>Hello</title></head>
+<body><h1>Hello World</h1></body>
+</html>
+\`\`\`
 
-Tools:\n`;
-  for (const tool of TOOLS) {
-    prompt += `\n- ${tool.name}: ${tool.description}\n`;
-    if (tool.parameters && Object.keys(tool.parameters).length > 0) {
-      prompt += `  Parameters:\n`;
-      for (const [k, v] of Object.entries(tool.parameters)) {
-        prompt += `    - ${k} (${v.type}${v.required ? ', required' : ', optional'}): ${v.description}\n`;
-      }
-    }
-  }
-  prompt += `\nIMPORTANT RULES:
-1. Always use tool calls to modify files — never just describe what to do
-2. Create complete, working HTML files with inline CSS and JS
-3. After creating/editing an HTML file, use the preview tool to show it
-4. Use commit after meaningful changes
-5. Be creative and make visually impressive things
-6. When the user asks you to build something, START BUILDING immediately with tool calls
-7. You can create multiple files and preview them in iframes
-8. Keep responses concise — let the code speak for itself\n`;
-  return prompt;
+TO EDIT A FILE, write a code block with "edit" and the filename:
+
+\`\`\`edit /hello.html
+<!DOCTYPE html>
+<html>
+<head><title>Updated</title></head>
+<body><h1>Updated Page</h1></body>
+</html>
+\`\`\`
+
+TO DELETE: \`\`\`delete /file.txt\`\`\`
+TO COMMIT: \`\`\`commit Added hello page\`\`\`
+TO LIST FILES: \`\`\`list\`\`\`
+
+RULES:
+1. ALWAYS use code blocks to create files — never just describe what you would do
+2. Write COMPLETE HTML files with inline CSS and JS
+3. Be creative and make visually impressive things
+4. When asked to build something, START IMMEDIATELY with a code block
+5. Keep explanations short — let the code speak
+6. You can create multiple files in one response
+
+EXAMPLE - if user says "make a red button page":
+
+Sure! Here's a page with a red button:
+
+\`\`\`create /button.html
+<!DOCTYPE html>
+<html>
+<head><style>body{display:flex;justify-content:center;align-items:center;height:100vh;background:#111}button{background:red;color:white;padding:20px 40px;border:none;border-radius:8px;font-size:24px;cursor:pointer}button:hover{background:#ff4444}</style></head>
+<body><button onclick="alert('Clicked!')">Click Me</button></body>
+</html>
+\`\`\`
+`;
 }
 
 // ─── Get State Summary ───
