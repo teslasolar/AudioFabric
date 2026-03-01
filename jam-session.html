@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AudioFabric — Jam Session</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#060612;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+
+#topBar{position:fixed;top:0;left:0;right:0;z-index:60;display:flex;align-items:center;
+  justify-content:space-between;padding:8px 16px;background:rgba(0,0,0,0.6);border-bottom:1px solid #f0f1}
+#sessionName{font-size:14px;color:#f0f;letter-spacing:2px}
+#jamInfo{font-size:10px;color:#808}
+
+/* Shared resonance meter at top */
+#sharedResonance{position:fixed;top:40px;left:50%;transform:translateX(-50%);z-index:55;
+  display:flex;gap:3px;pointer-events:none}
+.sr-segment{width:6px;height:30px;background:#111;border-radius:3px;overflow:hidden;transition:background 0.3s}
+.sr-segment.lit{background:#f0f;box-shadow:0 0 8px #f0f4}
+
+/* Player contribution rings */
+#contribRing{position:fixed;bottom:120px;left:50%;transform:translateX(-50%);z-index:50;
+  pointer-events:none}
+#contribCanvas{width:300px;height:300px}
+
+/* Jam participants strip */
+#jamStrip{position:fixed;bottom:60px;left:0;right:0;z-index:55;
+  display:flex;justify-content:center;gap:10px;padding:8px;pointer-events:none}
+.jam-player{display:flex;flex-direction:column;align-items:center;gap:2px;
+  min-width:60px;pointer-events:auto}
+.jam-player .jp-kanji{font-size:28px;transition:text-shadow 0.3s}
+.jam-player .jp-name{font-size:8px;color:#fff6;max-width:60px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.jam-player .jp-wave{width:50px;height:16px}
+.jam-player.contributing .jp-kanji{text-shadow:0 0 15px currentColor,0 0 30px currentColor}
+
+/* Bottom controls */
+#bottomBar{position:fixed;bottom:0;left:0;right:0;z-index:60;display:flex;align-items:center;
+  justify-content:center;gap:12px;padding:10px;background:rgba(0,0,0,0.8);border-top:1px solid #f0f1}
+.jam-btn{background:#111;border:1px solid #f0f3;color:#f0f;padding:8px 18px;
+  cursor:pointer;font-size:11px;font-family:monospace;border-radius:20px;letter-spacing:1px}
+.jam-btn:hover{background:#f0f1}
+.jam-btn.active{background:#f0f2;border-color:#f0f6}
+
+/* Chord display */
+#chordDisplay{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:45;
+  font-size:60px;color:#fff;opacity:0;transition:opacity 0.5s;pointer-events:none;
+  text-shadow:0 0 30px #f0f,0 0 60px #f0f4;text-align:center;line-height:1.2}
+#chordDisplay.on{opacity:0.6}
+#chordSub{font-size:14px;color:#f0f8;letter-spacing:4px}
+
+#version{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:45;
+  font-size:8px;color:#222;letter-spacing:3px;pointer-events:none}
+<div id="peers" style="display:none"></div>
+<div id="lbRows" style="display:none"></div>
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="topBar">
+  <span id="sessionName">JAM SESSION</span>
+  <span id="jamInfo">0 jammers</span>
+</div>
+
+<div id="sharedResonance"></div>
+
+<div id="contribRing"><canvas id="contribCanvas" width="300" height="300"></canvas></div>
+
+<div id="jamStrip"></div>
+
+<div id="chordDisplay">
+  <div id="chordKanji"></div>
+  <div id="chordSub"></div>
+</div>
+
+<div id="bottomBar">
+  <button class="jam-btn active" id="jamMic" onclick="toggleJamMic()">MIC ON</button>
+  <button class="jam-btn" onclick="toggleCamera()">CAM</button>
+  <button class="jam-btn" onclick="copyLink()">INVITE</button>
+</div>
+<div id="peers" style="display:none"></div>
+<div id="lbRows" style="display:none"></div>
+<div id="version">AUDIOFABRIC JAM SESSION</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+// ============================================================
+// AUDIOFABRIC — JAM SESSION
+// Everyone's voice contributes to a shared sound-reactive
+// landscape. Resonance layers STACK across all participants.
+// Collective depth = collective points + visual spectacle.
+// ============================================================
+
+import { KI } from './modules/core.js';
+import * as Scene from './modules/hd-scene.js';
+import * as VoiceEngine from './modules/voice-engine.js';
+import * as Kanji from './modules/kanji.js';
+import * as Vortex from './modules/hd-vortex.js';
+import * as Resonance from './modules/resonance.js';
+import * as ResonanceSynths from './modules/resonance-synths.js';
+import * as FX from './modules/hd-fx.js';
+import * as MqttNet from './modules/mqtt-net.js';
+import * as WebRTCNet from './modules/webrtc-net.js';
+import * as Camera from './modules/camera.js';
+import * as Chat from './modules/chat.js';
+
+const urlParams = new URLSearchParams(location.search);
+const ROOM = urlParams.get('room') || 'JAM-' + Math.random().toString(36).slice(2,6).toUpperCase();
+if (!urlParams.has('room')) history.replaceState(null, '', '?room=' + ROOM);
+
+KI.player.name = localStorage.getItem('jam_nick') || KI.genHash();
+const savedNick = localStorage.getItem('jam_nick');
+if (!savedNick) {
+  const n = prompt('Jammer name:', KI.player.name);
+  if (n?.trim()) { KI.player.name = n.trim().slice(0,16); localStorage.setItem('jam_nick', KI.player.name); }
+}
+
+window.copyLink = () => navigator.clipboard.writeText(location.href);
+window.toggleJamMic = () => {
+  if (KI.stream) {
+    const tracks = KI.stream.getAudioTracks();
+    const on = !tracks[0]?.enabled;
+    tracks.forEach(t => t.enabled = on);
+    document.getElementById('jamMic').textContent = on ? 'MIC ON' : 'MUTED';
+    document.getElementById('jamMic').classList.toggle('active', on);
+  }
+};
+window.toggleCamera = async () => {
+  const cam = KI.get('camera');
+  if (cam) { if (cam.feeds.has('__local__')) cam.stopLocal(); else await cam.startLocal(); }
+};
+
+// === SHARED RESONANCE — collective depth ===
+const jammers = {};       // name -> { vowel, energy, layer, pn, sounding, waveform[] }
+let sharedDepth = 0;      // sum of all active layers
+let sharedVowelChord = ''; // dominant chord formed by combined vowels
+const SHARED_SEGMENTS = 40;
+
+function buildSharedMeter() {
+  const cont = document.getElementById('sharedResonance');
+  for (let i = 0; i < SHARED_SEGMENTS; i++) {
+    const seg = document.createElement('div');
+    seg.className = 'sr-segment';
+    seg.id = 'sr-' + i;
+    cont.appendChild(seg);
+  }
+}
+
+function updateSharedResonance() {
+  // sum up all jammers' layers including self
+  const res = KI.get('resonance');
+  const myLayer = res ? Math.max(0, res.state.activeLayer + 1) : 0;
+  let total = myLayer;
+  const vowelCounts = {};
+
+  Object.keys(jammers).forEach(name => {
+    const j = jammers[name];
+    total += Math.max(0, (j.layer || 0) + 1);
+    if (j.vowel && j.sounding) vowelCounts[j.vowel] = (vowelCounts[j.vowel] || 0) + 1;
+  });
+
+  // add own vowel
+  if (KI.voice.vowel && KI.voice.sounding) {
+    vowelCounts[KI.voice.vowel] = (vowelCounts[KI.voice.vowel] || 0) + 1;
+  }
+
+  sharedDepth = total;
+
+  // shared meter
+  const fill = Math.min(SHARED_SEGMENTS, Math.round(total * 3));
+  for (let i = 0; i < SHARED_SEGMENTS; i++) {
+    document.getElementById('sr-' + i).classList.toggle('lit', i < fill);
+  }
+
+  // chord display — show combined kanji when multiple vowels active
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const activeVowels = Object.keys(vowelCounts).filter(v => vowelCounts[v] > 0).sort();
+  const chordEl = document.getElementById('chordDisplay');
+  if (activeVowels.length >= 2) {
+    chordEl.classList.add('on');
+    document.getElementById('chordKanji').textContent = activeVowels.map(v => KANJI[v]?.char || '').join('');
+    document.getElementById('chordSub').textContent = activeVowels.map(v => KANJI[v]?.name || '').join(' + ');
+  } else if (activeVowels.length === 1 && total >= 3) {
+    chordEl.classList.add('on');
+    const v = activeVowels[0];
+    document.getElementById('chordKanji').textContent = KANJI[v]?.char || '';
+    document.getElementById('chordSub').textContent = 'UNISON — ' + KANJI[v]?.name?.toUpperCase();
+  } else {
+    chordEl.classList.remove('on');
+  }
+
+  // score trickle from shared depth
+  if (total > 0) {
+    const trickle = total * 0.5;
+    KI.player.score += Math.round(trickle);
+  }
+
+  // update jammer count
+  document.getElementById('jamInfo').textContent = (Object.keys(jammers).length + 1) + ' jammers | depth: ' + total;
+}
+
+// === JAMMER STRIP ===
+function updateJammerCard(name, data) {
+  let el = document.getElementById('jm-' + CSS.escape(name));
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'jam-player';
+    el.id = 'jm-' + name;
+    el.innerHTML = `<div class="jp-kanji" style="color:#555">&#9898;</div>` +
+      `<canvas class="jp-wave" width="50" height="16"></canvas>` +
+      `<div class="jp-name">${escHtml(name)}</div>`;
+    document.getElementById('jamStrip').appendChild(el);
+  }
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const kj = KANJI[data.vowel];
+  el.querySelector('.jp-kanji').textContent = kj ? kj.char : '\u26AA';
+  el.querySelector('.jp-kanji').style.color = kj ? kj.color : '#555';
+  el.classList.toggle('contributing', data.sounding);
+
+  // mini waveform
+  const wc = el.querySelector('.jp-wave');
+  const wx = wc.getContext('2d');
+  wx.clearRect(0, 0, 50, 16);
+  wx.strokeStyle = kj ? kj.color : '#555';
+  wx.lineWidth = 1;
+  wx.beginPath();
+  const wf = data.waveform || [];
+  for (let i = 0; i < 50; i++) {
+    const v = wf[Math.floor(i / 50 * wf.length)] || 0;
+    const y = 8 + v * 40;
+    i === 0 ? wx.moveTo(i, y) : wx.lineTo(i, y);
+  }
+  wx.stroke();
+}
+
+// === CONTRIBUTION RING VISUALIZER ===
+const contribCanvas = document.getElementById('contribCanvas');
+const contribCtx = contribCanvas.getContext('2d');
+function drawContribRing(t) {
+  contribCtx.clearRect(0, 0, 300, 300);
+  const cx = 150, cy = 150;
+  const allJammers = [{ name: KI.player.name, vowel: KI.voice.vowel, energy: KI.voice.energy,
+    sounding: KI.voice.sounding, layer: KI.get('resonance')?.state.activeLayer ?? -1 }];
+  Object.keys(jammers).forEach(n => allJammers.push({ name: n, ...jammers[n] }));
+
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+
+  allJammers.forEach((j, idx) => {
+    const angle = (idx / Math.max(allJammers.length, 1)) * Math.PI * 2 - Math.PI / 2;
+    const r = 80 + (j.layer >= 0 ? j.layer * 8 : 0);
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    const kj = KANJI[j.vowel];
+    const color = kj?.color || '#555';
+
+    // arc segment
+    if (j.sounding) {
+      const arcLen = Math.PI * 2 / Math.max(allJammers.length, 1) * 0.8;
+      contribCtx.beginPath();
+      contribCtx.arc(cx, cy, r, angle - arcLen/2, angle + arcLen/2);
+      contribCtx.strokeStyle = color + '66';
+      contribCtx.lineWidth = 3 + (j.energy || 0) * 20;
+      contribCtx.stroke();
+    }
+
+    // dot
+    contribCtx.beginPath();
+    contribCtx.arc(x, y, 4 + (j.energy || 0) * 15, 0, Math.PI * 2);
+    contribCtx.fillStyle = j.sounding ? color : '#333';
+    contribCtx.fill();
+
+    // kanji
+    if (kj && j.sounding) {
+      contribCtx.font = '14px serif';
+      contribCtx.textAlign = 'center';
+      contribCtx.textBaseline = 'middle';
+      contribCtx.fillStyle = color;
+      contribCtx.fillText(kj.char, x, y - 16);
+    }
+  });
+}
+
+// === REMOTE STATE HANDLING ===
+function handleRemoteState(data) {
+  if (!data.name || data.name === KI.player.name) return;
+  jammers[data.name] = {
+    vowel: data.vowel || '',
+    energy: data.energy || 0,
+    layer: data.layer ?? -1,
+    pn: data.pn || 0,
+    sounding: data.sounding || false,
+    waveform: data.waveform || []
+  };
+  updateJammerCard(data.name, jammers[data.name]);
+}
+
+KI.on('rtc:data', d => { if (d.type === 'state') handleRemoteState(d); });
+KI.on('remote:state', handleRemoteState);
+
+// === SHARED VISUALS — vortex and scene react to shared depth ===
+let prevSharedDepth = 0;
+function updateSharedVisuals(dt, t) {
+  // the more shared depth, the more the vortex expands and brightens
+  if (sharedDepth > prevSharedDepth + 2) {
+    // depth burst!
+    KI.emit('resonance:layerUp', {
+      layer: Math.min(4, Math.floor(sharedDepth / 3)),
+      layerData: Resonance.LAYERS[Math.min(4, Math.floor(sharedDepth / 3))]
+    });
+  }
+  prevSharedDepth = sharedDepth;
+
+  // scale vortex energy by shared depth
+  KI.voice.energy = Math.max(KI.voice.energy, sharedDepth * 0.01);
+}
+
+// === BROADCAST ===
+let bcastTimer = 0;
+function broadcastJam(dt) {
+  bcastTimer += dt;
+  if (bcastTimer < 0.12) return;
+  bcastTimer = 0;
+
+  // grab a small waveform snapshot
+  const wf = [];
+  if (KI.analyser) {
+    const td = new Float32Array(64);
+    KI.analyser.getFloatTimeDomainData(td);
+    for (let i = 0; i < 32; i++) wf.push(Math.round(td[i*2] * 100) / 100);
+  }
+
+  const res = KI.get('resonance');
+  KI.emit('broadcast', {
+    type: 'state',
+    name: KI.player.name,
+    energy: KI.voice.energy,
+    vowel: KI.voice.vowel,
+    pn: KI.voice.pn,
+    layer: res ? res.state.activeLayer : -1,
+    sounding: KI.voice.sounding,
+    waveform: wf
+  });
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// === BOOT ===
+async function boot() {
+  document.getElementById('sessionName').textContent = 'JAM: ' + ROOM;
+  buildSharedMeter();
+
+  Scene.init({ stars: 5000, fogDensity: 0.005, fogColor: 0x060012 });
+  Kanji.init();
+  Resonance.init();
+  Vortex.init({ count: 2500 });
+  ResonanceSynths.init();
+  FX.init({ aurora: true });
+
+  try { await VoiceEngine.init(); } catch(e) { console.warn('Mic:', e); }
+
+  MqttNet.init({ room: 'JAM-' + ROOM });
+  WebRTCNet.init({ room: 'JAM-' + ROOM });
+  Camera.init();
+  Chat.init();
+
+  // self card
+  updateJammerCard(KI.player.name, { vowel: '', energy: 0, layer: -1, sounding: false, waveform: [] });
+
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    broadcastJam(dt);
+    updateSharedResonance();
+    updateSharedVisuals(dt, t);
+    drawContribRing(t);
+    // self card update
+    const res = KI.get('resonance');
+    updateJammerCard(KI.player.name, {
+      vowel: KI.voice.vowel, energy: KI.voice.energy,
+      layer: res ? res.state.activeLayer : -1,
+      sounding: KI.voice.sounding
+    });
+    KI.renderer.render(KI.scene, KI.camera);
+  })();
+
+  console.log('%c AUDIOFABRIC JAM SESSION ', 'background:#060012;color:#f0f;font-size:18px;padding:8px');
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
