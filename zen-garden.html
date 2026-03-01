@@ -148,97 +148,231 @@ function growStructure(vowel, layer, position) {
   const pos = position || randomGardenPos();
 
   switch (vowel) {
-    case 'ah': { // crystal spire
+    case 'ah': { // crystal spire cluster
       type = 'crystal';
-      const h = 0.5 + layer * 0.6;
-      const geo = new THREE.ConeGeometry(0.15 * layerScale, h * layerScale, 6);
-      const mat = new THREE.MeshBasicMaterial({
-        color: kj.hex, transparent: true, opacity: 0.6,
-        blending: THREE.AdditiveBlending, depthWrite: false
-      });
-      mesh = new THREE.Mesh(geo, mat);
-      // add inner glow
-      const ig = new THREE.ConeGeometry(0.08 * layerScale, h * layerScale * 0.8, 6);
-      const im = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2,
+      const group = new THREE.Group();
+      const spireCount = 2 + Math.floor(layer * 1.5);
+      for (let s = 0; s < spireCount; s++) {
+        const h = (0.4 + layer * 0.5 + Math.random() * 0.3) * layerScale;
+        const w = (0.06 + Math.random() * 0.08) * layerScale;
+        const geo = new THREE.ConeGeometry(w, h, 5 + Math.floor(Math.random()*3));
+        const mat = new THREE.MeshBasicMaterial({
+          color: kj.hex, transparent: true, opacity: 0.5 + Math.random()*0.2,
+          blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        const spire = new THREE.Mesh(geo, mat);
+        spire.position.set((Math.random()-0.5)*0.2*layerScale, h/2, (Math.random()-0.5)*0.2*layerScale);
+        spire.rotation.z = (Math.random()-0.5)*0.3;
+        // inner glow per spire
+        const ig = new THREE.ConeGeometry(w*0.5, h*0.7, 4);
+        const im = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15,
+          blending: THREE.AdditiveBlending, depthWrite: false });
+        spire.add(new THREE.Mesh(ig, im));
+        group.add(spire);
+      }
+      // base glow
+      const bg = new THREE.SphereGeometry(0.15*layerScale, 8, 8);
+      const bm = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.15,
         blending: THREE.AdditiveBlending, depthWrite: false });
-      mesh.add(new THREE.Mesh(ig, im));
+      group.add(new THREE.Mesh(bg, bm));
+      mesh = group;
       garden.crystals++;
       break;
     }
-    case 'ee': { // electric flower
+    case 'ee': { // electric flower bloom
       type = 'flower';
       const group = new THREE.Group();
-      // petals
-      for (let p = 0; p < 5 + layer; p++) {
-        const a = (p / (5 + layer)) * Math.PI * 2;
-        const pg = new THREE.SphereGeometry(0.1 * layerScale, 8, 8);
-        pg.scale(1, 0.3, 1);
-        const pm = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.5,
-          blending: THREE.AdditiveBlending, depthWrite: false });
-        const petal = new THREE.Mesh(pg, pm);
-        petal.position.set(Math.cos(a) * 0.2 * layerScale, 0.3, Math.sin(a) * 0.2 * layerScale);
-        petal.rotation.z = a;
-        group.add(petal);
+      const petalCount = 5 + layer * 2;
+      // double-layer petals with varying sizes
+      for (let ring = 0; ring < 2; ring++) {
+        const ringR = (0.15 + ring * 0.12) * layerScale;
+        const ringPetals = petalCount + ring * 3;
+        for (let p = 0; p < ringPetals; p++) {
+          const a = (p / ringPetals) * Math.PI * 2 + ring * 0.3;
+          const pg = new THREE.SphereGeometry((0.08 + ring * 0.04) * layerScale, 8, 8);
+          pg.scale(1, 0.25, 0.6);
+          const pm = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true,
+            opacity: 0.4 - ring * 0.1,
+            blending: THREE.AdditiveBlending, depthWrite: false });
+          const petal = new THREE.Mesh(pg, pm);
+          petal.position.set(Math.cos(a) * ringR, 0.3 + ring * 0.05, Math.sin(a) * ringR);
+          petal.rotation.z = a * 0.5;
+          petal.rotation.x = ring * 0.3;
+          group.add(petal);
+        }
       }
-      // stem
-      const sg = new THREE.CylinderGeometry(0.02, 0.02, 0.3 + layer * 0.15, 4);
+      // glowing center orb
+      const cg = new THREE.SphereGeometry(0.06 * layerScale, 12, 12);
+      const cm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5,
+        blending: THREE.AdditiveBlending, depthWrite: false });
+      const center = new THREE.Mesh(cg, cm);
+      center.position.y = 0.3;
+      group.add(center);
+      // stamen sparks
+      for (let s = 0; s < 3 + layer; s++) {
+        const sa = Math.random() * Math.PI * 2;
+        const sr = 0.04 * layerScale;
+        const sg2 = new THREE.SphereGeometry(0.015, 4, 4);
+        const sm2 = new THREE.MeshBasicMaterial({ color: 0xffff88, transparent: true, opacity: 0.6,
+          blending: THREE.AdditiveBlending, depthWrite: false });
+        const stamen = new THREE.Mesh(sg2, sm2);
+        stamen.position.set(Math.cos(sa)*sr, 0.35 + Math.random()*0.05, Math.sin(sa)*sr);
+        group.add(stamen);
+      }
+      // stem with slight curve
+      const stemH = 0.3 + layer * 0.15;
+      const sg = new THREE.CylinderGeometry(0.015, 0.025, stemH, 6);
       const sm = new THREE.MeshBasicMaterial({ color: 0x226622, transparent: true, opacity: 0.4 });
-      group.add(new THREE.Mesh(sg, sm));
+      const stem = new THREE.Mesh(sg, sm);
+      stem.position.y = stemH * 0.3;
+      group.add(stem);
       mesh = group;
       garden.flowers++;
       break;
     }
-    case 'oh': { // floating orb
+    case 'oh': { // floating spirit orb
       type = 'orb';
       const group = new THREE.Group();
-      const og = new THREE.SphereGeometry(0.15 * layerScale, 16, 16);
-      const om = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.4,
-        blending: THREE.AdditiveBlending, depthWrite: false });
+      // outer shell — soft glow
+      const og = new THREE.SphereGeometry(0.18 * layerScale, 24, 24);
+      const om = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.25,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
       group.add(new THREE.Mesh(og, om));
-      // halo ring
-      const rg = new THREE.TorusGeometry(0.25 * layerScale, 0.01, 8, 32);
-      const rm = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.3,
+      // inner core — bright
+      const ig = new THREE.SphereGeometry(0.08 * layerScale, 16, 16);
+      const im = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4,
         blending: THREE.AdditiveBlending, depthWrite: false });
-      const ring = new THREE.Mesh(rg, rm);
-      ring.rotation.x = Math.PI / 2;
-      group.add(ring);
+      group.add(new THREE.Mesh(ig, im));
+      // double halo rings at different angles
+      for (let r = 0; r < 2; r++) {
+        const rg = new THREE.TorusGeometry((0.22 + r * 0.08) * layerScale, 0.008, 8, 48);
+        const rm = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.25 - r * 0.08,
+          blending: THREE.AdditiveBlending, depthWrite: false });
+        const ring = new THREE.Mesh(rg, rm);
+        ring.rotation.x = Math.PI / 2 + r * 0.6;
+        ring.rotation.z = r * 1.2;
+        group.add(ring);
+      }
+      // orbiting motes
+      const moteCount = 4 + layer * 2;
+      for (let m = 0; m < moteCount; m++) {
+        const mg = new THREE.SphereGeometry(0.02 * layerScale, 4, 4);
+        const mm = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.5,
+          blending: THREE.AdditiveBlending, depthWrite: false });
+        const mote = new THREE.Mesh(mg, mm);
+        const ma = (m / moteCount) * Math.PI * 2;
+        const mr = 0.3 * layerScale;
+        mote.position.set(Math.cos(ma)*mr, Math.sin(ma*0.7)*0.1, Math.sin(ma)*mr);
+        group.add(mote);
+      }
       mesh = group;
       pos.y = 1 + layer * 0.5 + Math.random() * 2;
       garden.orbs++;
       break;
     }
-    case 'oo': { // fluid pillar
+    case 'oo': { // fluid pillar with ring accents
       type = 'pillar';
-      const h = 0.4 + layer * 0.5;
-      const geo = new THREE.CylinderGeometry(0.08 * layerScale, 0.12 * layerScale, h * layerScale, 8);
-      const mat = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.5,
+      const group = new THREE.Group();
+      const h = (0.5 + layer * 0.6) * layerScale;
+      // main column — tapered
+      const geo = new THREE.CylinderGeometry(0.06 * layerScale, 0.12 * layerScale, h, 10);
+      const mat = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.4,
         blending: THREE.AdditiveBlending, depthWrite: false });
-      mesh = new THREE.Mesh(geo, mat);
+      const col = new THREE.Mesh(geo, mat);
+      col.position.y = h / 2;
+      group.add(col);
+      // ring accents along height
+      const ringCount = 2 + layer;
+      for (let r = 0; r < ringCount; r++) {
+        const ry = (r + 1) / (ringCount + 1) * h;
+        const rr = (0.08 + (1 - r/ringCount) * 0.04) * layerScale;
+        const rg = new THREE.TorusGeometry(rr, 0.006, 6, 24);
+        const rm = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.35,
+          blending: THREE.AdditiveBlending, depthWrite: false });
+        const ring = new THREE.Mesh(rg, rm);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.y = ry;
+        group.add(ring);
+      }
+      // glowing cap
+      const cg = new THREE.SphereGeometry(0.07 * layerScale, 12, 12);
+      const cm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3,
+        blending: THREE.AdditiveBlending, depthWrite: false });
+      const cap = new THREE.Mesh(cg, cm);
+      cap.position.y = h;
+      group.add(cap);
+      // base pool
+      const bg = new THREE.CircleGeometry(0.15 * layerScale, 16);
+      const bm = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.15,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+      const base = new THREE.Mesh(bg, bm);
+      base.rotation.x = -Math.PI / 2;
+      base.position.y = 0.01;
+      group.add(base);
+      mesh = group;
       garden.pillars++;
       break;
     }
-    case 'eh': { // wind petal cloud
+    case 'eh': { // wind petal cloud — drifting constellation
       type = 'flower';
       const group = new THREE.Group();
-      for (let p = 0; p < 3 + layer * 2; p++) {
-        const pg = new THREE.SphereGeometry(0.06 + Math.random()*0.06, 6, 6);
-        const pm = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.3,
+      const cloudSize = (3 + layer * 2);
+      // scattered petals in a flowing formation
+      for (let p = 0; p < cloudSize; p++) {
+        const spread = 0.3 + layer * 0.15;
+        const pg = new THREE.SphereGeometry((0.04 + Math.random()*0.05) * layerScale, 6, 6);
+        pg.scale(1.2, 0.4, 0.8);
+        const pm = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true,
+          opacity: 0.25 + Math.random() * 0.15,
           blending: THREE.AdditiveBlending, depthWrite: false });
         const petal = new THREE.Mesh(pg, pm);
-        petal.position.set((Math.random()-0.5)*0.5, Math.random()*0.3, (Math.random()-0.5)*0.5);
+        const pa = (p / cloudSize) * Math.PI * 2;
+        const pr = Math.random() * spread * layerScale;
+        petal.position.set(Math.cos(pa)*pr, Math.random()*0.3, Math.sin(pa)*pr);
+        petal.rotation.set(Math.random()*0.5, pa, Math.random()*0.3);
         group.add(petal);
       }
+      // central wisp
+      const wg = new THREE.SphereGeometry(0.03 * layerScale, 6, 6);
+      const wm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2,
+        blending: THREE.AdditiveBlending, depthWrite: false });
+      const wisp = new THREE.Mesh(wg, wm);
+      wisp.position.y = 0.15;
+      group.add(wisp);
+      // trailing thread
+      const tg = new THREE.CylinderGeometry(0.005, 0.002, 0.4 * layerScale, 4);
+      const tm = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.15 });
+      const thread = new THREE.Mesh(tg, tm);
+      thread.position.y = -0.15;
+      group.add(thread);
       mesh = group;
-      pos.y = 0.5 + Math.random() * 2;
+      pos.y = 0.8 + Math.random() * 2.5;
       garden.flowers++;
       break;
     }
-    default: { // earth stone
+    default: { // earth stone cluster
       type = 'crystal';
-      const geo = new THREE.DodecahedronGeometry(0.12 * layerScale, 0);
-      const mat = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true, opacity: 0.5,
+      const group = new THREE.Group();
+      const stoneCount = 1 + Math.floor(layer * 0.8);
+      for (let s = 0; s < stoneCount; s++) {
+        const size = (0.08 + Math.random() * 0.08) * layerScale;
+        const geo = new THREE.DodecahedronGeometry(size, 0);
+        const mat = new THREE.MeshBasicMaterial({ color: kj.hex, transparent: true,
+          opacity: 0.4 + Math.random() * 0.2,
+          blending: THREE.AdditiveBlending, depthWrite: false });
+        const stone = new THREE.Mesh(geo, mat);
+        stone.position.set((Math.random()-0.5)*0.15*layerScale, size*0.5 + s*0.05, (Math.random()-0.5)*0.15*layerScale);
+        stone.rotation.set(Math.random()*0.5, Math.random()*Math.PI, Math.random()*0.5);
+        group.add(stone);
+      }
+      // inner light
+      const lg = new THREE.SphereGeometry(0.04 * layerScale, 6, 6);
+      const lm = new THREE.MeshBasicMaterial({ color: 0xffddaa, transparent: true, opacity: 0.2,
         blending: THREE.AdditiveBlending, depthWrite: false });
-      mesh = new THREE.Mesh(geo, mat);
+      const light = new THREE.Mesh(lg, lm);
+      light.position.y = 0.06;
+      group.add(light);
+      mesh = group;
       garden.crystals++;
     }
   }
@@ -386,9 +520,8 @@ function broadcastZen(dt) {
 async function boot() {
   document.getElementById('gardenName').textContent = 'GARDEN: ' + ROOM;
 
-  Scene.init({ stars: 8000, fogColor: 0x040810, fogDensity: 0.004 });
+  Scene.init({ stars: 10000, fogColor: 0x030610, fogDensity: 0.003 });
 
-  // softer camera for zen
   if (KI.camera) {
     KI.camera.position.set(0, 6, 16);
     KI.camera.lookAt(0, 1, 0);
@@ -404,17 +537,135 @@ async function boot() {
   WebRTCNet.init({ room: 'ZEN-' + ROOM });
   Chat.init();
 
-  // override scene update for slower, calmer camera
+  // === WATER PLANE — reflective ground ===
+  const waterGeo = new THREE.CircleGeometry(25, 96);
+  const waterMat = new THREE.MeshBasicMaterial({
+    color: 0x0a1530, transparent: true, opacity: 0.4, side: THREE.DoubleSide
+  });
+  const water = new THREE.Mesh(waterGeo, waterMat);
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = -0.05;
+  KI.scene.add(water);
+
+  // water ripple rings
+  const ripples = [];
+  KI.on('resonance:layerUp', () => {
+    const rg = new THREE.TorusGeometry(0.3, 0.02, 6, 48);
+    const rm = new THREE.MeshBasicMaterial({
+      color: 0x2244aa, transparent: true, opacity: 0.4,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    const ring = new THREE.Mesh(rg, rm);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(
+      (Math.random()-0.5) * 8, 0.02, (Math.random()-0.5) * 8
+    );
+    KI.scene.add(ring);
+    ripples.push({ mesh: ring, life: 3 });
+  });
+
+  // === FIREFLIES ===
+  const fireflyCount = 120;
+  const ffGeo = new THREE.BufferGeometry();
+  const ffPos = new Float32Array(fireflyCount * 3);
+  const ffCol = new Float32Array(fireflyCount * 3);
+  const ffData = [];
+  for (let i = 0; i < fireflyCount; i++) {
+    ffPos[i*3] = (Math.random()-0.5) * 30;
+    ffPos[i*3+1] = 0.5 + Math.random() * 4;
+    ffPos[i*3+2] = (Math.random()-0.5) * 30;
+    const hue = 0.15 + Math.random() * 0.15; // warm yellow-green
+    const rgb = KI.hslToRgb(hue, 0.8, 0.6);
+    ffCol[i*3] = rgb[0]; ffCol[i*3+1] = rgb[1]; ffCol[i*3+2] = rgb[2];
+    ffData.push({
+      baseX: ffPos[i*3], baseY: ffPos[i*3+1], baseZ: ffPos[i*3+2],
+      speed: 0.2 + Math.random() * 0.5, phase: Math.random() * Math.PI * 2,
+      wanderR: 1 + Math.random() * 3
+    });
+  }
+  ffGeo.setAttribute('position', new THREE.BufferAttribute(ffPos, 3));
+  ffGeo.setAttribute('color', new THREE.BufferAttribute(ffCol, 3));
+  const ffMat = new THREE.PointsMaterial({
+    size: 0.12, vertexColors: true, transparent: true, opacity: 0.6,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const fireflies = new THREE.Points(ffGeo, ffMat);
+  KI.scene.add(fireflies);
+
+  // === GROWTH PARTICLE TRAILS ===
+  const trailParticles = [];
+  KI.on('resonance:layerUp', data => {
+    const kanji = KI.get('kanji'); const KANJI = kanji?.KANJI || {};
+    const kj = KANJI[data.vowel || KI.voice.vowel];
+    if (!kj) return;
+    for (let i = 0; i < 20; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 0.5 + Math.random() * 2;
+      const pg = new THREE.SphereGeometry(0.03 + Math.random()*0.03, 4, 4);
+      const pm = new THREE.MeshBasicMaterial({
+        color: kj.hex, transparent: true, opacity: 0.6,
+        blending: THREE.AdditiveBlending, depthWrite: false
+      });
+      const p = new THREE.Mesh(pg, pm);
+      const pos = KI._scene?.aura?.position || new THREE.Vector3(0,2.5,5);
+      p.position.set(pos.x + Math.cos(a)*r, pos.y + Math.random()*2, pos.z + Math.sin(a)*r);
+      KI.scene.add(p);
+      trailParticles.push({
+        mesh: p, life: 2 + Math.random(),
+        vy: 0.01 + Math.random() * 0.02,
+        vx: (Math.random()-0.5) * 0.01,
+        vz: (Math.random()-0.5) * 0.01
+      });
+    }
+  });
+
+  // override scene for calmer camera
   const sceneUpdate = KI.get('scene')?.update;
   if (sceneUpdate) {
-    const origUpdate = sceneUpdate;
     KI.get('scene').update = function(dt, t) {
-      // slow orbit
-      KI._scene.camAngle += 0.0008;
-      KI.camera.position.x = Math.sin(KI._scene.camAngle) * 3;
-      KI.camera.position.y = 5 + Math.sin(KI._scene.camAngle * 0.3) * 0.5;
-      KI.camera.position.z = 14 + Math.cos(KI._scene.camAngle * 0.5) * 2;
-      KI.camera.lookAt(0, 1.5, 0);
+      KI._scene.camAngle += 0.0006;
+      KI.camera.position.x = Math.sin(KI._scene.camAngle) * 4;
+      KI.camera.position.y = 5.5 + Math.sin(KI._scene.camAngle * 0.2) * 0.8;
+      KI.camera.position.z = 15 + Math.cos(KI._scene.camAngle * 0.3) * 3;
+      KI.camera.lookAt(0, 1, 0);
+
+      // water shimmer
+      water.material.opacity = 0.35 + Math.sin(t * 0.3) * 0.05;
+
+      // fireflies
+      for (let i = 0; i < fireflyCount; i++) {
+        const fd = ffData[i];
+        ffPos[i*3] = fd.baseX + Math.sin(t * fd.speed + fd.phase) * fd.wanderR;
+        ffPos[i*3+1] = fd.baseY + Math.sin(t * fd.speed * 0.7 + fd.phase * 2) * 0.5;
+        ffPos[i*3+2] = fd.baseZ + Math.cos(t * fd.speed * 0.8 + fd.phase) * fd.wanderR;
+        // brightness pulse
+        const bright = 0.3 + Math.sin(t * 2 + fd.phase * 3) * 0.3;
+        ffCol[i*3] *= (1 + bright * 0.01);
+      }
+      fireflies.geometry.attributes.position.needsUpdate = true;
+      ffMat.opacity = 0.4 + Math.sin(t * 0.5) * 0.2;
+
+      // ripples
+      for (let i = ripples.length - 1; i >= 0; i--) {
+        const r = ripples[i]; r.life -= dt;
+        r.mesh.scale.multiplyScalar(1 + dt * 3);
+        r.mesh.material.opacity = Math.max(0, r.life / 3 * 0.4);
+        if (r.life <= 0) { KI.scene.remove(r.mesh); ripples.splice(i, 1); }
+      }
+
+      // trail particles
+      for (let i = trailParticles.length - 1; i >= 0; i--) {
+        const tp = trailParticles[i]; tp.life -= dt;
+        tp.mesh.position.y += tp.vy;
+        tp.mesh.position.x += tp.vx;
+        tp.mesh.position.z += tp.vz;
+        tp.mesh.material.opacity = Math.max(0, tp.life / 2 * 0.5);
+        tp.mesh.scale.multiplyScalar(1 - dt * 0.1);
+        if (tp.life <= 0) { KI.scene.remove(tp.mesh); trailParticles.splice(i, 1); }
+      }
+
+      // star twinkle
+      if (KI._scene.starMat) KI._scene.starMat.uniforms.uTime.value = t;
     };
   }
 

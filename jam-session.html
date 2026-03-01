@@ -22,7 +22,7 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 /* Player contribution rings */
 #contribRing{position:fixed;bottom:120px;left:50%;transform:translateX(-50%);z-index:50;
   pointer-events:none}
-#contribCanvas{width:300px;height:300px}
+#contribCanvas{width:400px;height:400px}
 
 /* Jam participants strip */
 #jamStrip{position:fixed;bottom:60px;left:0;right:0;z-index:55;
@@ -52,8 +52,6 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 
 #version{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:45;
   font-size:8px;color:#222;letter-spacing:3px;pointer-events:none}
-<div id="peers" style="display:none"></div>
-<div id="lbRows" style="display:none"></div>
 </style>
 </head>
 <body>
@@ -66,7 +64,7 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 
 <div id="sharedResonance"></div>
 
-<div id="contribRing"><canvas id="contribCanvas" width="300" height="300"></canvas></div>
+<div id="contribRing"><canvas id="contribCanvas" width="400" height="400"></canvas></div>
 
 <div id="jamStrip"></div>
 
@@ -238,12 +236,14 @@ function updateJammerCard(name, data) {
   wx.stroke();
 }
 
-// === CONTRIBUTION RING VISUALIZER ===
+// === CONTRIBUTION RING VISUALIZER — HD ===
 const contribCanvas = document.getElementById('contribCanvas');
 const contribCtx = contribCanvas.getContext('2d');
+const jamParticles = []; // floating particles in the ring
+
 function drawContribRing(t) {
-  contribCtx.clearRect(0, 0, 300, 300);
-  const cx = 150, cy = 150;
+  contribCtx.clearRect(0, 0, 400, 400);
+  const cx = 200, cy = 200;
   const allJammers = [{ name: KI.player.name, vowel: KI.voice.vowel, energy: KI.voice.energy,
     sounding: KI.voice.sounding, layer: KI.get('resonance')?.state.activeLayer ?? -1 }];
   Object.keys(jammers).forEach(n => allJammers.push({ name: n, ...jammers[n] }));
@@ -251,39 +251,132 @@ function drawContribRing(t) {
   const kanji = KI.get('kanji');
   const KANJI = kanji?.KANJI || {};
 
+  // background resonance circles
+  for (let ring = 0; ring < 3; ring++) {
+    const r = 60 + ring * 40;
+    const pulse = 1 + Math.sin(t * 0.5 + ring) * 0.03;
+    contribCtx.beginPath();
+    contribCtx.arc(cx, cy, r * pulse, 0, Math.PI * 2);
+    contribCtx.strokeStyle = 'rgba(255,0,255,' + (0.04 + sharedDepth * 0.005) + ')';
+    contribCtx.lineWidth = 1;
+    contribCtx.stroke();
+  }
+
+  // connection lines between active jammers
+  const activeJammers = allJammers.filter(j => j.sounding);
+  if (activeJammers.length >= 2) {
+    for (let i = 0; i < activeJammers.length; i++) {
+      for (let j = i + 1; j < activeJammers.length; j++) {
+        const ai = (allJammers.indexOf(activeJammers[i]) / Math.max(allJammers.length, 1)) * Math.PI * 2 - Math.PI / 2;
+        const aj = (allJammers.indexOf(activeJammers[j]) / Math.max(allJammers.length, 1)) * Math.PI * 2 - Math.PI / 2;
+        const ri = 100 + (activeJammers[i].layer >= 0 ? activeJammers[i].layer * 10 : 0);
+        const rj = 100 + (activeJammers[j].layer >= 0 ? activeJammers[j].layer * 10 : 0);
+        contribCtx.beginPath();
+        contribCtx.moveTo(cx + Math.cos(ai)*ri, cy + Math.sin(ai)*ri);
+        contribCtx.lineTo(cx + Math.cos(aj)*rj, cy + Math.sin(aj)*rj);
+        contribCtx.strokeStyle = 'rgba(255,0,255,0.15)';
+        contribCtx.lineWidth = 1;
+        contribCtx.stroke();
+      }
+    }
+  }
+
   allJammers.forEach((j, idx) => {
     const angle = (idx / Math.max(allJammers.length, 1)) * Math.PI * 2 - Math.PI / 2;
-    const r = 80 + (j.layer >= 0 ? j.layer * 8 : 0);
+    const r = 100 + (j.layer >= 0 ? j.layer * 10 : 0);
     const x = cx + Math.cos(angle) * r;
     const y = cy + Math.sin(angle) * r;
     const kj = KANJI[j.vowel];
     const color = kj?.color || '#555';
 
-    // arc segment
+    // arc segment with gradient
     if (j.sounding) {
-      const arcLen = Math.PI * 2 / Math.max(allJammers.length, 1) * 0.8;
+      const arcLen = Math.PI * 2 / Math.max(allJammers.length, 1) * 0.7;
+      // glow arc
       contribCtx.beginPath();
       contribCtx.arc(cx, cy, r, angle - arcLen/2, angle + arcLen/2);
-      contribCtx.strokeStyle = color + '66';
-      contribCtx.lineWidth = 3 + (j.energy || 0) * 20;
+      contribCtx.strokeStyle = color + '18';
+      contribCtx.lineWidth = 12 + (j.energy || 0) * 30;
       contribCtx.stroke();
+      // core arc
+      contribCtx.beginPath();
+      contribCtx.arc(cx, cy, r, angle - arcLen/2, angle + arcLen/2);
+      contribCtx.strokeStyle = color + '88';
+      contribCtx.lineWidth = 3 + (j.energy || 0) * 8;
+      contribCtx.stroke();
+
+      // spawn particle trail
+      if (Math.random() < 0.3) {
+        jamParticles.push({
+          x: x + (Math.random()-0.5)*10, y: y + (Math.random()-0.5)*10,
+          vx: (Math.random()-0.5)*0.5, vy: -0.5 - Math.random(),
+          life: 0.5 + Math.random()*0.5, size: 1 + Math.random()*2, color
+        });
+      }
     }
 
-    // dot
+    // dot with glow
+    if (j.sounding) {
+      const grad = contribCtx.createRadialGradient(x, y, 0, x, y, 12 + (j.energy||0)*20);
+      grad.addColorStop(0, color);
+      grad.addColorStop(1, color + '00');
+      contribCtx.fillStyle = grad;
+      contribCtx.beginPath();
+      contribCtx.arc(x, y, 12 + (j.energy||0)*20, 0, Math.PI*2);
+      contribCtx.fill();
+    }
+
+    // core dot
     contribCtx.beginPath();
-    contribCtx.arc(x, y, 4 + (j.energy || 0) * 15, 0, Math.PI * 2);
+    contribCtx.arc(x, y, 4 + (j.energy || 0) * 10, 0, Math.PI * 2);
     contribCtx.fillStyle = j.sounding ? color : '#333';
     contribCtx.fill();
 
-    // kanji
+    // kanji with shadow
     if (kj && j.sounding) {
-      contribCtx.font = '14px serif';
+      contribCtx.font = 'bold 18px serif';
       contribCtx.textAlign = 'center';
       contribCtx.textBaseline = 'middle';
+      contribCtx.shadowColor = color;
+      contribCtx.shadowBlur = 10;
       contribCtx.fillStyle = color;
-      contribCtx.fillText(kj.char, x, y - 16);
+      contribCtx.fillText(kj.char, x, y - 20);
+      contribCtx.shadowBlur = 0;
     }
+
+    // name
+    contribCtx.font = '8px monospace';
+    contribCtx.fillStyle = j.sounding ? '#fffa' : '#fff3';
+    contribCtx.textAlign = 'center';
+    contribCtx.fillText(j.name?.slice(0,8) || '', x, y + 18);
   });
+
+  // update particles
+  for (let i = jamParticles.length - 1; i >= 0; i--) {
+    const p = jamParticles[i];
+    p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+    contribCtx.globalAlpha = Math.max(0, p.life);
+    contribCtx.beginPath();
+    contribCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+    contribCtx.fillStyle = p.color;
+    contribCtx.fill();
+    if (p.life <= 0) jamParticles.splice(i, 1);
+  }
+  contribCtx.globalAlpha = 1;
+
+  // center shared depth display
+  if (sharedDepth > 0) {
+    contribCtx.font = 'bold 28px monospace';
+    contribCtx.textAlign = 'center';
+    contribCtx.fillStyle = 'rgba(255,0,255,' + Math.min(0.8, 0.2 + sharedDepth * 0.05) + ')';
+    contribCtx.shadowColor = '#f0f';
+    contribCtx.shadowBlur = 15;
+    contribCtx.fillText(sharedDepth, cx, cy);
+    contribCtx.font = '9px monospace';
+    contribCtx.fillStyle = '#f0f6';
+    contribCtx.fillText('SHARED DEPTH', cx, cy + 16);
+    contribCtx.shadowBlur = 0;
+  }
 }
 
 // === REMOTE STATE HANDLING ===
@@ -355,10 +448,10 @@ async function boot() {
   document.getElementById('sessionName').textContent = 'JAM: ' + ROOM;
   buildSharedMeter();
 
-  Scene.init({ stars: 5000, fogDensity: 0.005, fogColor: 0x060012 });
+  Scene.init({ stars: 7000, fogDensity: 0.004, fogColor: 0x060012 });
   Kanji.init();
   Resonance.init();
-  Vortex.init({ count: 2500 });
+  Vortex.init({ count: 3000 });
   ResonanceSynths.init();
   FX.init({ aurora: true });
 

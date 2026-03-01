@@ -36,7 +36,7 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 /* Clash zone — center of screen */
 #clashZone{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:50;
   pointer-events:none}
-#clashCanvas{width:400px;height:400px}
+#clashCanvas{width:600px;height:600px}
 
 /* Winner banner */
 #winner{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);z-index:70;
@@ -83,7 +83,7 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 </div>
 
 <div id="vsText">VS</div>
-<div id="clashZone"><canvas id="clashCanvas" width="400" height="400"></canvas></div>
+<div id="clashZone"><canvas id="clashCanvas" width="600" height="600"></canvas></div>
 <div id="winner"><span id="winnerText"></span><div id="winSub"></div></div>
 
 <div id="waitMsg">WAITING FOR OPPONENT<div id="waitSub">Share link to invite</div></div>
@@ -287,82 +287,209 @@ window.rematch = () => {
 
 // === CLASH EFFECTS ===
 function spawnClashEffect(x, y, color, text) {
-  duel.clashEffects.push({ x, y, color, text, life: 1.5, vy: -1 });
+  duel.clashEffects.push({ x: 300, y: 300, color, text, life: 1.5, vy: -1.5 });
+  spawnClashParticles(300, 300, color, 15);
 }
 
 const clashCanvas = document.getElementById('clashCanvas');
 const clashCtx = clashCanvas.getContext('2d');
 
-function drawClash() {
-  clashCtx.clearRect(0, 0, 400, 400);
+// clash particle system
+const clashParticles = [];
 
-  // draw energy beams converging at center
+function spawnClashParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 4;
+    clashParticles.push({
+      x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+      life: 0.5 + Math.random() * 0.5, size: 1 + Math.random() * 3, color
+    });
+  }
+}
+
+function drawClash() {
+  clashCtx.clearRect(0, 0, 600, 600);
+  const cx = 300, cy = 300;
+  const now = performance.now() * 0.001;
+
   if (duel.phase === 'fight') {
     const myRes = KI.get('resonance');
     const myLayer = myRes ? myRes.state.activeLayer : -1;
     const opLayer = duel.opponent?.layer ?? -1;
 
-    // P1 beam (left)
+    // P1 beam (left) — multi-layer with wave distortion
     if (myLayer >= 0 && KI.voice.sounding) {
       const ld = Resonance.LAYERS[myLayer];
       const col = '#' + ld.color.toString(16).padStart(6, '0');
-      const w = 4 + myLayer * 3;
-      clashCtx.strokeStyle = col;
-      clashCtx.lineWidth = w;
-      clashCtx.globalAlpha = 0.6;
+      const w = 6 + myLayer * 5;
+
+      // outer glow
+      clashCtx.globalAlpha = 0.06;
+      for (let g = 3; g >= 1; g--) {
+        clashCtx.beginPath();
+        for (let x = 0; x <= cx; x += 3) {
+          const wave = Math.sin(now * 8 + x * 0.05) * (w * 0.3 * g);
+          x === 0 ? clashCtx.moveTo(x, cy + wave) : clashCtx.lineTo(x, cy + wave);
+        }
+        clashCtx.strokeStyle = col;
+        clashCtx.lineWidth = w * g;
+        clashCtx.stroke();
+      }
+
+      // core beam with wave
+      clashCtx.globalAlpha = 0.7;
       clashCtx.beginPath();
-      clashCtx.moveTo(0, 200);
-      clashCtx.lineTo(200, 200);
+      for (let x = 0; x <= cx; x += 2) {
+        const wave = Math.sin(now * 10 + x * 0.08) * (2 + myLayer);
+        x === 0 ? clashCtx.moveTo(x, cy + wave) : clashCtx.lineTo(x, cy + wave);
+      }
+      clashCtx.strokeStyle = col;
+      clashCtx.lineWidth = w * 0.4;
       clashCtx.stroke();
-      // glow
-      clashCtx.lineWidth = w * 3;
-      clashCtx.globalAlpha = 0.1;
-      clashCtx.stroke();
+
+      // beam edge particles
+      if (Math.random() < 0.3) {
+        const px = Math.random() * cx;
+        spawnClashParticles(px, cy + (Math.random()-0.5) * w, col, 2);
+      }
       clashCtx.globalAlpha = 1;
     }
 
-    // P2 beam (right)
+    // P2 beam (right) — same treatment
     if (opLayer >= 0 && duel.opponent?.sounding) {
       const ld = Resonance.LAYERS[Math.min(4, opLayer)];
       const col = '#' + ld.color.toString(16).padStart(6, '0');
-      const w = 4 + opLayer * 3;
-      clashCtx.strokeStyle = col;
-      clashCtx.lineWidth = w;
-      clashCtx.globalAlpha = 0.6;
+      const w = 6 + opLayer * 5;
+
+      clashCtx.globalAlpha = 0.06;
+      for (let g = 3; g >= 1; g--) {
+        clashCtx.beginPath();
+        for (let x = 600; x >= cx; x -= 3) {
+          const wave = Math.sin(now * 8 + x * 0.05 + 2) * (w * 0.3 * g);
+          x === 600 ? clashCtx.moveTo(x, cy + wave) : clashCtx.lineTo(x, cy + wave);
+        }
+        clashCtx.strokeStyle = col;
+        clashCtx.lineWidth = w * g;
+        clashCtx.stroke();
+      }
+
+      clashCtx.globalAlpha = 0.7;
       clashCtx.beginPath();
-      clashCtx.moveTo(400, 200);
-      clashCtx.lineTo(200, 200);
+      for (let x = 600; x >= cx; x -= 2) {
+        const wave = Math.sin(now * 10 + x * 0.08 + 2) * (2 + opLayer);
+        x === 600 ? clashCtx.moveTo(x, cy + wave) : clashCtx.lineTo(x, cy + wave);
+      }
+      clashCtx.strokeStyle = col;
+      clashCtx.lineWidth = w * 0.4;
       clashCtx.stroke();
-      clashCtx.lineWidth = w * 3;
-      clashCtx.globalAlpha = 0.1;
-      clashCtx.stroke();
+
+      if (Math.random() < 0.3) {
+        const px = cx + Math.random() * cx;
+        spawnClashParticles(px, cy + (Math.random()-0.5) * w, col, 2);
+      }
       clashCtx.globalAlpha = 1;
     }
 
-    // center clash spark
+    // center clash — HD sparks + shockwave rings
     if (myLayer >= 0 && opLayer >= 0 && KI.voice.sounding && duel.opponent?.sounding) {
-      const t = performance.now() * 0.01;
-      for (let i = 0; i < 6; i++) {
-        const a = t + i * Math.PI / 3;
-        const r = 10 + Math.sin(t * 3 + i) * 8;
+      // shockwave ring
+      const ringR = 15 + Math.sin(now * 6) * 10;
+      clashCtx.beginPath();
+      clashCtx.arc(cx, cy, ringR, 0, Math.PI * 2);
+      clashCtx.strokeStyle = 'rgba(255,255,255,0.4)';
+      clashCtx.lineWidth = 2;
+      clashCtx.stroke();
+
+      // inner sparks
+      const sparkCount = 12 + Math.max(myLayer, opLayer) * 4;
+      for (let i = 0; i < sparkCount; i++) {
+        const a = now * 3 + i * Math.PI * 2 / sparkCount;
+        const r = 5 + Math.sin(now * 8 + i * 1.5) * 15;
+        const sx = 1 + Math.random() * 2;
         clashCtx.beginPath();
-        clashCtx.arc(200 + Math.cos(a)*r, 200 + Math.sin(a)*r, 2, 0, Math.PI*2);
-        clashCtx.fillStyle = '#fff';
+        clashCtx.arc(cx + Math.cos(a)*r, cy + Math.sin(a)*r, sx, 0, Math.PI*2);
+        clashCtx.fillStyle = i % 2 === 0 ? '#fff' : '#ff0';
         clashCtx.fill();
       }
+
+      // energy cross pattern
+      clashCtx.globalAlpha = 0.15;
+      for (let i = 0; i < 4; i++) {
+        const a = now * 0.5 + i * Math.PI / 2;
+        clashCtx.beginPath();
+        clashCtx.moveTo(cx, cy);
+        clashCtx.lineTo(cx + Math.cos(a)*40, cy + Math.sin(a)*40);
+        clashCtx.strokeStyle = '#fff';
+        clashCtx.lineWidth = 3;
+        clashCtx.stroke();
+      }
+      clashCtx.globalAlpha = 1;
+
+      spawnClashParticles(cx, cy, '#fff', 1);
     }
   }
 
-  // damage text effects
+  // update particles
+  for (let i = clashParticles.length - 1; i >= 0; i--) {
+    const p = clashParticles[i];
+    p.x += p.vx; p.y += p.vy; p.life -= 0.02; p.vx *= 0.97; p.vy *= 0.97;
+    clashCtx.globalAlpha = Math.max(0, p.life);
+    clashCtx.beginPath();
+    clashCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    clashCtx.fillStyle = p.color;
+    clashCtx.fill();
+    if (p.life <= 0) clashParticles.splice(i, 1);
+  }
+  clashCtx.globalAlpha = 1;
+
+  // fighter charge auras — left and right edges
+  if (duel.phase === 'fight') {
+    const myRes = KI.get('resonance');
+    const myL = myRes ? myRes.state.activeLayer : -1;
+    const opL = duel.opponent?.layer ?? -1;
+    // P1 left aura
+    if (myL >= 0 && KI.voice.sounding) {
+      const ld = Resonance.LAYERS[myL];
+      const col = '#' + ld.color.toString(16).padStart(6,'0');
+      const grad = clashCtx.createRadialGradient(40, cy, 5, 40, cy, 60 + myL * 15);
+      grad.addColorStop(0, col + '66');
+      grad.addColorStop(0.5, col + '18');
+      grad.addColorStop(1, col + '00');
+      clashCtx.fillStyle = grad;
+      clashCtx.fillRect(0, cy - 80, 120, 160);
+    }
+    // P2 right aura
+    if (opL >= 0 && duel.opponent?.sounding) {
+      const ld = Resonance.LAYERS[Math.min(4, opL)];
+      const col = '#' + ld.color.toString(16).padStart(6,'0');
+      const grad = clashCtx.createRadialGradient(560, cy, 5, 560, cy, 60 + opL * 15);
+      grad.addColorStop(0, col + '66');
+      grad.addColorStop(0.5, col + '18');
+      grad.addColorStop(1, col + '00');
+      clashCtx.fillStyle = grad;
+      clashCtx.fillRect(480, cy - 80, 120, 160);
+    }
+  }
+
+  // damage text effects — bigger font, with shadow
   for (let i = duel.clashEffects.length - 1; i >= 0; i--) {
     const e = duel.clashEffects[i];
-    e.life -= 0.016;
+    e.life -= 0.012;
     e.y += e.vy;
+    const scale = 1 + (1 - e.life) * 0.5;
     clashCtx.globalAlpha = Math.max(0, e.life);
+    clashCtx.save();
+    clashCtx.translate(e.x, e.y);
+    clashCtx.scale(scale, scale);
+    clashCtx.shadowColor = e.color;
+    clashCtx.shadowBlur = 12;
     clashCtx.fillStyle = e.color;
-    clashCtx.font = 'bold 18px monospace';
+    clashCtx.font = 'bold 22px monospace';
     clashCtx.textAlign = 'center';
-    clashCtx.fillText(e.text, e.x, e.y);
+    clashCtx.fillText(e.text, 0, 0);
+    clashCtx.restore();
+    clashCtx.shadowBlur = 0;
     clashCtx.globalAlpha = 1;
     if (e.life <= 0) duel.clashEffects.splice(i, 1);
   }
@@ -424,10 +551,10 @@ async function boot() {
   document.getElementById('duelTitle').textContent = 'DUEL: ' + ROOM;
   document.getElementById('p1Name').textContent = KI.player.name;
 
-  Scene.init({ stars: 3000, fogColor: 0x0a0000, fogDensity: 0.01 });
+  Scene.init({ stars: 5000, fogColor: 0x0a0000, fogDensity: 0.008 });
   Kanji.init();
   Resonance.init();
-  Vortex.init({ count: 2000 });
+  Vortex.init({ count: 3000 });
   KiBlasts.init();
   ResonanceSynths.init();
   FX.init({ aurora: true });
