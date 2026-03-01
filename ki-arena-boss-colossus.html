@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena BOSS COLOSSUS — Giant 3D Geometric Boss Battles</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:12px 20px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.85),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-c,.hud-r{display:flex;flex-direction:column;gap:3px}
+.hud-c{align-items:center}
+.hud-r{align-items:flex-end;text-align:right}
+#score{font-size:32px;color:#ff0;text-shadow:0 0 12px #f80}
+#combo{font-size:18px;color:#f80}
+#blastType{font-size:14px;color:#4af}
+#waveLabel{font-size:16px;color:#f44;letter-spacing:3px;text-shadow:0 0 10px #f44}
+#bossName{font-size:24px;color:#ff0;text-shadow:0 0 14px #f80;letter-spacing:2px}
+#waveSub{font-size:10px;color:#fff5}
+
+/* BOSS HP */
+#bossHPBar{position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:55;
+  width:520px;max-width:82%;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#bossHPBar.on{opacity:1}
+#bossHPLabel{display:flex;justify-content:space-between;font-size:10px;color:#fff8;margin-bottom:3px}
+#bossHPTrack{height:16px;background:#111;border:2px solid #f44;border-radius:8px;overflow:hidden}
+#bossHPFill{height:100%;background:linear-gradient(90deg,#f44,#ff6644);border-radius:6px;
+  transition:width 0.15s;width:100%}
+
+/* PLAYER HP */
+#playerHP{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:55;
+  width:300px;max-width:60%;pointer-events:none}
+#playerHPLabel{font-size:9px;color:#0f08;text-align:center;margin-bottom:2px}
+#playerHPTrack{height:8px;background:#111;border:1px solid #0f04;border-radius:4px;overflow:hidden}
+#playerHPFill{height:100%;background:linear-gradient(90deg,#0a0,#0f0);border-radius:3px;
+  transition:width 0.15s;width:100%}
+
+/* RESONANCE HUD */
+#resHUD{position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:55;
+  pointer-events:none;opacity:0;transition:opacity 0.4s}
+#resHUD.on{opacity:1}
+#resKanji{font-size:80px;line-height:1;text-shadow:0 0 30px currentColor,0 0 60px currentColor;
+  text-align:center;transition:color 0.3s}
+#resLabel{font-size:9px;color:#fff5;text-align:center;margin-top:3px;letter-spacing:2px}
+#resDepth{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+.depth-layer{display:flex;align-items:center;gap:6px;opacity:0.2;transition:opacity 0.3s,transform 0.3s}
+.depth-layer.active{opacity:1;transform:translateX(4px)}
+.depth-layer.peak{opacity:1;transform:translateX(8px)}
+.depth-dot{width:10px;height:10px;border-radius:50%;border:1px solid;transition:background 0.3s,box-shadow 0.3s}
+.depth-layer.active .depth-dot{box-shadow:0 0 8px currentColor}
+.depth-layer.peak .depth-dot{background:currentColor;box-shadow:0 0 12px currentColor,0 0 24px currentColor}
+.depth-name{font-size:9px;letter-spacing:1px}
+.depth-mult{font-size:8px;color:#ff08;margin-left:auto}
+#resMultiplier{font-size:20px;color:#ff0;text-align:center;margin-top:4px;
+  text-shadow:0 0 10px #f80;opacity:0;transition:opacity 0.3s}
+#resMultiplier.on{opacity:1}
+
+/* KANJI HUD */
+#kanjiHUD{position:fixed;right:20px;top:50%;transform:translateY(-50%);z-index:55;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#kanjiHUD.on{opacity:1}
+#kanjiChar{font-size:60px;line-height:1;text-shadow:0 0 25px currentColor,0 0 50px currentColor}
+#kanjiName{font-size:9px;color:#fff8;margin-top:3px}
+#kanjiReading{font-size:7px;color:#fff4}
+
+/* MORPH BALL */
+#morphBall{position:fixed;right:16px;bottom:50px;z-index:55;pointer-events:none;
+  filter:drop-shadow(0 0 16px rgba(255,200,0,0.4))}
+
+/* BOSS ATTACK */
+#bossAtk{position:fixed;top:38%;left:50%;transform:translate(-50%,-50%);z-index:80;
+  font-size:30px;color:#f44;text-shadow:0 0 20px #f44,0 0 40px #f004;letter-spacing:6px;
+  opacity:0;transition:opacity 0.15s;pointer-events:none}
+#bossAtk.show{opacity:1;animation:atkPulse 0.6s ease-in-out}
+@keyframes atkPulse{0%{transform:translate(-50%,-50%) scale(0.5)}
+  50%{transform:translate(-50%,-50%) scale(1.3)}100%{transform:translate(-50%,-50%) scale(1)}}
+
+/* BOSS INTRO */
+#bossIntro{position:fixed;inset:0;z-index:150;display:none;
+  background:rgba(0,0,0,0.92);align-items:center;justify-content:center;flex-direction:column}
+#bossIntro.show{display:flex}
+#introWave{font-size:16px;color:#f448;letter-spacing:6px;margin-bottom:10px}
+#introName{font-size:52px;color:#ff0;text-shadow:0 0 30px #f80,0 0 60px #ff04;letter-spacing:4px}
+#introTitle{font-size:14px;color:#f44;margin-top:8px;letter-spacing:3px}
+#introDesc{font-size:12px;color:#0ff;margin-top:20px;max-width:400px;text-align:center;line-height:1.6}
+
+/* GAME OVER / VICTORY */
+#gameOver,#victory{position:fixed;inset:0;z-index:200;display:none;
+  background:rgba(0,0,0,0.9);align-items:center;justify-content:center;flex-direction:column}
+#gameOver.show,#victory.show{display:flex}
+#goTitle{font-size:60px;color:#f44;text-shadow:0 0 30px #f44}
+#goScore,#vicScore{font-size:22px;color:#ff0;margin-top:16px}
+#goWaves{font-size:16px;color:#0ff;margin-top:8px}
+#vicTitle{font-size:50px;color:#ff0;text-shadow:0 0 40px #f80,0 0 80px #ff04;letter-spacing:4px}
+#vicSub{font-size:18px;color:#0f0;margin-top:12px}
+.retry-btn{margin-top:30px;padding:12px 32px;font-size:16px;border:none;border-radius:8px;
+  cursor:pointer;font-weight:bold;letter-spacing:2px}
+#goBtn{background:#f44;color:#fff}
+#vicBtn{background:#ff0;color:#000}
+
+/* DAMAGE */
+#dmgLayer{position:fixed;inset:0;z-index:60;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 10px currentColor,0 0 20px currentColor;
+  animation:dmgUp 1.4s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}
+  100%{opacity:0;transform:translateY(-140px) scale(2)}}
+
+/* COMMENTARY */
+#cmt{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:70;
+  background:rgba(0,0,0,0.85);border:2px solid #ff0;border-radius:14px;padding:10px 24px;
+  font-size:18px;color:#ff0;text-shadow:0 0 12px #f80;text-align:center;
+  max-width:600px;opacity:0;transition:opacity 0.3s;pointer-events:none}
+#cmt.show{opacity:1}
+
+/* SCREEN FLASH */
+#hitFlash{position:fixed;inset:0;z-index:100;pointer-events:none;opacity:0;
+  background:radial-gradient(circle,rgba(255,0,0,0.3),transparent 60%)}
+#hitFlash.flash{opacity:1;animation:flashOut 0.4s ease-out forwards}
+@keyframes flashOut{0%{opacity:0.6}100%{opacity:0}}
+
+/* MODULE BADGES */
+#modBadges{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:55;
+  display:flex;gap:6px;pointer-events:none;flex-wrap:wrap;justify-content:center;max-width:80%}
+.mod-badge{background:#0002;border:1px solid #f803;border-radius:4px;padding:2px 8px;
+  font-size:8px;color:#f808;letter-spacing:1px}
+.mod-badge.active{color:#f80;border-color:#f804}
+
+#version{position:fixed;bottom:6px;left:50%;transform:translateX(-50%);z-index:50;
+  font-size:9px;color:#333;letter-spacing:3px;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div class="hud-l"><div id="score">0</div><div id="combo"></div><div id="blastType">—</div></div>
+  <div class="hud-c"><div id="waveLabel">WAVE 1</div><div id="bossName">—</div><div id="waveSub">Get Ready</div></div>
+  <div class="hud-r"></div>
+</div>
+
+<div id="bossHPBar"><div id="bossHPLabel"><span id="bossHPName">BOSS</span><span id="bossHPPct">100%</span></div>
+  <div id="bossHPTrack"><div id="bossHPFill"></div></div></div>
+
+<div id="playerHP"><div id="playerHPLabel">YOUR SPIRIT</div>
+  <div id="playerHPTrack"><div id="playerHPFill"></div></div></div>
+
+<div id="resHUD"><div id="resKanji">気</div><div id="resLabel">RESONANCE</div>
+  <div id="resDepth"></div><div id="resMultiplier">1x</div></div>
+
+<div id="kanjiHUD"><div id="kanjiChar">気</div><div id="kanjiName">Spirit</div><div id="kanjiReading">KI</div></div>
+
+<canvas id="morphBall" width="140" height="140"></canvas>
+<div id="bossAtk">INCOMING!</div>
+
+<div id="bossIntro"><div id="introWave">WAVE 1</div><div id="introName">—</div>
+  <div id="introTitle">—</div><div id="introDesc"></div></div>
+
+<div id="gameOver"><div id="goTitle">DEFEATED</div><div id="goScore">Score: 0</div>
+  <div id="goWaves">Waves Cleared: 0</div>
+  <button class="retry-btn" id="goBtn" onclick="restartRush()">TRY AGAIN</button></div>
+
+<div id="victory"><div id="vicTitle">全勝 COLOSSUS CONQUERED</div>
+  <div id="vicSub">You defeated all the Colossi!</div><div id="vicScore">Score: 0</div>
+  <button class="retry-btn" id="vicBtn" onclick="restartRush()">PLAY AGAIN</button></div>
+
+<div id="dmgLayer"></div>
+<div id="cmt"></div>
+<div id="hitFlash"></div>
+<div id="modBadges"></div>
+<div id="version">KI ARENA BOSS COLOSSUS</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+// ============================================================
+// KI ARENA BOSS COLOSSUS
+//
+// Giant 3D geometric bosses towering over the arena.
+// Each boss is a massive construct of nested rotating geometries.
+// Boss attacks are 3D projectiles that fly toward the player.
+// ============================================================
+
+import { KI } from './modules/core.js';
+import * as Scene from './modules/hd-scene.js';
+import * as Vortex from './modules/hd-vortex.js';
+import * as FX from './modules/hd-fx.js';
+import * as Resonance from './modules/resonance.js';
+import * as ResonanceSynths from './modules/resonance-synths.js';
+import * as VoiceEngine from './modules/voice-engine.js';
+import * as Kanji from './modules/kanji.js';
+import * as KiBlasts from './modules/ki-blasts.js';
+import * as EmojiSystem from './modules/emoji-system.js';
+
+// ============================================================
+// COLOSSUS BOSS DEFINITIONS
+// Each boss has a unique 3D geometry construct
+// ============================================================
+const BOSSES = [
+  {
+    name: 'THE TETRAHEDRON', title: 'First Colossus — Blade of Angles',
+    hp: 2500, atkInterval: 2.8, atkDmg: 45, atkName: 'EDGE SLICE',
+    color: 0x44ffaa, weakness: 'eh', weakMult: 2.0,
+    build: buildTetrahedron,
+    desc: 'A spinning blade of pure geometry. Weak to wind (eh).'
+  },
+  {
+    name: 'THE CUBE', title: 'Second Colossus — Perfect Containment',
+    hp: 4000, atkInterval: 2.5, atkDmg: 55, atkName: 'CAGE CRUSH',
+    color: 0xff4444, weakness: 'ah', weakMult: 2.0,
+    build: buildCube,
+    desc: 'Nested cubes that rotate in opposing directions. Weak to fire (ah).'
+  },
+  {
+    name: 'THE OCTAHEDRON', title: 'Third Colossus — Diamond Wrath',
+    hp: 6000, atkInterval: 2.0, atkDmg: 65, atkName: 'PRISM BEAM',
+    color: 0xffff00, weakness: 'ee', weakMult: 1.8,
+    build: buildOctahedron,
+    desc: 'Twin diamonds spinning in opposing axes. Weak to lightning (ee).'
+  },
+  {
+    name: 'THE ICOSAHEDRON', title: 'Fourth Colossus — Sphere of Fury',
+    hp: 8000, atkInterval: 2.2, atkDmg: 75, atkName: 'SPHERE BURST',
+    color: 0x4488ff, weakness: 'oo', weakMult: 1.8,
+    build: buildIcosahedron,
+    desc: 'A near-perfect sphere bristling with triangular facets. Weak to water (oo).'
+  },
+  {
+    name: 'THE TOROID', title: 'Fifth Colossus — Ring of Eternity',
+    hp: 11000, atkInterval: 3.0, atkDmg: 100, atkName: 'RING SLAM',
+    color: 0xaa6622, weakness: 'mm', weakMult: 2.0,
+    build: buildToroid,
+    desc: 'Massive interlocking torus rings. Slow but devastating. Weak to earth (mm).'
+  },
+  {
+    name: 'THE DODECAHEDRON', title: 'Sixth Colossus — Pentagon Phantom',
+    hp: 14000, atkInterval: 1.5, atkDmg: 55, atkName: 'PHASE CUT',
+    color: 0x8800ff, weakness: 'oh', weakMult: 1.5,
+    build: buildDodecahedron,
+    desc: 'Rapidly phasing pentagonal construct. Attacks relentlessly. Weak to spirit (oh).'
+  },
+  {
+    name: 'THE STELLATED', title: 'Final Colossus — Star of Annihilation',
+    hp: 20000, atkInterval: 1.8, atkDmg: 90, atkName: 'STAR NOVA',
+    color: 0xffffff, weakness: null, weakMult: 1.0,
+    build: buildStellated,
+    desc: 'A stellated polyhedron of pure destruction. No weakness. Master all voices.'
+  }
+];
+
+// ============================================================
+// 3D BOSS BUILDERS — Each creates a unique geometry construct
+// ============================================================
+function buildTetrahedron(scene, color) {
+  const group = new THREE.Group();
+  // outer tetrahedron wireframe
+  const outerGeo = new THREE.TetrahedronGeometry(5, 0);
+  const outerMat = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.8 });
+  const outer = new THREE.Mesh(outerGeo, outerMat);
+  group.add(outer);
+  // inner solid tetrahedron
+  const innerGeo = new THREE.TetrahedronGeometry(2.5, 0);
+  const innerMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.15,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  group.add(new THREE.Mesh(innerGeo, innerMat));
+  // core glow
+  const coreGeo = new THREE.SphereGeometry(1.2, 16, 16);
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  group.add(new THREE.Mesh(coreGeo, coreMat));
+  // orbiting edge particles
+  const edgeGeo = new THREE.BufferGeometry();
+  const edgePos = new Float32Array(60 * 3);
+  for (let i = 0; i < 60; i++) {
+    const a = (i / 60) * Math.PI * 2;
+    edgePos[i*3] = Math.cos(a) * 4.5;
+    edgePos[i*3+1] = Math.sin(a * 2) * 2;
+    edgePos[i*3+2] = Math.sin(a) * 4.5;
+  }
+  edgeGeo.setAttribute('position', new THREE.BufferAttribute(edgePos, 3));
+  const edgeMat = new THREE.PointsMaterial({ color, size: 0.2, transparent: true, opacity: 0.6,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  group.add(new THREE.Points(edgeGeo, edgeMat));
+
+  group._animate = (t, hpPct) => {
+    outer.rotation.y = t * 0.8;
+    outer.rotation.x = t * 0.3;
+    outer.scale.setScalar(1 + Math.sin(t * 2) * 0.05 * (2 - hpPct));
+  };
+  return group;
+}
+
+function buildCube(scene, color) {
+  const group = new THREE.Group();
+  // 3 nested cubes rotating on different axes
+  const sizes = [6, 4, 2.2];
+  const cubes = [];
+  sizes.forEach((s, i) => {
+    const geo = new THREE.BoxGeometry(s, s, s);
+    const mat = new THREE.MeshBasicMaterial({
+      color, wireframe: true, transparent: true, opacity: 0.7 - i * 0.15
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    group.add(mesh);
+    cubes.push(mesh);
+  });
+  // inner glow cube
+  const glowGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  group.add(new THREE.Mesh(glowGeo, glowMat));
+  // edge lines
+  const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(6.2, 6.2, 6.2));
+  const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15,
+    blending: THREE.AdditiveBlending });
+  group.add(new THREE.LineSegments(edgeGeo, edgeMat));
+
+  group._animate = (t, hpPct) => {
+    cubes[0].rotation.y = t * 0.4;
+    cubes[0].rotation.x = t * 0.15;
+    cubes[1].rotation.y = -t * 0.6;
+    cubes[1].rotation.z = t * 0.3;
+    cubes[2].rotation.x = t * 0.8;
+    cubes[2].rotation.y = t * 0.5;
+    // shake when low HP
+    if (hpPct < 0.3) {
+      group.position.x = Math.sin(t * 20) * 0.15;
+      group.position.z = Math.cos(t * 17) * 0.1;
+    }
+  };
+  return group;
+}
+
+function buildOctahedron(scene, color) {
+  const group = new THREE.Group();
+  // twin octahedra — top and bottom
+  const topGeo = new THREE.OctahedronGeometry(4, 0);
+  const topMat = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.8 });
+  const top = new THREE.Mesh(topGeo, topMat);
+  top.position.y = 1;
+  group.add(top);
+  const botGeo = new THREE.OctahedronGeometry(3.5, 0);
+  const botMat = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.6 });
+  const bot = new THREE.Mesh(botGeo, botMat);
+  bot.position.y = -1;
+  bot.rotation.y = Math.PI / 4;
+  group.add(bot);
+  // inner crystal — higher subdivision
+  const crystalGeo = new THREE.OctahedronGeometry(1.8, 1);
+  const crystalMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.12,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  group.add(new THREE.Mesh(crystalGeo, crystalMat));
+  // orbiting ring
+  const ringGeo = new THREE.TorusGeometry(5, 0.08, 8, 48);
+  const ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.4,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  group.add(ring);
+  // bright core
+  const coreGeo = new THREE.SphereGeometry(0.8, 12, 12);
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  group.add(new THREE.Mesh(coreGeo, coreMat));
+
+  group._animate = (t, hpPct) => {
+    top.rotation.y = t * 0.6;
+    top.rotation.x = Math.sin(t * 0.5) * 0.3;
+    bot.rotation.y = -t * 0.8;
+    bot.rotation.z = Math.cos(t * 0.4) * 0.2;
+    ring.rotation.x = t * 0.3;
+    ring.rotation.z = t * 0.4;
+    ring.scale.setScalar(1 + Math.sin(t * 3) * 0.08);
+  };
+  return group;
+}
+
+function buildIcosahedron(scene, color) {
+  const group = new THREE.Group();
+  // high-detail icosahedron layers
+  [5, 3.8, 2.5].forEach((r, i) => {
+    const geo = new THREE.IcosahedronGeometry(r, i);
+    const mat = new THREE.MeshBasicMaterial({
+      color, wireframe: true, transparent: true, opacity: 0.7 - i * 0.2
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = 'shell-' + i;
+    group.add(mesh);
+  });
+  // core sphere with glow
+  const coreGeo = new THREE.SphereGeometry(1.5, 24, 24);
+  const coreMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.1,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  group.add(new THREE.Mesh(coreGeo, coreMat));
+  // orbiting particle belt
+  const beltGeo = new THREE.BufferGeometry();
+  const beltPos = new Float32Array(100 * 3);
+  for (let i = 0; i < 100; i++) {
+    const a = (i / 100) * Math.PI * 2;
+    beltPos[i*3] = Math.cos(a) * (5.5 + Math.random() * 0.5);
+    beltPos[i*3+1] = (Math.random() - 0.5) * 1;
+    beltPos[i*3+2] = Math.sin(a) * (5.5 + Math.random() * 0.5);
+  }
+  beltGeo.setAttribute('position', new THREE.BufferAttribute(beltPos, 3));
+  const beltMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.15, transparent: true,
+    opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false });
+  group.add(new THREE.Points(beltGeo, beltMat));
+
+  group._animate = (t, hpPct) => {
+    group.children.forEach((c, i) => {
+      if (c.name?.startsWith('shell')) {
+        c.rotation.y = t * (0.3 + i * 0.15) * (i % 2 === 0 ? 1 : -1);
+        c.rotation.x = t * (0.1 + i * 0.1);
+      }
+    });
+    // pulse at low HP
+    const pulse = 1 + Math.sin(t * 4) * 0.03 * (2 - hpPct);
+    group.scale.setScalar(pulse);
+  };
+  return group;
+}
+
+function buildToroid(scene, color) {
+  const group = new THREE.Group();
+  // 3 interlocking torus rings at different orientations
+  const configs = [
+    { r: 5, tube: 0.5, rotX: Math.PI / 2, rotY: 0 },
+    { r: 5, tube: 0.4, rotX: 0, rotY: 0 },
+    { r: 5, tube: 0.3, rotX: 0, rotY: Math.PI / 2 }
+  ];
+  const toruses = [];
+  configs.forEach((cfg, i) => {
+    const geo = new THREE.TorusGeometry(cfg.r, cfg.tube, 16, 48);
+    const mat = new THREE.MeshBasicMaterial({
+      color, wireframe: true, transparent: true, opacity: 0.6 - i * 0.1
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = cfg.rotX;
+    mesh.rotation.y = cfg.rotY;
+    group.add(mesh);
+    toruses.push(mesh);
+  });
+  // inner torus knot
+  const knotGeo = new THREE.TorusKnotGeometry(2, 0.4, 64, 8, 2, 3);
+  const knotMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.15,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  const knot = new THREE.Mesh(knotGeo, knotMat);
+  group.add(knot);
+  // core
+  const coreGeo = new THREE.SphereGeometry(1, 16, 16);
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  group.add(new THREE.Mesh(coreGeo, coreMat));
+
+  group._animate = (t, hpPct) => {
+    toruses[0].rotation.z = t * 0.3;
+    toruses[1].rotation.y = t * 0.4;
+    toruses[1].rotation.x = t * 0.15;
+    toruses[2].rotation.z = -t * 0.35;
+    toruses[2].rotation.x = t * 0.2;
+    knot.rotation.x = t * 0.2;
+    knot.rotation.y = t * 0.3;
+  };
+  return group;
+}
+
+function buildDodecahedron(scene, color) {
+  const group = new THREE.Group();
+  // main dodecahedron
+  const mainGeo = new THREE.DodecahedronGeometry(4.5, 0);
+  const mainMat = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.8 });
+  const main = new THREE.Mesh(mainGeo, mainMat);
+  group.add(main);
+  // inner dodecahedron (inverted rotation)
+  const innerGeo = new THREE.DodecahedronGeometry(3, 0);
+  const innerMat = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.4 });
+  const inner = new THREE.Mesh(innerGeo, innerMat);
+  group.add(inner);
+  // phantom copies (semi-transparent)
+  for (let i = 0; i < 3; i++) {
+    const ghostGeo = new THREE.DodecahedronGeometry(5 + i * 0.8, 0);
+    const ghostMat = new THREE.MeshBasicMaterial({
+      color, wireframe: true, transparent: true, opacity: 0.08 - i * 0.02,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    const ghost = new THREE.Mesh(ghostGeo, ghostMat);
+    ghost.name = 'ghost-' + i;
+    group.add(ghost);
+  }
+  // pentagon face highlights
+  const pentGeo = new THREE.CircleGeometry(1.8, 5);
+  const pentMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.05,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const pent = new THREE.Mesh(pentGeo, pentMat);
+  pent.position.z = 4;
+  group.add(pent);
+
+  group._animate = (t, hpPct) => {
+    main.rotation.y = t * 0.5;
+    main.rotation.x = Math.sin(t * 0.3) * 0.3;
+    inner.rotation.y = -t * 0.7;
+    inner.rotation.z = t * 0.4;
+    // ghosts phase in and out
+    group.children.forEach(c => {
+      if (c.name?.startsWith('ghost')) {
+        const i = parseInt(c.name.split('-')[1]);
+        c.rotation.y = t * (0.1 + i * 0.05);
+        c.rotation.x = t * (0.05 + i * 0.03);
+        c.material.opacity = 0.04 + Math.sin(t * 2 + i * 2) * 0.03;
+        c.scale.setScalar(1 + Math.sin(t * 1.5 + i) * 0.1);
+      }
+    });
+  };
+  return group;
+}
+
+function buildStellated(scene, color) {
+  const group = new THREE.Group();
+  // stellated icosahedron — icosahedron + extended spikes
+  const baseGeo = new THREE.IcosahedronGeometry(3.5, 1);
+  const baseMat = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.6 });
+  group.add(new THREE.Mesh(baseGeo, baseMat));
+
+  // spikes from each vertex of an icosahedron
+  const icoGeo = new THREE.IcosahedronGeometry(3.5, 0);
+  const positions = icoGeo.attributes.position;
+  const spikePositions = new Set();
+  for (let i = 0; i < positions.count; i++) {
+    const key = Math.round(positions.getX(i)*100) + ',' +
+                Math.round(positions.getY(i)*100) + ',' +
+                Math.round(positions.getZ(i)*100);
+    if (!spikePositions.has(key)) {
+      spikePositions.add(key);
+      const dir = new THREE.Vector3(positions.getX(i), positions.getY(i), positions.getZ(i)).normalize();
+      const spikeGeo = new THREE.ConeGeometry(0.5, 3.5, 4);
+      const spikeMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5,
+        blending: THREE.AdditiveBlending, depthWrite: false });
+      const spike = new THREE.Mesh(spikeGeo, spikeMat);
+      spike.position.copy(dir.multiplyScalar(4.5));
+      spike.lookAt(0, 0, 0);
+      spike.rotateX(Math.PI / 2);
+      group.add(spike);
+    }
+  }
+
+  // inner glowing sphere
+  const coreGeo = new THREE.SphereGeometry(2, 24, 24);
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  group.add(new THREE.Mesh(coreGeo, coreMat));
+
+  // orbiting rings
+  for (let i = 0; i < 3; i++) {
+    const ringGeo = new THREE.TorusGeometry(6 + i, 0.04, 8, 48);
+    const ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.2 - i * 0.05,
+      blending: THREE.AdditiveBlending, depthWrite: false });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.name = 'orbit-' + i;
+    group.add(ring);
+  }
+
+  group._animate = (t, hpPct) => {
+    group.rotation.y = t * 0.3;
+    group.rotation.x = Math.sin(t * 0.2) * 0.2;
+    group.children.forEach(c => {
+      if (c.name?.startsWith('orbit')) {
+        const i = parseInt(c.name.split('-')[1]);
+        c.rotation.x = t * (0.2 + i * 0.15);
+        c.rotation.z = t * (0.15 + i * 0.1);
+      }
+    });
+    // pulsing at low HP
+    if (hpPct < 0.3) {
+      const s = 1 + Math.sin(t * 6) * 0.08;
+      group.scale.setScalar(s);
+    }
+  };
+  return group;
+}
+
+// ============================================================
+// BOSS PROJECTILE SYSTEM — 3D attacks flying toward player
+// ============================================================
+const projectiles = [];
+
+function spawnBossProjectile(bossPos, playerPos, color, type) {
+  const scene = KI.scene;
+  if (!scene) return;
+
+  let projMesh;
+  const speed = 12 + Math.random() * 6;
+
+  if (type === 'sphere') {
+    const geo = new THREE.SphereGeometry(0.4, 12, 12);
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8,
+      blending: THREE.AdditiveBlending, depthWrite: false });
+    projMesh = new THREE.Mesh(geo, mat);
+    // add glow shell
+    const glowGeo = new THREE.SphereGeometry(0.8, 8, 8);
+    const glowMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.15,
+      blending: THREE.AdditiveBlending, depthWrite: false });
+    projMesh.add(new THREE.Mesh(glowGeo, glowMat));
+  } else if (type === 'spike') {
+    const geo = new THREE.ConeGeometry(0.3, 1.5, 6);
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8,
+      blending: THREE.AdditiveBlending, depthWrite: false });
+    projMesh = new THREE.Mesh(geo, mat);
+    projMesh.lookAt(playerPos);
+    projMesh.rotateX(Math.PI / 2);
+  } else {
+    const geo = new THREE.OctahedronGeometry(0.35, 0);
+    const mat = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.8 });
+    projMesh = new THREE.Mesh(geo, mat);
+    const trailGeo = new THREE.SphereGeometry(0.6, 6, 6);
+    const trailMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.1,
+      blending: THREE.AdditiveBlending, depthWrite: false });
+    projMesh.add(new THREE.Mesh(trailGeo, trailMat));
+  }
+
+  projMesh.position.copy(bossPos);
+  scene.add(projMesh);
+
+  const dir = new THREE.Vector3().subVectors(playerPos, bossPos).normalize();
+
+  projectiles.push({
+    mesh: projMesh, dir, speed, life: 3,
+    target: playerPos.clone()
+  });
+}
+
+function updateProjectiles(dt) {
+  const scene = KI.scene;
+  if (!scene) return;
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+    p.life -= dt;
+    p.mesh.position.addScaledVector(p.dir, p.speed * dt);
+    p.mesh.rotation.y += dt * 5;
+    p.mesh.rotation.x += dt * 3;
+
+    // trail particles
+    if (Math.random() < 0.3) {
+      const tGeo = new THREE.SphereGeometry(0.1, 4, 4);
+      const tMat = new THREE.MeshBasicMaterial({
+        color: p.mesh.material.color, transparent: true, opacity: 0.3,
+        blending: THREE.AdditiveBlending, depthWrite: false
+      });
+      const trail = new THREE.Mesh(tGeo, tMat);
+      trail.position.copy(p.mesh.position);
+      scene.add(trail);
+      setTimeout(() => scene.remove(trail), 400);
+    }
+
+    // check if reached player area
+    const playerPos = KI._scene?.aura?.position || new THREE.Vector3(0, 2.5, 5);
+    if (p.mesh.position.distanceTo(playerPos) < 2) {
+      // impact flash
+      const impactGeo = new THREE.SphereGeometry(1.5, 8, 8);
+      const impactMat = new THREE.MeshBasicMaterial({
+        color: p.mesh.material.color, transparent: true, opacity: 0.4,
+        blending: THREE.AdditiveBlending, depthWrite: false
+      });
+      const impact = new THREE.Mesh(impactGeo, impactMat);
+      impact.position.copy(p.mesh.position);
+      scene.add(impact);
+      setTimeout(() => scene.remove(impact), 300);
+
+      scene.remove(p.mesh);
+      projectiles.splice(i, 1);
+      continue;
+    }
+
+    if (p.life <= 0) {
+      scene.remove(p.mesh);
+      projectiles.splice(i, 1);
+    }
+  }
+}
+
+// ============================================================
+// RUSH STATE
+// ============================================================
+const RUSH = {
+  wave: 0, bossHP: 0, bossMaxHP: 0,
+  playerHP: 1200, maxPlayerHP: 1200,
+  boss: null, bossGroup: null,
+  phase: 0, atkTimer: 0,
+  active: false, totalDmgDealt: 0,
+  wavesCleared: 0, bossEnraged: false
+};
+
+function buildResHUD() {
+  const cont = document.getElementById('resDepth');
+  Resonance.LAYERS.forEach((layer, i) => {
+    const d = document.createElement('div');
+    d.className = 'depth-layer'; d.id = 'dL-' + i;
+    const c6 = '#' + layer.color.toString(16).padStart(6, '0');
+    d.innerHTML =
+      '<div class="depth-dot" style="color:'+c6+';border-color:'+c6+'"></div>' +
+      '<span class="depth-name" style="color:'+c6+'">' + layer.name.toUpperCase() + '</span>' +
+      '<span class="depth-mult">' + layer.mult + 'x</span>';
+    cont.appendChild(d);
+  });
+}
+
+let currentLayer = -1;
+KI.on('resonance:update', data => {
+  const resHUD = document.getElementById('resHUD');
+  if (data.activeLayer >= 0 || data.sustainTime > 0.1) resHUD.classList.add('on');
+  else resHUD.classList.remove('on');
+  Resonance.LAYERS.forEach((layer, i) => {
+    const el = document.getElementById('dL-' + i);
+    if (!el) return;
+    el.classList.toggle('active', i <= data.activeLayer);
+    el.classList.toggle('peak', i === data.peakLayer && data.activeLayer >= 0);
+  });
+  const multEl = document.getElementById('resMultiplier');
+  if (data.multiplier > 1) {
+    multEl.classList.add('on');
+    multEl.textContent = Math.round(data.multiplier * 10) / 10 + 'x';
+    multEl.style.color = data.activeLayer >= 0 ?
+      '#' + Resonance.LAYERS[data.activeLayer].color.toString(16).padStart(6, '0') : '#ff0';
+  } else { multEl.classList.remove('on'); }
+  const kanji = KI.get('kanji'), KANJI = kanji?.KANJI || {};
+  const kj = KANJI[data.vowel];
+  if (kj && data.activeLayer >= 0) {
+    document.getElementById('resKanji').textContent = kj.char;
+    document.getElementById('resKanji').style.color =
+      '#' + Resonance.LAYERS[data.activeLayer].color.toString(16).padStart(6, '0');
+    document.getElementById('resLabel').textContent =
+      Resonance.LAYERS[Math.max(0, data.activeLayer)].name.toUpperCase();
+  }
+  currentLayer = data.activeLayer;
+});
+
+// === RESONANCE RELEASE -> BOSS DAMAGE ===
+KI.on('resonance:release', data => {
+  if (!RUSH.active || !RUSH.boss) return;
+  const auraPos = KI._scene?.aura?.position || new THREE.Vector3(0, 2.5, 5);
+  const kanji = KI.get('kanji'), KANJI = kanji?.KANJI || {};
+  const kj = KANJI[data.vowel];
+  const blastType = kj?.blast || 'kiball';
+  KI.voice.chargeLevel = Math.min(1, data.multiplier / 8);
+  KI.voice.energy = Math.max(KI.voice.energy, data.multiplier * 0.05);
+  const blastMod = KI.get('ki-blasts');
+  if (blastMod) blastMod.fireBlast(blastType, Math.min(1, data.multiplier / 4), auraPos);
+
+  let bossDmg = data.multiplier * 35 * (1 + data.coherenceBonus);
+  if (RUSH.boss.weakness && data.vowel === RUSH.boss.weakness) {
+    bossDmg *= RUSH.boss.weakMult;
+    showCmt('SUPER EFFECTIVE! x' + RUSH.boss.weakMult + '!');
+  }
+  bossDmg *= (1 + data.layer * 0.3);
+  RUSH.bossHP -= bossDmg;
+  RUSH.totalDmgDealt += bossDmg;
+  KI.player.score += Math.round(bossDmg);
+  document.getElementById('score').textContent = KI.player.score.toLocaleString();
+  showBossDmg(bossDmg, data.vowel);
+  updateBossHP();
+
+  // flash boss geometry on hit
+  if (RUSH.bossGroup) {
+    RUSH.bossGroup.children.forEach(c => {
+      if (c.material) {
+        const orig = c.material.opacity;
+        c.material.opacity = Math.min(1, orig + 0.3);
+        setTimeout(() => { c.material.opacity = orig; }, 100);
+      }
+    });
+  }
+
+  // phase transition
+  const hpPct = RUSH.bossHP / RUSH.bossMaxHP;
+  const phases = RUSH.boss.phases || 3;
+  const newPhase = Math.floor((1 - hpPct) * phases);
+  if (newPhase > RUSH.phase) {
+    RUSH.phase = newPhase;
+    RUSH.boss.atkInterval *= 0.85;
+    RUSH.boss.atkDmg *= 1.15;
+    showCmt(RUSH.boss.name + ' ENRAGES! Phase ' + (RUSH.phase + 1));
+  }
+
+  if (RUSH.bossHP <= 0) {
+    RUSH.bossHP = 0;
+    updateBossHP();
+    RUSH.wavesCleared++;
+    RUSH.wave++;
+    KI.player.score += 500 * RUSH.wave;
+    document.getElementById('score').textContent = KI.player.score.toLocaleString();
+    // remove boss 3D model
+    if (RUSH.bossGroup) { KI.scene.remove(RUSH.bossGroup); RUSH.bossGroup = null; }
+    if (RUSH.wave >= BOSSES.length) { showVictory(); }
+    else {
+      showCmt(RUSH.boss.name + ' SHATTERED!');
+      RUSH.playerHP = Math.min(RUSH.maxPlayerHP, RUSH.playerHP + 300);
+      updatePlayerHP();
+      setTimeout(() => startBoss(RUSH.wave), 3000);
+    }
+    RUSH.active = false;
+  }
+});
+
+KI.on('charge:update', data => {
+  document.getElementById('blastType').textContent = data.blastType.name;
+  const kanji = KI.get('kanji'), KANJI = kanji?.KANJI || {};
+  const khud = document.getElementById('kanjiHUD');
+  if (KI.voice.vowel && KI.voice.sounding && KANJI[KI.voice.vowel]) {
+    const kj = KANJI[KI.voice.vowel];
+    khud.classList.add('on');
+    document.getElementById('kanjiChar').textContent = kj.char;
+    document.getElementById('kanjiChar').style.color = kj.color;
+    document.getElementById('kanjiName').textContent = kj.name;
+    document.getElementById('kanjiReading').textContent = kj.reading;
+  } else { khud.classList.remove('on'); }
+});
+
+KI.on('hit', data => {
+  document.getElementById('score').textContent = KI.player.score.toLocaleString();
+  document.getElementById('combo').textContent = KI.player.combo > 1 ? KI.player.combo + 'x COMBO' : '';
+});
+
+// ============================================================
+// BOSS FIGHT LOGIC
+// ============================================================
+function startBoss(idx) {
+  const boss = { ...BOSSES[idx] };
+  RUSH.boss = boss;
+  RUSH.bossHP = boss.hp;
+  RUSH.bossMaxHP = boss.hp;
+  RUSH.phase = 0;
+  RUSH.atkTimer = boss.atkInterval;
+  RUSH.bossEnraged = false;
+  showBossIntro(idx, boss);
+}
+
+function showBossIntro(idx, boss) {
+  RUSH.active = false;
+  const intro = document.getElementById('bossIntro');
+  document.getElementById('introWave').textContent = 'COLOSSUS ' + (idx + 1);
+  document.getElementById('introName').textContent = boss.name;
+  document.getElementById('introName').style.color = '#' + boss.color.toString(16).padStart(6, '0');
+  document.getElementById('introTitle').textContent = boss.title;
+  document.getElementById('introDesc').textContent = boss.desc;
+  intro.classList.add('show');
+
+  setTimeout(() => {
+    intro.classList.remove('show');
+    RUSH.active = true;
+    // build 3D boss model
+    if (RUSH.bossGroup) KI.scene.remove(RUSH.bossGroup);
+    RUSH.bossGroup = boss.build(KI.scene, boss.color);
+    RUSH.bossGroup.position.set(0, 6, -10);
+    KI.scene.add(RUSH.bossGroup);
+    // HP bar
+    document.getElementById('bossHPBar').classList.add('on');
+    document.getElementById('bossHPName').textContent = boss.name;
+    const c = '#' + boss.color.toString(16).padStart(6, '0');
+    document.getElementById('bossHPFill').style.background =
+      'linear-gradient(90deg,' + c + ',' + c + 'aa)';
+    updateBossHP();
+    document.getElementById('waveLabel').textContent = 'COLOSSUS ' + (idx + 1);
+    document.getElementById('bossName').textContent = boss.name;
+    document.getElementById('bossName').style.color = c;
+    document.getElementById('waveSub').textContent = boss.desc;
+  }, 3000);
+}
+
+function updateBossHP() {
+  const pct = Math.max(0, RUSH.bossHP / RUSH.bossMaxHP);
+  document.getElementById('bossHPFill').style.width = (pct * 100) + '%';
+  document.getElementById('bossHPPct').textContent = Math.round(pct * 100) + '%';
+}
+function updatePlayerHP() {
+  const pct = Math.max(0, RUSH.playerHP / RUSH.maxPlayerHP);
+  document.getElementById('playerHPFill').style.width = (pct * 100) + '%';
+  document.getElementById('playerHPFill').style.background =
+    pct < 0.3 ? 'linear-gradient(90deg,#f44,#f66)' : 'linear-gradient(90deg,#0a0,#0f0)';
+}
+
+function updateBoss(dt, t) {
+  if (!RUSH.active || !RUSH.boss) return;
+
+  // animate 3D boss model
+  if (RUSH.bossGroup?._animate) {
+    RUSH.bossGroup._animate(t, RUSH.bossHP / RUSH.bossMaxHP);
+  }
+
+  // boss breathing/hovering
+  if (RUSH.bossGroup) {
+    RUSH.bossGroup.position.y = 6 + Math.sin(t * 0.8) * 0.8;
+  }
+
+  RUSH.atkTimer -= dt;
+  if (RUSH.atkTimer <= 0) {
+    RUSH.atkTimer = RUSH.boss.atkInterval;
+    const dmg = RUSH.boss.atkDmg * (1 + Math.random() * 0.3);
+    RUSH.playerHP -= dmg;
+    updatePlayerHP();
+
+    // spawn 3D projectile from boss toward player
+    const bossPos = RUSH.bossGroup?.position || new THREE.Vector3(0, 6, -10);
+    const playerPos = KI._scene?.aura?.position || new THREE.Vector3(0, 2.5, 5);
+    const projTypes = ['sphere', 'spike', 'octa'];
+    spawnBossProjectile(bossPos.clone(), playerPos.clone(), RUSH.boss.color,
+      projTypes[Math.floor(Math.random() * projTypes.length)]);
+
+    // attack warning
+    const atk = document.getElementById('bossAtk');
+    atk.textContent = RUSH.boss.atkName + '!';
+    atk.style.color = '#' + RUSH.boss.color.toString(16).padStart(6, '0');
+    atk.classList.remove('show');
+    void atk.offsetWidth;
+    atk.classList.add('show');
+    setTimeout(() => atk.classList.remove('show'), 800);
+
+    const flash = document.getElementById('hitFlash');
+    flash.classList.remove('flash');
+    void flash.offsetWidth;
+    flash.classList.add('flash');
+    showDmg(dmg, 'boss');
+
+    // screen shake
+    if (KI._scene) KI._scene.screenShake = Math.max(KI._scene.screenShake, dmg / 80);
+
+    if (RUSH.playerHP <= 0) {
+      RUSH.playerHP = 0; updatePlayerHP();
+      RUSH.active = false; showGameOver();
+    }
+  }
+
+  // enrage at 20%
+  if (!RUSH.bossEnraged && RUSH.bossHP / RUSH.bossMaxHP < 0.2) {
+    RUSH.bossEnraged = true;
+    RUSH.boss.atkInterval *= 0.6;
+    RUSH.boss.atkDmg *= 1.5;
+    showCmt(RUSH.boss.name + ' IS ENRAGED!');
+  }
+}
+
+function showGameOver() {
+  document.getElementById('bossHPBar').classList.remove('on');
+  if (RUSH.bossGroup) { KI.scene.remove(RUSH.bossGroup); RUSH.bossGroup = null; }
+  document.getElementById('goScore').textContent = 'Score: ' + KI.player.score.toLocaleString();
+  document.getElementById('goWaves').textContent = 'Colossi Defeated: ' + RUSH.wavesCleared + '/' + BOSSES.length;
+  document.getElementById('gameOver').classList.add('show');
+}
+
+function showVictory() {
+  document.getElementById('bossHPBar').classList.remove('on');
+  document.getElementById('vicScore').textContent = 'Score: ' + KI.player.score.toLocaleString() +
+    ' | Damage: ' + Math.round(RUSH.totalDmgDealt).toLocaleString();
+  document.getElementById('victory').classList.add('show');
+}
+
+window.restartRush = function() {
+  document.getElementById('gameOver').classList.remove('show');
+  document.getElementById('victory').classList.remove('show');
+  if (RUSH.bossGroup) { KI.scene.remove(RUSH.bossGroup); RUSH.bossGroup = null; }
+  projectiles.forEach(p => KI.scene.remove(p.mesh));
+  projectiles.length = 0;
+  RUSH.wave = 0; RUSH.playerHP = 1200; RUSH.wavesCleared = 0;
+  RUSH.totalDmgDealt = 0; RUSH.bossEnraged = false;
+  KI.player.score = 0;
+  document.getElementById('score').textContent = '0';
+  updatePlayerHP();
+  startBoss(0);
+};
+
+// === MORPH BALL ===
+const morphCanvas = document.getElementById('morphBall');
+const mCtx = morphCanvas.getContext('2d');
+function drawMorphBall(t) {
+  const W = 140, cx = W/2, cy = W/2;
+  mCtx.clearRect(0, 0, W, W);
+  const layer = Math.max(0, currentLayer);
+  const lc = Resonance.LAYERS[layer]?.color || 0x4488ff;
+  const r = (lc>>16)&0xff, g = (lc>>8)&0xff, b = lc&0xff;
+  const sides = [0, 60, 5, 4, 3][layer];
+  const baseR = 30 + currentLayer * 5, wobble = Math.sin(t*3)*3;
+  const grad = mCtx.createRadialGradient(cx,cy,baseR*0.4,cx,cy,baseR*2);
+  grad.addColorStop(0,'rgba('+r+','+g+','+b+',0.3)');
+  grad.addColorStop(1,'rgba('+r+','+g+','+b+',0)');
+  mCtx.fillStyle=grad;
+  mCtx.beginPath();mCtx.arc(cx,cy,baseR*2,0,Math.PI*2);mCtx.fill();
+  mCtx.save();mCtx.translate(cx,cy);mCtx.rotate(t*0.5);
+  mCtx.beginPath();
+  if(sides===0){mCtx.arc(0,0,baseR+wobble,0,Math.PI*2);}
+  else{for(let i=0;i<=sides;i++){const a=(i/sides)*Math.PI*2-Math.PI/2;
+    const rr=baseR+wobble+Math.sin(t*5+i)*2;
+    if(i===0)mCtx.moveTo(Math.cos(a)*rr,Math.sin(a)*rr);
+    else mCtx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr);}mCtx.closePath();}
+  mCtx.fillStyle='rgba('+r+','+g+','+b+',0.5)';
+  mCtx.strokeStyle='rgb('+r+','+g+','+b+')';
+  mCtx.lineWidth=2;mCtx.fill();mCtx.stroke();
+  const cG=mCtx.createRadialGradient(0,0,0,0,0,baseR*0.5);
+  cG.addColorStop(0,'rgba(255,255,255,0.8)');cG.addColorStop(1,'rgba('+r+','+g+','+b+',0)');
+  mCtx.fillStyle=cG;mCtx.beginPath();mCtx.arc(0,0,baseR*0.5,0,Math.PI*2);mCtx.fill();
+  for(let i=0;i<3+layer*2;i++){const a=(i/(3+layer*2))*Math.PI*2+t*2;
+    const sr=baseR+10+Math.sin(t*4+i*2)*6;
+    mCtx.beginPath();mCtx.arc(Math.cos(a)*sr,Math.sin(a)*sr,1.5,0,Math.PI*2);
+    mCtx.fillStyle='rgba(255,255,255,0.6)';mCtx.fill();}
+  mCtx.restore();
+}
+
+function showDmg(amount, type) {
+  const el = document.createElement('div'); el.className = 'dmg';
+  el.textContent = (type==='boss'?'-':'') + Math.round(amount);
+  el.style.color = type==='boss' ? '#'+RUSH.boss?.color.toString(16).padStart(6,'0') : '#ff0';
+  el.style.fontSize = (18+Math.min(amount/8,30))+'px';
+  el.style.left = (KI.W/2+(Math.random()-0.5)*140)+'px';
+  el.style.top = (type==='boss'?KI.H*0.6:80+(Math.random()-0.5)*40)+'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(()=>el.remove(),1400);
+}
+function showBossDmg(amount, vowel) {
+  const kanji = KI.get('kanji'), KANJI = kanji?.KANJI||{};
+  const kj = KANJI[vowel||'mm'];
+  const isWeak = RUSH.boss?.weakness === vowel;
+  const el = document.createElement('div'); el.className = 'dmg';
+  el.textContent = (kj?kj.char+' ':'')+Math.round(amount)+(isWeak?'!':'');
+  el.style.color = isWeak?'#0f0':'#ff0';
+  el.style.fontSize = (20+Math.min(amount/6,36)+(isWeak?8:0))+'px';
+  el.style.left = (KI.W/2+(Math.random()-0.5)*160)+'px';
+  el.style.top = (80+(Math.random()-0.5)*40)+'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(()=>el.remove(),1400);
+}
+
+let cmtTimeout = null;
+function showCmt(text) {
+  if (cmtTimeout) clearTimeout(cmtTimeout);
+  if (text.length > 80) text = text.slice(0, 80) + '...';
+  const el = document.getElementById('cmt'); el.textContent = text; el.classList.add('show');
+  cmtTimeout = setTimeout(() => { el.classList.remove('show'); cmtTimeout = null; }, 3000);
+}
+function showModuleBadge(name) {
+  const b = document.createElement('div'); b.className = 'mod-badge active';
+  b.textContent = name.toUpperCase();
+  document.getElementById('modBadges').appendChild(b);
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+async function boot() {
+  document.getElementById('hud').classList.add('on');
+  Scene.init({ stars: 7000 });
+  showModuleBadge('hd-scene');
+  Kanji.init();
+  showModuleBadge('kanji');
+  Resonance.init();
+  buildResHUD();
+  showModuleBadge('resonance');
+  Vortex.init({ count: 3500, particleSize: 0.12 });
+  showModuleBadge('hd-vortex');
+  KiBlasts.init();
+  showModuleBadge('blasts');
+  EmojiSystem.init();
+  showModuleBadge('emoji');
+  FX.init({ aurora: true });
+  showModuleBadge('hd-fx');
+  ResonanceSynths.init();
+  showModuleBadge('res-synths');
+  try { await VoiceEngine.init(); showModuleBadge('voice'); }
+  catch (e) { console.warn('Voice init failed:', e); }
+  updatePlayerHP();
+  setTimeout(() => startBoss(0), 1500);
+
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    updateBoss(dt, t);
+    updateProjectiles(dt);
+    drawMorphBall(t);
+    KI.renderer.render(KI.scene, KI.camera);
+  })();
+
+  console.log('%c KI ARENA BOSS COLOSSUS ', 'background:#100;color:#f80;font-size:22px;padding:12px');
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
