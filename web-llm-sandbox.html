@@ -337,7 +337,7 @@ $skipBtn.onclick = () => {
 };
 
 // ─── Start Sandbox ───
-function startSandbox() {
+async function startSandbox() {
   initRepo('my-project');
   $repoName.textContent = 'my-project';
   refreshFileList();
@@ -345,8 +345,16 @@ function startSandbox() {
   addSystemMsg('Sandbox initialized. ' + (modelLoaded
     ? 'AI model loaded — talk or type to start building!'
     : 'No AI model — you can still create files manually.'));
-  setupMic();
+  // Chain: mic first, then voice recognition, then auto-start listening
+  await setupMic();
   setupVoiceRecognition();
+  // Auto-engage voice recognition if mic connected
+  if (analyser && recognition) {
+    micActive = true;
+    document.getElementById('btn-mic').classList.add('active');
+    try { recognition.start(); } catch(e) {}
+    $voiceStatus.textContent = 'Listening — speak to chat...';
+  }
 }
 
 // ─── File Explorer ───
@@ -497,7 +505,7 @@ async function sendMessage(text) {
   $chatInput.value = '';
 
   if (!modelLoaded) {
-    addSystemMsg('No model loaded — cannot generate response. Load a model or use skip mode for manual editing.');
+    addSystemMsg('Voice captured: "' + text + '" — Load a model to get AI responses.');
     isGenerating = false;
     return;
   }
@@ -780,9 +788,16 @@ function setupVoiceRecognition() {
         interim += e.results[i][0].transcript;
       }
     }
-    if (interim) $voiceStatus.textContent = '🎤 ' + interim;
+    if (interim) {
+      // Show live transcript in both status bar AND the input box
+      $voiceStatus.textContent = '🎤 ' + interim;
+      $chatInput.value = interim;
+      $chatInput.style.borderColor = 'var(--green)';
+    }
     if (final.trim()) {
-      $voiceStatus.textContent = '';
+      $voiceStatus.textContent = 'Listening — speak to chat...';
+      $chatInput.value = '';
+      $chatInput.style.borderColor = '';
       sendMessage(final.trim());
     }
   };
