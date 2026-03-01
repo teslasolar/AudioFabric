@@ -50,6 +50,48 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 #chordDisplay.on{opacity:0.6}
 #chordSub{font-size:14px;color:#f0f8;letter-spacing:4px}
 
+/* Resonance depth HUD — left side */
+#resHUD{position:fixed;left:12px;top:50%;transform:translateY(-50%);z-index:55;
+  pointer-events:none;opacity:0;transition:opacity 0.4s}
+#resHUD.on{opacity:1}
+#resKanji{font-size:56px;line-height:1;text-shadow:0 0 25px currentColor,0 0 50px currentColor;
+  text-align:center;transition:color 0.3s}
+#resLabel{font-size:9px;color:#fff5;text-align:center;margin-top:3px;letter-spacing:2px}
+#resDepth{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+.depth-layer{display:flex;align-items:center;gap:6px;opacity:0.15;transition:opacity 0.3s,transform 0.3s}
+.depth-layer.active{opacity:1;transform:translateX(4px)}
+.depth-layer.peak{opacity:1}
+.depth-dot{width:8px;height:8px;border-radius:50%;border:1px solid;transition:background 0.3s,box-shadow 0.3s}
+.depth-layer.active .depth-dot{box-shadow:0 0 8px currentColor}
+.depth-layer.peak .depth-dot{background:currentColor;box-shadow:0 0 10px currentColor}
+.depth-name{font-size:9px;letter-spacing:1px}
+.depth-mult{font-size:8px;color:#ff08;margin-left:auto}
+#resProgress{width:100%;height:2px;background:#111;border-radius:1px;margin-top:5px;overflow:hidden}
+#resProgressFill{height:100%;width:0%;background:#fff;transition:width 0.08s;border-radius:1px}
+#resSustain{font-size:8px;color:#fff3;text-align:center;margin-top:3px;font-variant-numeric:tabular-nums}
+#resMultiplier{font-size:20px;color:#ff0;text-align:center;margin-top:4px;text-shadow:0 0 8px #f80;
+  opacity:0;transition:opacity 0.3s}
+#resMultiplier.on{opacity:1}
+
+/* Kanji + score HUD — right side */
+#kanjiHUD{position:fixed;right:12px;top:50%;transform:translateY(-50%);z-index:55;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#kanjiHUD.on{opacity:1}
+#kanjiChar{font-size:48px;line-height:1;text-shadow:0 0 20px currentColor,0 0 40px currentColor}
+#kanjiName{font-size:9px;color:#fff8;margin-top:3px}
+#kanjiReading{font-size:8px;color:#fff3}
+#scoreVal{font-size:20px;color:#ff0;margin-top:8px;text-shadow:0 0 8px #f80}
+
+/* Morph ball preview */
+#morphBall{position:fixed;right:12px;bottom:120px;z-index:52;pointer-events:none}
+#morphCanvas{width:120px;height:120px}
+
+/* Damage popups */
+#dmgLayer{position:fixed;inset:0;z-index:62;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 10px currentColor,0 0 20px currentColor;
+  animation:dmgUp 1.4s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-140px) scale(2)}}
+
 #version{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:45;
   font-size:8px;color:#222;letter-spacing:3px;pointer-events:none}
 </style>
@@ -67,6 +109,23 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 <div id="contribRing"><canvas id="contribCanvas" width="400" height="400"></canvas></div>
 
 <div id="jamStrip"></div>
+
+<div id="resHUD">
+  <div id="resKanji" style="color:#f0f">気</div>
+  <div id="resLabel">RESONANCE</div>
+  <div id="resDepth"></div>
+  <div id="resProgress"><div id="resProgressFill"></div></div>
+  <div id="resSustain">0.0s</div>
+  <div id="resMultiplier">1x</div>
+</div>
+<div id="kanjiHUD">
+  <div id="kanjiChar" style="color:#f0f">気</div>
+  <div id="kanjiName">Spirit</div>
+  <div id="kanjiReading">KI</div>
+  <div id="scoreVal">0</div>
+</div>
+<div id="morphBall"><canvas id="morphCanvas" width="120" height="120"></canvas></div>
+<div id="dmgLayer"></div>
 
 <div id="chordDisplay">
   <div id="chordKanji"></div>
@@ -99,6 +158,7 @@ import * as Kanji from './modules/kanji.js';
 import * as Vortex from './modules/hd-vortex.js';
 import * as Resonance from './modules/resonance.js';
 import * as ResonanceSynths from './modules/resonance-synths.js';
+import * as KiBlasts from './modules/ki-blasts.js';
 import * as FX from './modules/hd-fx.js';
 import * as MqttNet from './modules/mqtt-net.js';
 import * as WebRTCNet from './modules/webrtc-net.js';
@@ -443,6 +503,154 @@ function broadcastJam(dt) {
 
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+// === RESONANCE HUD ===
+function buildResHUD() {
+  const cont = document.getElementById('resDepth');
+  Resonance.LAYERS.forEach((layer, i) => {
+    const d = document.createElement('div');
+    d.className = 'depth-layer';
+    d.id = 'dL-' + i;
+    d.innerHTML =
+      '<div class="depth-dot" style="color:#' + layer.color.toString(16).padStart(6,'0') +
+      ';border-color:#' + layer.color.toString(16).padStart(6,'0') + '"></div>' +
+      '<span class="depth-name" style="color:#' + layer.color.toString(16).padStart(6,'0') + '">' +
+      layer.name.toUpperCase() + '</span>' +
+      '<span class="depth-mult">' + layer.mult + 'x</span>';
+    cont.appendChild(d);
+  });
+}
+
+function updateResHUD() {
+  const res = KI.get('resonance');
+  if (!res) return;
+  const st = res.state;
+  const hud = document.getElementById('resHUD');
+  const kanjiHud = document.getElementById('kanjiHUD');
+
+  if (st.activeLayer >= 0 || KI.voice.sounding) {
+    hud.classList.add('on');
+    kanjiHud.classList.add('on');
+  } else {
+    hud.classList.remove('on');
+    kanjiHud.classList.remove('on');
+  }
+
+  Resonance.LAYERS.forEach((layer, i) => {
+    const el = document.getElementById('dL-' + i);
+    if (!el) return;
+    el.classList.toggle('active', i <= st.activeLayer);
+    el.classList.toggle('peak', i <= st.peakLayer && i > st.activeLayer);
+  });
+
+  const fill = document.getElementById('resProgressFill');
+  fill.style.width = (st.layerProgress * 100) + '%';
+  if (st.activeLayer >= 0)
+    fill.style.background = '#' + Resonance.LAYERS[st.activeLayer].color.toString(16).padStart(6,'0');
+
+  document.getElementById('resSustain').textContent = st.sustainTime.toFixed(1) + 's';
+
+  const mult = document.getElementById('resMultiplier');
+  const m = Resonance.getMultiplier();
+  if (m > 1) { mult.textContent = Math.round(m) + 'x'; mult.classList.add('on'); }
+  else mult.classList.remove('on');
+
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const kj = KANJI[KI.voice.vowel];
+  if (kj) {
+    document.getElementById('resKanji').textContent = kj.char;
+    document.getElementById('resKanji').style.color = kj.color;
+    document.getElementById('kanjiChar').textContent = kj.char;
+    document.getElementById('kanjiChar').style.color = kj.color;
+    document.getElementById('kanjiName').textContent = kj.name;
+    document.getElementById('kanjiReading').textContent = kj.reading;
+  }
+
+  document.getElementById('scoreVal').textContent = KI.player.score.toLocaleString();
+}
+
+// === MORPH BALL PREVIEW ===
+const morphCanvas = document.getElementById('morphCanvas');
+const morphCtx = morphCanvas.getContext('2d');
+
+function drawMorphBall(t) {
+  morphCtx.clearRect(0, 0, 120, 120);
+  const res = KI.get('resonance');
+  const layer = res ? res.state.activeLayer : -1;
+  if (layer < 0 || !KI.voice.sounding) return;
+
+  const cx = 60, cy = 60;
+  const ld = Resonance.LAYERS[layer];
+  const col = '#' + ld.color.toString(16).padStart(6,'0');
+  const charge = res.state.layerProgress;
+  const baseR = 12 + layer * 5 + charge * 8;
+  const sides = [0, 60, 5, 4, 3][layer];
+
+  // glow
+  morphCtx.globalAlpha = 0.1;
+  for (let g = 2; g >= 1; g--) {
+    morphCtx.beginPath();
+    morphCtx.arc(cx, cy, baseR * g * 0.9, 0, Math.PI * 2);
+    morphCtx.fillStyle = col;
+    morphCtx.fill();
+  }
+
+  // core shape
+  morphCtx.globalAlpha = 0.6;
+  morphCtx.beginPath();
+  const wobble = 1 + Math.sin(t * 6) * 0.12 * (layer + 1);
+  if (sides === 0) {
+    morphCtx.arc(cx, cy, baseR * wobble, 0, Math.PI * 2);
+  } else {
+    for (let i = 0; i <= sides; i++) {
+      const a = (i / sides) * Math.PI * 2 + t * 1.5;
+      const r = baseR * wobble + Math.sin(t * 8 + i * 2) * 2;
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      i === 0 ? morphCtx.moveTo(x, y) : morphCtx.lineTo(x, y);
+    }
+    morphCtx.closePath();
+  }
+  morphCtx.fillStyle = col;
+  morphCtx.fill();
+
+  // white center
+  morphCtx.globalAlpha = 0.4;
+  morphCtx.beginPath();
+  morphCtx.arc(cx, cy, baseR * 0.3, 0, Math.PI * 2);
+  morphCtx.fillStyle = '#fff';
+  morphCtx.fill();
+
+  // sparks
+  const sparkCount = 4 + layer * 2;
+  morphCtx.globalAlpha = 0.5;
+  for (let i = 0; i < sparkCount; i++) {
+    const a = (i / sparkCount) * Math.PI * 2 + t * (2 + layer);
+    const r = baseR * 1.3 + Math.sin(t * 4 + i) * 3;
+    morphCtx.beginPath();
+    morphCtx.arc(cx + Math.cos(a)*r, cy + Math.sin(a)*r, 1.5, 0, Math.PI*2);
+    morphCtx.fillStyle = col;
+    morphCtx.fill();
+  }
+  morphCtx.globalAlpha = 1;
+}
+
+// === DAMAGE POPUPS ===
+function spawnDmgText(text, color) {
+  const el = document.createElement('div');
+  el.className = 'dmg';
+  el.textContent = text;
+  el.style.color = color || '#ff0';
+  el.style.left = (35 + Math.random()*30) + '%';
+  el.style.top = (30 + Math.random()*20) + '%';
+  el.style.fontSize = (16 + Math.random()*10) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1500);
+}
+
+KI.on('hit', data => {
+  spawnDmgText('+' + Math.round(data.dmg), '#ff0');
+});
+
 // === BOOT ===
 async function boot() {
   document.getElementById('sessionName').textContent = 'JAM: ' + ROOM;
@@ -452,8 +660,10 @@ async function boot() {
   Kanji.init();
   Resonance.init();
   Vortex.init({ count: 3000 });
+  KiBlasts.init();
   ResonanceSynths.init();
   FX.init({ aurora: true });
+  buildResHUD();
 
   try { await VoiceEngine.init(); } catch(e) { console.warn('Mic:', e); }
 
@@ -475,7 +685,9 @@ async function boot() {
     broadcastJam(dt);
     updateSharedResonance();
     updateSharedVisuals(dt, t);
+    updateResHUD();
     drawContribRing(t);
+    drawMorphBall(t);
     // self card update
     const res = KI.get('resonance');
     updateJammerCard(KI.player.name, {

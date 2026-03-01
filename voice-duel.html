@@ -56,6 +56,38 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
   font-size:18px;color:#f44;letter-spacing:4px;text-align:center}
 #waitSub{font-size:11px;color:#f448;margin-top:8px}
 
+/* Resonance depth bars — P1 left, P2 right */
+.res-bars{position:fixed;top:50%;transform:translateY(-50%);z-index:55;
+  pointer-events:none;display:flex;flex-direction:column;gap:3px}
+.res-bars.p1{left:12px}
+.res-bars.p2{right:12px}
+.res-bar{display:flex;align-items:center;gap:6px;opacity:0.15;transition:opacity 0.3s,transform 0.3s}
+.res-bar.active{opacity:1;transform:translateX(4px)}
+.res-bars.p2 .res-bar.active{transform:translateX(-4px)}
+.res-bar.peak{opacity:1}
+.rb-dot{width:8px;height:8px;border-radius:50%;border:1px solid;transition:background 0.3s,box-shadow 0.3s}
+.res-bar.active .rb-dot{box-shadow:0 0 8px currentColor}
+.res-bar.peak .rb-dot{background:currentColor;box-shadow:0 0 12px currentColor}
+.rb-name{font-size:9px;letter-spacing:1px}
+.rb-mult{font-size:8px;color:#ff08;margin-left:auto}
+.res-progress{width:100%;height:2px;background:#111;border-radius:1px;margin-top:4px;overflow:hidden}
+.res-fill{height:100%;width:0%;border-radius:1px;transition:width 0.08s}
+.res-sustain{font-size:8px;color:#fff3;text-align:center;margin-top:3px;font-variant-numeric:tabular-nums}
+.res-mult{font-size:18px;color:#ff0;text-align:center;margin-top:4px;text-shadow:0 0 8px #f80;
+  opacity:0;transition:opacity 0.3s}
+.res-mult.on{opacity:1}
+
+/* Damage popup layer */
+#dmgLayer{position:fixed;inset:0;z-index:62;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 10px currentColor,0 0 20px currentColor;
+  animation:dmgUp 1.4s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-140px) scale(2)}}
+
+/* Morphing ball indicator */
+#morphBall{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:52;
+  pointer-events:none}
+#morphCanvas{width:200px;height:200px}
+
 #version{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:45;
   font-size:8px;color:#220000;letter-spacing:3px;pointer-events:none}
 </style>
@@ -85,6 +117,11 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 <div id="vsText">VS</div>
 <div id="clashZone"><canvas id="clashCanvas" width="600" height="600"></canvas></div>
 <div id="winner"><span id="winnerText"></span><div id="winSub"></div></div>
+
+<div class="res-bars p1" id="p1Bars"></div>
+<div class="res-bars p2" id="p2Bars"></div>
+<div id="dmgLayer"></div>
+<div id="morphBall"><canvas id="morphCanvas" width="200" height="200"></canvas></div>
 
 <div id="waitMsg">WAITING FOR OPPONENT<div id="waitSub">Share link to invite</div></div>
 
@@ -526,6 +563,191 @@ function updateDuelHUD() {
   }
 }
 
+// === RESONANCE DEPTH BARS ===
+function buildResBars() {
+  ['p1Bars','p2Bars'].forEach(id => {
+    const cont = document.getElementById(id);
+    Resonance.LAYERS.forEach((layer, i) => {
+      const d = document.createElement('div');
+      d.className = 'res-bar';
+      d.id = id + '-' + i;
+      d.innerHTML =
+        '<div class="rb-dot" style="color:#' + layer.color.toString(16).padStart(6,'0') +
+        ';border-color:#' + layer.color.toString(16).padStart(6,'0') + '"></div>' +
+        '<span class="rb-name" style="color:#' + layer.color.toString(16).padStart(6,'0') + '">' +
+        layer.name.toUpperCase() + '</span>' +
+        '<span class="rb-mult">' + layer.mult + 'x</span>';
+      cont.appendChild(d);
+    });
+    const prog = document.createElement('div');
+    prog.className = 'res-progress';
+    prog.innerHTML = '<div class="res-fill" id="' + id + '-fill"></div>';
+    cont.appendChild(prog);
+    const sus = document.createElement('div');
+    sus.className = 'res-sustain';
+    sus.id = id + '-sus';
+    cont.appendChild(sus);
+    const mul = document.createElement('div');
+    mul.className = 'res-mult';
+    mul.id = id + '-mult';
+    cont.appendChild(mul);
+  });
+}
+
+function updateResBars() {
+  const res = KI.get('resonance');
+  const myLayer = res ? res.state.activeLayer : -1;
+  const myPeak = res ? res.state.peakLayer : -1;
+  const opLayer = Math.min(4, Math.max(-1, duel.opponent?.layer ?? -1));
+
+  // P1 bars
+  Resonance.LAYERS.forEach((_, i) => {
+    const el = document.getElementById('p1Bars-' + i);
+    if (el) {
+      el.classList.toggle('active', i <= myLayer);
+      el.classList.toggle('peak', i <= myPeak && i > myLayer);
+    }
+  });
+  const p1fill = document.getElementById('p1Bars-fill');
+  if (p1fill && res) {
+    p1fill.style.width = (res.state.layerProgress * 100) + '%';
+    p1fill.style.background = myLayer >= 0 ? '#' + Resonance.LAYERS[myLayer].color.toString(16).padStart(6,'0') : '#fff';
+  }
+  const p1sus = document.getElementById('p1Bars-sus');
+  if (p1sus && res) p1sus.textContent = res.state.sustainTime.toFixed(1) + 's';
+  const p1m = document.getElementById('p1Bars-mult');
+  if (p1m) {
+    const m = Resonance.getMultiplier();
+    if (m > 1) { p1m.textContent = Math.round(m) + 'x'; p1m.classList.add('on'); }
+    else p1m.classList.remove('on');
+  }
+
+  // P2 bars
+  Resonance.LAYERS.forEach((_, i) => {
+    const el = document.getElementById('p2Bars-' + i);
+    if (el) el.classList.toggle('active', i <= opLayer);
+  });
+}
+
+// === MORPH BALL CANVAS — shows a morphing ki-ball preview ===
+const morphCanvas = document.getElementById('morphCanvas');
+const morphCtx = morphCanvas.getContext('2d');
+
+function drawMorphBall(t) {
+  morphCtx.clearRect(0, 0, 200, 200);
+  const res = KI.get('resonance');
+  const layer = res ? res.state.activeLayer : -1;
+  if (layer < 0 || !KI.voice.sounding) return;
+
+  const cx = 100, cy = 100;
+  const ld = Resonance.LAYERS[layer];
+  const col = '#' + ld.color.toString(16).padStart(6,'0');
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const kj = KANJI[KI.voice.vowel];
+  const energy = KI.voice.energy;
+  const charge = res.state.layerProgress;
+
+  // outer morphing glow — shape changes per layer
+  const baseR = 20 + layer * 8 + energy * 15;
+  const sides = [0, 60, 5, 4, 3][layer]; // circle, hex, penta, square, triangle
+  morphCtx.globalAlpha = 0.12;
+  for (let g = 3; g >= 1; g--) {
+    morphCtx.beginPath();
+    if (sides === 0) {
+      morphCtx.arc(cx, cy, baseR * g * 0.8, 0, Math.PI * 2);
+    } else {
+      for (let i = 0; i <= sides; i++) {
+        const a = (i / sides) * Math.PI * 2 + t * 0.5;
+        const r = baseR * g * 0.8 + Math.sin(t * 3 + i) * 4;
+        const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+        i === 0 ? morphCtx.moveTo(x, y) : morphCtx.lineTo(x, y);
+      }
+      morphCtx.closePath();
+    }
+    morphCtx.fillStyle = col;
+    morphCtx.fill();
+  }
+
+  // core ball — morphs shape based on layer
+  morphCtx.globalAlpha = 0.7;
+  morphCtx.beginPath();
+  const coreR = 12 + layer * 5 + charge * 10;
+  const wobble = 1 + Math.sin(t * 6) * 0.15 * (layer + 1);
+  if (sides === 0) {
+    morphCtx.arc(cx, cy, coreR * wobble, 0, Math.PI * 2);
+  } else {
+    for (let i = 0; i <= sides; i++) {
+      const a = (i / sides) * Math.PI * 2 + t * 1.5;
+      const r = coreR * wobble + Math.sin(t * 8 + i * 2) * 3;
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      i === 0 ? morphCtx.moveTo(x, y) : morphCtx.lineTo(x, y);
+    }
+    morphCtx.closePath();
+  }
+  morphCtx.fillStyle = col;
+  morphCtx.fill();
+
+  // white-hot inner
+  morphCtx.globalAlpha = 0.4;
+  morphCtx.beginPath();
+  morphCtx.arc(cx, cy, coreR * 0.4, 0, Math.PI * 2);
+  morphCtx.fillStyle = '#fff';
+  morphCtx.fill();
+
+  // orbiting sparks
+  const sparkCount = 6 + layer * 3;
+  morphCtx.globalAlpha = 0.6;
+  for (let i = 0; i < sparkCount; i++) {
+    const a = (i / sparkCount) * Math.PI * 2 + t * (2 + layer);
+    const r = coreR * 1.4 + Math.sin(t * 4 + i) * 5;
+    const sz = 1.5 + Math.sin(t * 6 + i * 3) * 1;
+    morphCtx.beginPath();
+    morphCtx.arc(cx + Math.cos(a)*r, cy + Math.sin(a)*r, sz, 0, Math.PI*2);
+    morphCtx.fillStyle = col;
+    morphCtx.fill();
+  }
+
+  // kanji overlay
+  if (kj) {
+    morphCtx.globalAlpha = 0.5 + charge * 0.3;
+    morphCtx.font = 'bold ' + (18 + layer * 4) + 'px serif';
+    morphCtx.textAlign = 'center';
+    morphCtx.textBaseline = 'middle';
+    morphCtx.shadowColor = col;
+    morphCtx.shadowBlur = 15;
+    morphCtx.fillStyle = '#fff';
+    morphCtx.fillText(kj.char, cx, cy);
+    morphCtx.shadowBlur = 0;
+  }
+
+  // layer name
+  morphCtx.globalAlpha = 0.6;
+  morphCtx.font = '9px monospace';
+  morphCtx.fillStyle = col;
+  morphCtx.textAlign = 'center';
+  morphCtx.fillText(ld.name.toUpperCase() + ' ' + ld.mult + 'x', cx, cy + coreR + 16);
+
+  morphCtx.globalAlpha = 1;
+}
+
+// === DAMAGE POPUPS ===
+function spawnDmgPopup(text, color, side) {
+  const el = document.createElement('div');
+  el.className = 'dmg';
+  el.textContent = text;
+  el.style.color = color || '#ff0';
+  el.style.left = side === 'left' ? (10 + Math.random()*20) + '%' : (70 + Math.random()*20) + '%';
+  el.style.top = (25 + Math.random()*15) + '%';
+  el.style.fontSize = (16 + Math.random()*12) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1500);
+}
+
+KI.on('resonance:release', () => {
+  if (duel.phase === 'fight') spawnDmgPopup('FIRE!', '#ff0', 'left');
+});
+
 // === BROADCAST ===
 let bTimer = 0;
 function broadcastDuel(dt) {
@@ -558,6 +780,7 @@ async function boot() {
   KiBlasts.init();
   ResonanceSynths.init();
   FX.init({ aurora: true });
+  buildResBars();
 
   try { await VoiceEngine.init(); } catch(e) { console.warn('Mic:', e); }
 
@@ -574,7 +797,9 @@ async function boot() {
     KI.runUpdates(dt, t);
     broadcastDuel(dt);
     updateDuelHUD();
+    updateResBars();
     drawClash();
+    drawMorphBall(t);
     KI.renderer.render(KI.scene, KI.camera);
   })();
 

@@ -51,6 +51,51 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 #voiceRing.on{opacity:1}
 #voiceRingCanvas{width:100%;height:100%}
 
+/* Resonance depth HUD — left side */
+#resHUD{position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:55;
+  pointer-events:none;opacity:0;transition:opacity 0.4s}
+#resHUD.on{opacity:1}
+#resKanji{font-size:64px;line-height:1;text-shadow:0 0 30px currentColor,0 0 60px currentColor;
+  text-align:center;transition:color 0.3s}
+#resLabel{font-size:9px;color:#fff5;text-align:center;margin-top:4px;letter-spacing:2px}
+#resDepth{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.depth-layer{display:flex;align-items:center;gap:8px;opacity:0.15;
+  transition:opacity 0.3s,transform 0.3s}
+.depth-layer.active{opacity:1;transform:translateX(4px)}
+.depth-layer.peak{opacity:1;transform:translateX(8px)}
+.depth-dot{width:10px;height:10px;border-radius:50%;border:1px solid;transition:background 0.3s,box-shadow 0.3s}
+.depth-layer.active .depth-dot{box-shadow:0 0 8px currentColor}
+.depth-layer.peak .depth-dot{background:currentColor;box-shadow:0 0 12px currentColor,0 0 24px currentColor}
+.depth-name{font-size:10px;letter-spacing:1px}
+.depth-mult{font-size:9px;color:#ff08;margin-left:auto}
+#resProgress{width:100%;height:2px;background:#111;border-radius:1px;margin-top:6px;overflow:hidden}
+#resProgressFill{height:100%;width:0%;background:#fff;transition:width 0.08s,background 0.3s;border-radius:1px}
+#resSustain{font-size:9px;color:#fff3;text-align:center;margin-top:4px;font-variant-numeric:tabular-nums}
+#resMultiplier{font-size:22px;color:#ff0;text-align:center;margin-top:6px;text-shadow:0 0 10px #f80;
+  opacity:0;transition:opacity 0.3s}
+#resMultiplier.on{opacity:1}
+
+/* Kanji element HUD — right side */
+#kanjiHUD{position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:55;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#kanjiHUD.on{opacity:1}
+#kanjiChar{font-size:56px;line-height:1;text-shadow:0 0 25px currentColor,0 0 50px currentColor}
+#kanjiName{font-size:10px;color:#fff8;margin-top:4px}
+#kanjiReading{font-size:8px;color:#fff3}
+
+/* Score display */
+#scoreHUD{position:fixed;top:40px;left:50%;transform:translateX(-50%);z-index:55;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#scoreHUD.on{opacity:1}
+#scoreVal{font-size:24px;color:#ff0;text-shadow:0 0 8px #f80}
+#comboVal{font-size:12px;color:#f80;letter-spacing:2px}
+
+/* Damage text layer */
+#dmgLayer{position:fixed;inset:0;z-index:60;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 10px currentColor,0 0 20px currentColor;
+  animation:dmgUp 1.4s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-140px) scale(2)}}
+
 #version{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:45;
   font-size:8px;color:#222;letter-spacing:3px;pointer-events:none}
 </style>
@@ -87,6 +132,25 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
   </button>
 </div>
 
+<div id="resHUD">
+  <div id="resKanji" style="color:#4488ff">気</div>
+  <div id="resLabel">RESONANCE</div>
+  <div id="resDepth"></div>
+  <div id="resProgress"><div id="resProgressFill"></div></div>
+  <div id="resSustain">0.0s</div>
+  <div id="resMultiplier">1x</div>
+</div>
+<div id="kanjiHUD">
+  <div id="kanjiChar" style="color:#4488ff">気</div>
+  <div id="kanjiName">Spirit</div>
+  <div id="kanjiReading">KI</div>
+</div>
+<div id="scoreHUD">
+  <div id="scoreVal">0</div>
+  <div id="comboVal"></div>
+</div>
+<div id="dmgLayer"></div>
+
 <div id="voiceRing"><canvas id="voiceRingCanvas" width="200" height="200"></canvas></div>
 <div id="version">AUDIOFABRIC VOICE ROOM</div>
 <!-- hidden peers element for MQTT module -->
@@ -109,6 +173,8 @@ import * as Kanji from './modules/kanji.js';
 import * as Vortex from './modules/hd-vortex.js';
 import * as Resonance from './modules/resonance.js';
 import * as ResonanceSynths from './modules/resonance-synths.js';
+import * as KiBlasts from './modules/ki-blasts.js';
+import * as FX from './modules/hd-fx.js';
 import * as MqttNet from './modules/mqtt-net.js';
 import * as WebRTCNet from './modules/webrtc-net.js';
 import * as Camera from './modules/camera.js';
@@ -509,6 +575,110 @@ function updateAvatars(dt, t) {
 
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+// === RESONANCE HUD — ki-arena style bars ===
+function buildResHUD() {
+  const cont = document.getElementById('resDepth');
+  Resonance.LAYERS.forEach((layer, i) => {
+    const d = document.createElement('div');
+    d.className = 'depth-layer';
+    d.id = 'dL-' + i;
+    d.innerHTML =
+      '<div class="depth-dot" style="color:#' + layer.color.toString(16).padStart(6,'0') +
+      ';border-color:#' + layer.color.toString(16).padStart(6,'0') + '"></div>' +
+      '<span class="depth-name" style="color:#' + layer.color.toString(16).padStart(6,'0') + '">' +
+      layer.name.toUpperCase() + '</span>' +
+      '<span class="depth-mult">' + layer.mult + 'x</span>';
+    cont.appendChild(d);
+  });
+}
+
+function updateResHUD() {
+  const res = KI.get('resonance');
+  if (!res) return;
+  const st = res.state;
+  const hud = document.getElementById('resHUD');
+  const kanjiHud = document.getElementById('kanjiHUD');
+  const scoreHud = document.getElementById('scoreHUD');
+
+  if (st.activeLayer >= 0 || KI.voice.sounding) {
+    hud.classList.add('on');
+    kanjiHud.classList.add('on');
+    scoreHud.classList.add('on');
+  } else {
+    hud.classList.remove('on');
+    kanjiHud.classList.remove('on');
+    if (KI.player.score > 0) scoreHud.classList.add('on');
+    else scoreHud.classList.remove('on');
+  }
+
+  // layer indicators
+  Resonance.LAYERS.forEach((layer, i) => {
+    const el = document.getElementById('dL-' + i);
+    if (!el) return;
+    el.classList.toggle('active', i <= st.activeLayer);
+    el.classList.toggle('peak', i <= st.peakLayer && i > st.activeLayer);
+  });
+
+  // progress bar
+  const fill = document.getElementById('resProgressFill');
+  fill.style.width = (st.layerProgress * 100) + '%';
+  if (st.activeLayer >= 0)
+    fill.style.background = '#' + Resonance.LAYERS[st.activeLayer].color.toString(16).padStart(6,'0');
+
+  // sustain timer
+  document.getElementById('resSustain').textContent = st.sustainTime.toFixed(1) + 's';
+
+  // multiplier
+  const mult = document.getElementById('resMultiplier');
+  const m = Resonance.getMultiplier();
+  if (m > 1) { mult.textContent = Math.round(m) + 'x'; mult.classList.add('on'); }
+  else mult.classList.remove('on');
+
+  // resonance kanji
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const kj = KANJI[KI.voice.vowel];
+  const resK = document.getElementById('resKanji');
+  if (kj) {
+    resK.textContent = kj.char;
+    resK.style.color = kj.color;
+  } else {
+    resK.textContent = '気';
+    resK.style.color = '#4488ff';
+  }
+
+  // right-side kanji HUD
+  if (kj) {
+    document.getElementById('kanjiChar').textContent = kj.char;
+    document.getElementById('kanjiChar').style.color = kj.color;
+    document.getElementById('kanjiName').textContent = kj.name;
+    document.getElementById('kanjiReading').textContent = kj.reading;
+  }
+
+  // score
+  document.getElementById('scoreVal').textContent = KI.player.score.toLocaleString();
+  const combo = KI.player.combo || 0;
+  document.getElementById('comboVal').textContent = combo > 1 ? combo + 'x COMBO' : '';
+}
+
+// === DAMAGE POPUPS ===
+function spawnDmgText(text, color) {
+  const el = document.createElement('div');
+  el.className = 'dmg';
+  el.textContent = text;
+  el.style.color = color || '#ff0';
+  el.style.left = (35 + Math.random()*30) + '%';
+  el.style.top = (30 + Math.random()*20) + '%';
+  el.style.fontSize = (18 + Math.random()*14) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1500);
+}
+
+KI.on('hit', data => {
+  spawnDmgText('+' + Math.round(data.dmg), '#ff0');
+  if (data.combo > 1) spawnDmgText(data.combo + 'x', '#f80');
+});
+
 // === BOOT ===
 async function boot() {
   document.getElementById('roomName').textContent = 'ROOM: ' + ROOM;
@@ -524,8 +694,11 @@ async function boot() {
   Kanji.init();
   Resonance.init();
   Vortex.init({ count: 2500 });
+  KiBlasts.init();
+  FX.init({ aurora: true });
   initAmbientParticles();
   ResonanceSynths.init();
+  buildResHUD();
 
   // floor glow ring
   const floorGeo = new THREE.RingGeometry(3, 12, 64);
@@ -567,6 +740,7 @@ async function boot() {
     KI.runUpdates(dt, t);
     broadcastState(dt);
     updateAvatars(dt, t);
+    updateResHUD();
     drawVoiceRing();
     // floor glow reacts to room activity
     if (floorGlow) {
