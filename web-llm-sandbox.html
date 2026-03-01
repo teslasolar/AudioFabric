@@ -510,25 +510,20 @@ async function sendMessage(text) {
     return;
   }
 
-  // Build messages with tool system prompt and emotion context
-  const systemPrompt = buildToolSystemPrompt() + `\n\nUSER EMOTION STATE: The user currently sounds ${dominantEmo} (${(emoProfile[dominantEmo]*100).toFixed(0)}% intensity). Emotions: ${Object.entries(emoProfile).map(([k,v])=>k+':'+Math.round(v*100)+'%').join(', ')}. Adapt your tone accordingly.\n`;
+  // Build single system prompt with everything merged in
+  const state = getRepoState();
+  const repoCtx = state.fileCount > 0
+    ? `\nCURRENT REPO: ${state.fileCount} files (${state.files.join(', ')}), ${state.commitCount} commits on branch '${state.branch}'.`
+    : '';
+  const systemPrompt = buildToolSystemPrompt()
+    + `\n\nUSER EMOTION STATE: The user currently sounds ${dominantEmo} (${(emoProfile[dominantEmo]*100).toFixed(0)}% intensity). Emotions: ${Object.entries(emoProfile).map(([k,v])=>k+':'+Math.round(v*100)+'%').join(', ')}. Adapt your tone accordingly.`
+    + repoCtx;
 
-  // Build conversation
+  // Build conversation — single system msg, then only user/assistant roles
   const messages = [
     { role: 'system', content: systemPrompt }
   ];
-
-  // Include repo state context
-  const state = getRepoState();
-  if (state.fileCount > 0) {
-    messages.push({
-      role: 'system',
-      content: `Current repo has ${state.fileCount} files: ${state.files.join(', ')}. ${state.commitCount} commits on branch '${state.branch}'.`
-    });
-  }
-
-  // Add chat history (last 16 messages)
-  const recentHistory = chatHistory.slice(-16);
+  const recentHistory = chatHistory.slice(-16).filter(m => m.role === 'user' || m.role === 'assistant');
   messages.push(...recentHistory);
   messages.push({ role: 'user', content: text });
 
@@ -580,10 +575,10 @@ async function sendMessage(text) {
       // Send tool results back to LLM for follow-up
       chatHistory.push({ role: 'user', content: `[Tool Results]\n${toolResults}\n[Continue your response based on these results. If you created HTML files, they are now showing in the preview.]` });
 
-      // Get follow-up response
+      // Get follow-up response — single system msg + only user/assistant roles
       const followMsgs = [
         { role: 'system', content: systemPrompt },
-        ...chatHistory.slice(-20)
+        ...chatHistory.slice(-20).filter(m => m.role === 'user' || m.role === 'assistant')
       ];
 
       let followResponse = '';
