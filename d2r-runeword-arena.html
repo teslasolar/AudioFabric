@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D2R Runeword Arena — Audio Exploration of All Diablo 2 Resurrected Runes & Runewords</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0806;color:#d4c4a0;font-family:'Courier New',monospace;overflow:hidden;user-select:none}
+canvas#bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+
+/* ─── LEFT PANEL: RUNEWORD BROWSER ─── */
+#panel{position:fixed;left:0;top:0;bottom:0;width:340px;z-index:20;
+  background:linear-gradient(135deg,rgba(12,8,4,0.95),rgba(20,14,8,0.92));
+  border-right:2px solid #44332244;overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:4px 0 30px rgba(0,0,0,0.6)}
+
+#panelHead{padding:14px 16px 10px;border-bottom:1px solid #332a1a}
+#panelHead h1{font-size:16px;color:#ffa844;text-shadow:0 0 8px #f804;letter-spacing:3px;margin-bottom:8px}
+#searchBox{width:100%;background:#111008;border:1px solid #44332288;color:#d4c4a0;
+  padding:7px 10px;font-family:inherit;font-size:12px;border-radius:4px;outline:none}
+#searchBox:focus{border-color:#ffa844;box-shadow:0 0 8px #f804}
+#searchBox::placeholder{color:#665}
+
+#filters{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.fBtn{padding:3px 8px;font-size:10px;font-family:inherit;background:#1a1408;border:1px solid #332a1a;
+  color:#886;cursor:pointer;border-radius:3px;transition:all 0.2s}
+.fBtn:hover{border-color:#886;color:#cc8}
+.fBtn.on{background:#332a1a;border-color:#ffa844;color:#ffa844;box-shadow:0 0 6px #f802}
+
+#runewordList{flex:1;overflow-y:auto;padding:6px 0}
+#runewordList::-webkit-scrollbar{width:6px}
+#runewordList::-webkit-scrollbar-track{background:#0a0806}
+#runewordList::-webkit-scrollbar-thumb{background:#332a1a;border-radius:3px}
+#runewordList::-webkit-scrollbar-thumb:hover{background:#44382a}
+
+.rwItem{padding:8px 16px;cursor:pointer;border-bottom:1px solid #1a150e;transition:all 0.2s;position:relative}
+.rwItem:hover{background:#1a1408}
+.rwItem.sel{background:#221a0c;border-left:3px solid #ffa844}
+.rwName{font-size:13px;color:#d4c4a0;font-weight:bold}
+.rwItem.sel .rwName{color:#ffa844}
+.rwRunes{font-size:10px;color:#776;margin-top:2px;display:flex;gap:2px;flex-wrap:wrap}
+.rwRune{padding:1px 4px;border-radius:2px;background:#1a150c;border:1px solid #22180f}
+.rwMeta{font-size:9px;color:#554;margin-top:2px}
+.rwSockets{position:absolute;right:12px;top:8px;font-size:11px;color:#886}
+
+#listCount{padding:8px 16px;font-size:9px;color:#554;border-top:1px solid #1a150e;text-align:center}
+
+/* ─── RIGHT PANEL: RUNE DETAILS ─── */
+#detail{position:fixed;right:0;top:0;bottom:0;width:300px;z-index:20;
+  background:linear-gradient(225deg,rgba(12,8,4,0.95),rgba(20,14,8,0.92));
+  border-left:2px solid #44332244;overflow-y:auto;display:flex;flex-direction:column;
+  box-shadow:-4px 0 30px rgba(0,0,0,0.6);transform:translateX(100%);transition:transform 0.3s}
+#detail.on{transform:translateX(0)}
+
+#detailHead{padding:16px;border-bottom:1px solid #332a1a}
+#detailName{font-size:20px;color:#ffa844;text-shadow:0 0 10px #f806;letter-spacing:2px}
+#detailType{font-size:11px;color:#886;margin-top:4px}
+#detailLevel{font-size:10px;color:#776;margin-top:2px}
+
+#runeSlots{padding:16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;border-bottom:1px solid #1a150e}
+.runeSlot{width:52px;height:68px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border:2px solid #332a1a;border-radius:6px;cursor:pointer;transition:all 0.3s;position:relative}
+.runeSlot:hover{border-color:#ffa844;box-shadow:0 0 12px #f804;transform:scale(1.08)}
+.runeSlotName{font-size:14px;font-weight:bold}
+.runeSlotNote{font-size:8px;color:#776;margin-top:2px}
+.runeSlotTier{position:absolute;top:-1px;right:-1px;font-size:7px;padding:1px 3px;
+  border-radius:0 4px 0 4px;text-transform:uppercase;letter-spacing:1px}
+
+#audioControls{padding:16px;border-bottom:1px solid #1a150e}
+#audioControls h3{font-size:11px;color:#886;letter-spacing:2px;margin-bottom:8px}
+.aBtn{display:block;width:100%;padding:8px;font-family:inherit;font-size:11px;
+  background:#1a1408;border:1px solid #332a1a;color:#cc8;cursor:pointer;
+  border-radius:4px;margin-bottom:4px;transition:all 0.2s;text-align:center}
+.aBtn:hover{background:#221a0c;border-color:#ffa844;color:#ffa844;box-shadow:0 0 8px #f802}
+.aBtn:active{transform:scale(0.97)}
+
+#effectsList{padding:16px}
+#effectsList h3{font-size:11px;color:#886;letter-spacing:2px;margin-bottom:8px}
+#effectsContent{font-size:10px;color:#998;line-height:1.6}
+.effectLine{padding:3px 0;border-bottom:1px solid #1a150e08}
+.effectLabel{color:#886}
+
+/* ─── BOTTOM: ALL 33 RUNES KEYBOARD ─── */
+#runeKeyboard{position:fixed;bottom:0;left:340px;right:0;z-index:15;height:72px;
+  background:linear-gradient(0deg,rgba(10,8,6,0.95),rgba(10,8,6,0.7));
+  border-top:1px solid #332a1a44;display:flex;align-items:center;justify-content:center;
+  padding:0 8px;gap:2px;transition:right 0.3s}
+#runeKeyboard.shifted{right:300px}
+
+.runeKey{flex:1;max-width:42px;height:52px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;cursor:pointer;border-radius:4px;
+  border:1px solid #221a0f;transition:all 0.15s;position:relative}
+.runeKey:hover{border-color:#886;transform:translateY(-2px);z-index:2}
+.runeKey.playing{border-color:#ffa844;box-shadow:0 0 12px #f804;transform:translateY(-4px);z-index:3}
+.runeKey .rkName{font-size:9px;font-weight:bold}
+.runeKey .rkNote{font-size:7px;color:#554;margin-top:1px}
+
+/* ─── CENTER: 3D SCENE INFO ─── */
+#centerInfo{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:10;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.5s}
+#centerInfo.on{opacity:1}
+#centerTitle{font-size:28px;color:#ffa844;text-shadow:0 0 20px #f806,0 0 40px #f803;
+  letter-spacing:6px}
+#centerSub{font-size:11px;color:#886;margin-top:4px;letter-spacing:3px}
+
+/* ─── MODE INDICATOR ─── */
+#modeInd{position:fixed;top:16px;left:356px;z-index:12;font-size:10px;color:#554;letter-spacing:2px}
+
+/* ─── START OVERLAY ─── */
+#startOverlay{position:fixed;inset:0;z-index:100;background:rgba(6,4,2,0.95);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer}
+#startOverlay h1{font-size:36px;color:#ffa844;text-shadow:0 0 30px #f806;letter-spacing:8px;margin-bottom:8px}
+#startOverlay p{font-size:14px;color:#886;letter-spacing:4px;margin-bottom:30px}
+#startOverlay .rune-preview{font-size:60px;color:#44332288;letter-spacing:20px;margin-bottom:30px}
+#startOverlay .start-prompt{font-size:12px;color:#ffa84488;letter-spacing:3px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}
+
+/* ─── DRONE INDICATOR ─── */
+#droneInd{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:12;
+  font-size:9px;color:#4a8;letter-spacing:2px;opacity:0;transition:opacity 0.3s;pointer-events:none}
+#droneInd.on{opacity:1}
+
+/* ─── NOTIFICATION ─── */
+#notify{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:60;
+  font-size:32px;color:#ffa844;text-shadow:0 0 20px #f806,0 0 40px #f803;
+  letter-spacing:4px;opacity:0;transition:opacity 0.3s;pointer-events:none}
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<!-- START OVERLAY -->
+<div id="startOverlay">
+  <div class="rune-preview">El Eld Tir Nef Eth</div>
+  <h1>RUNEWORD ARENA</h1>
+  <p>DIABLO II RESURRECTED</p>
+  <div class="start-prompt">CLICK TO ENTER THE HORADRIC SANCTUM</div>
+</div>
+
+<!-- LEFT PANEL -->
+<div id="panel">
+  <div id="panelHead">
+    <h1>RUNEWORDS</h1>
+    <input type="text" id="searchBox" placeholder="Search runewords, runes, types..." spellcheck="false">
+    <div id="filters">
+      <button class="fBtn on" data-f="all">ALL</button>
+      <button class="fBtn" data-f="weapon">WEAPON</button>
+      <button class="fBtn" data-f="armor">ARMOR</button>
+      <button class="fBtn" data-f="helm">HELM</button>
+      <button class="fBtn" data-f="shield">SHIELD</button>
+      <button class="fBtn" data-f="missile">MISSILE</button>
+      <button class="fBtn" data-f="polearm">POLE</button>
+      <button class="fBtn" data-f="claw">CLAW</button>
+      <button class="fBtn" data-f="staff">STAFF</button>
+      <button class="fBtn" data-f="grimoire">GRIM</button>
+    </div>
+  </div>
+  <div id="runewordList"></div>
+  <div id="listCount"></div>
+</div>
+
+<!-- RIGHT DETAIL PANEL -->
+<div id="detail">
+  <div id="detailHead">
+    <div id="detailName"></div>
+    <div id="detailType"></div>
+    <div id="detailLevel"></div>
+  </div>
+  <div id="runeSlots"></div>
+  <div id="audioControls">
+    <h3>AUDIO</h3>
+    <button class="aBtn" id="btnArpeggio">ARPEGGIO — Play Rune Sequence</button>
+    <button class="aBtn" id="btnChord">CHORD — All Runes Together</button>
+    <button class="aBtn" id="btnElemental">ELEMENTAL — With Harmonics</button>
+    <button class="aBtn" id="btnDrone">DRONE — Ambient Sustain</button>
+  </div>
+  <div id="effectsList">
+    <h3>RUNEWORD PROPERTIES</h3>
+    <div id="effectsContent"></div>
+  </div>
+</div>
+
+<!-- BOTTOM RUNE KEYBOARD -->
+<div id="runeKeyboard"></div>
+
+<!-- CENTER -->
+<div id="centerInfo">
+  <div id="centerTitle"></div>
+  <div id="centerSub"></div>
+</div>
+
+<div id="modeInd"></div>
+<div id="droneInd">DRONE ACTIVE</div>
+<div id="notify"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+// ─── IMPORTS ───
+import { RUNES, RUNE_MAP, TIER_COLORS, ELEMENT_COLORS, getRune } from './modules/d2r-runes.js';
+import { RUNEWORDS, RUNEWORD_MAP, byCategory, bySockets, byLevel, byRune, search } from './modules/d2r-runewords.js';
+import * as RuneAudio from './modules/d2r-audio.js';
+import * as RuneVisuals from './modules/d2r-visuals.js';
+
+// ─── STATE ───
+const ST = {
+  started: false,
+  selectedRW: null,
+  filter: 'all',
+  query: '',
+  drone: null,
+  activeStones: [],
+  assembly: null,
+  cameraTarget: new THREE.Vector3(0, 0, 0),
+  cameraAngle: 0,
+  cameraRadius: 8,
+  cameraY: 3,
+  mouseX: 0, mouseY: 0,
+  clock: new THREE.Clock()
+};
+
+// ─── THREE.JS SCENE ───
+let renderer, scene, camera;
+const bgStars = [];
+const ambientParticles = [];
+
+function initThree() {
+  renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg'), antialias: true, alpha: false });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x0a0806);
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0a0806, 0.04);
+
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 3, 8);
+
+  // ambient light
+  scene.add(new THREE.AmbientLight(0x332a1a, 0.3));
+
+  // point lights for warmth
+  const pl1 = new THREE.PointLight(0xffa844, 0.6, 30);
+  pl1.position.set(5, 8, 5);
+  scene.add(pl1);
+  const pl2 = new THREE.PointLight(0x4488ff, 0.3, 25);
+  pl2.position.set(-5, 6, -5);
+  scene.add(pl2);
+
+  // ground grid
+  const gridGeo = new THREE.BufferGeometry();
+  const gridPos = [];
+  const gridSize = 40;
+  for (let i = -gridSize; i <= gridSize; i += 2) {
+    gridPos.push(-gridSize, -1.5, i, gridSize, -1.5, i);
+    gridPos.push(i, -1.5, -gridSize, i, -1.5, gridSize);
+  }
+  gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridPos, 3));
+  const gridMat = new THREE.LineBasicMaterial({ color: 0x221a0f, transparent: true, opacity: 0.3 });
+  scene.add(new THREE.LineSegments(gridGeo, gridMat));
+
+  // starfield
+  const starCount = 2000;
+  const starGeo = new THREE.BufferGeometry();
+  const starPositions = new Float32Array(starCount * 3);
+  const starColors = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++) {
+    const r = 50 + Math.random() * 100;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.random() * Math.PI;
+    starPositions[i*3] = r * Math.sin(phi) * Math.cos(theta);
+    starPositions[i*3+1] = r * Math.cos(phi) * 0.6 + 10;
+    starPositions[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+    const warmth = Math.random();
+    starColors[i*3] = 0.6 + warmth * 0.4;
+    starColors[i*3+1] = 0.4 + warmth * 0.3;
+    starColors[i*3+2] = 0.2 + warmth * 0.2;
+  }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
+  starGeo.setAttribute('color', new THREE.Float32BufferAttribute(starColors, 3));
+  const starMat = new THREE.PointsMaterial({ size: 0.5, vertexColors: true, transparent: true, opacity: 0.6 });
+  scene.add(new THREE.Points(starGeo, starMat));
+
+  // floating ambient dust
+  const dustCount = 500;
+  const dustGeo = new THREE.BufferGeometry();
+  const dustPositions = new Float32Array(dustCount * 3);
+  for (let i = 0; i < dustCount; i++) {
+    dustPositions[i*3] = (Math.random() - 0.5) * 30;
+    dustPositions[i*3+1] = Math.random() * 10 - 2;
+    dustPositions[i*3+2] = (Math.random() - 0.5) * 30;
+    ambientParticles.push({ idx: i, vx: (Math.random()-0.5)*0.02, vy: Math.random()*0.01+0.005, vz: (Math.random()-0.5)*0.02 });
+  }
+  dustGeo.setAttribute('position', new THREE.Float32BufferAttribute(dustPositions, 3));
+  const dustMat = new THREE.PointsMaterial({ color: 0xffa844, size: 0.06, transparent: true, opacity: 0.15,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  const dustMesh = new THREE.Points(dustGeo, dustMat);
+  scene.add(dustMesh);
+  ST.dustGeo = dustGeo;
+  ST.dustMesh = dustMesh;
+
+  // horadric circle (decorative ground rune)
+  buildHoradricCircle();
+
+  RuneVisuals.init(scene);
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+
+function buildHoradricCircle() {
+  // outer ring
+  const ringGeo = new THREE.RingGeometry(4, 4.1, 64);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x332a1a, transparent: true, opacity: 0.4, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = -1.49;
+  scene.add(ring);
+
+  // inner ring
+  const ring2Geo = new THREE.RingGeometry(2.8, 2.85, 64);
+  const ring2 = new THREE.Mesh(ring2Geo, ringMat.clone());
+  ring2.material.opacity = 0.25;
+  ring2.rotation.x = -Math.PI / 2;
+  ring2.position.y = -1.48;
+  scene.add(ring2);
+
+  // runic symbols around the circle
+  const symbolCount = 12;
+  for (let i = 0; i < symbolCount; i++) {
+    const a = (i / symbolCount) * Math.PI * 2;
+    const r = 3.5;
+    const pillarGeo = new THREE.BoxGeometry(0.08, 0.6, 0.08);
+    const pillarMat = new THREE.MeshBasicMaterial({ color: 0x44382a, transparent: true, opacity: 0.4 });
+    const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+    pillar.position.set(Math.cos(a) * r, -1.2, Math.sin(a) * r);
+    scene.add(pillar);
+  }
+
+  // radial lines
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI;
+    const pts = [
+      new THREE.Vector3(Math.cos(a) * 2.85, -1.48, Math.sin(a) * 2.85),
+      new THREE.Vector3(Math.cos(a) * 4.05, -1.48, Math.sin(a) * 4.05)
+    ];
+    const lGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    const lMat = new THREE.LineBasicMaterial({ color: 0x332a1a, transparent: true, opacity: 0.2 });
+    scene.add(new THREE.Line(lGeo, lMat));
+    // opposite
+    const pts2 = [
+      new THREE.Vector3(Math.cos(a + Math.PI) * 2.85, -1.48, Math.sin(a + Math.PI) * 2.85),
+      new THREE.Vector3(Math.cos(a + Math.PI) * 4.05, -1.48, Math.sin(a + Math.PI) * 4.05)
+    ];
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts2), lMat.clone()));
+  }
+}
+
+// ─── BUILD UI ───
+function buildRuneKeyboard() {
+  const kb = document.getElementById('runeKeyboard');
+  RUNES.forEach(rune => {
+    const key = document.createElement('div');
+    key.className = 'runeKey';
+    key.dataset.rune = rune.name;
+    const tc = TIER_COLORS[rune.tier];
+    key.style.background = tc.bg;
+    key.style.borderColor = tc.border;
+    key.innerHTML = `<span class="rkName" style="color:${tc.text}">${rune.name}</span>
+      <span class="rkNote">${rune.note}</span>`;
+    key.addEventListener('click', () => playKeyboardRune(rune));
+    kb.appendChild(key);
+  });
+}
+
+function playKeyboardRune(rune) {
+  RuneAudio.playRuneElemental(rune.name, 0.8);
+  flashKey(rune.name);
+  // spawn a small burst in 3D
+  const angle = Math.random() * Math.PI * 2;
+  const pos = new THREE.Vector3(Math.cos(angle) * 2, 0, Math.sin(angle) * 2);
+  RuneVisuals.spawnRuneBurst(rune, pos, 15);
+  showNotify(rune.name + ' — ' + rune.note);
+}
+
+function flashKey(name) {
+  const el = document.querySelector(`.runeKey[data-rune="${name}"]`);
+  if (!el) return;
+  el.classList.add('playing');
+  setTimeout(() => el.classList.remove('playing'), 400);
+}
+
+function buildRunewordList() {
+  const list = document.getElementById('runewordList');
+  list.innerHTML = '';
+  let items = RUNEWORDS;
+
+  if (ST.filter !== 'all') {
+    items = items.filter(rw => rw.c === ST.filter);
+  }
+  if (ST.query) {
+    const q = ST.query.toLowerCase();
+    items = items.filter(rw =>
+      rw.name.toLowerCase().includes(q) ||
+      rw.t.toLowerCase().includes(q) ||
+      rw.r.some(r => r.toLowerCase().includes(q))
+    );
+  }
+
+  items.forEach(rw => {
+    const div = document.createElement('div');
+    div.className = 'rwItem' + (ST.selectedRW && ST.selectedRW.name === rw.name ? ' sel' : '');
+    div.innerHTML = `
+      <div class="rwName">${rw.name}</div>
+      <div class="rwRunes">${rw.r.map(r => {
+        const rune = RUNE_MAP[r];
+        const tc = rune ? TIER_COLORS[rune.tier] : { bg:'#111', border:'#333', text:'#666' };
+        return `<span class="rwRune" style="background:${tc.bg};border-color:${tc.border};color:${tc.text}">${r}</span>`;
+      }).join('')}</div>
+      <div class="rwMeta">${rw.t} • Lv${rw.l}</div>
+      <div class="rwSockets">${'◇'.repeat(rw.s)}</div>`;
+    div.addEventListener('click', () => selectRuneword(rw));
+    list.appendChild(div);
+  });
+
+  document.getElementById('listCount').textContent = `${items.length} of ${RUNEWORDS.length} runewords`;
+}
+
+function selectRuneword(rw) {
+  ST.selectedRW = rw;
+  buildRunewordList(); // re-highlight
+  showDetail(rw);
+  showIn3D(rw);
+  document.getElementById('detail').classList.add('on');
+  document.getElementById('runeKeyboard').classList.add('shifted');
+  document.getElementById('centerInfo').classList.add('on');
+  document.getElementById('centerTitle').textContent = rw.name.toUpperCase();
+  document.getElementById('centerSub').textContent = rw.r.join(' + ') + ' — ' + rw.t;
+
+  // auto-play arpeggio
+  RuneAudio.playRunewordArpeggio(rw.r, 0.3, 0.12);
+  rw.r.forEach((name, i) => {
+    setTimeout(() => flashKey(name), i * (0.3 + 0.12) * 1000);
+  });
+}
+
+function showDetail(rw) {
+  document.getElementById('detailName').textContent = rw.name;
+  document.getElementById('detailType').textContent = rw.t;
+  document.getElementById('detailLevel').textContent = `Required Level: ${rw.l} • ${rw.s} Sockets`;
+
+  // rune slots
+  const slots = document.getElementById('runeSlots');
+  slots.innerHTML = '';
+  rw.r.forEach(name => {
+    const rune = RUNE_MAP[name];
+    if (!rune) return;
+    const tc = TIER_COLORS[rune.tier];
+    const slot = document.createElement('div');
+    slot.className = 'runeSlot';
+    slot.style.background = tc.bg;
+    slot.style.borderColor = tc.border;
+    slot.innerHTML = `
+      <span class="runeSlotName" style="color:${tc.text}">${name}</span>
+      <span class="runeSlotNote">${rune.note} • ${rune.freq.toFixed(0)}Hz</span>
+      <span class="runeSlotTier" style="background:${tc.border};color:${tc.bg}">${rune.tier}</span>`;
+    slot.addEventListener('click', () => {
+      RuneAudio.playRuneElemental(name, 0.6);
+      flashKey(name);
+      showNotify(`${name} — ${rune.note} — ${rune.element}`);
+    });
+    slots.appendChild(slot);
+  });
+
+  // effects
+  const eff = document.getElementById('effectsContent');
+  let html = '<div style="margin-bottom:8px;color:#cc8;font-size:11px">Rune Components:</div>';
+  rw.r.forEach(name => {
+    const rune = RUNE_MAP[name];
+    if (!rune) return;
+    const ec = ELEMENT_COLORS[rune.element] || '#888';
+    html += `<div class="effectLine">
+      <span class="effectLabel" style="color:${ec}">${name}</span>
+      <span style="color:#776"> (${rune.element})</span><br>
+      <span style="color:#998;font-size:9px">Wep: ${rune.wepEffect}</span><br>
+      <span style="color:#889;font-size:9px">Arm: ${rune.armEffect}</span>
+    </div>`;
+  });
+  // musical info
+  html += '<div style="margin-top:12px;margin-bottom:6px;color:#cc8;font-size:11px">Musical Mapping:</div>';
+  const notes = rw.r.map(name => { const r = RUNE_MAP[name]; return r ? r.note : '?'; });
+  const freqs = rw.r.map(name => { const r = RUNE_MAP[name]; return r ? r.freq.toFixed(1) + 'Hz' : '?'; });
+  html += `<div class="effectLine"><span class="effectLabel">Notes:</span> ${notes.join(' → ')}</div>`;
+  html += `<div class="effectLine"><span class="effectLabel">Freqs:</span> ${freqs.join(', ')}</div>`;
+  const tiers = rw.r.map(name => { const r = RUNE_MAP[name]; return r ? r.tier : '?'; });
+  html += `<div class="effectLine"><span class="effectLabel">Tiers:</span> ${tiers.join(', ')}</div>`;
+  eff.innerHTML = html;
+}
+
+function showIn3D(rw) {
+  // clear previous
+  if (ST.assembly) {
+    ST.assembly.remove();
+    ST.assembly = null;
+  }
+  RuneVisuals.clearAll();
+
+  // create runeword assembly
+  const center = new THREE.Vector3(0, 0, 0);
+  const spacing = rw.r.length <= 3 ? 2.2 : rw.r.length <= 4 ? 1.8 : rw.r.length <= 5 ? 1.5 : 1.2;
+  ST.assembly = RuneVisuals.createRunewordAssembly(rw.r, center, spacing);
+
+  // spawn burst at each rune position
+  rw.r.forEach((name, i) => {
+    const rune = RUNE_MAP[name];
+    if (!rune) return;
+    const totalWidth = (rw.r.length - 1) * spacing;
+    const x = -totalWidth / 2 + i * spacing;
+    setTimeout(() => {
+      RuneVisuals.spawnRuneBurst(rune, new THREE.Vector3(x, 0, 0), 20);
+    }, i * 200);
+  });
+
+  // adjust camera
+  ST.cameraTarget.set(0, 0, 0);
+  ST.cameraRadius = Math.max(6, rw.r.length * 1.5);
+}
+
+// ─── AUDIO BUTTON HANDLERS ───
+function setupAudioButtons() {
+  document.getElementById('btnArpeggio').addEventListener('click', () => {
+    if (!ST.selectedRW) return;
+    RuneAudio.playRunewordArpeggio(ST.selectedRW.r, 0.35, 0.15);
+    ST.selectedRW.r.forEach((name, i) => {
+      setTimeout(() => flashKey(name), i * 500);
+    });
+  });
+
+  document.getElementById('btnChord').addEventListener('click', () => {
+    if (!ST.selectedRW) return;
+    RuneAudio.playRunewordChord(ST.selectedRW.r, 1.5);
+    ST.selectedRW.r.forEach(name => flashKey(name));
+  });
+
+  document.getElementById('btnElemental').addEventListener('click', () => {
+    if (!ST.selectedRW) return;
+    ST.selectedRW.r.forEach((name, i) => {
+      setTimeout(() => {
+        RuneAudio.playRuneElemental(name, 0.7);
+        flashKey(name);
+      }, i * 400);
+    });
+  });
+
+  document.getElementById('btnDrone').addEventListener('click', () => {
+    if (ST.drone) {
+      ST.drone.stop();
+      ST.drone = null;
+      document.getElementById('droneInd').classList.remove('on');
+      document.getElementById('btnDrone').textContent = 'DRONE — Ambient Sustain';
+      return;
+    }
+    if (!ST.selectedRW) return;
+    // drone on the lowest rune
+    let lowestRune = null;
+    let lowestFreq = Infinity;
+    ST.selectedRW.r.forEach(name => {
+      const rune = RUNE_MAP[name];
+      if (rune && rune.freq < lowestFreq) {
+        lowestFreq = rune.freq;
+        lowestRune = rune;
+      }
+    });
+    if (lowestRune) {
+      ST.drone = RuneAudio.startDrone(lowestRune.name);
+      document.getElementById('droneInd').classList.add('on');
+      document.getElementById('btnDrone').textContent = 'DRONE — STOP (' + lowestRune.name + ')';
+    }
+  });
+}
+
+// ─── FILTERS & SEARCH ───
+function setupFilters() {
+  document.querySelectorAll('.fBtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.fBtn').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      ST.filter = btn.dataset.f;
+      buildRunewordList();
+    });
+  });
+
+  document.getElementById('searchBox').addEventListener('input', (e) => {
+    ST.query = e.target.value;
+    buildRunewordList();
+  });
+}
+
+// ─── NOTIFICATION ───
+function showNotify(text) {
+  const el = document.getElementById('notify');
+  el.textContent = text;
+  el.style.opacity = '1';
+  clearTimeout(ST.notifyTimer);
+  ST.notifyTimer = setTimeout(() => { el.style.opacity = '0'; }, 1200);
+}
+
+// ─── CAMERA ORBIT ───
+function updateCamera(dt) {
+  ST.cameraAngle += dt * 0.08;
+  // mouse influence
+  const mx = (ST.mouseX / window.innerWidth - 0.5) * 0.5;
+  const my = (ST.mouseY / window.innerHeight - 0.5) * 0.3;
+  const angle = ST.cameraAngle + mx;
+  const radius = ST.cameraRadius;
+  const targetY = ST.cameraY + my * 2;
+
+  camera.position.x += (Math.cos(angle) * radius - camera.position.x) * 0.02;
+  camera.position.z += (Math.sin(angle) * radius - camera.position.z) * 0.02;
+  camera.position.y += (targetY - camera.position.y) * 0.02;
+  camera.lookAt(ST.cameraTarget);
+}
+
+// ─── ANIMATE DUST ───
+function animateDust(t) {
+  const pos = ST.dustGeo.attributes.position;
+  ambientParticles.forEach(p => {
+    let x = pos.getX(p.idx) + p.vx;
+    let y = pos.getY(p.idx) + p.vy;
+    let z = pos.getZ(p.idx) + p.vz;
+    if (y > 8) { y = -2; x = (Math.random()-0.5)*30; z = (Math.random()-0.5)*30; }
+    if (Math.abs(x) > 15) p.vx *= -1;
+    if (Math.abs(z) > 15) p.vz *= -1;
+    pos.setXYZ(p.idx, x, y, z);
+  });
+  pos.needsUpdate = true;
+}
+
+// ─── MAIN LOOP ───
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(ST.clock.getDelta(), 0.05);
+  const t = ST.clock.getElapsedTime();
+
+  updateCamera(dt);
+  animateDust(t);
+  RuneVisuals.update(dt, t);
+
+  renderer.render(scene, camera);
+}
+
+// ─── KEYBOARD SHORTCUTS ───
+function setupKeyboard() {
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    // number keys 1-9 for socket filter
+    if (e.key >= '1' && e.key <= '6') {
+      const n = parseInt(e.key);
+      showNotify(`${n}-socket runewords`);
+      ST.filter = 'all';
+      ST.query = '';
+      document.querySelectorAll('.fBtn').forEach(b => b.classList.remove('on'));
+      document.querySelector('.fBtn[data-f="all"]').classList.add('on');
+      document.getElementById('searchBox').value = '';
+      const items = bySockets(n);
+      // temp highlight
+      ST.socketFilter = n;
+      buildRunewordListBySockets(n);
+    }
+    // ESC to deselect
+    if (e.key === 'Escape') {
+      ST.selectedRW = null;
+      document.getElementById('detail').classList.remove('on');
+      document.getElementById('runeKeyboard').classList.remove('shifted');
+      document.getElementById('centerInfo').classList.remove('on');
+      RuneVisuals.clearAll();
+      ST.assembly = null;
+      if (ST.drone) { ST.drone.stop(); ST.drone = null; document.getElementById('droneInd').classList.remove('on'); }
+      buildRunewordList();
+    }
+    // space to replay
+    if (e.key === ' ' && ST.selectedRW) {
+      e.preventDefault();
+      RuneAudio.playRunewordArpeggio(ST.selectedRW.r, 0.3, 0.12);
+      ST.selectedRW.r.forEach((name, i) => {
+        setTimeout(() => flashKey(name), i * 420);
+      });
+    }
+  });
+}
+
+function buildRunewordListBySockets(n) {
+  const list = document.getElementById('runewordList');
+  list.innerHTML = '';
+  const items = bySockets(n);
+  items.forEach(rw => {
+    const div = document.createElement('div');
+    div.className = 'rwItem';
+    div.innerHTML = `
+      <div class="rwName">${rw.name}</div>
+      <div class="rwRunes">${rw.r.map(r => {
+        const rune = RUNE_MAP[r];
+        const tc = rune ? TIER_COLORS[rune.tier] : { bg:'#111', border:'#333', text:'#666' };
+        return `<span class="rwRune" style="background:${tc.bg};border-color:${tc.border};color:${tc.text}">${r}</span>`;
+      }).join('')}</div>
+      <div class="rwMeta">${rw.t} • Lv${rw.l}</div>
+      <div class="rwSockets">${'◇'.repeat(rw.s)}</div>`;
+    div.addEventListener('click', () => selectRuneword(rw));
+    list.appendChild(div);
+  });
+  document.getElementById('listCount').textContent = `${items.length} ${n}-socket runewords`;
+}
+
+// ─── MOUSE TRACKING ───
+document.addEventListener('mousemove', (e) => {
+  ST.mouseX = e.clientX;
+  ST.mouseY = e.clientY;
+});
+
+// ─── SCROLL ZOOM ───
+document.addEventListener('wheel', (e) => {
+  if (e.target.closest('#panel') || e.target.closest('#detail')) return;
+  ST.cameraRadius = Math.max(3, Math.min(20, ST.cameraRadius + e.deltaY * 0.01));
+}, { passive: true });
+
+// ─── INIT ───
+function start() {
+  if (ST.started) return;
+  ST.started = true;
+  document.getElementById('startOverlay').style.display = 'none';
+
+  RuneAudio.init();
+  initThree();
+  buildRuneKeyboard();
+  buildRunewordList();
+  setupFilters();
+  setupAudioButtons();
+  setupKeyboard();
+  animate();
+
+  // entrance: play a dramatic chord of El + Zod
+  setTimeout(() => {
+    RuneAudio.playRune('El', 1.2, 0.2);
+    RuneAudio.playRune('Zod', 1.2, 0.2);
+    flashKey('El');
+    flashKey('Zod');
+  }, 300);
+
+  document.getElementById('modeInd').textContent = 'ESC close • SPACE replay • 1-6 socket filter • SCROLL zoom';
+}
+
+document.getElementById('startOverlay').addEventListener('click', start);
+</script>
+</body>
+</html>
