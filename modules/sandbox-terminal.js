@@ -39,6 +39,10 @@ const COMMANDS = {
       '  commit <msg>      Commit all changes',
       '  eval <js>         Execute JavaScript',
       '  run <file.html>   Open HTML in preview',
+      '  open <page>       Load AudioFabric page in preview',
+      '  load <page>       Same as open',
+      '  browse [cat]      List project pages (game/arena/music/...)',
+      '  fetch <page>      Fetch source into editor',
       '  clear             Clear terminal',
       '  pwd               Print working directory',
       '  cd <dir>          Change directory',
@@ -178,9 +182,43 @@ const COMMANDS = {
     desc: 'Open HTML file in preview',
     run: (args) => {
       if (!args[0]) return ['Usage: run <file.html>'];
-      // trigger external callback
       if (onCommand) onCommand('run', args[0]);
       return [`Opening ${args[0]} in preview...`];
+    }
+  },
+
+  open: {
+    desc: 'Load an AudioFabric project page in preview',
+    run: (args) => {
+      if (!args[0]) return ['Usage: open <page.html>', 'Try: open kamehameha.html, open zen-garden.html'];
+      if (onCommand) onCommand('open', args.join(' '));
+      return [`Loading ${args.join(' ')} in preview...`];
+    }
+  },
+
+  load: {
+    desc: 'Load an AudioFabric project page in preview (alias for open)',
+    run: (args) => {
+      if (!args[0]) return ['Usage: load <page.html>'];
+      if (onCommand) onCommand('open', args.join(' '));
+      return [`Loading ${args.join(' ')} in preview...`];
+    }
+  },
+
+  browse: {
+    desc: 'List AudioFabric project pages',
+    run: (args) => {
+      if (onCommand) onCommand('browse', args[0] || '');
+      return ['See project browser in sidebar'];
+    }
+  },
+
+  fetch: {
+    desc: 'Fetch source code of a project page into the editor',
+    run: (args) => {
+      if (!args[0]) return ['Usage: fetch <page.html>'];
+      if (onCommand) onCommand('fetch', args.join(' '));
+      return [`Fetching source of ${args.join(' ')}...`];
     }
   },
 

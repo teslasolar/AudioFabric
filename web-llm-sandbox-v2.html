@@ -54,7 +54,20 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .fe .sz{color:var(--dim);font-size:9px}
 
 /* Template picker */
-#tpl-section{border-top:1px solid var(--border);max-height:240px;overflow-y:auto}
+#tpl-section{border-top:1px solid var(--border);max-height:200px;overflow-y:auto}
+
+/* Project browser */
+#proj-section{border-top:1px solid var(--border);max-height:260px;overflow-y:auto}
+.proj-cat{padding:3px 8px;font-size:9px;color:var(--pink);text-transform:uppercase;letter-spacing:1px;
+  cursor:pointer;user-select:none;display:flex;align-items:center;gap:4px}
+.proj-cat:hover{background:rgba(255,102,170,.04)}
+.proj-cat .arrow{font-size:7px;transition:transform .2s}
+.proj-cat .arrow.open{transform:rotate(90deg)}
+.proj-entry{padding:3px 8px 3px 16px;cursor:pointer;font-size:10px;display:flex;align-items:center;
+  gap:5px;transition:background .15s}
+.proj-entry:hover{background:rgba(255,102,170,.06)}
+.proj-entry .pe-name{color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.proj-entry .pe-cat{font-size:8px;color:var(--dim);background:rgba(255,255,255,.03);padding:0 4px;border-radius:2px}
 .tpl-entry{padding:5px 8px;cursor:pointer;font-size:11px;display:flex;align-items:center;gap:6px;
   transition:background .15s}
 .tpl-entry:hover{background:rgba(68,170,255,.06)}
@@ -268,8 +281,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   <div id="file-panel">
     <div class="phead files"><span>Files</span><span id="file-count">0</span></div>
     <div id="file-list"></div>
+    <div id="proj-section">
+      <div class="phead" style="color:var(--pink)"><span>AudioFabric</span><span id="proj-count"></span></div>
+      <div id="proj-list"></div>
+    </div>
     <div id="tpl-section">
-      <div class="phead" style="color:var(--pink)">Templates</div>
+      <div class="phead" style="color:var(--purple)">Templates</div>
       <div id="tpl-list"></div>
     </div>
     <div id="commit-section">
@@ -365,7 +382,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 import { createFile, editFile, readFile, deleteFile, listFiles, searchFiles,
          commitChanges, getLog, getDiff, checkout, initRepo, getPreviewHTML,
          getPreviewableFiles, executeTool, parseToolCalls, buildToolSystemPrompt,
-         getRepoState, getAllFiles, patchFile } from './modules/mcp-tools-engine.js';
+         getRepoState, getAllFiles, patchFile,
+         listProjectPages, loadProjectPage, PROJECT_PAGES } from './modules/mcp-tools-engine.js';
 import * as Editor from './modules/sandbox-editor.js';
 import * as Terminal from './modules/sandbox-terminal.js';
 import { TEMPLATES, scaffold, getTemplateList } from './modules/sandbox-templates.js';
@@ -467,7 +485,37 @@ let termAPI = null;
 function initTerminal() {
   termAPI = Terminal.init($('term-container'), {
     onCommand: (cmd, arg) => {
-      if (cmd === 'run' && arg) showPreview(arg.startsWith('/') ? arg : '/' + arg);
+      if (cmd === 'run' && arg) {
+        showPreview(arg.startsWith('/') ? arg : '/' + arg);
+      } else if (cmd === 'open' && arg) {
+        const match = PROJECT_PAGES.find(p =>
+          p.file.toLowerCase().includes(arg.toLowerCase()) ||
+          p.name.toLowerCase().includes(arg.toLowerCase()));
+        if (match) loadProjectInPreview(match.file);
+        else showPreview(arg.startsWith('/') ? arg : '/' + arg);
+      } else if (cmd === 'browse') {
+        if (arg) openCategories.add(arg);
+        else PROJECT_PAGES.forEach(p => openCategories.add(p.cat));
+        buildProjectBrowser();
+      } else if (cmd === 'fetch' && arg) {
+        const match = PROJECT_PAGES.find(p =>
+          p.file.toLowerCase().includes(arg.toLowerCase()) ||
+          p.name.toLowerCase().includes(arg.toLowerCase()));
+        if (match) {
+          fetchProjectSource(match.file).then(result => {
+            if (result.ok) {
+              createFile('/' + result.file, result.content);
+              openFileInEditor('/' + result.file);
+              refreshFileList();
+              termAPI.print([`Fetched: ${result.file} (${(result.size/1024).toFixed(1)}KB)`]);
+            } else {
+              termAPI.print(['Error: ' + result.error], 'term-err');
+            }
+          });
+        } else {
+          termAPI.print(['No matching project page found for: ' + arg]);
+        }
+      }
     }
   });
 }
@@ -512,6 +560,88 @@ function applyTemplate(id) {
 
 window.openTplPicker = () => $('tpl-overlay').classList.add('show');
 window.closeTplPicker = () => $('tpl-overlay').classList.remove('show');
+
+// ─── Project Browser ───
+const openCategories = new Set();
+
+function buildProjectBrowser() {
+  const projList = $('proj-list');
+  projList.innerHTML = '';
+  $('proj-count').textContent = PROJECT_PAGES.length;
+  const cats = [...new Set(PROJECT_PAGES.map(p => p.cat))];
+  const catLabels = { game:'Games', arena:'Arenas', boss:'Boss Fights', music:'Music',
+    social:'Social', ai:'AI/LLM', visual:'Visuals', relax:'Relax', core:'Core' };
+  for (const cat of cats) {
+    const pages = PROJECT_PAGES.filter(p => p.cat === cat);
+    const isOpen = openCategories.has(cat);
+    // category header
+    const catEl = document.createElement('div');
+    catEl.className = 'proj-cat';
+    catEl.innerHTML = `<span class="arrow${isOpen ? ' open' : ''}">▶</span> ${catLabels[cat] || cat} (${pages.length})`;
+    catEl.onclick = () => {
+      if (openCategories.has(cat)) openCategories.delete(cat); else openCategories.add(cat);
+      buildProjectBrowser();
+    };
+    projList.appendChild(catEl);
+    // pages in category
+    if (isOpen) {
+      for (const page of pages) {
+        const entry = document.createElement('div');
+        entry.className = 'proj-entry';
+        entry.innerHTML = `<span class="pe-name" title="${escHtml(page.desc)}">${escHtml(page.name)}</span>`;
+        entry.onclick = () => loadProjectInPreview(page.file);
+        projList.appendChild(entry);
+      }
+    }
+  }
+}
+
+function loadProjectInPreview(filename) {
+  const result = loadProjectPage(filename);
+  if (!result.ok) { addSystemMsg('Error: ' + result.error); return; }
+  // load via iframe src (relative URL to actual file)
+  currentPreview = null; // not a virtual FS file
+  const box = $('preview-iframe-box');
+  const noP = $('no-preview');
+  noP.style.display = 'none';
+  box.style.display = 'block';
+  box.innerHTML = '';
+  const iframe = document.createElement('iframe');
+  iframe.src = result.url;
+  iframe.allow = 'microphone; camera; autoplay';
+  box.appendChild(iframe);
+  // switch to preview or split view
+  if (currentView === 'code') setView('split');
+  addSystemMsg(`Loaded: ${result.name} (${result.file})`);
+}
+
+function loadUrlInPreview(url) {
+  currentPreview = null;
+  const box = $('preview-iframe-box');
+  const noP = $('no-preview');
+  noP.style.display = 'none';
+  box.style.display = 'block';
+  box.innerHTML = '';
+  const iframe = document.createElement('iframe');
+  iframe.src = url;
+  iframe.allow = 'microphone; camera; autoplay';
+  iframe.sandbox = 'allow-scripts allow-same-origin allow-forms allow-popups';
+  box.appendChild(iframe);
+  if (currentView === 'code') setView('split');
+}
+
+async function fetchProjectSource(filename) {
+  const result = loadProjectPage(filename);
+  if (!result.ok) return { ok: false, error: result.error };
+  try {
+    const resp = await fetch(result.url);
+    if (!resp.ok) return { ok: false, error: `HTTP ${resp.status}` };
+    const source = await resp.text();
+    return { ok: true, file: result.file, name: result.name, content: source, size: source.length };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
 
 // ─── File Explorer ───
 function refreshFileList() {
@@ -775,7 +905,19 @@ async function sendMessage(text) {
     if (toolCalls.length > 0) {
       let toolResults = '';
       for (const tc of toolCalls) {
-        const result = executeTool(tc.name, tc.args || {});
+        let result;
+        if (tc.name === 'fetch_page') {
+          // async fetch of real project source
+          result = await fetchProjectSource(tc.args.file);
+          if (result.ok) {
+            // also import into virtual FS so the LLM can see/edit it
+            createFile('/' + result.file, result.content);
+            openFileInEditor('/' + result.file);
+            refreshFileList();
+          }
+        } else {
+          result = executeTool(tc.name, tc.args || {});
+        }
         logToolCall(tc.name, tc.args || {}, result);
         toolResults += `\nTool ${tc.name}: ${JSON.stringify(result)}\n`;
         if ((tc.name === 'create_file' || tc.name === 'edit_file') && result.ok) {
@@ -784,6 +926,10 @@ async function sendMessage(text) {
           if (p.endsWith('.html') || p.endsWith('.htm')) showPreview(p);
         } else if (tc.name === 'preview' && result.ok) {
           showPreview(tc.args.path);
+        } else if (tc.name === 'load_page' && result.ok) {
+          loadProjectInPreview(result.file);
+        } else if (tc.name === 'load_url' && result.ok) {
+          loadUrlInPreview(result.url);
         }
       }
       refreshFileList();
@@ -806,12 +952,22 @@ async function sendMessage(text) {
       chatHistory.push({ role: 'assistant', content: followResp });
       const moreCalls = parseToolCalls(followResp);
       for (const tc of moreCalls) {
-        const result = executeTool(tc.name, tc.args || {});
+        let result;
+        if (tc.name === 'fetch_page') {
+          result = await fetchProjectSource(tc.args.file);
+          if (result.ok) { createFile('/' + result.file, result.content); openFileInEditor('/' + result.file); }
+        } else {
+          result = executeTool(tc.name, tc.args || {});
+        }
         logToolCall(tc.name, tc.args || {}, result);
         if (result.ok) {
-          const p = tc.args?.path || '';
-          if (p.endsWith('.html') || p.endsWith('.htm') || tc.name === 'preview') showPreview(p);
-          openFileInEditor(p);
+          if (tc.name === 'load_page') loadProjectInPreview(result.file);
+          else if (tc.name === 'load_url') loadUrlInPreview(result.url);
+          else {
+            const p = tc.args?.path || '';
+            if (p.endsWith('.html') || p.endsWith('.htm') || tc.name === 'preview') showPreview(p);
+            if (p) openFileInEditor(p);
+          }
         }
       }
       if (moreCalls.length > 0) { refreshFileList(); refreshCommitLog(); }
@@ -842,6 +998,37 @@ function handleVoiceCommand(text) {
   } else if (t.startsWith('run ')) {
     const file = t.slice(4).trim();
     showPreview(file.startsWith('/') ? file : '/' + file);
+  } else if (t.startsWith('load ') || t.startsWith('open ') || t.startsWith('show ')) {
+    const file = t.replace(/^(load|open|show)\s*/i, '').trim();
+    // check if it matches a project page
+    const match = PROJECT_PAGES.find(p =>
+      p.file.toLowerCase().includes(file) || p.name.toLowerCase().includes(file));
+    if (match) {
+      loadProjectInPreview(match.file);
+    } else {
+      showPreview(file.startsWith('/') ? file : '/' + file);
+    }
+  } else if (t === 'browse' || t === 'browse project' || t === 'show project') {
+    // open all categories in project browser
+    PROJECT_PAGES.forEach(p => openCategories.add(p.cat));
+    buildProjectBrowser();
+    addSystemMsg('Project browser expanded');
+  } else if (t.startsWith('fetch ') || t.startsWith('get source ')) {
+    const file = t.replace(/^(fetch|get source)\s*/i, '').trim();
+    const match = PROJECT_PAGES.find(p =>
+      p.file.toLowerCase().includes(file) || p.name.toLowerCase().includes(file));
+    if (match) {
+      fetchProjectSource(match.file).then(result => {
+        if (result.ok) {
+          createFile('/' + result.file, result.content);
+          openFileInEditor('/' + result.file);
+          refreshFileList();
+          addSystemMsg(`Fetched source: ${result.file} (${(result.size/1024).toFixed(1)}KB)`);
+        } else {
+          addSystemMsg('Fetch error: ' + result.error);
+        }
+      });
+    }
   }
 }
 
@@ -981,11 +1168,13 @@ async function startSandbox() {
   initEditor();
   initTerminal();
   buildTemplateList();
+  buildProjectBrowser();
   refreshFileList();
   refreshCommitLog();
   addSystemMsg('Sandbox v2 initialized. ' + (modelLoaded
     ? 'AI model loaded — talk or type to start building!'
     : 'No AI model — use templates, editor, and terminal.'));
+  addSystemMsg(`${PROJECT_PAGES.length} AudioFabric pages available. Click the sidebar to browse, or say "load kamehameha" / "open zen garden".`);
   await setupMic();
   setupVoiceRecognition();
   if (analyser && recognition) {
