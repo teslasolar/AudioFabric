@@ -98,6 +98,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #chat-btns button:hover{border-color:var(--accent);color:var(--accent)}
 #chat-btns button.active{background:var(--accent);color:#000;border-color:var(--accent)}
 #voice-status{font-size:10px;color:var(--dim);margin-top:4px;height:14px}
+#mic-level-row{display:flex;align-items:center;gap:6px;margin-top:4px}
+#mic-level-bar{flex:1;height:6px;background:#1a1a2a;border-radius:3px;overflow:hidden}
+#mic-level-fill{height:100%;width:0%;background:var(--accent);border-radius:3px;transition:width 50ms}
+#mic-level-label{font-size:9px;color:var(--dim);width:28px;text-align:right}
+#mic-indicator{width:8px;height:8px;border-radius:50%;background:#333;transition:background .15s}
+#mic-indicator.active{background:#44ff88;box-shadow:0 0 8px #44ff88}
 
 /* ─── Load Overlay ─── */
 #load-overlay{position:fixed;inset:0;background:rgba(5,5,10,.97);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px}
@@ -214,6 +220,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
           <button id="btn-send" title="Send">&#9654;</button>
           <button id="btn-mic" title="Voice">&#127908;</button>
         </div>
+      </div>
+      <div id="mic-level-row">
+        <div id="mic-indicator"></div>
+        <div id="mic-level-bar"><div id="mic-level-fill"></div></div>
+        <div id="mic-level-label">0%</div>
       </div>
       <div id="voice-status"></div>
     </div>
@@ -638,21 +649,33 @@ document.getElementById('btn-commit').onclick = () => {
   addSystemMsg(`Committed: ${msg} (${result.id})`);
 };
 
+// ─── DOM refs for mic level ───
+const $micFill = document.getElementById('mic-level-fill');
+const $micLabel = document.getElementById('mic-level-label');
+const $micIndicator = document.getElementById('mic-indicator');
+
 // ─── Microphone Setup ───
-function setupMic() {
-  navigator.mediaDevices?.getUserMedia({ audio: true }).then(stream => {
-    micStream = stream;
+async function setupMic() {
+  try {
+    $voiceStatus.textContent = 'Requesting mic access...';
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // CRITICAL: resume AudioContext (browsers suspend until user gesture)
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 2048;
-    const source = audioCtx.createMediaStreamSource(stream);
+    analyser.smoothingTimeConstant = 0.8;
+    const source = audioCtx.createMediaStreamSource(micStream);
     source.connect(analyser);
     dataArray = new Float32Array(analyser.fftSize);
     freqArray = new Uint8Array(analyser.frequencyBinCount);
+    $voiceStatus.textContent = 'Mic connected — click mic button for voice chat';
+    $micIndicator.classList.add('active');
     requestAnimationFrame(analyzeLoop);
-  }).catch(() => {
-    $voiceStatus.textContent = 'Mic unavailable';
-  });
+  } catch(e) {
+    $voiceStatus.textContent = 'Mic error: ' + (e.name === 'NotAllowedError' ? 'Permission denied' : e.message);
+    console.error('Mic setup failed:', e);
+  }
 }
 
 // ─── Voice Analysis Loop ───
@@ -722,6 +745,13 @@ function analyzeLoop() {
     if (v > maxE) { maxE = v; dominantEmo = k; }
   }
 
+  // Update mic level indicator
+  const micPct = Math.min(100, Math.round(voice.energy * 100));
+  $micFill.style.width = micPct + '%';
+  $micFill.style.background = micPct > 70 ? 'var(--orange)' : micPct > 40 ? 'var(--green)' : 'var(--accent)';
+  $micLabel.textContent = micPct + '%';
+  $micIndicator.classList.toggle('active', micPct > 5);
+
   // Update emotion dots
   const emoKeys = ['excitement', 'calm', 'anger', 'sadness', 'joy', 'curiosity'];
   $emoDots.forEach((dot, i) => {
@@ -757,27 +787,43 @@ function setupVoiceRecognition() {
     }
   };
 
-  recognition.onerror = () => {
+  recognition.onerror = (e) => {
+    // 'no-speech' and 'aborted' are normal — just keep listening
+    if (e.error === 'no-speech' || e.error === 'aborted') {
+      if (micActive) $voiceStatus.textContent = 'Listening — speak to chat...';
+      return;
+    }
     micActive = false;
     document.getElementById('btn-mic').classList.remove('active');
-    $voiceStatus.textContent = '';
+    $voiceStatus.textContent = 'Voice error: ' + e.error;
+    console.warn('Speech recognition error:', e.error);
   };
 
   recognition.onend = () => {
-    if (micActive) recognition.start(); // auto-restart
+    if (micActive) {
+      // Auto-restart with small delay to avoid hammering
+      setTimeout(() => { try { recognition.start(); } catch(e) {} }, 150);
+    }
   };
 }
 
-document.getElementById('btn-mic').onclick = () => {
-  if (!recognition) return;
+document.getElementById('btn-mic').onclick = async () => {
+  // Resume AudioContext on user gesture if needed
+  if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
+  // Start mic if not yet set up
+  if (!analyser) await setupMic();
+  if (!recognition) {
+    $voiceStatus.textContent = 'Speech recognition not supported in this browser';
+    return;
+  }
   micActive = !micActive;
   document.getElementById('btn-mic').classList.toggle('active', micActive);
   if (micActive) {
-    recognition.start();
-    $voiceStatus.textContent = 'Listening...';
+    try { recognition.start(); } catch(e) { /* already started */ }
+    $voiceStatus.textContent = 'Listening — speak to chat...';
   } else {
     recognition.stop();
-    $voiceStatus.textContent = '';
+    $voiceStatus.textContent = 'Mic connected — click mic button for voice chat';
   }
 };
 
