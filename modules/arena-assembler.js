@@ -44,7 +44,12 @@ const MODULE_CATALOG = {
   'tone-genesis':   { path: './modules/tone-genesis.js',       import: 'ToneGenesis',    init: "ToneGenesis.init({ position: %%TGENESIS_POS%%, scale: %%TGENESIS_SCALE%% });", default: { TGENESIS_POS: '[0,0,0]', TGENESIS_SCALE: 1 } },
   'voice-composer': { path: './modules/voice-composer.js',     import: 'VoiceComposer',  init: "VoiceComposer.init({ position: %%COMPOSER_POS%% });", default: { COMPOSER_POS: '[0,1,-3]' } },
   'story-world':    { path: './modules/story-world.js',         import: 'StoryWorld',     init: "StoryWorld.init({ position: %%STORYWORLD_POS%% });", default: { STORYWORLD_POS: '[0,0,0]' } },
-  'dream-weaver':   { path: './modules/dream-weaver.js',        import: 'DreamWeaver',    init: "DreamWeaver.init({ position: %%DREAMWEAVER_POS%% });", default: { DREAMWEAVER_POS: '[0,1,-1]' } }
+  'dream-weaver':   { path: './modules/dream-weaver.js',        import: 'DreamWeaver',    init: "DreamWeaver.init({ position: %%DREAMWEAVER_POS%% });", default: { DREAMWEAVER_POS: '[0,1,-1]' } },
+  'voice-ai-core':  { path: './modules/voice-ai-core.js',       import: 'VoiceAICore',    init: "VoiceAICore.init();" },
+  'voice-code':     { path: './modules/voice-code.js',           import: 'VoiceCode',      init: "VoiceCode.init({ position: %%VCODE_POS%% });", default: { VCODE_POS: '[-2,2,-3]' } },
+  'voice-api':      { path: './modules/voice-api.js',            import: 'VoiceAPI',       init: "VoiceAPI.init({ position: %%VAPI_POS%% });", default: { VAPI_POS: '[2,2,-3]' } },
+  'voice-data':     { path: './modules/voice-data.js',           import: 'VoiceData',      init: "VoiceData.init({ position: %%VDATA_POS%% });", default: { VDATA_POS: '[0,0,-4]' } },
+  'voice-mcp-server': { path: './modules/voice-mcp-server.js',   import: 'VoiceMCP',       init: "VoiceMCP.init();" }
 };
 
 // Pre-defined arena presets
@@ -153,6 +158,11 @@ export const PRESETS = {
     title: 'Ki Arena Dream Weaver',
     modules: ['scene', 'voice', 'synths', 'resonance', 'freq-bands-12', 'dream-weaver', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 800
+  },
+  voicetools: {
+    title: 'Ki Arena Voice Tools',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'voice-ai-core', 'voice-code', 'voice-api', 'voice-data', 'voice-mcp-server', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 1500
   }
 };
 
@@ -512,6 +522,10 @@ export function makeStoryWorld(room, opts = {}) {
 
 export function makeDreamWeaver(room, opts = {}) {
   return assemble({ preset: 'dreamweaver', room, ...opts });
+}
+
+export function makeVoiceTools(room, opts = {}) {
+  return assemble({ preset: 'voicetools', room, ...opts });
 }
 
 // List all available modules
