@@ -121,16 +121,24 @@ canvas{position:fixed;top:0;left:0;width:100%;height:100%}
   <button class="bottom-btn active" id="micBtn" onclick="toggleMic()">
     <span class="icon">&#9899;</span> MIC ON
   </button>
+  <button class="bottom-btn" id="shareAudioBtn" onclick="toggleShareAudio()">
+    <span class="icon">&#9836;</span> SHARE AUDIO
+  </button>
   <button class="bottom-btn" id="camBtn" onclick="toggleCamera()">
     <span class="icon">&#9673;</span> CAM
   </button>
   <button class="bottom-btn" id="shareBtn2" onclick="toggleScreen()">
     <span class="icon">&#9707;</span> SCREEN
   </button>
+  <button class="bottom-btn" id="reactionBtn" onclick="sendReaction()">
+    <span class="icon">&#9733;</span> REACT
+  </button>
   <button class="bottom-btn danger" onclick="leaveRoom()">
     <span class="icon">&#10005;</span> LEAVE
   </button>
 </div>
+<!-- Hidden audio container for remote streams -->
+<div id="remoteAudio" style="display:none"></div>
 
 <div id="resHUD">
   <div id="resKanji" style="color:#4488ff">気</div>
@@ -195,7 +203,9 @@ window.copyInvite = () => {
   });
 };
 
-let micActive = true, camActive = false;
+let micActive = true, camActive = false, sharingAudio = false;
+let tabAudioStream = null;
+
 window.toggleMic = () => {
   micActive = !micActive;
   const btn = document.getElementById('micBtn');
@@ -203,6 +213,74 @@ window.toggleMic = () => {
   else { btn.className = 'bottom-btn muted'; btn.innerHTML = '<span class="icon">&#9898;</span> MUTED'; }
   if (KI.stream) KI.stream.getAudioTracks().forEach(t => t.enabled = micActive);
 };
+
+// === SHARE TAB AUDIO (YouTube etc) ===
+window.toggleShareAudio = async () => {
+  const btn = document.getElementById('shareAudioBtn');
+  if (sharingAudio) {
+    // Stop sharing
+    if (tabAudioStream) {
+      tabAudioStream.getTracks().forEach(t => t.stop());
+      tabAudioStream = null;
+    }
+    sharingAudio = false;
+    btn.className = 'bottom-btn';
+    btn.innerHTML = '<span class="icon">&#9836;</span> SHARE AUDIO';
+    return;
+  }
+
+  try {
+    // Capture tab audio via getDisplayMedia
+    tabAudioStream = await navigator.mediaDevices.getDisplayMedia({
+      video: false,
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+
+    // Add audio tracks to all peer connections
+    const rtc = KI.get('webrtc-net');
+    if (rtc && rtc.pcs) {
+      rtc.pcs.forEach((pc) => {
+        tabAudioStream.getAudioTracks().forEach(track => {
+          pc.addTrack(track, tabAudioStream);
+        });
+      });
+    }
+
+    sharingAudio = true;
+    btn.className = 'bottom-btn active';
+    btn.innerHTML = '<span class="icon">&#9836;</span> SHARING';
+
+    // Auto-stop when user stops sharing
+    tabAudioStream.getAudioTracks()[0].onended = () => {
+      sharingAudio = false;
+      tabAudioStream = null;
+      btn.className = 'bottom-btn';
+      btn.innerHTML = '<span class="icon">&#9836;</span> SHARE AUDIO';
+    };
+  } catch(e) {
+    console.warn('Tab audio share failed:', e);
+  }
+};
+
+// === REACTIONS ===
+const REACTIONS = ['&#9733;', '&#10084;', '&#9996;', '&#128293;', '&#127881;', '&#128640;'];
+let reactionIdx = 0;
+window.sendReaction = () => {
+  const emoji = REACTIONS[reactionIdx++ % REACTIONS.length];
+  KI.emit('broadcast', { type: 'reaction', name: KI.player.name, emoji });
+  showReaction(emoji);
+};
+
+function showReaction(emoji) {
+  const el = document.createElement('div');
+  el.className = 'dmg';
+  el.innerHTML = emoji;
+  el.style.fontSize = '36px';
+  el.style.left = (30 + Math.random() * 40) + '%';
+  el.style.top = (20 + Math.random() * 30) + '%';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1400);
+}
 
 window.toggleCamera = async () => {
   const cam = KI.get('camera');
@@ -218,7 +296,27 @@ window.toggleScreen = () => {
   if (ss) ss.toggleShare();
 };
 
-window.leaveRoom = () => { KI.running = false; location.href = 'about:blank'; };
+window.leaveRoom = () => { cleanup(); location.href = 'about:blank'; };
+
+// === CLEANUP — prevent stale connections and echo on refresh ===
+function cleanup() {
+  KI.running = false;
+  // Stop all streams
+  if (KI.stream) KI.stream.getTracks().forEach(t => t.stop());
+  if (tabAudioStream) tabAudioStream.getTracks().forEach(t => t.stop());
+  // Close all peer connections
+  const rtc = KI.get('webrtc-net');
+  if (rtc) {
+    if (rtc.pcs) rtc.pcs.forEach(pc => pc.close());
+    if (rtc.dcs) rtc.dcs.forEach(dc => dc.close());
+  }
+  // Remove all audio elements
+  document.querySelectorAll('#remoteAudio audio').forEach(el => {
+    el.srcObject = null; el.remove();
+  });
+}
+window.addEventListener('beforeunload', cleanup);
+window.addEventListener('pagehide', cleanup);
 
 // === PARTICIPANT TRACKING ===
 const participants = new Map();
@@ -711,7 +809,23 @@ async function boot() {
   floorGlow.position.y = -0.3;
   KI.scene.add(floorGlow);
 
+  // Voice engine with echo cancellation
   try { await VoiceEngine.init(); } catch(e) { console.warn('Mic failed:', e); }
+
+  // Re-request mic with echo cancellation for voice chat (separate from analysis)
+  let voiceChatStream = null;
+  try {
+    voiceChatStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+  } catch(e) {
+    console.warn('Voice chat mic failed, using analysis mic:', e);
+    voiceChatStream = KI.stream; // fallback
+  }
 
   MqttNet.init({ room: 'VR-' + ROOM });
   WebRTCNet.init({ room: 'VR-' + ROOM });
@@ -719,16 +833,71 @@ async function boot() {
   ScreenShare.init();
   Chat.init();
 
+  // === SEND VOICE CHAT AUDIO TO PEERS ===
+  // After WebRTC connects, add our mic audio track to peer connections
+  const addMicToPeers = () => {
+    if (!voiceChatStream) return;
+    const rtc = KI.get('webrtc-net');
+    if (rtc && rtc.pcs) {
+      rtc.pcs.forEach((pc) => {
+        // Check if we already added audio to this connection
+        const senders = pc.getSenders();
+        const hasAudio = senders.some(s => s.track && s.track.kind === 'audio');
+        if (!hasAudio) {
+          voiceChatStream.getAudioTracks().forEach(track => {
+            pc.addTrack(track, voiceChatStream);
+          });
+        }
+      });
+    }
+  };
+
+  // === PLAY REMOTE AUDIO ===
+  const playedStreams = new Set(); // prevent duplicate audio elements
+  KI.on('rtc:remoteStream', ({ peerId, stream }) => {
+    const streamId = stream.id;
+    if (playedStreams.has(streamId)) return; // deduplicate
+    playedStreams.add(streamId);
+
+    // Create audio element to play remote audio
+    const audio = document.createElement('audio');
+    audio.id = 'audio-' + peerId;
+    audio.srcObject = stream;
+    audio.autoplay = true;
+    audio.playsInline = true;
+    audio.volume = 1.0;
+    // Remove old audio element for this peer (prevent echo stacking on refresh)
+    const old = document.getElementById('audio-' + peerId);
+    if (old) old.remove();
+    document.getElementById('remoteAudio').appendChild(audio);
+
+    // Some browsers require user gesture to play
+    audio.play().catch(() => {
+      document.addEventListener('click', () => audio.play(), { once: true });
+    });
+  });
+
   document.getElementById('userCount').textContent = '1 in room';
 
-  // count peers
+  // count peers + send mic audio when they connect
   KI.on('rtc:peerConnect', () => {
     const ct = (KI.get('webrtc-net')?.getPeerCount?.() || 0) + 1;
     document.getElementById('userCount').textContent = ct + ' in room';
+    addMicToPeers();
   });
-  KI.on('rtc:peerDisconnect', () => {
+  KI.on('rtc:peerDisconnect', ({ peerId }) => {
     const ct = Math.max(1, (KI.get('webrtc-net')?.getPeerCount?.() || 0) + 1);
     document.getElementById('userCount').textContent = ct + ' in room';
+    // Clean up audio element
+    const audio = document.getElementById('audio-' + peerId);
+    if (audio) { audio.srcObject = null; audio.remove(); }
+  });
+
+  // Handle reactions from others
+  KI.on('rtc:data', data => {
+    if (data.type === 'reaction' && data.name !== KI.player.name) {
+      showReaction(data.emoji);
+    }
   });
 
   KI.running = true;

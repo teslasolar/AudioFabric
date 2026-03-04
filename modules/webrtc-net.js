@@ -59,6 +59,11 @@ function genOffers(n) {
   const promises = [];
   for (let i = 0; i < n; i++) {
     const pc = new RTCPeerConnection(ICE_CFG);
+    // Add local mic stream for voice chat if available
+    if (KI.stream) {
+      try { KI.stream.getAudioTracks().forEach(track => pc.addTrack(track, KI.stream)); }
+      catch(e) { /* track already added */ }
+    }
     const dc = pc.createDataChannel('kiu');
     const oid = crypto.randomUUID();
     const p = new Promise(res => {
@@ -115,6 +120,11 @@ function setupMedia(pc, id) {
 
 function handleOffer(msg) {
   const pc = new RTCPeerConnection(ICE_CFG);
+  // Add local mic stream for voice chat
+  if (KI.stream) {
+    try { KI.stream.getAudioTracks().forEach(track => pc.addTrack(track, KI.stream)); }
+    catch(e) { /* track already added */ }
+  }
   pc.ondatachannel = e => setupDC(pc, e.channel, msg.peer_id);
   setupMedia(pc, msg.peer_id);
   pc.setRemoteDescription(msg.offer)
