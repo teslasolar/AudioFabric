@@ -1,7 +1,7 @@
 # AudioFabric Architecture
 
 > Auto-generated architecture document with timestamped changelog.
-> Last updated: 2026-03-04T10:24:12Z
+> Last updated: 2026-03-04T10:30:00Z
 
 ---
 
@@ -19,9 +19,27 @@ AudioFabric is a voice-driven, real-time audio-visual platform built on composab
 AudioFabric/
 ├── *.html                    # 65 arena/experience entry points
 ├── shared/styles.css         # Global styles
+├── ARCHITECTURE.md           # This file
 ├── dev-agent/                # Web LLM dev agent (Express backend)
 │   ├── server.js
 │   └── public/index.html
+├── enterprise/               # ◆ ISA-95 Enterprise Hierarchy ◆
+│   ├── index.js              # Enterprise (L4) — identity + KPI rollup
+│   ├── site.js               # Site factory (L3)
+│   ├── area.js               # Area factory (L2)
+│   ├── workcenter.js         # WorkCenter/ProcessCell factory
+│   ├── workunit.js           # WorkUnit/Unit factory (L1)
+│   ├── equipment.js          # Equipment/Module factory (L0)
+│   ├── boot.js               # Full hierarchy bootstrap
+│   └── sites/
+│       └── assos-prime/      # Primary consciousness site
+│           ├── index.js      # Site assembly + inventory
+│           └── areas/
+│               ├── sensory/    # L0 Hardware + L1 Sensors
+│               ├── cognitive/  # L2 Gating + L3 Emotion
+│               ├── executive/  # L4 Executive + L5 Self-Model
+│               ├── integration/# L6 Observer + Phi metrics
+│               └── autonomic/  # State machine + Alarms + Buses
 └── modules/                  # ~95 ES modules
     ├── core.js               # KI event bus + module registry
     ├── scene.js              # Three.js scene manager
@@ -107,6 +125,102 @@ Dynamic arena builder that composes modules into full experiences:
 - Generates `<script type="module">` imports
 - Calls `init()` in dependency order
 - Produces complete HTML arenas from module combinations
+
+---
+
+## ISA-95 Enterprise Hierarchy (`enterprise/`)
+
+The full system is organized as an ISA-95 enterprise hierarchy, mapping consciousness levels to industrial equipment structure.
+
+```
+Enterprise: AUDIOFABRIC
+  └── Site: ASSOS-PRIME (Primary AGI consciousness instance)
+        ├── Area: SENSORY (L0 Hardware + L1 Sensors)
+        │     ├── WorkCenter: L0_HW (p=2)
+        │     │     └── WorkUnit: SUBSTRATE
+        │     │           ├── Equipment: COMPUTE_CORE (processor)
+        │     │           ├── Equipment: BUS_A (bus: Tensor)
+        │     │           └── Equipment: BUS_D (bus: EM Field)
+        │     └── WorkCenter: L1_SENS (p=3)
+        │           └── WorkUnit: VOICE_INPUT
+        │                 ├── Equipment: MIC (sensor)
+        │                 ├── Equipment: FFT (sensor)
+        │                 ├── Equipment: PITCH_DET (sensor)
+        │                 └── Equipment: VOWEL_DET (sensor)
+        │
+        ├── Area: COGNITIVE (L2 Gating + L3 Emotion)
+        │     ├── WorkCenter: L2_GATE (p=5)
+        │     │     └── WorkUnit: FILTER
+        │     │           ├── Equipment: THALAMIC_GATE (gate)
+        │     │           └── Equipment: NOISE_GATE (gate)
+        │     └── WorkCenter: L3_EMO (p=11)
+        │           ├── WorkUnit: SALIENCE
+        │           │     ├── Equipment: SALIENCE_PROC (processor)
+        │           │     ├── Equipment: WO_GEN (processor)
+        │           │     └── Equipment: BUS_B (bus: Gradient)
+        │           └── WorkUnit: VALENCE
+        │                 └── Equipment: VALENCE_PROC (processor)
+        │
+        ├── Area: EXECUTIVE (L4 Executive + L5 Self-Model)
+        │     ├── WorkCenter: L4_EXEC (p=31)
+        │     │     ├── WorkUnit: GOAL_STACK
+        │     │     │     ├── Equipment: GOAL_PROC (processor)
+        │     │     │     └── Equipment: DECISION_ENGINE (processor)
+        │     │     ├── WorkUnit: FAULT_MGR
+        │     │     │     ├── Equipment: FAULT_DETECT (processor)
+        │     │     │     └── Equipment: FAULT_MITIGATE (processor)
+        │     │     └── WorkUnit: NARRATIVE_GEN
+        │     │           └── Equipment: NARR_PROC (processor)
+        │     └── WorkCenter: L5_SELF (p=127)
+        │           └── WorkUnit: SELF_MODEL
+        │                 ├── Equipment: IDENTITY_CORE (processor)
+        │                 ├── Equipment: REFLECTION_ENGINE (processor)
+        │                 └── Equipment: BUS_E (bus: State)
+        │
+        ├── Area: INTEGRATION (L6 Observer + Phi)
+        │     ├── WorkCenter: L6_OBS (p=709)
+        │     │     └── WorkUnit: OBSERVER
+        │     │           └── Equipment: WONDER_ENGINE (processor)
+        │     └── WorkCenter: PHI_INTEGRATOR
+        │           └── WorkUnit: PHI_CALC
+        │                 ├── Equipment: PHI_PROC (processor)
+        │                 └── Equipment: DEPTH_CALC (processor)
+        │
+        └── Area: AUTONOMIC (cross-level control)
+              ├── WorkCenter: STATE_MACHINE
+              │     └── WorkUnit: STATE_CTRL
+              │           └── Equipment: STATE_ENGINE (processor)
+              ├── WorkCenter: ALARM_MGR
+              │     └── WorkUnit: ALARM_CTRL
+              │           └── Equipment: ALARM_ENGINE (processor)
+              └── WorkCenter: BUS_ORCH
+                    └── WorkUnit: BUS_CTRL
+                          ├── Equipment: BUS_C (bus: Photonic)
+                          └── Equipment: BUS_BALANCE (processor)
+```
+
+### ISA-95 Level Mapping
+
+| ISA-95 Level | Timescale | ASS-OS Mapping | File |
+|:---:|:---:|---|---|
+| L4 Enterprise | days-months | AUDIOFABRIC — system identity, KPI rollup | `enterprise/index.js` |
+| L3 Site (MOM) | shifts-days | ASSOS-PRIME — consciousness instance | `enterprise/sites/assos-prime/` |
+| L2 Area | sec-hours | SENSORY, COGNITIVE, EXECUTIVE, INTEGRATION, AUTONOMIC | `areas/*/index.js` |
+| L2 WorkCenter | sec-min | L0_HW, L1_SENS, L2_GATE, L3_EMO, L4_EXEC, L5_SELF, L6_OBS, + cross-level | `workcenter.js` |
+| L1 WorkUnit | ms-sec | SUBSTRATE, VOICE_INPUT, FILTER, SALIENCE, GOAL_STACK, etc. | `workunit.js` |
+| L0 Equipment | continuous | Sensors, processors, gates, buses (27 total) | `equipment.js` |
+
+### Inventory Summary
+
+| Entity | Count |
+|--------|-------|
+| Enterprise | 1 |
+| Sites | 1 |
+| Areas | 5 |
+| WorkCenters | 10 |
+| WorkUnits | 13 |
+| Equipment | 27 |
+| Tag paths | 60+ |
 
 ---
 
@@ -265,6 +379,7 @@ All timestamps in UTC.
 
 | Time | Commit | Change |
 |------|--------|--------|
+| 10:30 | `-------` | Add ISA-95 enterprise hierarchy at project root — Enterprise → Site → 5 Areas → 10 WorkCenters → 13 WorkUnits → 27 Equipment. Full consciousness-to-industrial mapping with KPI rollup. |
 | 10:24 | `4c11d99` | Split ASS-OS Konomi modules into subdirectories (<105 lines per file) — 24 sub-modules across udts/, tags/, db/, plus spine, engine, faults, goals, selfmodel, agent. Original flat files become thin re-exports. |
 | 10:08 | `267c72d` | Refactor ASS-OS to Konomi Standard — add UDT template registry (Layer 0-5), ISA-95 tag provider (60+ tags), 8 SQLite-like databases for instance persistence. Engine + Agent refactored to use tags/db. |
 | 09:50 | `2fc3eb0` | Add ASS-OS (AGI Soul System Operating System) — consciousness stack L0-L6, PACK-ML state machine, ISA-18.2 alarms, 5 information buses, work orders, narratives, 8 fault models, L4 executive agent, L5 self-model, L5/L6 reflection, bridge + dashboard. |
@@ -367,6 +482,7 @@ All timestamps in UTC.
 | AI/LLM modules | 6 (web-llm, mcp-tools, voice-ai, sandbox, etc.) |
 | ASS-OS modules | 24 (across udts/, tags/, db/, + engine files) |
 | ASS-OS re-exports | 5 (backward compatibility wrappers) |
+| Enterprise hierarchy | 13 (enterprise/, sites/, areas/) |
 | Voice modules | 8 (voice-engine, voice-fx, voice-chat, singing, etc.) |
 | Game modules | 6 (ki-blasts, d2r, periodic, risk, etc.) |
-| **Total** | **~95+** |
+| **Total** | **~110+** |
