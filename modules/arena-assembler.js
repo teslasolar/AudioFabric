@@ -35,7 +35,8 @@ const MODULE_CATALOG = {
   'prime-recursion':{ path: './modules/prime-recursion.js',  import: 'PrimeRecursion', init: "PrimeRecursion.init({ position: %%PRIME_POS%%, scale: %%PRIME_SCALE%% });", default: { PRIME_POS: '[4,5,-1]', PRIME_SCALE: 1 } },
   'deep-fractal':   { path: './modules/deep-fractal.js',     import: 'DeepFractal',    init: "DeepFractal.init({ position: %%FRACTAL_POS%%, scale: %%FRACTAL_SCALE%% });", default: { FRACTAL_POS: '[-4,4,-2]', FRACTAL_SCALE: 1 } },
   'sound-landscape':{ path: './modules/sound-landscape.js',   import: 'SoundLandscape', init: "SoundLandscape.init({ position: %%LANDSCAPE_POS%%, scale: %%LANDSCAPE_SCALE%% });", default: { LANDSCAPE_POS: '[0,0.5,5]', LANDSCAPE_SCALE: 0.9 } },
-  'wrapped-geo':    { path: './modules/wrapped-geo.js',       import: 'WrappedGeo',     init: "WrappedGeo.init({ position: %%WRAPPED_POS%%, scale: %%WRAPPED_SCALE%% });", default: { WRAPPED_POS: '[0,3.5,-1]', WRAPPED_SCALE: 1.5 } }
+  'wrapped-geo':    { path: './modules/wrapped-geo.js',       import: 'WrappedGeo',     init: "WrappedGeo.init({ position: %%WRAPPED_POS%%, scale: %%WRAPPED_SCALE%% });", default: { WRAPPED_POS: '[0,3.5,-1]', WRAPPED_SCALE: 1.5 } },
+  'voxel-wormhole': { path: './modules/voxel-wormhole.js',    import: 'VoxelWormhole',  init: "VoxelWormhole.init({ position: %%VOXEL_POS%%, scale: %%VOXEL_SCALE%% });", default: { VOXEL_POS: '[0,0.5,-3]', VOXEL_SCALE: 1.2 } }
 };
 
 // Pre-defined arena presets
@@ -109,6 +110,11 @@ export const PRESETS = {
     title: 'Ki Arena Wrapped Geometry',
     modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'fx', 'synths', 'resonance', 'freq-bands-12', 'wrapped-geo', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 4000, VORTEX_COUNT: 800, AURORA: true
+  },
+  voxelwormhole: {
+    title: 'Ki Arena Voxel Wormhole',
+    modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'fx', 'synths', 'resonance', 'freq-bands-12', 'voxel-wormhole', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 4000, VORTEX_COUNT: 600, AURORA: true
   }
 };
 
@@ -435,6 +441,10 @@ export function makeDeepRecursion(room, opts = {}) {
 
 export function makeWrappedGeo(room, opts = {}) {
   return assemble({ preset: 'wrappedgeo', room, ...opts });
+}
+
+export function makeVoxelWormhole(room, opts = {}) {
+  return assemble({ preset: 'voxelwormhole', room, ...opts });
 }
 
 // List all available modules
