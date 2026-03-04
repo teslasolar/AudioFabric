@@ -66,7 +66,10 @@ const MODULE_CATALOG = {
   'crystal-orb':     { path: './modules/crystal-orb.js',          import: 'CrystalOrb',     init: "CrystalOrb.init({ position: %%CORB_POS%% });", default: { CORB_POS: '[0,2.5,-3.5]' } },
   'void-orb':        { path: './modules/void-orb.js',             import: 'VoidOrb',        init: "VoidOrb.init({ position: %%VORB_POS%% });", default: { VORB_POS: '[0,2.5,-3.5]' } },
   'solar-orb':       { path: './modules/solar-orb.js',            import: 'SolarOrb',       init: "SolarOrb.init({ position: %%SORB_POS%% });", default: { SORB_POS: '[0,2.5,-3.5]' } },
-  'rune-orb':        { path: './modules/rune-orb.js',             import: 'RuneOrb',        init: "RuneOrb.init({ position: %%RORB_POS%% });", default: { RORB_POS: '[0,2.5,-3.5]' } }
+  'rune-orb':        { path: './modules/rune-orb.js',             import: 'RuneOrb',        init: "RuneOrb.init({ position: %%RORB_POS%% });", default: { RORB_POS: '[0,2.5,-3.5]' } },
+  'fractal-orb':     { path: './modules/fractal-orb.js',          import: 'FractalOrb',     init: "FractalOrb.init({ position: %%FORB_POS%% });", default: { FORB_POS: '[0,2.5,-3.5]' } },
+  'ocean-orb':       { path: './modules/ocean-orb.js',            import: 'OceanOrb',       init: "OceanOrb.init({ position: %%OORB_POS%% });", default: { OORB_POS: '[0,2.5,-3.5]' } },
+  'storm-orb':       { path: './modules/storm-orb.js',            import: 'StormOrb',       init: "StormOrb.init({ position: %%STORB_POS%% });", default: { STORB_POS: '[0,2.5,-3.5]' } }
 };
 
 // Pre-defined arena presets
@@ -265,6 +268,21 @@ export const PRESETS = {
     title: 'Ki Arena Rune Orb',
     modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'rune-orb', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 800
+  },
+  fractalorb: {
+    title: 'Ki Arena Fractal Orb',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'fractal-orb', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 600
+  },
+  oceanorb: {
+    title: 'Ki Arena Ocean Orb',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'ocean-orb', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 300
+  },
+  stormorb: {
+    title: 'Ki Arena Storm Orb',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'storm-orb', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 200
   }
 };
 
@@ -696,6 +714,18 @@ export function makeSolarOrb(room, opts = {}) {
 
 export function makeRuneOrb(room, opts = {}) {
   return assemble({ preset: 'runeorb', room, ...opts });
+}
+
+export function makeFractalOrb(room, opts = {}) {
+  return assemble({ preset: 'fractalorb', room, ...opts });
+}
+
+export function makeOceanOrb(room, opts = {}) {
+  return assemble({ preset: 'oceanorb', room, ...opts });
+}
+
+export function makeStormOrb(room, opts = {}) {
+  return assemble({ preset: 'stormorb', room, ...opts });
 }
 
 // List all available modules
