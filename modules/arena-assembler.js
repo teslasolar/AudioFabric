@@ -31,7 +31,10 @@ const MODULE_CATALOG = {
   'voice-chat':   { path: './modules/voice-chat.js',     import: 'VoiceChat',  init: "VoiceChat.init();" },
   'singing-voice':{ path: './modules/singing-voice.js',   import: 'SingingVoice', init: "SingingVoice.init();" },
   'resonance-synths': { path: './modules/resonance-synths.js', import: 'ResSynths', init: "ResSynths.init();" },
-  'voice-fx':       { path: './modules/voice-fx.js',         import: 'VoiceFX',    init: "VoiceFX.init();" }
+  'voice-fx':       { path: './modules/voice-fx.js',         import: 'VoiceFX',    init: "VoiceFX.init();" },
+  'prime-recursion':{ path: './modules/prime-recursion.js',  import: 'PrimeRecursion', init: "PrimeRecursion.init({ position: %%PRIME_POS%%, scale: %%PRIME_SCALE%% });", default: { PRIME_POS: '[4,5,-1]', PRIME_SCALE: 1 } },
+  'deep-fractal':   { path: './modules/deep-fractal.js',     import: 'DeepFractal',    init: "DeepFractal.init({ position: %%FRACTAL_POS%%, scale: %%FRACTAL_SCALE%% });", default: { FRACTAL_POS: '[-4,4,-2]', FRACTAL_SCALE: 1 } },
+  'sound-landscape':{ path: './modules/sound-landscape.js',   import: 'SoundLandscape', init: "SoundLandscape.init({ position: %%LANDSCAPE_POS%%, scale: %%LANDSCAPE_SCALE%% });", default: { LANDSCAPE_POS: '[0,0.5,5]', LANDSCAPE_SCALE: 0.9 } }
 };
 
 // Pre-defined arena presets
@@ -94,6 +97,11 @@ export const PRESETS = {
   voiceroyale: {
     title: 'Ki Arena Voice Royale v2',
     modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'emoji', 'fx', 'synths', 'resonance', 'freq-bands-12', 'geo-folder', 'stargate', 'voice-chat', 'voice-fx', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 5000, VORTEX_COUNT: 1200, AURORA: true
+  },
+  deeprecursion: {
+    title: 'Ki Arena Deep Recursion',
+    modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'fx', 'synths', 'resonance', 'freq-bands-12', 'geo-folder', 'prime-recursion', 'deep-fractal', 'sound-landscape', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 5000, VORTEX_COUNT: 1200, AURORA: true
   }
 };
@@ -413,6 +421,10 @@ export function makeVoiceTrainer(room, opts = {}) {
 
 export function makeVoiceRoyale(room, opts = {}) {
   return assemble({ preset: 'voiceroyale', room, ...opts });
+}
+
+export function makeDeepRecursion(room, opts = {}) {
+  return assemble({ preset: 'deeprecursion', room, ...opts });
 }
 
 // List all available modules
