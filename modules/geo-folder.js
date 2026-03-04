@@ -220,6 +220,24 @@ let burstLayer = null, burstPos = null, burstCol = null, burstDir = null;
 let slBurstForce = 0;
 let slTimeData = null;
 
+// === NEW SUB-LAYERS ===
+const TENDRIL_COUNT = 12;       // one per freq band, from vertices
+const TENDRIL_SEGMENTS = 40;
+const SHELL_SUBDIVISIONS = 2;   // icosahedron detail
+const WEB_POINTS = 80;          // constellation points
+const WEB_MAX_LINES = 120;      // constellation connections
+const STREAM_COUNT = 200;       // flowing particles
+const AURA_RING_COUNT = 5;      // ring planes
+const ECHO_COUNT = 6;           // fractal echo copies
+
+let tendrils = [], tendrilPos = [], tendrilCol = [];
+let harmonicShell = null, shellBasePos = null;
+let webPoints = null, webPos = null, webCol = null;
+let webLines = null, webLinePos = null, webLineCol = null;
+let streams = null, streamPos = null, streamCol = null, streamVel = null;
+let auraRings = [];
+let fractalEchoes = [];
+
 export function init(opts = {}) {
   const scene = KI.scene;
   if (!scene) { KI.on('scene:ready', () => init(opts)); return; }
@@ -585,6 +603,146 @@ function buildSubLayers() {
 
   // time-domain buffer for waveform displacement
   slTimeData = new Float32Array(256);
+
+  // --- 5. Energy Tendrils (lines from vertices outward, voice-reactive) ---
+  for (let i = 0; i < TENDRIL_COUNT; i++) {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(TENDRIL_SEGMENTS * 3);
+    const col = new Float32Array(TENDRIL_SEGMENTS * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending
+    }));
+    group.add(line);
+    tendrils.push(line);
+    tendrilPos.push(pos);
+    tendrilCol.push(col);
+  }
+
+  // --- 6. Harmonic Shell (outer wireframe icosahedron) ---
+  const shellGeo = new THREE.IcosahedronGeometry(2, SHELL_SUBDIVISIONS);
+  shellBasePos = shellGeo.attributes.position.array.slice(); // save base positions
+  harmonicShell = new THREE.Mesh(shellGeo, new THREE.MeshBasicMaterial({
+    color: 0x8844ff, wireframe: true, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  }));
+  group.add(harmonicShell);
+
+  // --- 7. Constellation Web (points + connecting lines) ---
+  const cwGeo = new THREE.BufferGeometry();
+  webPos = new Float32Array(WEB_POINTS * 3);
+  webCol = new Float32Array(WEB_POINTS * 3);
+  // Distribute on sphere via Fibonacci lattice
+  for (let i = 0; i < WEB_POINTS; i++) {
+    const y = 1 - (i / (WEB_POINTS - 1)) * 2;
+    const rAtY = Math.sqrt(1 - y * y);
+    const theta = i * 2.399963;
+    webPos[i*3] = Math.cos(theta) * rAtY * 3;
+    webPos[i*3+1] = y * 3;
+    webPos[i*3+2] = Math.sin(theta) * rAtY * 3;
+  }
+  cwGeo.setAttribute('position', new THREE.BufferAttribute(webPos, 3));
+  cwGeo.setAttribute('color', new THREE.BufferAttribute(webCol, 3));
+  webPoints = new THREE.Points(cwGeo, new THREE.PointsMaterial({
+    size: 0.05, vertexColors: true, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  }));
+  group.add(webPoints);
+
+  // Web connecting lines
+  const wlGeo = new THREE.BufferGeometry();
+  webLinePos = new Float32Array(WEB_MAX_LINES * 2 * 3);
+  webLineCol = new Float32Array(WEB_MAX_LINES * 2 * 3);
+  wlGeo.setAttribute('position', new THREE.BufferAttribute(webLinePos, 3));
+  wlGeo.setAttribute('color', new THREE.BufferAttribute(webLineCol, 3));
+  webLines = new THREE.LineSegments(wlGeo, new THREE.LineBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending
+  }));
+  group.add(webLines);
+
+  // --- 8. Particle Streams (flowing outward from center) ---
+  const psGeo = new THREE.BufferGeometry();
+  streamPos = new Float32Array(STREAM_COUNT * 3);
+  streamCol = new Float32Array(STREAM_COUNT * 3);
+  streamVel = new Float32Array(STREAM_COUNT * 4); // vx,vy,vz,life
+  for (let i = 0; i < STREAM_COUNT; i++) {
+    resetStreamParticle(i);
+  }
+  psGeo.setAttribute('position', new THREE.BufferAttribute(streamPos, 3));
+  psGeo.setAttribute('color', new THREE.BufferAttribute(streamCol, 3));
+  streams = new THREE.Points(psGeo, new THREE.PointsMaterial({
+    size: 0.04, vertexColors: true, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  }));
+  group.add(streams);
+
+  // --- 9. Aura Planes (rotating ring planes at different angles) ---
+  for (let i = 0; i < AURA_RING_COUNT; i++) {
+    const inner = 2.5 + i * 0.4;
+    const outer = inner + 0.08;
+    const geo = new THREE.RingGeometry(inner, outer, 64);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    // Tilt each ring differently
+    mesh.rotation.x = (i / AURA_RING_COUNT) * Math.PI;
+    mesh.rotation.z = i * 0.6;
+    group.add(mesh);
+    auraRings.push(mesh);
+  }
+
+  // --- 10. Fractal Echoes (mini copies orbiting) ---
+  for (let i = 0; i < ECHO_COUNT; i++) {
+    const eGeo = new THREE.BufferGeometry();
+    const ePos = new Float32Array(MAX_VERTS * 3);
+    const eCol = new Float32Array(MAX_VERTS * 3);
+    eGeo.setAttribute('position', new THREE.BufferAttribute(ePos, 3));
+    eGeo.setAttribute('color', new THREE.BufferAttribute(eCol, 3));
+    const ePts = new THREE.Points(eGeo, new THREE.PointsMaterial({
+      size: 0.06, vertexColors: true, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    }));
+    group.add(ePts);
+    // Edge lines for echo
+    const elGeo = new THREE.BufferGeometry();
+    const elPos = new Float32Array(MAX_EDGES * 6);
+    const elCol = new Float32Array(MAX_EDGES * 6);
+    elGeo.setAttribute('position', new THREE.BufferAttribute(elPos, 3));
+    elGeo.setAttribute('color', new THREE.BufferAttribute(elCol, 3));
+    const eLines = new THREE.LineSegments(elGeo, new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending
+    }));
+    group.add(eLines);
+    fractalEchoes.push({
+      points: ePts, lines: eLines,
+      pointPos: ePos, pointCol: eCol,
+      linePos: elPos, lineCol: elCol,
+      angle: (i / ECHO_COUNT) * Math.PI * 2,
+      tilt: Math.random() * Math.PI,
+      speed: 0.2 + Math.random() * 0.3,
+      scale: 0.2 + Math.random() * 0.15,
+      orbitR: 3.5 + i * 0.6
+    });
+  }
+}
+
+function resetStreamParticle(i) {
+  // Random direction on sphere
+  const y = (Math.random() - 0.5) * 2;
+  const rAtY = Math.sqrt(1 - y * y);
+  const theta = Math.random() * Math.PI * 2;
+  const speed = 0.5 + Math.random() * 1.5;
+  streamVel[i*4] = Math.cos(theta) * rAtY * speed;
+  streamVel[i*4+1] = y * speed;
+  streamVel[i*4+2] = Math.sin(theta) * rAtY * speed;
+  streamVel[i*4+3] = Math.random() * 3; // life
+  streamPos[i*3] = streamPos[i*3+1] = streamPos[i*3+2] = 0;
 }
 
 // === Master sub-layer updater ===
@@ -596,6 +754,12 @@ function updateSubLayers(t, bandEnergy, totalEnergy) {
   updateWormholeRings(t, bandEnergy, totalEnergy, tier, R);
   updateWaveWraps(t, bandEnergy, totalEnergy, tier, R);
   updateBurstLayer(t, bandEnergy, totalEnergy, tier, R);
+  updateTendrils(t, bandEnergy, totalEnergy, tier, R);
+  updateHarmonicShell(t, bandEnergy, totalEnergy, tier, R);
+  updateConstellationWeb(t, bandEnergy, totalEnergy, tier, R);
+  updateStreams(t, bandEnergy, totalEnergy, tier, R);
+  updateAuraRings(t, bandEnergy, totalEnergy, tier, R);
+  updateFractalEchoes(t, bandEnergy, totalEnergy, tier, R);
 }
 
 // --- 1. PRIME ORBITS ---
@@ -779,4 +943,302 @@ function updateBurstLayer(t, bandEnergy, totalEnergy, tier, R) {
   burstLayer.geometry.attributes.position.needsUpdate = true;
   burstLayer.geometry.attributes.color.needsUpdate = true;
   burstLayer.material.size = 0.04 + slBurstForce * 0.08 + totalEnergy * 0.04;
+}
+
+// --- 5. ENERGY TENDRILS ---
+function updateTendrils(t, bandEnergy, totalEnergy, tier, R) {
+  const fade = Math.min(1, Math.max(0, (tier - 2.5) * 0.4));
+  if (fade < 0.01) {
+    for (const td of tendrils) td.material.opacity = 0;
+    return;
+  }
+
+  const verts = geoState.vertices;
+  const vCount = verts.length;
+
+  for (let i = 0; i < TENDRIL_COUNT; i++) {
+    tendrils[i].material.opacity = fade * (0.25 + bandEnergy[i] * 0.6);
+    const pos = tendrilPos[i];
+    const col = tendrilCol[i];
+
+    // Start from a vertex of the shape
+    const vi = i % vCount;
+    const vx = verts[vi][0], vy = verts[vi][1], vz = verts[vi][2];
+    // Direction outward from center
+    const len = Math.sqrt(vx*vx + vy*vy + vz*vz) || 0.1;
+    const dx = vx/len, dy = vy/len, dz = vz/len;
+
+    // Tendril length driven by band energy
+    const tendrilLen = R * (0.5 + bandEnergy[i] * 3 + totalEnergy);
+
+    for (let s = 0; s < TENDRIL_SEGMENTS; s++) {
+      const frac = s / (TENDRIL_SEGMENTS - 1);
+      const dist = frac * tendrilLen;
+      // Curl/wave along tendril
+      const wave = Math.sin(frac * Math.PI * 3 + t * 3 + i * 0.5) * 0.3 * bandEnergy[i];
+      const wave2 = Math.cos(frac * Math.PI * 2 + t * 2 + i * 1.1) * 0.2 * totalEnergy;
+      // Perpendicular axes for wave displacement
+      const px = -dz, pz = dx; // one perp axis in XZ
+      const py2 = 1; // vertical perp
+
+      pos[s*3]   = vx + dx * dist + px * wave + wave2 * 0.1;
+      pos[s*3+1] = vy + dy * dist + py2 * wave2;
+      pos[s*3+2] = vz + dz * dist + pz * wave;
+
+      // Color: band color, fading toward tip
+      const hue = (i / 12 + t * 0.03) % 1;
+      const bright = (1 - frac * 0.7) * (0.4 + bandEnergy[i]);
+      const rgb = KI.hslToRgb(hue, 0.85, Math.min(1, bright));
+      col[s*3] = rgb[0]; col[s*3+1] = rgb[1]; col[s*3+2] = rgb[2];
+    }
+
+    tendrils[i].geometry.attributes.position.needsUpdate = true;
+    tendrils[i].geometry.attributes.color.needsUpdate = true;
+  }
+}
+
+// --- 6. HARMONIC SHELL ---
+function updateHarmonicShell(t, bandEnergy, totalEnergy, tier, R) {
+  const fade = Math.min(1, Math.max(0, (tier - 3.5) * 0.4));
+  harmonicShell.material.opacity = fade * (0.08 + totalEnergy * 0.2);
+  if (fade < 0.01) return;
+
+  const coherence = KI.voice.coherence || 0;
+  const shellScale = R * (1.4 + totalEnergy * 0.3 + Math.sin(t * 0.8) * 0.1);
+  harmonicShell.scale.setScalar(shellScale / 2); // geometry has radius 2
+
+  // Vertex displacement by frequency bands
+  const positions = harmonicShell.geometry.attributes.position;
+  for (let i = 0; i < positions.count; i++) {
+    const bx = shellBasePos[i*3], by = shellBasePos[i*3+1], bz = shellBasePos[i*3+2];
+    const len = Math.sqrt(bx*bx + by*by + bz*bz) || 1;
+    const nx = bx/len, ny = by/len, nz = bz/len;
+    // Frequency-driven displacement
+    const bIdx = i % 12;
+    const disp = bandEnergy[bIdx] * 0.15 + Math.sin(t * 2 + i * 0.3) * 0.03 * totalEnergy;
+    positions.setXYZ(i, bx + nx * disp, by + ny * disp, bz + nz * disp);
+  }
+  positions.needsUpdate = true;
+
+  // Color from coherence: purple when chaotic, gold when coherent
+  const hue = coherence > 0.5 ? 0.12 : 0.75;
+  const rgb = KI.hslToRgb(hue, 0.7, 0.3 + totalEnergy * 0.3);
+  harmonicShell.material.color.setRGB(rgb[0], rgb[1], rgb[2]);
+
+  harmonicShell.rotation.y += 0.02 * (1 + totalEnergy);
+  harmonicShell.rotation.x += 0.01;
+}
+
+// --- 7. CONSTELLATION WEB ---
+function updateConstellationWeb(t, bandEnergy, totalEnergy, tier, R) {
+  const fade = Math.min(1, Math.max(0, (tier - 5.5) * 0.4));
+  webPoints.material.opacity = fade * (0.3 + totalEnergy * 0.5);
+  webLines.material.opacity = fade * (0.15 + totalEnergy * 0.3);
+  if (fade < 0.01) return;
+
+  const webR = R * (2.0 + totalEnergy * 0.5);
+  let lineIdx = 0;
+
+  for (let i = 0; i < WEB_POINTS; i++) {
+    const y = 1 - (i / (WEB_POINTS - 1)) * 2;
+    const rAtY = Math.sqrt(1 - y * y);
+    const theta = i * 2.399963 + t * 0.1;
+    // Frequency modulation
+    const bIdx = i % 12;
+    const mod = 1 + bandEnergy[bIdx] * 0.3 + Math.sin(t + i * 0.2) * 0.05 * totalEnergy;
+
+    webPos[i*3]   = Math.cos(theta) * rAtY * webR * mod;
+    webPos[i*3+1] = y * webR * mod;
+    webPos[i*3+2] = Math.sin(theta) * rAtY * webR * mod;
+
+    // Color: shimmer
+    const hue = (i / WEB_POINTS + t * 0.02) % 1;
+    const bright = 0.3 + bandEnergy[bIdx] * 0.6;
+    const rgb = KI.hslToRgb(hue, 0.6, Math.min(1, bright));
+    webCol[i*3] = rgb[0]; webCol[i*3+1] = rgb[1]; webCol[i*3+2] = rgb[2];
+
+    // Connect to nearby points
+    if (lineIdx < WEB_MAX_LINES) {
+      for (let j = i + 1; j < Math.min(i + 6, WEB_POINTS); j++) {
+        if (lineIdx >= WEB_MAX_LINES) break;
+        const dx = webPos[i*3] - webPos[j*3];
+        const dy = webPos[i*3+1] - webPos[j*3+1];
+        const dz = webPos[i*3+2] - webPos[j*3+2];
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        if (dist < webR * 0.6) {
+          const li = lineIdx * 6;
+          webLinePos[li] = webPos[i*3]; webLinePos[li+1] = webPos[i*3+1]; webLinePos[li+2] = webPos[i*3+2];
+          webLinePos[li+3] = webPos[j*3]; webLinePos[li+4] = webPos[j*3+1]; webLinePos[li+5] = webPos[j*3+2];
+          const lBright = (1 - dist / (webR * 0.6)) * 0.5;
+          webLineCol[li] = rgb[0]*lBright; webLineCol[li+1] = rgb[1]*lBright; webLineCol[li+2] = rgb[2]*lBright;
+          webLineCol[li+3] = rgb[0]*lBright; webLineCol[li+4] = rgb[1]*lBright; webLineCol[li+5] = rgb[2]*lBright;
+          lineIdx++;
+        }
+      }
+    }
+  }
+
+  webPoints.geometry.attributes.position.needsUpdate = true;
+  webPoints.geometry.attributes.color.needsUpdate = true;
+  webPoints.material.size = 0.04 + totalEnergy * 0.06;
+  webLines.geometry.attributes.position.needsUpdate = true;
+  webLines.geometry.attributes.color.needsUpdate = true;
+  webLines.geometry.setDrawRange(0, lineIdx * 2);
+}
+
+// --- 8. PARTICLE STREAMS ---
+function updateStreams(t, bandEnergy, totalEnergy, tier, R) {
+  const fade = Math.min(1, Math.max(0, tier * 0.2));
+  streams.material.opacity = fade * (0.3 + totalEnergy * 0.5);
+  if (fade < 0.01) return;
+
+  const dt = 0.016; // approximate frame dt
+
+  for (let i = 0; i < STREAM_COUNT; i++) {
+    // Update position
+    streamPos[i*3]   += streamVel[i*4]   * dt;
+    streamPos[i*3+1] += streamVel[i*4+1] * dt;
+    streamPos[i*3+2] += streamVel[i*4+2] * dt;
+
+    // Decrease life
+    streamVel[i*4+3] -= dt;
+
+    // Spiral force
+    const px = streamPos[i*3], py = streamPos[i*3+1], pz = streamPos[i*3+2];
+    const pr = Math.sqrt(px*px + py*py + pz*pz) || 0.1;
+    // Add tangential velocity for spiral
+    streamVel[i*4]   += (-pz / pr) * totalEnergy * 0.3 * dt;
+    streamVel[i*4+2] += (px / pr) * totalEnergy * 0.3 * dt;
+
+    // Respawn when dead or too far
+    if (streamVel[i*4+3] <= 0 || pr > R * 4) {
+      resetStreamParticle(i);
+      // Speed based on energy
+      const speed = 0.5 + totalEnergy * 2;
+      streamVel[i*4] *= speed;
+      streamVel[i*4+1] *= speed;
+      streamVel[i*4+2] *= speed;
+    }
+
+    // Color based on distance and band
+    const bIdx = i % 12;
+    const life = Math.max(0, streamVel[i*4+3] / 3);
+    const hue = (bIdx / 12 + t * 0.05) % 1;
+    const bright = life * (0.3 + bandEnergy[bIdx] * 0.7);
+    const rgb = KI.hslToRgb(hue, 0.7, Math.min(1, bright));
+    streamCol[i*3] = rgb[0]; streamCol[i*3+1] = rgb[1]; streamCol[i*3+2] = rgb[2];
+  }
+
+  streams.geometry.attributes.position.needsUpdate = true;
+  streams.geometry.attributes.color.needsUpdate = true;
+  streams.material.size = 0.03 + totalEnergy * 0.05;
+}
+
+// --- 9. AURA RINGS ---
+function updateAuraRings(t, bandEnergy, totalEnergy, tier, R) {
+  const fade = Math.min(1, Math.max(0, (tier - 6.5) * 0.35));
+  if (fade < 0.01) {
+    for (const ring of auraRings) ring.material.opacity = 0;
+    return;
+  }
+
+  for (let i = 0; i < AURA_RING_COUNT; i++) {
+    const ring = auraRings[i];
+    const bIdx = (i * 2 + 1) % 12;
+    const energy = bandEnergy[bIdx];
+
+    ring.material.opacity = fade * (0.05 + energy * 0.25);
+    // Rotate
+    ring.rotation.x += (0.1 + energy * 0.3) * 0.016 * (i % 2 === 0 ? 1 : -1);
+    ring.rotation.z += 0.05 * 0.016;
+    // Scale pulse
+    const pulse = 1 + Math.sin(t * 2 + i * 1.2) * 0.08 + energy * 0.15;
+    ring.scale.setScalar(pulse * (R / 2));
+
+    // Color
+    const hue = (i / AURA_RING_COUNT + t * 0.03) % 1;
+    const rgb = KI.hslToRgb(hue, 0.6, 0.3 + energy * 0.4);
+    ring.material.color.setRGB(rgb[0], rgb[1], rgb[2]);
+  }
+}
+
+// --- 10. FRACTAL ECHOES ---
+function updateFractalEchoes(t, bandEnergy, totalEnergy, tier, R) {
+  const fade = Math.min(1, Math.max(0, (tier - 7.5) * 0.35));
+  if (fade < 0.01) {
+    for (const echo of fractalEchoes) {
+      echo.points.material.opacity = 0;
+      echo.lines.material.opacity = 0;
+    }
+    return;
+  }
+
+  const verts = geoState.vertices;
+  const edges = getEdges(geoState.currentTier);
+  const vCount = verts.length;
+
+  for (let e = 0; e < ECHO_COUNT; e++) {
+    const echo = fractalEchoes[e];
+    const bIdx = e * 2 % 12;
+    const energy = bandEnergy[bIdx];
+
+    echo.points.material.opacity = fade * (0.3 + energy * 0.5);
+    echo.lines.material.opacity = fade * (0.2 + energy * 0.4);
+
+    // Orbit around main shape
+    echo.angle += echo.speed * 0.016 * (1 + totalEnergy);
+    const orbitR = echo.orbitR + Math.sin(t * 0.3 + e) * 0.3;
+    const cx = Math.cos(echo.angle) * orbitR;
+    const cy = Math.sin(echo.tilt + t * 0.1) * orbitR * 0.3;
+    const cz = Math.sin(echo.angle) * orbitR;
+
+    // Copy main shape vertices, scaled down and offset
+    const sc = echo.scale * (0.8 + energy * 0.4);
+    const pPos = echo.pointPos;
+    const pCol = echo.pointCol;
+    for (let i = 0; i < MAX_VERTS; i++) {
+      if (i < vCount) {
+        pPos[i*3]   = verts[i][0] * sc + cx;
+        pPos[i*3+1] = verts[i][1] * sc + cy;
+        pPos[i*3+2] = verts[i][2] * sc + cz;
+        const hue = (e / ECHO_COUNT + i / vCount * 0.3 + t * 0.04) % 1;
+        const rgb = KI.hslToRgb(hue, 0.8, 0.3 + energy * 0.5);
+        pCol[i*3] = rgb[0]; pCol[i*3+1] = rgb[1]; pCol[i*3+2] = rgb[2];
+      } else {
+        pPos[i*3] = pPos[i*3+1] = pPos[i*3+2] = 0;
+        pCol[i*3] = pCol[i*3+1] = pCol[i*3+2] = 0;
+      }
+    }
+    echo.points.geometry.attributes.position.needsUpdate = true;
+    echo.points.geometry.attributes.color.needsUpdate = true;
+    echo.points.geometry.setDrawRange(0, vCount);
+    echo.points.material.size = 0.04 + energy * 0.06;
+
+    // Copy edges
+    const lPos = echo.linePos;
+    const lCol = echo.lineCol;
+    const edgeCount = Math.min(edges.length, MAX_EDGES);
+    for (let i = 0; i < MAX_EDGES; i++) {
+      if (i < edgeCount) {
+        const [a, b] = edges[i];
+        const va = a % vCount, vb = b % vCount;
+        lPos[i*6]   = verts[va][0] * sc + cx;
+        lPos[i*6+1] = verts[va][1] * sc + cy;
+        lPos[i*6+2] = verts[va][2] * sc + cz;
+        lPos[i*6+3] = verts[vb][0] * sc + cx;
+        lPos[i*6+4] = verts[vb][1] * sc + cy;
+        lPos[i*6+5] = verts[vb][2] * sc + cz;
+        const hue = (e / ECHO_COUNT + t * 0.03 + i * 0.01) % 1;
+        const rgb = KI.hslToRgb(hue, 0.7, 0.25 + energy * 0.4);
+        lCol[i*6] = lCol[i*6+3] = rgb[0];
+        lCol[i*6+1] = lCol[i*6+4] = rgb[1];
+        lCol[i*6+2] = lCol[i*6+5] = rgb[2];
+      } else {
+        for (let j = 0; j < 6; j++) { lPos[i*6+j] = 0; lCol[i*6+j] = 0; }
+      }
+    }
+    echo.lines.geometry.attributes.position.needsUpdate = true;
+    echo.lines.geometry.attributes.color.needsUpdate = true;
+    echo.lines.geometry.setDrawRange(0, edgeCount * 2);
+  }
 }
