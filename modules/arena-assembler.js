@@ -41,7 +41,10 @@ const MODULE_CATALOG = {
   'voxel-world':    { path: './modules/voxel-world.js',        import: 'VoxelWorld',     init: "VoxelWorld.init({ position: %%VOXWORLD_POS%% });", default: { VOXWORLD_POS: '[0,0.5,-3]' } },
   'player-profile': { path: './modules/player-profile.js',    import: 'PlayerProfile',  init: "PlayerProfile.init();" },
   'nav-overlay':    { path: './modules/nav-overlay.js',        import: 'NavOverlay',     init: "NavOverlay.init();" },
-  'tone-genesis':   { path: './modules/tone-genesis.js',       import: 'ToneGenesis',    init: "ToneGenesis.init({ position: %%TGENESIS_POS%%, scale: %%TGENESIS_SCALE%% });", default: { TGENESIS_POS: '[0,0,0]', TGENESIS_SCALE: 1 } }
+  'tone-genesis':   { path: './modules/tone-genesis.js',       import: 'ToneGenesis',    init: "ToneGenesis.init({ position: %%TGENESIS_POS%%, scale: %%TGENESIS_SCALE%% });", default: { TGENESIS_POS: '[0,0,0]', TGENESIS_SCALE: 1 } },
+  'voice-composer': { path: './modules/voice-composer.js',     import: 'VoiceComposer',  init: "VoiceComposer.init({ position: %%COMPOSER_POS%% });", default: { COMPOSER_POS: '[0,1,-3]' } },
+  'story-world':    { path: './modules/story-world.js',         import: 'StoryWorld',     init: "StoryWorld.init({ position: %%STORYWORLD_POS%% });", default: { STORYWORLD_POS: '[0,0,0]' } },
+  'dream-weaver':   { path: './modules/dream-weaver.js',        import: 'DreamWeaver',    init: "DreamWeaver.init({ position: %%DREAMWEAVER_POS%% });", default: { DREAMWEAVER_POS: '[0,1,-1]' } }
 };
 
 // Pre-defined arena presets
@@ -135,6 +138,21 @@ export const PRESETS = {
     title: 'Ki Arena Tone Genesis',
     modules: ['scene', 'voice', 'synths', 'resonance', 'freq-bands-12', 'tone-genesis', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 200
+  },
+  voicecomposer: {
+    title: 'Ki Arena Voice Composer',
+    modules: ['scene', 'voice', 'synths', 'resonance', 'freq-bands-12', 'voice-composer', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 2000
+  },
+  storyworld: {
+    title: 'Ki Arena Story World',
+    modules: ['scene', 'voice', 'synths', 'resonance', 'freq-bands-12', 'story-world', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 1500
+  },
+  dreamweaver: {
+    title: 'Ki Arena Dream Weaver',
+    modules: ['scene', 'voice', 'synths', 'resonance', 'freq-bands-12', 'dream-weaver', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 800
   }
 };
 
@@ -482,6 +500,18 @@ export function makeVoxelCraft(room, opts = {}) {
 
 export function makeToneGenesis(room, opts = {}) {
   return assemble({ preset: 'tonegenesis', room, ...opts });
+}
+
+export function makeVoiceComposer(room, opts = {}) {
+  return assemble({ preset: 'voicecomposer', room, ...opts });
+}
+
+export function makeStoryWorld(room, opts = {}) {
+  return assemble({ preset: 'storyworld', room, ...opts });
+}
+
+export function makeDreamWeaver(room, opts = {}) {
+  return assemble({ preset: 'dreamweaver', room, ...opts });
 }
 
 // List all available modules
