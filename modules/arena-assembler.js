@@ -34,7 +34,8 @@ const MODULE_CATALOG = {
   'voice-fx':       { path: './modules/voice-fx.js',         import: 'VoiceFX',    init: "VoiceFX.init();" },
   'prime-recursion':{ path: './modules/prime-recursion.js',  import: 'PrimeRecursion', init: "PrimeRecursion.init({ position: %%PRIME_POS%%, scale: %%PRIME_SCALE%% });", default: { PRIME_POS: '[4,5,-1]', PRIME_SCALE: 1 } },
   'deep-fractal':   { path: './modules/deep-fractal.js',     import: 'DeepFractal',    init: "DeepFractal.init({ position: %%FRACTAL_POS%%, scale: %%FRACTAL_SCALE%% });", default: { FRACTAL_POS: '[-4,4,-2]', FRACTAL_SCALE: 1 } },
-  'sound-landscape':{ path: './modules/sound-landscape.js',   import: 'SoundLandscape', init: "SoundLandscape.init({ position: %%LANDSCAPE_POS%%, scale: %%LANDSCAPE_SCALE%% });", default: { LANDSCAPE_POS: '[0,0.5,5]', LANDSCAPE_SCALE: 0.9 } }
+  'sound-landscape':{ path: './modules/sound-landscape.js',   import: 'SoundLandscape', init: "SoundLandscape.init({ position: %%LANDSCAPE_POS%%, scale: %%LANDSCAPE_SCALE%% });", default: { LANDSCAPE_POS: '[0,0.5,5]', LANDSCAPE_SCALE: 0.9 } },
+  'wrapped-geo':    { path: './modules/wrapped-geo.js',       import: 'WrappedGeo',     init: "WrappedGeo.init({ position: %%WRAPPED_POS%%, scale: %%WRAPPED_SCALE%% });", default: { WRAPPED_POS: '[0,3.5,-1]', WRAPPED_SCALE: 1.5 } }
 };
 
 // Pre-defined arena presets
@@ -103,6 +104,11 @@ export const PRESETS = {
     title: 'Ki Arena Deep Recursion',
     modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'fx', 'synths', 'resonance', 'freq-bands-12', 'geo-folder', 'prime-recursion', 'deep-fractal', 'sound-landscape', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 5000, VORTEX_COUNT: 1200, AURORA: true
+  },
+  wrappedgeo: {
+    title: 'Ki Arena Wrapped Geometry',
+    modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'fx', 'synths', 'resonance', 'freq-bands-12', 'wrapped-geo', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 4000, VORTEX_COUNT: 800, AURORA: true
   }
 };
 
@@ -425,6 +431,10 @@ export function makeVoiceRoyale(room, opts = {}) {
 
 export function makeDeepRecursion(room, opts = {}) {
   return assemble({ preset: 'deeprecursion', room, ...opts });
+}
+
+export function makeWrappedGeo(room, opts = {}) {
+  return assemble({ preset: 'wrappedgeo', room, ...opts });
 }
 
 // List all available modules
