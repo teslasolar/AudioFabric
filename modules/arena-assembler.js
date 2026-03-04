@@ -55,7 +55,12 @@ const MODULE_CATALOG = {
   'neural-cascade':  { path: './modules/neural-cascade.js',      import: 'NeuralCascade',  init: "NeuralCascade.init({ position: %%NEURO_POS%% });", default: { NEURO_POS: '[0,2,-3]' } },
   'dimensional-slicer':{ path: './modules/dimensional-slicer.js', import: 'DimensionalSlicer', init: "DimensionalSlicer.init({ position: %%DIM4_POS%% });", default: { DIM4_POS: '[0,2.5,-4]' } },
   'liquid-symmetry': { path: './modules/liquid-symmetry.js',      import: 'LiquidSymmetry', init: "LiquidSymmetry.init({ position: %%CYMTC_POS%% });", default: { CYMTC_POS: '[0,1.5,-3]' } },
-  'void-lattice':    { path: './modules/void-lattice.js',         import: 'VoidLattice',    init: "VoidLattice.init({ position: %%VLAT_POS%% });", default: { VLAT_POS: '[0,0,-2]' } }
+  'void-lattice':    { path: './modules/void-lattice.js',         import: 'VoidLattice',    init: "VoidLattice.init({ position: %%VLAT_POS%% });", default: { VLAT_POS: '[0,0,-2]' } },
+  'liquid-orb':      { path: './modules/liquid-orb.js',           import: 'LiquidOrb',      init: "LiquidOrb.init({ position: %%LORB_POS%% });", default: { LORB_POS: '[0,2.5,-3.5]' } },
+  'layer-stack':     { path: './modules/layer-stack.js',          import: 'LayerStack',     init: "LayerStack.init({ position: %%LSTACK_POS%% });", default: { LSTACK_POS: '[0,2,-3]' } },
+  'metaball-swarm':  { path: './modules/metaball-swarm.js',       import: 'MetaballSwarm',  init: "MetaballSwarm.init({ position: %%MBALL_POS%% });", default: { MBALL_POS: '[0,2.5,-3]' } },
+  'prismatic-shatter':{ path: './modules/prismatic-shatter.js',   import: 'PrismaticShatter', init: "PrismaticShatter.init({ position: %%PRISM_POS%% });", default: { PRISM_POS: '[0,2.5,-3.5]' } },
+  'fluid-ribbons':   { path: './modules/fluid-ribbons.js',        import: 'FluidRibbons',   init: "FluidRibbons.init({ position: %%FRIBN_POS%% });", default: { FRIBN_POS: '[0,2,-3]' } }
 };
 
 // Pre-defined arena presets
@@ -199,6 +204,31 @@ export const PRESETS = {
     title: 'Ki Arena Voice Tools',
     modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'voice-ai-core', 'voice-code', 'voice-api', 'voice-data', 'voice-mcp-server', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 1500
+  },
+  liquidorb: {
+    title: 'Ki Arena Liquid Orb',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'liquid-orb', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 800
+  },
+  layerstack: {
+    title: 'Ki Arena Layer Stack',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'layer-stack', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 1200
+  },
+  metaballswarm: {
+    title: 'Ki Arena Metaball Swarm',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'metaball-swarm', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 600
+  },
+  prismaticshatter: {
+    title: 'Ki Arena Prismatic Shatter',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'prismatic-shatter', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 1000
+  },
+  fluidribbons: {
+    title: 'Ki Arena Fluid Ribbons',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'fluid-ribbons', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 600
   }
 };
 
@@ -586,6 +616,26 @@ export function makeLiquidSymmetry(room, opts = {}) {
 
 export function makeVoidLattice(room, opts = {}) {
   return assemble({ preset: 'voidlattice', room, ...opts });
+}
+
+export function makeLiquidOrb(room, opts = {}) {
+  return assemble({ preset: 'liquidorb', room, ...opts });
+}
+
+export function makeLayerStack(room, opts = {}) {
+  return assemble({ preset: 'layerstack', room, ...opts });
+}
+
+export function makeMetaballSwarm(room, opts = {}) {
+  return assemble({ preset: 'metaballswarm', room, ...opts });
+}
+
+export function makePrismaticShatter(room, opts = {}) {
+  return assemble({ preset: 'prismaticshatter', room, ...opts });
+}
+
+export function makeFluidRibbons(room, opts = {}) {
+  return assemble({ preset: 'fluidribbons', room, ...opts });
 }
 
 // List all available modules
