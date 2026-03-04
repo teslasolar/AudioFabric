@@ -27,7 +27,10 @@ const MODULE_CATALOG = {
   'stargate':     { path: './modules/stargate.js',       import: 'Stargate',   init: "Stargate.init({ position: %%GATE_POS%%, radius: %%GATE_RADIUS%% });", default: { GATE_POS: '[0,3,-8]', GATE_RADIUS: 4 } },
   'hd-scene':     { path: './modules/hd-scene.js',       import: 'HDScene',    init: "HDScene.init();" },
   'hd-fx':        { path: './modules/hd-fx.js',          import: 'HDFX',       init: "HDFX.init();" },
-  'hd-vortex':    { path: './modules/hd-vortex.js',      import: 'HDVortex',   init: "HDVortex.init();" }
+  'hd-vortex':    { path: './modules/hd-vortex.js',      import: 'HDVortex',   init: "HDVortex.init();" },
+  'voice-chat':   { path: './modules/voice-chat.js',     import: 'VoiceChat',  init: "VoiceChat.init();" },
+  'singing-voice':{ path: './modules/singing-voice.js',   import: 'SingingVoice', init: "SingingVoice.init();" },
+  'resonance-synths': { path: './modules/resonance-synths.js', import: 'ResSynths', init: "ResSynths.init();" }
 };
 
 // Pre-defined arena presets
@@ -66,6 +69,21 @@ export const PRESETS = {
     title: 'Ki Arena Hyperdimensional',
     modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'emoji', 'fx', 'synths', 'mqtt', 'webrtc', 'presence', 'camera', 'chat', 'freq-bands-12', 'geo-folder', 'stargate', 'resonance', 'vocal-ranges'],
     stars: 6000, VORTEX_COUNT: 2000, AURORA: true
+  },
+  voiceplus: {
+    title: 'Ki Arena Voice+ v2',
+    modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'emoji', 'fx', 'synths', 'resonance', 'mqtt', 'webrtc', 'presence', 'chat', 'voice-chat', 'freq-bands-12', 'geo-folder', 'singing-voice'],
+    stars: 4000, VORTEX_COUNT: 1000, AURORA: true
+  },
+  songbird: {
+    title: 'Songbird — Singing AI Companion',
+    modules: ['scene', 'voice', 'kanji', 'vortex', 'fx', 'synths', 'resonance', 'freq-bands-12', 'geo-folder', 'singing-voice'],
+    stars: 3000, VORTEX_COUNT: 800
+  },
+  voicefull: {
+    title: 'Ki Arena Voice Full',
+    modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'emoji', 'fx', 'synths', 'resonance', 'resonance-synths', 'mqtt', 'webrtc', 'presence', 'camera', 'screen-share', 'chat', 'voice-chat', 'freq-bands-12', 'geo-folder', 'stargate', 'singing-voice', 'vocal-ranges'],
+    stars: 5000, VORTEX_COUNT: 1500, AURORA: true
   }
 };
 
@@ -364,6 +382,18 @@ export function makeDuel(room, opts = {}) {
 
 export function makeMinimal(room, opts = {}) {
   return assemble({ preset: 'minimal', room, ...opts });
+}
+
+export function makeVoicePlus(room, opts = {}) {
+  return assemble({ preset: 'voiceplus', room, ...opts });
+}
+
+export function makeSongbird(room, opts = {}) {
+  return assemble({ preset: 'songbird', room, ...opts });
+}
+
+export function makeVoiceFull(room, opts = {}) {
+  return assemble({ preset: 'voicefull', room, ...opts });
 }
 
 // List all available modules
