@@ -40,7 +40,8 @@ const MODULE_CATALOG = {
   'genesis':        { path: './modules/genesis.js',            import: 'Genesis',        init: "Genesis.init({ position: %%GENESIS_POS%%, scale: %%GENESIS_SCALE%% });", default: { GENESIS_POS: '[0,3,-2]', GENESIS_SCALE: 1.5 } },
   'voxel-world':    { path: './modules/voxel-world.js',        import: 'VoxelWorld',     init: "VoxelWorld.init({ position: %%VOXWORLD_POS%% });", default: { VOXWORLD_POS: '[0,0.5,-3]' } },
   'player-profile': { path: './modules/player-profile.js',    import: 'PlayerProfile',  init: "PlayerProfile.init();" },
-  'nav-overlay':    { path: './modules/nav-overlay.js',        import: 'NavOverlay',     init: "NavOverlay.init();" }
+  'nav-overlay':    { path: './modules/nav-overlay.js',        import: 'NavOverlay',     init: "NavOverlay.init();" },
+  'tone-genesis':   { path: './modules/tone-genesis.js',       import: 'ToneGenesis',    init: "ToneGenesis.init({ position: %%TGENESIS_POS%%, scale: %%TGENESIS_SCALE%% });", default: { TGENESIS_POS: '[0,0,0]', TGENESIS_SCALE: 1 } }
 };
 
 // Pre-defined arena presets
@@ -129,6 +130,11 @@ export const PRESETS = {
     title: 'Ki Arena Voxel Craft',
     modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'fx', 'synths', 'resonance', 'freq-bands-12', 'geo-folder', 'voxel-world', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 4000, VORTEX_COUNT: 600, AURORA: true, GEO_POS: '[0,6,-5]', GEO_SCALE: 1.0
+  },
+  tonegenesis: {
+    title: 'Ki Arena Tone Genesis',
+    modules: ['scene', 'voice', 'synths', 'resonance', 'freq-bands-12', 'tone-genesis', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 200
   }
 };
 
@@ -472,6 +478,10 @@ export function makeGenesis(room, opts = {}) {
 
 export function makeVoxelCraft(room, opts = {}) {
   return assemble({ preset: 'voxelcraft', room, ...opts });
+}
+
+export function makeToneGenesis(room, opts = {}) {
+  return assemble({ preset: 'tonegenesis', room, ...opts });
 }
 
 // List all available modules
