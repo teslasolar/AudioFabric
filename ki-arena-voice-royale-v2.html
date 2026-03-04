@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena Royale v2 — Voice Battle Royale + 12-Band Elemental Powers</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+
+/* HUD */
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.8),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#nick:hover{color:#ff0}
+#score{font-size:28px;color:#ff0;text-shadow:0 0 10px #f80}
+#combo{font-size:16px;color:#f80}
+#blastType{font-size:14px;color:#4af}
+#charge{font-size:12px;color:#0f0}
+#room{font-size:11px;color:#0ff}
+#peers{font-size:11px;color:#088}
+#alive{font-size:13px;color:#ff4466;font-weight:bold}
+
+/* ZONE TIMER */
+#zoneTimer{position:fixed;top:45px;left:50%;transform:translateX(-50%);z-index:55;
+  text-align:center;pointer-events:none}
+#zoneText{font-size:12px;color:#ff4466;text-shadow:0 0 8px #ff446680}
+#zoneBorder{position:fixed;inset:0;z-index:58;pointer-events:none;border:0 solid rgba(255,68,102,0);
+  transition:border-width 2s}
+#zoneBorder.danger{border-width:4px;border-color:rgba(255,68,102,0.5);animation:borderPulse 1s infinite}
+@keyframes borderPulse{0%,100%{border-color:rgba(255,68,102,0.5)}50%{border-color:rgba(255,68,102,0.15)}}
+
+/* ELIMINATIONS FEED */
+#killFeed{position:fixed;top:60px;right:12px;z-index:55;display:flex;flex-direction:column;gap:3px;
+  pointer-events:none;max-width:280px}
+.kill-entry{font-size:10px;padding:3px 8px;background:rgba(0,0,0,0.6);border-left:3px solid #ff4466;
+  border-radius:2px;animation:killIn 0.3s ease-out;opacity:0.9}
+@keyframes killIn{from{opacity:0;transform:translateX(30px)}to{opacity:0.9;transform:translateX(0)}}
+.kill-entry .kn{color:#4af}.kill-entry .kt{color:#ff4466}
+
+/* KANJI HUD */
+#kanjiHUD{position:fixed;left:16px;top:35%;transform:translateY(-50%);z-index:55;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#kanjiHUD.on{opacity:1}
+#kanjiChar{font-size:72px;line-height:1;text-shadow:0 0 30px currentColor,0 0 60px currentColor}
+#kanjiName{font-size:11px;color:#fff8;margin-top:4px}
+#kanjiReading{font-size:9px;color:#fff4}
+
+/* PHONEMES */
+#phonemes{position:fixed;left:50%;bottom:75px;transform:translateX(-50%);z-index:55;display:none;gap:5px;pointer-events:none}
+#phonemes.on{display:flex}
+.ph{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:32px}
+.ph-label{font-size:7px;font-weight:bold;opacity:0.5;transition:opacity 0.15s}
+.ph.active .ph-label{opacity:1}
+.ph-bar{width:7px;height:45px;background:#111;border:1px solid #fff1;border-radius:4px;position:relative;overflow:hidden}
+.ph-fill{position:absolute;bottom:0;left:0;right:0;border-radius:3px;transition:height 0.08s}
+.ph-kanji{font-size:11px;opacity:0.3;transition:opacity 0.2s}
+.ph.active .ph-kanji{opacity:1}
+
+/* 12-BAND */
+#bandViz{position:fixed;left:50%;bottom:4px;transform:translateX(-50%);z-index:55;
+  display:flex;gap:2px;pointer-events:none;align-items:flex-end;height:50px}
+.band-bar{width:14px;height:50px;position:relative;overflow:hidden}
+.band-fill{position:absolute;bottom:0;left:1px;right:1px;border-radius:2px 2px 0 0;transition:height 0.06s;
+  box-shadow:0 0 3px currentColor}
+.band-label{position:absolute;bottom:-11px;left:50%;transform:translateX(-50%);font-size:5px;color:#444;white-space:nowrap}
+
+/* ELEMENTAL POWER INDICATOR */
+#elementHUD{position:fixed;left:16px;bottom:80px;z-index:55;pointer-events:none}
+#elementName{font-size:14px;text-shadow:0 0 8px currentColor;transition:color 0.3s}
+#elementDesc{font-size:9px;color:#666;margin-top:2px}
+#elementPower{font-size:10px;color:#888;margin-top:1px}
+
+/* TIER */
+#tierHUD{position:fixed;right:16px;bottom:80px;z-index:55;text-align:right;pointer-events:none}
+#tierName{font-size:14px;color:#4af;text-shadow:0 0 8px #4af;transition:color 0.3s}
+#tierShape{font-size:9px;color:#888;margin-top:2px}
+
+/* DMG / CMT / LB */
+#dmgLayer{position:fixed;inset:0;z-index:60;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 8px currentColor;
+  animation:dmgUp 1.2s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-120px) scale(1.8)}}
+#cmt{position:fixed;bottom:140px;left:50%;transform:translateX(-50%);z-index:70;
+  background:rgba(0,0,0,0.85);border:1px solid #ff0;border-radius:12px;padding:8px 20px;
+  font-size:16px;color:#ff0;text-shadow:0 0 10px #f80;text-align:center;
+  max-width:500px;opacity:0;transition:opacity 0.3s;pointer-events:none}
+#cmt.show{opacity:1}
+#lb{position:fixed;right:10px;top:50%;transform:translateY(-50%);z-index:50;
+  background:rgba(0,0,0,0.75);border:1px solid #ff03;border-radius:8px;padding:8px;
+  min-width:170px;display:none;font-size:11px}
+#lb.on{display:block}
+#lb h3{color:#ff4466;font-size:12px;margin-bottom:4px;text-align:center}
+#lb .row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #ff01}
+#lb .row .n{color:#0ff}#lb .row .s{color:#ff0}
+#lb .me{color:#0f0 !important}
+
+/* PLACEMENT OVERLAY */
+#placement{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,0.85);
+  display:none;align-items:center;justify-content:center;flex-direction:column}
+#placement.on{display:flex}
+#placement h1{font-size:42px;color:#ff0;text-shadow:0 0 30px #f80;margin-bottom:12px}
+#placement .place{font-size:24px;color:#ff4466;margin-bottom:8px}
+#placement .final-score{font-size:18px;color:#aaa}
+#placement .restart{margin-top:20px;padding:10px 30px;font:16px monospace;
+  background:rgba(255,68,102,0.15);border:1px solid #ff4466;color:#ff4466;
+  border-radius:8px;cursor:pointer}
+#placement .restart:hover{background:rgba(255,68,102,0.3)}
+
+/* CHAT */
+#chat{position:fixed;left:10px;bottom:16px;z-index:56;width:230px;
+  background:rgba(0,0,0,0.75);border:1px solid #333;border-radius:8px;overflow:hidden;display:none;flex-direction:column}
+#chat.on{display:flex}
+#chatMsgs{height:80px;overflow-y:auto;padding:4px;font-size:10px;scrollbar-width:thin;scrollbar-color:#333 transparent}
+.chat-msg{padding:1px 0;word-break:break-word;line-height:1.2}
+.chat-msg .cn{font-weight:bold}
+.chat-sys{color:#555;font-style:italic}
+#chatInput{width:100%;background:#0a0a0a;border:none;border-top:1px solid #333;
+  color:#fff;padding:4px 6px;font-size:10px;font-family:inherit;outline:none}
+
+/* BADGES */
+#modBadges{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:55;
+  display:flex;gap:3px;pointer-events:none;flex-wrap:wrap;justify-content:center;max-width:90%}
+.mod-badge{background:#0002;border:1px solid #0ff3;border-radius:3px;padding:1px 5px;font-size:7px;color:#0ff8}
+.mod-badge.active{color:#0f0;border-color:#0f04}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l">
+    <div id="score">0</div><div id="combo"></div><div id="blastType">—</div><div id="charge"></div>
+    <div id="alive">ALIVE: ?</div>
+  </div>
+  <div class="hud-r">
+    <div id="nick" onclick="changeNick()" title="Click to change name"></div>
+    <div id="room">ROYALE</div><div id="peers"></div>
+  </div>
+</div>
+<div id="zoneTimer"><div id="zoneText"></div></div>
+<div id="zoneBorder"></div>
+<div id="killFeed"></div>
+<div id="kanjiHUD"><div id="kanjiChar">気</div><div id="kanjiName">Spirit</div><div id="kanjiReading">KI</div></div>
+<div id="phonemes"></div>
+<div id="bandViz"></div>
+<div id="elementHUD"><div id="elementName"></div><div id="elementDesc"></div><div id="elementPower"></div></div>
+<div id="tierHUD"><div id="tierName">Point</div><div id="tierShape">Tier 0</div></div>
+<div id="dmgLayer"></div>
+<div id="cmt"></div>
+<div id="lb"><h3>ROYALE v2</h3><div id="lbRows"></div></div>
+<div id="chat"><div id="chatMsgs"></div><input id="chatInput" type="text" placeholder="Chat..." maxlength="200"></div>
+<div id="placement"><h1>ELIMINATED</h1><div class="place"></div><div class="final-score"></div>
+  <button class="restart" onclick="location.reload()">DROP AGAIN</button></div>
+<div id="modBadges"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+// ============================================================
+// KI ARENA ROYALE v2 — 12-Band Elemental Voice Battle Royale
+// ============================================================
+
+import { KI } from './modules/core.js';
+import * as Scene from './modules/scene.js';
+import * as VoiceEngine from './modules/voice-engine.js';
+import * as Kanji from './modules/kanji.js';
+import * as KiBlasts from './modules/ki-blasts.js';
+import * as Vortex from './modules/vortex.js';
+import * as EmojiSystem from './modules/emoji-system.js';
+import * as FX from './modules/fx.js';
+import * as Synths from './modules/synths.js';
+import * as Resonance from './modules/resonance.js';
+import * as MqttNet from './modules/mqtt-net.js';
+import * as WebRTCNet from './modules/webrtc-net.js';
+import * as Presence from './modules/presence.js';
+import * as Chat from './modules/chat.js';
+import * as VoiceChat from './modules/voice-chat.js';
+import * as FreqBands from './modules/freq-bands-12.js';
+import * as GeoFolder from './modules/geo-folder.js';
+import * as Stargate from './modules/stargate.js';
+
+// ============================================================
+// ROYALE STATE
+// ============================================================
+const royale = {
+  phase: 'waiting',    // waiting → dropping → fighting → eliminated → victory
+  zoneRadius: 18,      // starts at arena edge
+  zoneShrinkRate: 0.3,  // units per second
+  zoneMinRadius: 3,
+  zoneTimer: 60,       // seconds until next shrink
+  zoneShrinking: false,
+  playersAlive: 1,
+  totalPlayers: 1,
+  eliminations: 0,
+  eliminated: false,
+  hp: 1000,
+  maxHP: 1000,
+  placement: 0,
+  killFeed: [],
+  // 12-band elemental power — dominant band becomes your "element"
+  currentElement: null,
+  elementPower: 0,
+  elementStreak: 0
+};
+
+// Element names mapped to 12 bands
+const ELEMENTS = [
+  { name: 'VOID',    desc: 'Erasure — nullifies defenses',    color: '#220044', dmgType: 'pierce' },
+  { name: 'EARTH',   desc: 'Heavy strikes — slow but crushing', color: '#6600cc', dmgType: 'heavy' },
+  { name: 'FIRE',    desc: 'Burn damage over time',            color: '#ff2244', dmgType: 'burn' },
+  { name: 'LAVA',    desc: 'Area splash damage',               color: '#ff6600', dmgType: 'splash' },
+  { name: 'LIGHT',   desc: 'Blinds and disorients',           color: '#ffaa00', dmgType: 'flash' },
+  { name: 'THUNDER', desc: 'Chain lightning to nearby targets', color: '#ffdd00', dmgType: 'chain' },
+  { name: 'WIND',    desc: 'Fast strikes — rapid combos',     color: '#44ff44', dmgType: 'rapid' },
+  { name: 'WATER',   desc: 'Healing while attacking',         color: '#00ddaa', dmgType: 'drain' },
+  { name: 'ICE',     desc: 'Slows enemy charge rate',         color: '#0088ff', dmgType: 'slow' },
+  { name: 'PLASMA',  desc: 'Pure energy — highest base damage', color: '#4444ff', dmgType: 'pure' },
+  { name: 'AETHER',  desc: 'Phase through defenses',          color: '#aa44ff', dmgType: 'phase' },
+  { name: 'STAR',    desc: 'Cosmic power — scales with tier',  color: '#ff44ff', dmgType: 'cosmic' }
+];
+
+// ============================================================
+// PLAYER SETUP
+// ============================================================
+KI.player.name = KI.genHash();
+window.changeNick = function() {
+  const n = prompt('Nickname (max 16):', KI.player.name);
+  if (n && n.trim()) {
+    KI.player.name = n.trim().slice(0, 16);
+    document.getElementById('nick').textContent = KI.player.name;
+    KI.emit('broadcast', { type: 'nick', name: KI.player.name, score: KI.player.score });
+  }
+};
+
+// ============================================================
+// HUD WIRING
+// ============================================================
+KI.on('charge:update', data => {
+  document.getElementById('blastType').textContent = data.blastType?.name || '';
+  document.getElementById('charge').textContent = data.chargeLevel > 0.05
+    ? 'CHARGE: ' + Math.round(data.chargeLevel * 100) + '%' : '';
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const khud = document.getElementById('kanjiHUD');
+  if (KI.voice.vowel && KI.voice.sounding && KANJI[KI.voice.vowel]) {
+    const kj = KANJI[KI.voice.vowel];
+    khud.classList.add('on');
+    document.getElementById('kanjiChar').textContent = kj.char;
+    document.getElementById('kanjiChar').style.color = kj.color;
+    document.getElementById('kanjiName').textContent = kj.name;
+    document.getElementById('kanjiReading').textContent = kj.reading;
+  } else khud.classList.remove('on');
+  updatePhonemes();
+});
+
+KI.on('hit', data => {
+  document.getElementById('score').textContent = KI.player.score.toLocaleString();
+  document.getElementById('combo').textContent = KI.player.combo > 1 ? KI.player.combo + 'x COMBO' : '';
+  showDmg(data.dmg, data.type);
+  if (data.dmg > 300) showCmt(pickCmt('bigHit'));
+});
+KI.on('ko', () => {
+  royale.eliminations++;
+  addKillFeed(KI.player.name, 'target', royale.currentElement?.name || 'KI');
+  showCmt(pickCmt('ko'));
+});
+
+// ============================================================
+// PHONEME + BAND UI
+// ============================================================
+function buildPhonemeUI() {
+  const kanji = KI.get('kanji');
+  if (!kanji) return;
+  const cont = document.getElementById('phonemes');
+  kanji.PH_KEYS.forEach(k => {
+    const ph = kanji.PHONEMES[k], kj = kanji.KANJI[k];
+    const d = document.createElement('div'); d.className = 'ph'; d.id = 'ph-' + k;
+    d.innerHTML = '<div class="ph-kanji" style="color:' + ph.color + '">' + kj.char + '</div>' +
+      '<div class="ph-label" style="color:' + ph.color + '">' + ph.label + '</div>' +
+      '<div class="ph-bar"><div class="ph-fill" style="background:' + ph.color + ';height:0%"></div></div>';
+    cont.appendChild(d);
+  });
+}
+function updatePhonemes() {
+  const kanji = KI.get('kanji'); if (!kanji) return;
+  kanji.PH_KEYS.forEach(k => {
+    const ph = kanji.PHONEMES[k];
+    if (KI.voice.vowel === k && KI.voice.sounding) ph.power = Math.min(1, ph.power + KI.voice.rms * 0.12);
+    else ph.power *= 0.985;
+    const el = document.getElementById('ph-' + k); if (!el) return;
+    el.querySelector('.ph-fill').style.height = (ph.power * 100) + '%';
+    if (KI.voice.vowel === k && KI.voice.sounding) el.classList.add('active'); else el.classList.remove('active');
+  });
+}
+
+function buildBandViz() {
+  const cont = document.getElementById('bandViz');
+  FreqBands.BANDS.forEach((band, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'band-bar'; bar.id = 'band-' + i;
+    bar.innerHTML = '<div class="band-fill" style="background:' + band.color + ';height:0%;color:' + band.color + '"></div>' +
+      '<div class="band-label">' + band.label + '</div>';
+    cont.appendChild(bar);
+  });
+}
+
+KI.on('freq-bands-12:update', data => {
+  for (let i = 0; i < 12; i++) {
+    const fill = document.querySelector('#band-' + i + ' .band-fill');
+    if (fill) fill.style.height = Math.min(100, data.energy[i] * 100) + '%';
+  }
+  // update elemental power
+  if (data.dominant >= 0 && data.dominant < 12) {
+    const elem = ELEMENTS[data.dominant];
+    if (royale.currentElement !== elem) {
+      royale.currentElement = elem;
+      royale.elementStreak = 0;
+    }
+    royale.elementStreak++;
+    royale.elementPower = Math.min(1, data.totalEnergy * 0.5);
+    document.getElementById('elementName').textContent = elem.name;
+    document.getElementById('elementName').style.color = elem.color;
+    document.getElementById('elementDesc').textContent = elem.desc;
+    document.getElementById('elementPower').textContent = 'Power: ' + Math.round(royale.elementPower * 100) + '%';
+  }
+});
+
+// GEO TIER
+const TIER_COLORS = ['#220044','#6600cc','#ff2244','#ff6600','#ffaa00','#ffdd00',
+  '#44ff44','#00ddaa','#0088ff','#4444ff','#aa44ff','#ff44ff'];
+KI.on('geo-folder:tier-change', data => {
+  const el = document.getElementById('tierName');
+  const sh = document.getElementById('tierShape');
+  if (el) { el.textContent = data.name; el.style.color = TIER_COLORS[data.tier] || '#4af'; }
+  if (sh) sh.textContent = 'Tier ' + data.tier;
+  if (data.tier >= 8) showCmt(data.name.toUpperCase() + ' — POWER SURGE!');
+});
+
+// ============================================================
+// ZONE MECHANICS
+// ============================================================
+function updateZone(dt) {
+  if (royale.phase === 'eliminated') return;
+
+  royale.zoneTimer -= dt;
+  if (royale.zoneTimer <= 0) {
+    royale.zoneShrinking = true;
+    royale.zoneTimer = 30 + Math.random() * 20; // next shrink
+  }
+
+  if (royale.zoneShrinking && royale.zoneRadius > royale.zoneMinRadius) {
+    royale.zoneRadius -= royale.zoneShrinkRate * dt;
+    if (royale.zoneRadius <= royale.zoneMinRadius) {
+      royale.zoneRadius = royale.zoneMinRadius;
+      royale.zoneShrinking = false;
+    }
+  }
+
+  // zone warning
+  const zoneEl = document.getElementById('zoneText');
+  if (royale.zoneShrinking) {
+    zoneEl.textContent = 'ZONE SHRINKING — ' + Math.round(royale.zoneRadius) + 'm';
+    document.getElementById('zoneBorder').classList.add('danger');
+  } else {
+    zoneEl.textContent = 'Zone: ' + Math.round(royale.zoneRadius) + 'm — shrinks in ' + Math.round(royale.zoneTimer) + 's';
+    document.getElementById('zoneBorder').classList.remove('danger');
+  }
+
+  document.getElementById('alive').textContent = 'ALIVE: ' + royale.playersAlive;
+}
+
+// ============================================================
+// KILL FEED
+// ============================================================
+function addKillFeed(killer, victim, element) {
+  const cont = document.getElementById('killFeed');
+  const entry = document.createElement('div');
+  entry.className = 'kill-entry';
+  entry.innerHTML = '<span class="kn">' + escHtml(killer) + '</span> <span class="kt">[' + element + ']</span> ' + escHtml(victim);
+  cont.appendChild(entry);
+  while (cont.children.length > 6) cont.removeChild(cont.firstChild);
+  setTimeout(() => entry.remove(), 8000);
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ============================================================
+// DMG / CMT
+// ============================================================
+function showDmg(amount, type) {
+  const kanji = KI.get('kanji');
+  const blasts = KI.get('ki-blasts');
+  const el = document.createElement('div'); el.className = 'dmg';
+  const bt = blasts?.BLAST_TYPES?.[type];
+  const kj = kanji?.KANJI?.[bt?.vowel || 'mm'];
+  el.textContent = (kj ? kj.char + ' ' : '') + Math.round(amount);
+  const elemColor = royale.currentElement?.color || '#ff0';
+  el.style.color = elemColor;
+  el.style.fontSize = (18 + Math.min(amount / 10, 30)) + 'px';
+  el.style.left = (KI.W / 2 + (Math.random() - 0.5) * 120) + 'px';
+  el.style.top = (KI.H / 2 - 60 + (Math.random() - 0.5) * 40) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+
+const CMT = {
+  bigHit: ["DEVASTATING STRIKE!", "ELEMENTAL FURY!", "UNSTOPPABLE!", "RAW POWER!"],
+  combo: ["COMBO MACHINE!", "RELENTLESS ASSAULT!", "CHAIN REACTION!"],
+  ko: ["ELIMINATED!", "DESTROYED!", "全滅 OBLITERATION!"],
+  zone: ["ZONE CLOSING!", "MOVE OR DIE!", "THE STORM APPROACHES!"]
+};
+function pickCmt(ev) { const a = CMT[ev] || CMT.bigHit; return a[Math.floor(Math.random() * a.length)]; }
+let cmtTimeout = null;
+function showCmt(text) {
+  if (cmtTimeout) return;
+  const el = document.getElementById('cmt');
+  el.textContent = text.slice(0, 80); el.classList.add('show');
+  cmtTimeout = setTimeout(() => { el.classList.remove('show'); cmtTimeout = null; }, 3000);
+}
+
+function showBadge(name) {
+  const b = document.createElement('div');
+  b.className = 'mod-badge active';
+  b.textContent = name.toUpperCase();
+  document.getElementById('modBadges').appendChild(b);
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+async function boot() {
+  document.getElementById('nick').textContent = KI.player.name;
+  document.getElementById('hud').classList.add('on');
+  document.getElementById('lb').classList.add('on');
+  document.getElementById('phonemes').classList.add('on');
+  document.getElementById('chat').classList.add('on');
+
+  Scene.init({ stars: 4000, fogDensity: 0.006 });
+  showBadge('scene');
+
+  Kanji.init();
+  buildPhonemeUI();
+  showBadge('kanji');
+
+  Vortex.init({ count: 1000, particleSize: 0.1 });
+  showBadge('vortex');
+
+  KiBlasts.init();
+  showBadge('blasts');
+
+  EmojiSystem.init();
+  showBadge('emoji');
+
+  FX.init({ aurora: true });
+  showBadge('fx');
+
+  Synths.init();
+  showBadge('synths');
+
+  Resonance.init();
+  showBadge('resonance');
+
+  FreqBands.init();
+  buildBandViz();
+  showBadge('12-bands');
+
+  GeoFolder.init({ position: [0, 3.5, -3], scale: 1.3 });
+  showBadge('geo-folder');
+
+  Stargate.init({ position: [0, 3.5, -8], radius: 4 });
+  showBadge('stargate');
+
+  try {
+    await VoiceEngine.init();
+    showBadge('voice');
+  } catch (e) { console.warn('Voice init failed:', e); }
+
+  VoiceChat.init();
+  showBadge('voice-chat');
+
+  MqttNet.init({ room: 'ROYALE-V2' });
+  showBadge('mqtt');
+
+  WebRTCNet.init({ room: 'ROYALE-V2' });
+  showBadge('webrtc');
+
+  Presence.init();
+  showBadge('presence');
+
+  Chat.init();
+  showBadge('chat');
+
+  royale.phase = 'fighting';
+
+  KI.running = true;
+  const clock = KI.clock;
+  function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    updateZone(dt);
+    KI.renderer.render(KI.scene, KI.camera);
+  }
+  animate();
+
+  console.log('%c KI ARENA ROYALE v2 BOOTED ', 'background:#000;color:#ff4466;font-size:20px;padding:10px');
+  showCmt('ROYALE v2 — 12 ELEMENTS — LAST VOICE STANDING');
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

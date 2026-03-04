@@ -30,7 +30,8 @@ const MODULE_CATALOG = {
   'hd-vortex':    { path: './modules/hd-vortex.js',      import: 'HDVortex',   init: "HDVortex.init();" },
   'voice-chat':   { path: './modules/voice-chat.js',     import: 'VoiceChat',  init: "VoiceChat.init();" },
   'singing-voice':{ path: './modules/singing-voice.js',   import: 'SingingVoice', init: "SingingVoice.init();" },
-  'resonance-synths': { path: './modules/resonance-synths.js', import: 'ResSynths', init: "ResSynths.init();" }
+  'resonance-synths': { path: './modules/resonance-synths.js', import: 'ResSynths', init: "ResSynths.init();" },
+  'voice-fx':       { path: './modules/voice-fx.js',         import: 'VoiceFX',    init: "VoiceFX.init();" }
 };
 
 // Pre-defined arena presets
@@ -84,6 +85,16 @@ export const PRESETS = {
     title: 'Ki Arena Voice Full',
     modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'emoji', 'fx', 'synths', 'resonance', 'resonance-synths', 'mqtt', 'webrtc', 'presence', 'camera', 'screen-share', 'chat', 'voice-chat', 'freq-bands-12', 'geo-folder', 'stargate', 'singing-voice', 'vocal-ranges'],
     stars: 5000, VORTEX_COUNT: 1500, AURORA: true
+  },
+  voicetrainer: {
+    title: 'Ki Arena Voice Trainer',
+    modules: ['scene', 'voice', 'vortex', 'fx', 'synths', 'resonance', 'freq-bands-12', 'geo-folder', 'singing-voice', 'voice-fx'],
+    stars: 3000, VORTEX_COUNT: 800
+  },
+  voiceroyale: {
+    title: 'Ki Arena Voice Royale v2',
+    modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'emoji', 'fx', 'synths', 'resonance', 'freq-bands-12', 'geo-folder', 'stargate', 'voice-chat', 'voice-fx', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 5000, VORTEX_COUNT: 1200, AURORA: true
   }
 };
 
@@ -394,6 +405,14 @@ export function makeSongbird(room, opts = {}) {
 
 export function makeVoiceFull(room, opts = {}) {
   return assemble({ preset: 'voicefull', room, ...opts });
+}
+
+export function makeVoiceTrainer(room, opts = {}) {
+  return assemble({ preset: 'voicetrainer', room, ...opts });
+}
+
+export function makeVoiceRoyale(room, opts = {}) {
+  return assemble({ preset: 'voiceroyale', room, ...opts });
 }
 
 // List all available modules
