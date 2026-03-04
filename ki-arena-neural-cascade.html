@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena — Neural Cascade</title>
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.7),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#topoName{font-size:14px;color:#4af;text-transform:uppercase;letter-spacing:2px}
+/* Neural stats */
+#neuralStats{position:fixed;left:12px;bottom:12px;z-index:55;
+  background:rgba(0,0,0,0.7);border:1px solid #fff1;border-radius:6px;
+  padding:8px;font-size:10px;color:#888;pointer-events:none}
+.ns-row{display:flex;justify-content:space-between;gap:12px;padding:1px 0}
+.ns-val{color:#4af}
+/* Fire rate bar */
+#fireBar{width:100px;height:6px;background:#111;border-radius:3px;overflow:hidden;margin-top:4px}
+#fireFill{height:100%;width:0%;background:linear-gradient(90deg,#28f,#f44);border-radius:3px;transition:width 0.1s}
+/* Topology pills */
+#topoPills{position:fixed;right:12px;top:50%;transform:translateY(-50%);z-index:55;
+  display:flex;flex-direction:column;gap:3px;pointer-events:none}
+.topo-pill{padding:3px 8px;font-size:9px;color:#336;border:1px solid #fff1;
+  border-radius:10px;background:rgba(0,0,0,0.4);transition:all 0.3s}
+.topo-pill.active{color:#4af;border-color:#4af4;background:rgba(20,40,80,0.4)}
+/* Cascade flash */
+#cascadeFlash{position:fixed;inset:0;z-index:45;pointer-events:none;opacity:0;transition:opacity 0.3s;
+  background:radial-gradient(circle,rgba(40,100,255,0.1),transparent 60%)}
+#cascadeFlash.show{opacity:1}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l">
+    <div style="font-size:12px;color:#4af">NEURAL CASCADE</div>
+    <div id="topoName">random</div>
+    <div id="fireBar"><div id="fireFill"></div></div>
+  </div>
+  <div class="hud-r">
+    <div id="nick" onclick="changeNick()"></div>
+    <div id="firingCount" style="font-size:11px;color:#f80">0 firing</div>
+  </div>
+</div>
+<div id="neuralStats">
+  <div class="ns-row"><span>Nodes</span><span class="ns-val" id="nsNodes">120</span></div>
+  <div class="ns-row"><span>Connections</span><span class="ns-val" id="nsConns">0</span></div>
+  <div class="ns-row"><span>Total Fires</span><span class="ns-val" id="nsFires">0</span></div>
+  <div class="ns-row"><span>Fire Rate</span><span class="ns-val" id="nsRate">0%</span></div>
+</div>
+<div id="topoPills">
+  <div class="topo-pill active" data-t="random">Random</div>
+  <div class="topo-pill" data-t="lattice">Lattice</div>
+  <div class="topo-pill" data-t="small-world">Small World</div>
+  <div class="topo-pill" data-t="ring">Ring</div>
+  <div class="topo-pill" data-t="star">Star</div>
+</div>
+<div id="cascadeFlash"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+import { KI } from './modules/core.js';
+import * as Scene from './modules/scene.js';
+import * as VoiceEngine from './modules/voice-engine.js';
+import * as FreqBands from './modules/freq-bands-12.js';
+import * as Synths from './modules/synths.js';
+import * as Resonance from './modules/resonance.js';
+import * as NeuralCascade from './modules/neural-cascade.js';
+import * as MqttNet from './modules/mqtt-net.js';
+import * as WebRTCNet from './modules/webrtc-net.js';
+import * as Presence from './modules/presence.js';
+import * as Chat from './modules/chat.js';
+import * as PlayerProfile from './modules/player-profile.js';
+import * as NavOverlay from './modules/nav-overlay.js';
+
+const ROOM = 'NEURO-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+KI.player.name = KI.genHash();
+document.getElementById('nick').textContent = KI.player.name;
+window.changeNick = function() {
+  const n = prompt('Nickname:', KI.player.name);
+  if (n && n.trim()) { KI.player.name = n.trim().slice(0,16); document.getElementById('nick').textContent = KI.player.name; }
+};
+
+KI.on('neural-cascade:topology-change', data => {
+  const flash = document.getElementById('cascadeFlash');
+  flash.classList.add('show');
+  setTimeout(() => flash.classList.remove('show'), 500);
+});
+
+KI.on('neural-cascade:update', data => {
+  document.getElementById('topoName').textContent = data.topology;
+  document.getElementById('firingCount').textContent = data.firingCount + ' firing';
+  document.getElementById('nsNodes').textContent = data.nodeCount;
+  document.getElementById('nsConns').textContent = data.connectionCount;
+  document.getElementById('nsFires').textContent = data.totalFires;
+  document.getElementById('nsRate').textContent = data.firingRate + '%';
+  document.getElementById('fireFill').style.width = data.firingRate + '%';
+  document.querySelectorAll('.topo-pill').forEach(el => {
+    el.classList.toggle('active', el.dataset.t === data.topology);
+  });
+});
+
+async function boot() {
+  document.getElementById('hud').classList.add('on');
+  Scene.init({ stars: 800 });
+  try { await VoiceEngine.init(); } catch(e) { console.warn('voice:', e); }
+  FreqBands.init(); Synths.init(); Resonance.init();
+  NeuralCascade.init({ position: [0, 2, -3] });
+  MqttNet.init({ room: ROOM }); WebRTCNet.init({ room: ROOM });
+  Presence.init(); Chat.init(); PlayerProfile.init(); NavOverlay.init();
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return; requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t); KI.renderer.render(KI.scene, KI.camera);
+  })();
+  console.log('%c NEURAL CASCADE BOOTED ', 'background:#000;color:#4af;font-size:22px;padding:12px');
+}
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
