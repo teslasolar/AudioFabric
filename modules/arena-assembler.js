@@ -49,7 +49,8 @@ const MODULE_CATALOG = {
   'voice-code':     { path: './modules/voice-code.js',           import: 'VoiceCode',      init: "VoiceCode.init({ position: %%VCODE_POS%% });", default: { VCODE_POS: '[-2,2,-3]' } },
   'voice-api':      { path: './modules/voice-api.js',            import: 'VoiceAPI',       init: "VoiceAPI.init({ position: %%VAPI_POS%% });", default: { VAPI_POS: '[2,2,-3]' } },
   'voice-data':     { path: './modules/voice-data.js',           import: 'VoiceData',      init: "VoiceData.init({ position: %%VDATA_POS%% });", default: { VDATA_POS: '[0,0,-4]' } },
-  'voice-mcp-server': { path: './modules/voice-mcp-server.js',   import: 'VoiceMCP',       init: "VoiceMCP.init();" }
+  'voice-mcp-server': { path: './modules/voice-mcp-server.js',   import: 'VoiceMCP',       init: "VoiceMCP.init();" },
+  'recursive-cube':  { path: './modules/recursive-cube.js',      import: 'RecursiveCube',  init: "RecursiveCube.init({ position: %%RCUBE_POS%% });", default: { RCUBE_POS: '[0,2.5,-3]' } }
 };
 
 // Pre-defined arena presets
@@ -158,6 +159,11 @@ export const PRESETS = {
     title: 'Ki Arena Dream Weaver',
     modules: ['scene', 'voice', 'synths', 'resonance', 'freq-bands-12', 'dream-weaver', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 800
+  },
+  recursivecube: {
+    title: 'Ki Arena Recursive Cube',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'recursive-cube', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 1200
   },
   voicetools: {
     title: 'Ki Arena Voice Tools',
@@ -526,6 +532,10 @@ export function makeDreamWeaver(room, opts = {}) {
 
 export function makeVoiceTools(room, opts = {}) {
   return assemble({ preset: 'voicetools', room, ...opts });
+}
+
+export function makeRecursiveCube(room, opts = {}) {
+  return assemble({ preset: 'recursivecube', room, ...opts });
 }
 
 // List all available modules

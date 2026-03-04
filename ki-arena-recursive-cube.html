@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena — Recursive Cube</title>
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.7),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+
+/* Depth meter */
+#depthMeter{position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:55;
+  display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none}
+.depth-seg{width:24px;height:20px;border:1px solid #fff1;border-radius:3px;
+  background:rgba(0,40,0,0.3);transition:background 0.3s,border-color 0.3s}
+.depth-seg.lit{background:rgba(0,255,100,0.3);border-color:#0f06}
+.depth-seg.active{background:rgba(0,255,100,0.6);border-color:#0f0;
+  box-shadow:0 0 8px rgba(0,255,0,0.4)}
+#depthLabel{font-size:9px;color:#0f0;margin-top:4px}
+#depthNum{font-size:22px;color:#0f0;text-shadow:0 0 12px #0f0;font-weight:bold}
+
+/* Pattern display */
+#patternHUD{position:fixed;left:50px;top:50%;transform:translateY(-50%);z-index:55;
+  pointer-events:none}
+#patternName{font-size:11px;color:#4af;text-transform:uppercase}
+#cubeCount{font-size:10px;color:#888}
+#resonanceScore{font-size:10px;color:#0ff}
+
+/* Side tools panel */
+#sideTools{position:fixed;right:12px;top:80px;z-index:55;width:200px;
+  display:flex;flex-direction:column;gap:8px;pointer-events:auto}
+.tool-card{background:rgba(0,0,0,0.7);border:1px solid #fff1;border-radius:6px;
+  padding:8px;font-size:10px;color:#aaa;cursor:pointer;transition:border-color 0.2s}
+.tool-card:hover{border-color:#0f04}
+.tool-card.active{border-color:#0f0}
+.tool-title{font-size:9px;color:#0f0;text-transform:uppercase;margin-bottom:4px;letter-spacing:1px}
+
+/* Harmonic spectrum bars */
+#harmonicViz{display:flex;gap:1px;align-items:flex-end;height:40px}
+.h-bar{width:10px;background:#0f04;border-radius:2px 2px 0 0;transition:height 0.1s}
+
+/* Timeline sparkline */
+#timelineCanvas{width:100%;height:30px;background:#0001;border-radius:3px}
+
+/* Palette swatches */
+#paletteViz{display:flex;gap:3px;flex-wrap:wrap}
+.swatch{width:18px;height:18px;border-radius:3px;border:1px solid #fff2;
+  cursor:pointer;transition:transform 0.15s}
+.swatch:hover{transform:scale(1.3)}
+
+/* Trainer */
+#trainerViz{text-align:center}
+#trainerFreq{font-size:16px;color:#ff0;text-shadow:0 0 8px #f80}
+#trainerBar{width:100%;height:6px;background:#111;border-radius:3px;margin:4px 0;overflow:hidden}
+#trainerFill{height:100%;width:0%;border-radius:3px;transition:width 0.15s,background 0.3s}
+#trainerLabel{font-size:9px;color:#666}
+
+/* Export button */
+#exportBtn{background:rgba(0,60,0,0.5);border:1px solid #0f03;border-radius:4px;
+  padding:4px 10px;font-size:9px;color:#0f0;cursor:pointer;font-family:'Courier New',monospace;
+  text-align:center;transition:background 0.2s}
+#exportBtn:hover{background:rgba(0,100,0,0.5)}
+
+/* Resonance flash */
+#resoFlash{position:fixed;inset:0;z-index:45;pointer-events:none;
+  background:radial-gradient(circle,rgba(0,255,100,0.1),transparent 70%);opacity:0;transition:opacity 0.5s}
+#resoFlash.show{opacity:1}
+
+/* Depth announce */
+#depthAnnounce{position:fixed;top:35%;left:50%;transform:translate(-50%,-50%);z-index:60;
+  font-size:48px;color:#0f0;text-shadow:0 0 30px #0f0,0 0 60px #0f08;
+  opacity:0;transition:opacity 0.3s;pointer-events:none;text-align:center}
+#depthAnnounce.show{opacity:1}
+#depthSub{font-size:14px;color:#0ff;text-shadow:0 0 10px #08f}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l">
+    <div style="font-size:12px;color:#0f0">RECURSIVE CUBE</div>
+    <div id="resonanceScore" style="font-size:10px;color:#0ff">Resonance: 0%</div>
+  </div>
+  <div class="hud-r">
+    <div id="nick" onclick="changeNick()"></div>
+    <div id="cubeCount" style="font-size:10px;color:#888">0 cubes</div>
+  </div>
+</div>
+
+<!-- Depth meter (left side, vertical) -->
+<div id="depthMeter">
+  <div id="depthNum">0</div>
+  <div class="depth-seg" id="ds6"></div>
+  <div class="depth-seg" id="ds5"></div>
+  <div class="depth-seg" id="ds4"></div>
+  <div class="depth-seg" id="ds3"></div>
+  <div class="depth-seg" id="ds2"></div>
+  <div class="depth-seg" id="ds1"></div>
+  <div class="depth-seg" id="ds0"></div>
+  <div id="depthLabel">DEPTH</div>
+  <div id="patternName" style="font-size:9px;color:#4af;margin-top:6px">uniform</div>
+</div>
+
+<!-- Side tools -->
+<div id="sideTools">
+  <!-- Harmonic Spectrum -->
+  <div class="tool-card active" id="harmonicCard">
+    <div class="tool-title">Harmonic Spectrum</div>
+    <div id="harmonicViz"></div>
+  </div>
+
+  <!-- Recursion Timeline -->
+  <div class="tool-card" id="timelineCard">
+    <div class="tool-title">Recursion Timeline</div>
+    <canvas id="timelineCanvas" width="180" height="30"></canvas>
+  </div>
+
+  <!-- Color Palette -->
+  <div class="tool-card" id="paletteCard">
+    <div class="tool-title">Cube Palette</div>
+    <div id="paletteViz"></div>
+  </div>
+
+  <!-- Resonance Trainer -->
+  <div class="tool-card" id="trainerCard" onclick="toggleTrainer()">
+    <div class="tool-title">Resonance Trainer <span id="trainerToggle" style="color:#666">[OFF]</span></div>
+    <div id="trainerViz">
+      <div id="trainerFreq">—</div>
+      <div id="trainerBar"><div id="trainerFill"></div></div>
+      <div id="trainerLabel">Sing the target frequency</div>
+    </div>
+  </div>
+
+  <!-- Geometry Export -->
+  <div id="exportBtn" onclick="exportGeo()">EXPORT GEOMETRY JSON</div>
+</div>
+
+<div id="resoFlash"></div>
+<div id="depthAnnounce"><span id="depthAnnounceNum"></span><br><span id="depthSub"></span></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+import { KI } from './modules/core.js';
+import * as Scene from './modules/scene.js';
+import * as VoiceEngine from './modules/voice-engine.js';
+import * as FreqBands from './modules/freq-bands-12.js';
+import * as Synths from './modules/synths.js';
+import * as Resonance from './modules/resonance.js';
+import * as RecursiveCube from './modules/recursive-cube.js';
+import * as MqttNet from './modules/mqtt-net.js';
+import * as WebRTCNet from './modules/webrtc-net.js';
+import * as Presence from './modules/presence.js';
+import * as Chat from './modules/chat.js';
+import * as PlayerProfile from './modules/player-profile.js';
+import * as NavOverlay from './modules/nav-overlay.js';
+
+const ROOM = 'RCUBE-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+KI.player.name = KI.genHash();
+document.getElementById('nick').textContent = KI.player.name;
+
+window.changeNick = function() {
+  const n = prompt('Nickname:', KI.player.name);
+  if (n && n.trim()) {
+    KI.player.name = n.trim().slice(0, 16);
+    document.getElementById('nick').textContent = KI.player.name;
+  }
+};
+
+// ── Build harmonic bars ──
+const harmonicViz = document.getElementById('harmonicViz');
+for (let i = 0; i < 16; i++) {
+  const bar = document.createElement('div');
+  bar.className = 'h-bar';
+  bar.id = 'hbar-' + i;
+  bar.style.height = '2px';
+  bar.title = `Harmonic ${i + 1}`;
+  harmonicViz.appendChild(bar);
+}
+
+// ── Timeline canvas ──
+const tlCanvas = document.getElementById('timelineCanvas');
+const tlCtx = tlCanvas.getContext('2d');
+
+// ── Trainer toggle ──
+window.toggleTrainer = function() {
+  const rc = KI.get('recursive-cube');
+  if (rc) rc.toggleTrainer();
+};
+
+// ── Export ──
+window.exportGeo = function() {
+  const rc = KI.get('recursive-cube');
+  if (!rc) return;
+  const data = rc.exportGeometry();
+  const json = JSON.stringify(data, null, 2);
+  navigator.clipboard.writeText(json).then(() => {
+    document.getElementById('exportBtn').textContent = 'COPIED!';
+    setTimeout(() => { document.getElementById('exportBtn').textContent = 'EXPORT GEOMETRY JSON'; }, 2000);
+  }).catch(() => {
+    console.log('Geometry export:', json);
+    document.getElementById('exportBtn').textContent = 'LOGGED TO CONSOLE';
+    setTimeout(() => { document.getElementById('exportBtn').textContent = 'EXPORT GEOMETRY JSON'; }, 2000);
+  });
+};
+
+// ── Depth announcements ──
+let lastAnnouncedDepth = -1;
+let depthAnnounceTimer = null;
+const DEPTH_NAMES = ['Seed', 'Sprout', 'Branch', 'Fractal', 'Labyrinth', 'Infinite', 'Singularity'];
+
+function announceDepth(depth) {
+  if (depth === lastAnnouncedDepth) return;
+  lastAnnouncedDepth = depth;
+  const el = document.getElementById('depthAnnounce');
+  document.getElementById('depthAnnounceNum').textContent = DEPTH_NAMES[depth] || `Depth ${depth}`;
+  document.getElementById('depthSub').textContent = `Level ${depth} — ${Math.pow(8, depth)} potential cubes`;
+  el.classList.add('show');
+  clearTimeout(depthAnnounceTimer);
+  depthAnnounceTimer = setTimeout(() => el.classList.remove('show'), 2500);
+
+  // Flash
+  const flash = document.getElementById('resoFlash');
+  flash.classList.add('show');
+  setTimeout(() => flash.classList.remove('show'), 800);
+}
+
+// ── Main update from recursive-cube ──
+KI.on('recursive-cube:update', data => {
+  // Depth meter
+  document.getElementById('depthNum').textContent = data.depth;
+  for (let i = 0; i <= 6; i++) {
+    const seg = document.getElementById('ds' + i);
+    seg.classList.toggle('lit', i <= data.depth);
+    seg.classList.toggle('active', i === data.depth);
+  }
+
+  // HUD
+  document.getElementById('cubeCount').textContent = data.activeCubes + ' cubes / ' + data.activeEdges + ' edges';
+  document.getElementById('resonanceScore').textContent = 'Resonance: ' + Math.round(data.resonanceScore * 100) + '%';
+  document.getElementById('patternName').textContent = data.pattern;
+
+  // Announce depth changes
+  announceDepth(data.depth);
+
+  // ── Harmonic spectrum bars ──
+  const harmonics = data.harmonics || [];
+  for (let i = 0; i < 16; i++) {
+    const bar = document.getElementById('hbar-' + i);
+    if (bar) {
+      const h = Math.min(40, (harmonics[i] || 0) * 40);
+      bar.style.height = Math.max(2, h) + 'px';
+      const hue = 120 + i * 15;
+      bar.style.background = `hsl(${hue}, 70%, ${30 + (harmonics[i]||0)*40}%)`;
+    }
+  }
+
+  // ── Timeline sparkline ──
+  const rc = KI.get('recursive-cube');
+  if (rc && tlCtx) {
+    const tl = rc.getTimeline();
+    tlCtx.clearRect(0, 0, 180, 30);
+    tlCtx.strokeStyle = '#0f0';
+    tlCtx.lineWidth = 1;
+    tlCtx.beginPath();
+    for (let i = 0; i < tl.length; i++) {
+      const x = (i / tl.length) * 180;
+      const y = 30 - tl[i] * 28;
+      if (i === 0) tlCtx.moveTo(x, y);
+      else tlCtx.lineTo(x, y);
+    }
+    tlCtx.stroke();
+
+    // Depth zones
+    tlCtx.globalAlpha = 0.1;
+    for (let d = 1; d <= 6; d++) {
+      const y = 30 - (d / 6) * 28;
+      tlCtx.strokeStyle = '#fff';
+      tlCtx.beginPath();
+      tlCtx.moveTo(0, y);
+      tlCtx.lineTo(180, y);
+      tlCtx.stroke();
+    }
+    tlCtx.globalAlpha = 1;
+  }
+
+  // ── Palette swatches ──
+  const palette = data.palette || [];
+  const palEl = document.getElementById('paletteViz');
+  // Only rebuild if count changed
+  if (palEl.children.length !== palette.length) {
+    palEl.innerHTML = '';
+    palette.forEach((hex, i) => {
+      const sw = document.createElement('div');
+      sw.className = 'swatch';
+      sw.style.background = hex;
+      sw.title = hex;
+      sw.onclick = () => {
+        navigator.clipboard.writeText(hex).catch(() => {});
+        sw.style.transform = 'scale(1.5)';
+        setTimeout(() => sw.style.transform = '', 300);
+      };
+      palEl.appendChild(sw);
+    });
+  } else {
+    for (let i = 0; i < palette.length; i++) {
+      if (palEl.children[i]) {
+        palEl.children[i].style.background = palette[i];
+        palEl.children[i].title = palette[i];
+      }
+    }
+  }
+
+  // ── Resonance Trainer ──
+  const trainer = data.trainer;
+  if (trainer) {
+    const isOn = trainer.active === true || trainer.active === 'true';
+    document.getElementById('trainerToggle').textContent = isOn ? '[ON]' : '[OFF]';
+    document.getElementById('trainerToggle').style.color = isOn ? '#0f0' : '#666';
+
+    if (isOn) {
+      document.getElementById('trainerFreq').textContent = trainer.target + ' Hz';
+      const acc = parseFloat(trainer.accuracy) * 100;
+      document.getElementById('trainerFill').style.width = acc + '%';
+      const accColor = acc > 80 ? '#0f0' : acc > 50 ? '#ff0' : '#f44';
+      document.getElementById('trainerFill').style.background = accColor;
+      document.getElementById('trainerLabel').textContent =
+        acc > 80 ? 'Excellent resonance!' :
+        acc > 50 ? 'Getting closer...' :
+        acc > 20 ? 'Keep adjusting pitch' : 'Sing the target frequency';
+    } else {
+      document.getElementById('trainerFreq').textContent = '—';
+      document.getElementById('trainerFill').style.width = '0%';
+      document.getElementById('trainerLabel').textContent = 'Click to enable';
+    }
+  }
+});
+
+// ── Trainer target change ──
+KI.on('recursive-cube:trainer-target', data => {
+  const el = document.getElementById('trainerFreq');
+  el.style.transform = 'scale(1.3)';
+  setTimeout(() => el.style.transform = '', 300);
+});
+
+async function boot() {
+  document.getElementById('hud').classList.add('on');
+  Scene.init({ stars: 1200 });
+  try { await VoiceEngine.init(); } catch(e) { console.warn('voice:', e); }
+  FreqBands.init();
+  Synths.init();
+  Resonance.init();
+  RecursiveCube.init({ position: [0, 2.5, -3] });
+  MqttNet.init({ room: ROOM });
+  WebRTCNet.init({ room: ROOM });
+  Presence.init();
+  Chat.init();
+  PlayerProfile.init();
+  NavOverlay.init();
+
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    KI.renderer.render(KI.scene, KI.camera);
+  })();
+  console.log('%c RECURSIVE CUBE BOOTED ', 'background:#000;color:#0f0;font-size:22px;padding:12px;text-shadow:0 0 20px #0f0');
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
