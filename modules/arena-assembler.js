@@ -37,7 +37,8 @@ const MODULE_CATALOG = {
   'sound-landscape':{ path: './modules/sound-landscape.js',   import: 'SoundLandscape', init: "SoundLandscape.init({ position: %%LANDSCAPE_POS%%, scale: %%LANDSCAPE_SCALE%% });", default: { LANDSCAPE_POS: '[0,0.5,5]', LANDSCAPE_SCALE: 0.9 } },
   'wrapped-geo':    { path: './modules/wrapped-geo.js',       import: 'WrappedGeo',     init: "WrappedGeo.init({ position: %%WRAPPED_POS%%, scale: %%WRAPPED_SCALE%% });", default: { WRAPPED_POS: '[0,3.5,-1]', WRAPPED_SCALE: 1.5 } },
   'voxel-wormhole': { path: './modules/voxel-wormhole.js',    import: 'VoxelWormhole',  init: "VoxelWormhole.init({ position: %%VOXEL_POS%%, scale: %%VOXEL_SCALE%% });", default: { VOXEL_POS: '[0,0.5,-3]', VOXEL_SCALE: 1.2 } },
-  'genesis':        { path: './modules/genesis.js',            import: 'Genesis',        init: "Genesis.init({ position: %%GENESIS_POS%%, scale: %%GENESIS_SCALE%% });", default: { GENESIS_POS: '[0,3,-2]', GENESIS_SCALE: 1.5 } }
+  'genesis':        { path: './modules/genesis.js',            import: 'Genesis',        init: "Genesis.init({ position: %%GENESIS_POS%%, scale: %%GENESIS_SCALE%% });", default: { GENESIS_POS: '[0,3,-2]', GENESIS_SCALE: 1.5 } },
+  'voxel-world':    { path: './modules/voxel-world.js',        import: 'VoxelWorld',     init: "VoxelWorld.init({ position: %%VOXWORLD_POS%% });", default: { VOXWORLD_POS: '[0,0.5,-3]' } }
 };
 
 // Pre-defined arena presets
@@ -121,6 +122,11 @@ export const PRESETS = {
     title: 'Ki Arena Genesis',
     modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'fx', 'synths', 'resonance', 'freq-bands-12', 'genesis', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 5000, VORTEX_COUNT: 800, AURORA: true
+  },
+  voxelcraft: {
+    title: 'Ki Arena Voxel Craft',
+    modules: ['scene', 'voice', 'kanji', 'ki-blasts', 'vortex', 'fx', 'synths', 'resonance', 'freq-bands-12', 'geo-folder', 'voxel-world', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 4000, VORTEX_COUNT: 600, AURORA: true, GEO_POS: '[0,6,-5]', GEO_SCALE: 1.0
   }
 };
 
@@ -455,6 +461,10 @@ export function makeVoxelWormhole(room, opts = {}) {
 
 export function makeGenesis(room, opts = {}) {
   return assemble({ preset: 'genesis', room, ...opts });
+}
+
+export function makeVoxelCraft(room, opts = {}) {
+  return assemble({ preset: 'voxelcraft', room, ...opts });
 }
 
 // List all available modules

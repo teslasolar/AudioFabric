@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena — Voxel Craft</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.6),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#score{font-size:28px;color:#ff0;text-shadow:0 0 10px #f80}
+#combo{font-size:16px;color:#f80}
+#blastType{font-size:14px;color:#4af}
+#charge{font-size:12px;color:#0f0}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#room{font-size:11px;color:#0ff}
+
+/* Voxel Craft HUD */
+#craftHUD{position:fixed;left:16px;bottom:16px;z-index:55;pointer-events:none}
+#blockType{font-size:14px;color:#0f8;text-shadow:0 0 8px #0f8}
+#buildModeLabel{font-size:11px;color:#ff0;margin-top:2px}
+#cursorInfo{font-size:10px;color:#888;margin-top:2px}
+#llmStatus{font-size:9px;color:#555;margin-top:4px}
+
+/* Command response */
+#cmdResponse{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);z-index:70;
+  text-align:center;opacity:0;transition:opacity 0.5s;pointer-events:none;
+  font-size:24px;font-weight:bold;letter-spacing:3px;text-transform:uppercase;
+  text-shadow:0 0 20px rgba(0,255,136,0.6)}
+#cmdResponse.show{opacity:1}
+
+/* Speech transcript */
+#transcript{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:55;
+  text-align:center;pointer-events:none;font-size:12px;color:#fff6;
+  max-width:500px;background:rgba(0,0,0,0.5);border-radius:8px;padding:4px 12px;
+  opacity:0;transition:opacity 0.3s}
+#transcript.show{opacity:1}
+
+/* 12-band */
+#bandViz{position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:55;
+  display:flex;gap:3px;pointer-events:none;align-items:flex-end;height:36px}
+.band-bar{width:10px;background:#0a0a0a;border:1px solid #fff1;border-radius:3px 3px 0 0;
+  position:relative;overflow:hidden;height:36px}
+.band-fill{position:absolute;bottom:0;left:0;right:0;border-radius:2px;transition:height 0.08s}
+
+/* Block palette */
+#palette{position:fixed;right:16px;bottom:16px;z-index:55;pointer-events:none;
+  display:flex;flex-direction:column;gap:3px;align-items:flex-end}
+.pal-block{width:20px;height:20px;border:1px solid #fff2;border-radius:3px;
+  display:inline-flex;align-items:center;justify-content:center;font-size:7px;color:#fffa}
+.pal-block.active{border-color:#0f8;box-shadow:0 0 6px #0f8}
+
+/* Weather indicator */
+#weatherHUD{position:fixed;right:16px;top:60px;z-index:55;pointer-events:none;
+  font-size:10px;color:#888}
+
+#dmgLayer{position:fixed;inset:0;z-index:60;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 8px currentColor;
+  animation:dmgUp 1.2s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-120px) scale(1.8)}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l"><div id="score">0</div><div id="combo"></div><div id="blastType">&mdash;</div><div id="charge"></div></div>
+  <div class="hud-r"><div id="nick" onclick="changeNick()"></div><div id="room"></div></div>
+</div>
+<div id="craftHUD">
+  <div id="blockType">GRASS</div>
+  <div id="buildModeLabel">BUILD MODE</div>
+  <div id="cursorInfo">16, 4, 16</div>
+  <div id="llmStatus"></div>
+</div>
+<div id="cmdResponse"></div>
+<div id="transcript"></div>
+<div id="bandViz"></div>
+<div id="palette"></div>
+<div id="weatherHUD"></div>
+<div id="dmgLayer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+import { KI } from './modules/core.js';
+import * as Scene from './modules/scene.js';
+import * as VoiceEngine from './modules/voice-engine.js';
+import * as Kanji from './modules/kanji.js';
+import * as KiBlasts from './modules/ki-blasts.js';
+import * as Vortex from './modules/vortex.js';
+import * as FX from './modules/fx.js';
+import * as Synths from './modules/synths.js';
+import * as Resonance from './modules/resonance.js';
+import * as FreqBands from './modules/freq-bands-12.js';
+import * as GeoFolder from './modules/geo-folder.js';
+import * as VoxelWorld from './modules/voxel-world.js';
+import * as MqttNet from './modules/mqtt-net.js';
+import * as WebRTCNet from './modules/webrtc-net.js';
+import * as Presence from './modules/presence.js';
+import * as Chat from './modules/chat.js';
+
+const ROOM = 'VOXCRAFT-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+KI.player.name = KI.genHash();
+document.getElementById('nick').textContent = KI.player.name;
+document.getElementById('room').textContent = ROOM;
+
+window.changeNick = function() {
+  const n = prompt('Nickname:', KI.player.name);
+  if (n && n.trim()) {
+    KI.player.name = n.trim().slice(0, 16);
+    document.getElementById('nick').textContent = KI.player.name;
+  }
+};
+
+KI.on('hit', data => {
+  document.getElementById('score').textContent = KI.player.score.toLocaleString();
+  document.getElementById('combo').textContent = KI.player.combo > 1 ? KI.player.combo + 'x COMBO' : '';
+  if (data.dmg > 200) {
+    const el = document.createElement('div'); el.className = 'dmg';
+    el.textContent = Math.round(data.dmg); el.style.color = '#ff0';
+    el.style.fontSize = (18 + Math.min(data.dmg / 10, 30)) + 'px';
+    el.style.left = (innerWidth/2 + (Math.random()-0.5)*200) + 'px';
+    el.style.top = (innerHeight/2 + (Math.random()-0.5)*60) + 'px';
+    document.getElementById('dmgLayer').appendChild(el);
+    setTimeout(() => el.remove(), 1200);
+  }
+});
+KI.on('charge:update', data => {
+  document.getElementById('blastType').textContent = data.blastType?.name || '';
+  document.getElementById('charge').textContent = data.chargeLevel > 0.05 ? 'CHARGE ' + Math.round(data.chargeLevel*100) + '%' : '';
+});
+
+// 12-band viz
+KI.on('freq-bands-12:ready', () => {
+  const cont = document.getElementById('bandViz');
+  const fb = KI.get('freq-bands-12');
+  if (!fb) return;
+  fb.BANDS.forEach((band, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'band-bar'; bar.id = 'band-' + i;
+    bar.innerHTML = '<div class="band-fill" style="background:' + band.color + ';height:0%"></div>';
+    cont.appendChild(bar);
+  });
+});
+KI.on('freq-bands-12:update', data => {
+  for (let i = 0; i < 12; i++) {
+    const fill = document.querySelector('#band-' + i + ' .band-fill');
+    if (fill) fill.style.height = (data.energy[i] * 100) + '%';
+  }
+});
+
+// Geo tier
+KI.on('geo-folder:tier-change', data => {
+  // No separate tier HUD needed — it's embedded in the voxel world context
+});
+
+// === Voxel World HUD ===
+const BLOCK_COLORS = {
+  dirt: '#6b4226', grass: '#4a8c3f', stone: '#808080', sand: '#e6d291',
+  water: '#2288dd', lava: '#ff4400', wood: '#8b5e3c', leaf: '#55bb55',
+  crystal: '#aa44ff', gold: '#ffcc00', obsidian: '#332244'
+};
+
+// Build palette
+const palEl = document.getElementById('palette');
+for (const [name, color] of Object.entries(BLOCK_COLORS)) {
+  const el = document.createElement('div');
+  el.className = 'pal-block';
+  el.style.background = color;
+  el.textContent = name.slice(0, 3).toUpperCase();
+  el.dataset.block = name;
+  palEl.appendChild(el);
+}
+
+// Update craft HUD every frame via event
+let lastBlock = '', lastMode = '';
+setInterval(() => {
+  const vw = KI.get('voxel-world');
+  if (!vw) return;
+  const st = vw.state;
+  const block = st.selectedBlock || 'grass';
+  const mode = st.buildMode || 'place';
+
+  if (block !== lastBlock) {
+    document.getElementById('blockType').textContent = block.toUpperCase();
+    document.getElementById('blockType').style.color = BLOCK_COLORS[block] || '#0f8';
+    lastBlock = block;
+    // Update palette highlight
+    palEl.querySelectorAll('.pal-block').forEach(el => {
+      el.classList.toggle('active', el.dataset.block === block);
+    });
+  }
+  if (mode !== lastMode) {
+    const labels = { place: 'BUILD MODE', destroy: 'DESTROY MODE', terraform: 'TERRAFORM MODE' };
+    const colors = { place: '#0f8', destroy: '#f44', terraform: '#fa0' };
+    document.getElementById('buildModeLabel').textContent = labels[mode] || mode;
+    document.getElementById('buildModeLabel').style.color = colors[mode] || '#ff0';
+    lastMode = mode;
+  }
+  document.getElementById('cursorInfo').textContent =
+    st.cursorX + ', ' + st.cursorY + ', ' + st.cursorZ;
+}, 100);
+
+// Command responses
+let cmdTimer = null;
+KI.on('voxel-world:response', data => {
+  const el = document.getElementById('cmdResponse');
+  el.textContent = data.text;
+  el.classList.add('show');
+  clearTimeout(cmdTimer);
+  cmdTimer = setTimeout(() => el.classList.remove('show'), 2500);
+
+  // Show transcript
+  const tr = document.getElementById('transcript');
+  tr.textContent = '"' + data.command + '"';
+  tr.classList.add('show');
+  setTimeout(() => tr.classList.remove('show'), 3000);
+});
+
+KI.on('voxel-world:command', data => {
+  const tr = document.getElementById('transcript');
+  tr.textContent = '> ' + data.command;
+  tr.classList.add('show');
+  setTimeout(() => tr.classList.remove('show'), 2000);
+});
+
+// LLM status
+KI.on('voxel-world:llm-ready', () => {
+  document.getElementById('llmStatus').textContent = 'LLM READY';
+  document.getElementById('llmStatus').style.color = '#0f8';
+  setTimeout(() => { document.getElementById('llmStatus').style.color = '#555'; }, 3000);
+});
+KI.on('voxel-world:speech-ready', () => {
+  document.getElementById('llmStatus').textContent = 'SPEECH ON';
+  document.getElementById('llmStatus').style.color = '#4af';
+});
+
+// Weather
+KI.on('voxel-world:weather', data => {
+  const labels = { none: '', rain: 'RAIN', snow: 'SNOW', 'lava-rain': 'LAVA RAIN' };
+  document.getElementById('weatherHUD').textContent = labels[data.type] || '';
+});
+
+// Place/destroy events
+KI.on('voxel-world:place', data => {
+  const el = document.createElement('div'); el.className = 'dmg';
+  el.textContent = '+' + data.type; el.style.color = BLOCK_COLORS[data.type] || '#0f8';
+  el.style.fontSize = '14px';
+  el.style.left = (innerWidth/2 + (Math.random()-0.5)*100) + 'px';
+  el.style.top = (innerHeight/2 + 20) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+});
+
+async function boot() {
+  document.getElementById('hud').classList.add('on');
+  Scene.init({ stars: 4000 });
+  try { await VoiceEngine.init(); } catch(e) { console.warn('voice:', e); }
+  Kanji.init();
+  KiBlasts.init();
+  Vortex.init({ count: 600, particleSize: 0.07 });
+  FX.init({ aurora: true });
+  Synths.init();
+  Resonance.init();
+  FreqBands.init();
+  GeoFolder.init({ position: [0, 6, -5], scale: 1.0 });
+  VoxelWorld.init({ position: [0, 0.5, -3] });
+  MqttNet.init({ room: ROOM });
+  WebRTCNet.init({ room: ROOM });
+  Presence.init();
+  Chat.init();
+
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    KI.renderer.render(KI.scene, KI.camera);
+  })();
+  console.log('%c VOXEL CRAFT BOOTED ', 'background:#000;color:#0f8;font-size:22px;padding:12px;text-shadow:0 0 20px #0f8');
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
