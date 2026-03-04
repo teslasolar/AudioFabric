@@ -50,7 +50,12 @@ const MODULE_CATALOG = {
   'voice-api':      { path: './modules/voice-api.js',            import: 'VoiceAPI',       init: "VoiceAPI.init({ position: %%VAPI_POS%% });", default: { VAPI_POS: '[2,2,-3]' } },
   'voice-data':     { path: './modules/voice-data.js',           import: 'VoiceData',      init: "VoiceData.init({ position: %%VDATA_POS%% });", default: { VDATA_POS: '[0,0,-4]' } },
   'voice-mcp-server': { path: './modules/voice-mcp-server.js',   import: 'VoiceMCP',       init: "VoiceMCP.init();" },
-  'recursive-cube':  { path: './modules/recursive-cube.js',      import: 'RecursiveCube',  init: "RecursiveCube.init({ position: %%RCUBE_POS%% });", default: { RCUBE_POS: '[0,2.5,-3]' } }
+  'recursive-cube':  { path: './modules/recursive-cube.js',      import: 'RecursiveCube',  init: "RecursiveCube.init({ position: %%RCUBE_POS%% });", default: { RCUBE_POS: '[0,2.5,-3]' } },
+  'topology-morpher':{ path: './modules/topology-morpher.js',    import: 'TopologyMorpher', init: "TopologyMorpher.init({ position: %%TOPO_POS%% });", default: { TOPO_POS: '[0,2.5,-4]' } },
+  'neural-cascade':  { path: './modules/neural-cascade.js',      import: 'NeuralCascade',  init: "NeuralCascade.init({ position: %%NEURO_POS%% });", default: { NEURO_POS: '[0,2,-3]' } },
+  'dimensional-slicer':{ path: './modules/dimensional-slicer.js', import: 'DimensionalSlicer', init: "DimensionalSlicer.init({ position: %%DIM4_POS%% });", default: { DIM4_POS: '[0,2.5,-4]' } },
+  'liquid-symmetry': { path: './modules/liquid-symmetry.js',      import: 'LiquidSymmetry', init: "LiquidSymmetry.init({ position: %%CYMTC_POS%% });", default: { CYMTC_POS: '[0,1.5,-3]' } },
+  'void-lattice':    { path: './modules/void-lattice.js',         import: 'VoidLattice',    init: "VoidLattice.init({ position: %%VLAT_POS%% });", default: { VLAT_POS: '[0,0,-2]' } }
 };
 
 // Pre-defined arena presets
@@ -164,6 +169,31 @@ export const PRESETS = {
     title: 'Ki Arena Recursive Cube',
     modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'recursive-cube', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 1200
+  },
+  topology: {
+    title: 'Ki Arena Topology Morpher',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'topology-morpher', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 2000
+  },
+  neuralcascade: {
+    title: 'Ki Arena Neural Cascade',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'neural-cascade', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 800
+  },
+  dimensionalslicer: {
+    title: 'Ki Arena Dimensional Slicer',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'dimensional-slicer', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 1500
+  },
+  liquidsymmetry: {
+    title: 'Ki Arena Liquid Symmetry',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'liquid-symmetry', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 600
+  },
+  voidlattice: {
+    title: 'Ki Arena Void Lattice',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'void-lattice', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 400
   },
   voicetools: {
     title: 'Ki Arena Voice Tools',
@@ -536,6 +566,26 @@ export function makeVoiceTools(room, opts = {}) {
 
 export function makeRecursiveCube(room, opts = {}) {
   return assemble({ preset: 'recursivecube', room, ...opts });
+}
+
+export function makeTopology(room, opts = {}) {
+  return assemble({ preset: 'topology', room, ...opts });
+}
+
+export function makeNeuralCascade(room, opts = {}) {
+  return assemble({ preset: 'neuralcascade', room, ...opts });
+}
+
+export function makeDimensionalSlicer(room, opts = {}) {
+  return assemble({ preset: 'dimensionalslicer', room, ...opts });
+}
+
+export function makeLiquidSymmetry(room, opts = {}) {
+  return assemble({ preset: 'liquidsymmetry', room, ...opts });
+}
+
+export function makeVoidLattice(room, opts = {}) {
+  return assemble({ preset: 'voidlattice', room, ...opts });
 }
 
 // List all available modules
