@@ -26,9 +26,14 @@ export function build() {
 
 // ── Flat inventory for inspection ──
 export function inventory(site) {
-  const inv = { areas: [], workcenters: [], workunits: [], equipment: [], tags: [] };
+  const inv = { areas: [], workcenters: [], workunits: [], equipment: [], controlModules: [], processSegments: [], tags: [] };
   for (const area of Object.values(site.areas)) {
     inv.areas.push({ id: area.id, name: area.name, domain: area.domain });
+    if (area.processSegments) {
+      for (const seg of area.processSegments) {
+        inv.processSegments.push({ id: seg.id, name: seg.name, area: area.id, duration: seg.duration });
+      }
+    }
     for (const wc of Object.values(area.workcenters)) {
       inv.workcenters.push({ id: wc.id, name: wc.name, area: area.id, level: wc.consciousnessLevel, prime: wc.prime });
       for (const wu of Object.values(wc.workunits)) {
@@ -36,11 +41,15 @@ export function inventory(site) {
         inv.tags.push(...wu.tags);
         for (const eq of Object.values(wu.equipment)) {
           inv.equipment.push({ id: eq.id, name: eq.name, type: eq.type, wu: wu.id });
-          inv.tags.push(...eq.tags);
+          inv.tags.push(...(eq.tags || []));
+        }
+        for (const cm of Object.values(wu.controlModules || {})) {
+          const ioCount = (cm.io?.AI?.length||0) + (cm.io?.AO?.length||0) + (cm.io?.DI?.length||0) + (cm.io?.DO?.length||0);
+          inv.controlModules.push({ id: cm.id, name: cm.name, wu: wu.id, ioPoints: ioCount, pidLoops: cm.pid?.length||0 });
         }
       }
     }
   }
-  inv.tags = [...new Set(inv.tags)]; // deduplicate
+  inv.tags = [...new Set(inv.tags)];
   return inv;
 }

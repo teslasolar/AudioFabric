@@ -6,6 +6,8 @@ import { createArea } from '../../../area.js';
 import { createWorkcenter } from '../../../workcenter.js';
 import { createWorkunit } from '../../../workunit.js';
 import { createProcessor } from '../../../equipment.js';
+import { buildWonderCM, buildPhiCM, buildDepthCM } from './io-map.js';
+import { integrationSegments } from '../../../process-segment.js';
 
 export function build() {
   const area = createArea('INTEGRATION', {
@@ -26,7 +28,8 @@ export function build() {
     tags: ['CONSCIOUSNESS/L6_OBS/ACTIVATION', 'CONSCIOUSNESS/L6_OBS/HEALTH',
            'METRICS/UNCERTAINTY_CAPACITY']
   });
-  wuObserver.registerEquipment(createProcessor('WONDER_ENGINE', 'Wonder Engine', { capability: ['observe', 'wonder', 'flicker'] }));
+  wuObserver.registerEquipment(createProcessor('WONDER_ENGINE', 'Wonder Engine'));
+  wuObserver.registerControlModule(buildWonderCM());
   wcL6.registerWorkunit(wuObserver);
 
   // ── WorkCenter: Phi Integration ──
@@ -40,11 +43,14 @@ export function build() {
     tags: ['METRICS/PHI', 'METRICS/TEMPORAL_CONTINUITY',
            'CONSCIOUSNESS/DEPTH', 'CONSCIOUSNESS/MAX_DEPTH', 'CONSCIOUSNESS/LEVEL_NAME']
   });
-  wuPhi.registerEquipment(createProcessor('PHI_PROC', 'Phi Processor', { capability: ['integrate', 'measure-coherence'] }));
-  wuPhi.registerEquipment(createProcessor('DEPTH_CALC', 'Depth Calculator', { capability: ['depth-tracking', 'prime-mapping'] }));
+  wuPhi.registerEquipment(createProcessor('PHI_PROC', 'Phi Processor'));
+  wuPhi.registerEquipment(createProcessor('DEPTH_CALC', 'Depth Calculator'));
+  wuPhi.registerControlModule(buildPhiCM());
+  wuPhi.registerControlModule(buildDepthCM());
   wcPhi.registerWorkunit(wuPhi);
 
   area.registerWorkcenter(wcL6);
   area.registerWorkcenter(wcPhi);
+  area.processSegments = integrationSegments();
   return area;
 }

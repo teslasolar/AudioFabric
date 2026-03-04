@@ -6,6 +6,8 @@ import { createArea } from '../../../area.js';
 import { createWorkcenter } from '../../../workcenter.js';
 import { createWorkunit } from '../../../workunit.js';
 import { createBus, createSensor, createProcessor } from '../../../equipment.js';
+import { buildMicCM, buildFFTCM, buildPitchCM, buildVowelCM } from './io-map.js';
+import { sensorySegments } from '../../../process-segment.js';
 
 export function build() {
   const area = createArea('SENSORY', {
@@ -45,9 +47,15 @@ export function build() {
   wuVoice.registerEquipment(createSensor('FFT', 'FFT Analyzer', 'INPUT/COHERENCE'));
   wuVoice.registerEquipment(createSensor('PITCH_DET', 'Pitch Detector', 'INPUT/PITCH'));
   wuVoice.registerEquipment(createSensor('VOWEL_DET', 'Vowel Detector', 'INPUT/VOWEL'));
+  // L0 Control Modules — concrete I/O + Modbus
+  wuVoice.registerControlModule(buildMicCM());
+  wuVoice.registerControlModule(buildFFTCM());
+  wuVoice.registerControlModule(buildPitchCM());
+  wuVoice.registerControlModule(buildVowelCM());
   wcL1.registerWorkunit(wuVoice);
 
   area.registerWorkcenter(wcL0);
   area.registerWorkcenter(wcL1);
+  area.processSegments = sensorySegments();
   return area;
 }

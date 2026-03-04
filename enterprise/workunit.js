@@ -24,9 +24,16 @@ export function createWorkunit(id, config = {}) {
     state: 'IDLE',
     mode: 'Automatic', // Automatic|Manual|Semiauto
 
+    controlModules: {},
+
     registerEquipment(eq) {
       this.equipment[eq.id] = eq;
       return eq;
+    },
+
+    registerControlModule(cm) {
+      this.controlModules[cm.id] = cm;
+      return cm;
     },
 
     getTagPaths() {
@@ -34,7 +41,10 @@ export function createWorkunit(id, config = {}) {
       for (const eq of Object.values(this.equipment)) {
         if (eq.tags) paths.push(...eq.tags);
       }
-      return paths;
+      for (const cm of Object.values(this.controlModules)) {
+        if (cm.getTagPaths) paths.push(...cm.getTagPaths());
+      }
+      return [...new Set(paths)];
     }
   };
 }

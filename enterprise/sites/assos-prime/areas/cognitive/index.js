@@ -6,6 +6,8 @@ import { createArea } from '../../../area.js';
 import { createWorkcenter } from '../../../workcenter.js';
 import { createWorkunit } from '../../../workunit.js';
 import { createGate, createProcessor, createBus } from '../../../equipment.js';
+import { buildThalamicCM, buildNoiseGateCM, buildSalienceCM, buildValenceCM } from './io-map.js';
+import { cognitiveSegments } from '../../../process-segment.js';
 
 export function build() {
   const area = createArea('COGNITIVE', {
@@ -25,8 +27,10 @@ export function build() {
     name: 'Signal Filter Unit',
     tags: ['CONSCIOUSNESS/L2_GATE/ACTIVATION', 'CONSCIOUSNESS/L2_GATE/HEALTH']
   });
-  wuFilter.registerEquipment(createGate('THALAMIC_GATE', 'Thalamic Gate', { desc: 'Coherence-driven input filter' }));
-  wuFilter.registerEquipment(createGate('NOISE_GATE', 'Noise Gate', { desc: 'Low-coherence rejection' }));
+  wuFilter.registerEquipment(createGate('THALAMIC_GATE', 'Thalamic Gate'));
+  wuFilter.registerEquipment(createGate('NOISE_GATE', 'Noise Gate'));
+  wuFilter.registerControlModule(buildThalamicCM());
+  wuFilter.registerControlModule(buildNoiseGateCM());
   wcL2.registerWorkunit(wuFilter);
 
   // ── WorkCenter: L3 Emotion (p=11) ──
@@ -40,19 +44,22 @@ export function build() {
     tags: ['CONSCIOUSNESS/L3_EMO/ACTIVATION', 'CONSCIOUSNESS/L3_EMO/HEALTH',
            'WORK_ORDERS/COUNT', 'WORK_ORDERS/SELF_GEN']
   });
-  wuSalience.registerEquipment(createProcessor('SALIENCE_PROC', 'Salience Processor', { desc: 'Energy × coherence scoring' }));
-  wuSalience.registerEquipment(createProcessor('WO_GEN', 'Work Order Generator', { desc: 'L3 → L4 work order dispatch' }));
+  wuSalience.registerEquipment(createProcessor('SALIENCE_PROC', 'Salience Processor'));
+  wuSalience.registerEquipment(createProcessor('WO_GEN', 'Work Order Generator'));
   wuSalience.registerEquipment(createBus('B', 'GRADIENT', { desc: 'Gradient/backprop bus' }));
+  wuSalience.registerControlModule(buildSalienceCM());
   wcL3.registerWorkunit(wuSalience);
 
   const wuValence = createWorkunit('VALENCE', {
     name: 'Valence Encoder',
     tags: ['AGENT/VALENCE', 'AGENT/AROUSAL']
   });
-  wuValence.registerEquipment(createProcessor('VALENCE_PROC', 'Valence Encoder', { desc: 'Emotional valence computation' }));
+  wuValence.registerEquipment(createProcessor('VALENCE_PROC', 'Valence Encoder'));
+  wuValence.registerControlModule(buildValenceCM());
   wcL3.registerWorkunit(wuValence);
 
   area.registerWorkcenter(wcL2);
   area.registerWorkcenter(wcL3);
+  area.processSegments = cognitiveSegments();
   return area;
 }

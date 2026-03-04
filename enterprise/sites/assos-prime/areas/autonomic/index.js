@@ -6,6 +6,8 @@ import { createArea } from '../../../area.js';
 import { createWorkcenter } from '../../../workcenter.js';
 import { createWorkunit } from '../../../workunit.js';
 import { createProcessor, createBus } from '../../../equipment.js';
+import { buildStateCM, buildAlarmCM, buildBusBalanceCM } from './io-map.js';
+import { autonomicSegments } from '../../../process-segment.js';
 
 export function build() {
   const area = createArea('AUTONOMIC', {
@@ -25,7 +27,8 @@ export function build() {
     name: 'State Controller',
     tags: ['STATE/CURRENT', 'STATE/PREVIOUS', 'STATE/TIME', 'STATE/UPTIME', 'STATE/CYCLE_COUNT']
   });
-  wuState.registerEquipment(createProcessor('STATE_ENGINE', 'State Engine', { capability: ['transition', 'guard', 'timeout'] }));
+  wuState.registerEquipment(createProcessor('STATE_ENGINE', 'State Engine'));
+  wuState.registerControlModule(buildStateCM());
   wcState.registerWorkunit(wuState);
 
   // ── WorkCenter: Alarm Management ──
@@ -38,7 +41,8 @@ export function build() {
     name: 'Alarm Controller',
     tags: ['ALARMS/COUNT', 'ALARMS/HIGHEST']
   });
-  wuAlarm.registerEquipment(createProcessor('ALARM_ENGINE', 'Alarm Engine', { capability: ['detect', 'prioritize', 'route', 'shelve'] }));
+  wuAlarm.registerEquipment(createProcessor('ALARM_ENGINE', 'Alarm Engine'));
+  wuAlarm.registerControlModule(buildAlarmCM());
   wcAlarm.registerWorkunit(wuAlarm);
 
   // ── WorkCenter: Bus Orchestration ──
@@ -52,11 +56,13 @@ export function build() {
     tags: []
   });
   wuBusCtrl.registerEquipment(createBus('C', 'PHOTONIC', { desc: 'Photonic/visual bus' }));
-  wuBusCtrl.registerEquipment(createProcessor('BUS_BALANCE', 'Bus Balancer', { capability: ['cross-couple', 'balance', 'profile-switch'] }));
+  wuBusCtrl.registerEquipment(createProcessor('BUS_BALANCE', 'Bus Balancer'));
+  wuBusCtrl.registerControlModule(buildBusBalanceCM());
   wcBus.registerWorkunit(wuBusCtrl);
 
   area.registerWorkcenter(wcState);
   area.registerWorkcenter(wcAlarm);
   area.registerWorkcenter(wcBus);
+  area.processSegments = autonomicSegments();
   return area;
 }

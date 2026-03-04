@@ -1,7 +1,7 @@
 # AudioFabric Architecture
 
 > Auto-generated architecture document with timestamped changelog.
-> Last updated: 2026-03-04T10:30:00Z
+> Last updated: 2026-03-04T12:00:00Z
 
 ---
 
@@ -30,16 +30,29 @@ AudioFabric/
 │   ├── workcenter.js         # WorkCenter/ProcessCell factory
 │   ├── workunit.js           # WorkUnit/Unit factory (L1)
 │   ├── equipment.js          # Equipment/Module factory (L0)
-│   ├── boot.js               # Full hierarchy bootstrap
+│   ├── controlmodule.js      # ISA-88 ControlModule + EquipmentModule (L0 I/O)
+│   ├── process-segment.js    # ISA-95 ProcessSegment templates per area
+│   ├── runtime.js            # Wire hierarchy to ASS-OS runtime (update loops)
+│   ├── boot.js               # Full hierarchy bootstrap + runtime wiring
 │   └── sites/
 │       └── assos-prime/      # Primary consciousness site
 │           ├── index.js      # Site assembly + inventory
 │           └── areas/
 │               ├── sensory/    # L0 Hardware + L1 Sensors
+│               │   ├── index.js  # Area build
+│               │   └── io-map.js # L0 ControlModules (MIC, FFT, PITCH, VOWEL)
 │               ├── cognitive/  # L2 Gating + L3 Emotion
+│               │   ├── index.js
+│               │   └── io-map.js # L0 CMs (Thalamic, NoiseGate, Salience, Valence)
 │               ├── executive/  # L4 Executive + L5 Self-Model
+│               │   ├── index.js
+│               │   └── io-map.js # L0 CMs (Goal, Decision, Fault, Identity, Reflection)
 │               ├── integration/# L6 Observer + Phi metrics
+│               │   ├── index.js
+│               │   └── io-map.js # L0 CMs (Wonder, Phi, Depth)
 │               └── autonomic/  # State machine + Alarms + Buses
+│                   ├── index.js
+│                   └── io-map.js # L0 CMs (State, Alarm, BusBalance)
 └── modules/                  # ~95 ES modules
     ├── core.js               # KI event bus + module registry
     ├── scene.js              # Three.js scene manager
@@ -144,59 +157,78 @@ Enterprise: AUDIOFABRIC
         │     └── WorkCenter: L1_SENS (p=3)
         │           └── WorkUnit: VOICE_INPUT
         │                 ├── Equipment: MIC (sensor)
+        │                 │     └── CM: CM_MIC [2 AI, 1 DI, Modbus 40001-10001]
         │                 ├── Equipment: FFT (sensor)
+        │                 │     └── CM: CM_FFT [2 AI, 1 PID, Modbus 40005-40007]
         │                 ├── Equipment: PITCH_DET (sensor)
+        │                 │     └── CM: CM_PITCH [2 AI, Modbus 40009-40011]
         │                 └── Equipment: VOWEL_DET (sensor)
+        │                       └── CM: CM_VOWEL [2 AI, 1 DO, Modbus 40013-40015]
         │
         ├── Area: COGNITIVE (L2 Gating + L3 Emotion)
         │     ├── WorkCenter: L2_GATE (p=5)
         │     │     └── WorkUnit: FILTER
         │     │           ├── Equipment: THALAMIC_GATE (gate)
+        │     │           │     └── CM: CM_THALAMIC [2 AI, 1 AO, 1 DI, 1 PID]
         │     │           └── Equipment: NOISE_GATE (gate)
+        │     │                 └── CM: CM_NOISE_GATE [1 AI, 1 AO]
         │     └── WorkCenter: L3_EMO (p=11)
         │           ├── WorkUnit: SALIENCE
         │           │     ├── Equipment: SALIENCE_PROC (processor)
+        │           │     │     └── CM: CM_SALIENCE [3 AI, 1 AO]
         │           │     ├── Equipment: WO_GEN (processor)
         │           │     └── Equipment: BUS_B (bus: Gradient)
         │           └── WorkUnit: VALENCE
-        │                 └── Equipment: VALENCE_PROC (processor)
+        │                 ├── Equipment: VALENCE_PROC (processor)
+        │                 └── CM: CM_VALENCE [2 AI]
         │
         ├── Area: EXECUTIVE (L4 Executive + L5 Self-Model)
         │     ├── WorkCenter: L4_EXEC (p=31)
         │     │     ├── WorkUnit: GOAL_STACK
         │     │     │     ├── Equipment: GOAL_PROC (processor)
+        │     │     │     │     └── CM: CM_GOAL [2 AI, 1 AO]
         │     │     │     └── Equipment: DECISION_ENGINE (processor)
+        │     │     │           └── CM: CM_DECISION [1 AI, 1 DO]
         │     │     ├── WorkUnit: FAULT_MGR
         │     │     │     ├── Equipment: FAULT_DETECT (processor)
+        │     │     │     │     └── CM: CM_FAULT_DET [2 AI, 1 DI]
         │     │     │     └── Equipment: FAULT_MITIGATE (processor)
         │     │     └── WorkUnit: NARRATIVE_GEN
         │     │           └── Equipment: NARR_PROC (processor)
         │     └── WorkCenter: L5_SELF (p=127)
         │           └── WorkUnit: SELF_MODEL
         │                 ├── Equipment: IDENTITY_CORE (processor)
+        │                 │     └── CM: CM_IDENTITY [2 AI]
         │                 ├── Equipment: REFLECTION_ENGINE (processor)
+        │                 │     └── CM: CM_REFLECTION [1 AI, 1 AO]
         │                 └── Equipment: BUS_E (bus: State)
         │
         ├── Area: INTEGRATION (L6 Observer + Phi)
         │     ├── WorkCenter: L6_OBS (p=709)
         │     │     └── WorkUnit: OBSERVER
         │     │           └── Equipment: WONDER_ENGINE (processor)
+        │     │                 └── CM: CM_WONDER [2 AI, 1 DI]
         │     └── WorkCenter: PHI_INTEGRATOR
         │           └── WorkUnit: PHI_CALC
         │                 ├── Equipment: PHI_PROC (processor)
+        │                 │     └── CM: CM_PHI [2 AI, 1 AO]
         │                 └── Equipment: DEPTH_CALC (processor)
+        │                       └── CM: CM_DEPTH [2 AI]
         │
         └── Area: AUTONOMIC (cross-level control)
               ├── WorkCenter: STATE_MACHINE
               │     └── WorkUnit: STATE_CTRL
               │           └── Equipment: STATE_ENGINE (processor)
+              │                 └── CM: CM_STATE [2 AI, 1 DO, 2 DI]
               ├── WorkCenter: ALARM_MGR
               │     └── WorkUnit: ALARM_CTRL
               │           └── Equipment: ALARM_ENGINE (processor)
+              │                 └── CM: CM_ALARM [1 AI, 2 DO, 1 DI]
               └── WorkCenter: BUS_ORCH
                     └── WorkUnit: BUS_CTRL
                           ├── Equipment: BUS_C (bus: Photonic)
                           └── Equipment: BUS_BALANCE (processor)
+                                └── CM: CM_BUS_BAL [5 AI, 1 AO, 2 PID]
 ```
 
 ### ISA-95 Level Mapping
@@ -209,6 +241,8 @@ Enterprise: AUDIOFABRIC
 | L2 WorkCenter | sec-min | L0_HW, L1_SENS, L2_GATE, L3_EMO, L4_EXEC, L5_SELF, L6_OBS, + cross-level | `workcenter.js` |
 | L1 WorkUnit | ms-sec | SUBSTRATE, VOICE_INPUT, FILTER, SALIENCE, GOAL_STACK, etc. | `workunit.js` |
 | L0 Equipment | continuous | Sensors, processors, gates, buses (27 total) | `equipment.js` |
+| L0 ControlModule | continuous | ISA-88 CMs with AI/AO/DI/DO + PID + Modbus (18 total) | `controlmodule.js` |
+| ProcessSegments | per-batch | Recipe steps per area (10 total) | `process-segment.js` |
 
 ### Inventory Summary
 
@@ -220,7 +254,12 @@ Enterprise: AUDIOFABRIC
 | WorkCenters | 10 |
 | WorkUnits | 13 |
 | Equipment | 27 |
-| Tag paths | 60+ |
+| ControlModules | 18 |
+| ProcessSegments | 10 |
+| I/O Points | 55+ (AI/AO/DI/DO) |
+| PID Loops | 5 |
+| Modbus Registers | 40+ |
+| Tag paths | 80+ |
 
 ---
 
@@ -343,6 +382,30 @@ ISA-101.Faceplate.L1-5 ≈ ASS-OS.HMI_depth
 
 ---
 
+## Enterprise Runtime Wiring (`runtime.js`)
+
+```
+boot() → buildAssosPrime() → registerSite() → wireRuntime()
+                                                  ↓
+                                          Walk hierarchy:
+                                          Area.update()       → rollupKPI
+                                          WorkCenter.update() → sync levels/health from engine
+                                          WorkUnit.update()   → read owned tags → update local KPI
+                                          Equipment.update()  → read I/O tags → mirror state
+                                                  ↓
+                                          updateEnterprise(site, dt, t)  ← called each frame
+                                          site.rollupKPI()  ← every 5 seconds
+```
+
+ControlModules define L0 I/O:
+- **AI** (Analog Input): read from tag path, range, engineering unit
+- **AO** (Analog Output): write to tag path
+- **DI/DO** (Discrete I/O): boolean signals
+- **PID**: closed-loop control (pv→sp→cv with Kp, Ki, Kd)
+- **Modbus**: register map for external SCADA integration
+
+---
+
 ## Data Flow
 
 ```
@@ -379,6 +442,7 @@ All timestamps in UTC.
 
 | Time | Commit | Change |
 |------|--------|--------|
+| 12:00 | `-------` | Build full enterprise L0: 18 ISA-88 ControlModules with 55+ I/O points (AI/AO/DI/DO), 5 PID loops, 40+ Modbus registers, 10 ProcessSegments, runtime wiring (enterprise↔ASS-OS tags/engine), live update loops for all hierarchy nodes. |
 | 10:30 | `-------` | Add ISA-95 enterprise hierarchy at project root — Enterprise → Site → 5 Areas → 10 WorkCenters → 13 WorkUnits → 27 Equipment. Full consciousness-to-industrial mapping with KPI rollup. |
 | 10:24 | `4c11d99` | Split ASS-OS Konomi modules into subdirectories (<105 lines per file) — 24 sub-modules across udts/, tags/, db/, plus spine, engine, faults, goals, selfmodel, agent. Original flat files become thin re-exports. |
 | 10:08 | `267c72d` | Refactor ASS-OS to Konomi Standard — add UDT template registry (Layer 0-5), ISA-95 tag provider (60+ tags), 8 SQLite-like databases for instance persistence. Engine + Agent refactored to use tags/db. |
@@ -482,7 +546,7 @@ All timestamps in UTC.
 | AI/LLM modules | 6 (web-llm, mcp-tools, voice-ai, sandbox, etc.) |
 | ASS-OS modules | 24 (across udts/, tags/, db/, + engine files) |
 | ASS-OS re-exports | 5 (backward compatibility wrappers) |
-| Enterprise hierarchy | 13 (enterprise/, sites/, areas/) |
+| Enterprise hierarchy | 21 (enterprise/, sites/, areas/, io-maps) |
 | Voice modules | 8 (voice-engine, voice-fx, voice-chat, singing, etc.) |
 | Game modules | 6 (ki-blasts, d2r, periodic, risk, etc.) |
-| **Total** | **~110+** |
+| **Total** | **~118+** |

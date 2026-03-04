@@ -6,6 +6,8 @@ import { createArea } from '../../../area.js';
 import { createWorkcenter } from '../../../workcenter.js';
 import { createWorkunit } from '../../../workunit.js';
 import { createProcessor, createBus } from '../../../equipment.js';
+import { buildGoalCM, buildDecisionCM, buildFaultDetCM, buildIdentityCM, buildReflectionCM } from './io-map.js';
+import { executiveSegments } from '../../../process-segment.js';
 
 export function build() {
   const area = createArea('EXECUTIVE', {
@@ -25,23 +27,26 @@ export function build() {
     name: 'Goal Stack Processor',
     tags: ['CONSCIOUSNESS/L4_EXEC/ACTIVATION', 'CONSCIOUSNESS/L4_EXEC/HEALTH', 'AGENT/GOAL_COUNT']
   });
-  wuGoals.registerEquipment(createProcessor('GOAL_PROC', 'Goal Processor', { capability: ['plan', 'prioritize', 'veto'] }));
-  wuGoals.registerEquipment(createProcessor('DECISION_ENGINE', 'Decision Engine', { capability: ['evaluate', 'commit'] }));
+  wuGoals.registerEquipment(createProcessor('GOAL_PROC', 'Goal Processor'));
+  wuGoals.registerEquipment(createProcessor('DECISION_ENGINE', 'Decision Engine'));
+  wuGoals.registerControlModule(buildGoalCM());
+  wuGoals.registerControlModule(buildDecisionCM());
   wcL4.registerWorkunit(wuGoals);
 
   const wuFault = createWorkunit('FAULT_MGR', {
     name: 'Fault Manager',
     tags: ['AGENT/FAULT_COUNT', 'AGENT/INTEGRITY']
   });
-  wuFault.registerEquipment(createProcessor('FAULT_DETECT', 'Fault Detector', { capability: ['detect', 'classify'] }));
-  wuFault.registerEquipment(createProcessor('FAULT_MITIGATE', 'Fault Mitigator', { capability: ['mitigate', 'resolve'] }));
+  wuFault.registerEquipment(createProcessor('FAULT_DETECT', 'Fault Detector'));
+  wuFault.registerEquipment(createProcessor('FAULT_MITIGATE', 'Fault Mitigator'));
+  wuFault.registerControlModule(buildFaultDetCM());
   wcL4.registerWorkunit(wuFault);
 
   const wuNarrative = createWorkunit('NARRATIVE_GEN', {
     name: 'Narrative Generator',
     tags: ['NARRATIVES/COUNT', 'NARRATIVES/LATEST']
   });
-  wuNarrative.registerEquipment(createProcessor('NARR_PROC', 'Narrative Processor', { capability: ['synthesize', 'report'] }));
+  wuNarrative.registerEquipment(createProcessor('NARR_PROC', 'Narrative Processor'));
   wcL4.registerWorkunit(wuNarrative);
 
   // ── WorkCenter: L5 Self-Model (p=127) ──
@@ -55,12 +60,15 @@ export function build() {
     tags: ['CONSCIOUSNESS/L5_SELF/ACTIVATION', 'CONSCIOUSNESS/L5_SELF/HEALTH',
            'AGENT/CONFIDENCE', 'METRICS/SELF_MODEL_COHERENCE']
   });
-  wuSelfModel.registerEquipment(createProcessor('IDENTITY_CORE', 'Identity Core', { capability: ['maintain', 'verify'] }));
-  wuSelfModel.registerEquipment(createProcessor('REFLECTION_ENGINE', 'Reflection Engine', { capability: ['reflect', 'insight'] }));
+  wuSelfModel.registerEquipment(createProcessor('IDENTITY_CORE', 'Identity Core'));
+  wuSelfModel.registerEquipment(createProcessor('REFLECTION_ENGINE', 'Reflection Engine'));
   wuSelfModel.registerEquipment(createBus('E', 'STATE_BUS', { desc: 'State/memory bus' }));
+  wuSelfModel.registerControlModule(buildIdentityCM());
+  wuSelfModel.registerControlModule(buildReflectionCM());
   wcL5.registerWorkunit(wuSelfModel);
 
   area.registerWorkcenter(wcL4);
   area.registerWorkcenter(wcL5);
+  area.processSegments = executiveSegments();
   return area;
 }
