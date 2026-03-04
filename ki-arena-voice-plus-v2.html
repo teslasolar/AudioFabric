@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena Voice+ v2 — Enhanced Modular Voice Combat</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#nick:hover{color:#ff0}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.7),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#score{font-size:28px;color:#ff0;text-shadow:0 0 10px #f80}
+#combo{font-size:16px;color:#f80}
+#blastType{font-size:14px;color:#4af}
+#charge{font-size:12px;color:#0f0}
+#room{font-size:11px;color:#0ff}
+#peers{font-size:11px;color:#088}
+#llmStatus{font-size:10px;color:#555}
+/* KANJI */
+#kanjiHUD{position:fixed;left:16px;top:35%;transform:translateY(-50%);z-index:55;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#kanjiHUD.on{opacity:1}
+#kanjiChar{font-size:72px;line-height:1;text-shadow:0 0 30px currentColor,0 0 60px currentColor}
+#kanjiName{font-size:11px;color:#fff8;margin-top:4px}
+#kanjiReading{font-size:9px;color:#fff4}
+/* PHONEMES */
+#phonemes{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);z-index:55;display:none;gap:6px;pointer-events:none}
+#phonemes.on{display:flex}
+.ph{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:36px}
+.ph-label{font-size:8px;font-weight:bold;opacity:0.5;transition:opacity 0.15s}
+.ph.active .ph-label{opacity:1}
+.ph-bar{width:8px;height:50px;background:#111;border:1px solid #fff1;border-radius:5px;position:relative;overflow:hidden}
+.ph-fill{position:absolute;bottom:0;left:0;right:0;border-radius:4px;transition:height 0.08s}
+.ph-kanji{font-size:12px;opacity:0.3;transition:opacity 0.2s}
+.ph.active .ph-kanji{opacity:1}
+/* 12-BAND */
+#bandViz{position:fixed;left:50%;bottom:4px;transform:translateX(-50%);z-index:55;
+  display:flex;gap:2px;pointer-events:none;align-items:flex-end;height:55px}
+.band-bar{width:14px;height:55px;position:relative;overflow:hidden}
+.band-fill{position:absolute;bottom:0;left:1px;right:1px;border-radius:2px 2px 0 0;transition:height 0.06s;
+  box-shadow:0 0 4px currentColor}
+.band-label{position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);font-size:6px;color:#555;white-space:nowrap}
+.band-peak{position:absolute;left:1px;right:1px;height:2px;border-radius:1px;transition:bottom 0.05s}
+/* TIER */
+#tierHUD{position:fixed;right:16px;bottom:80px;z-index:55;text-align:right;pointer-events:none}
+#tierName{font-size:16px;color:#4af;text-shadow:0 0 10px #4af;transition:color 0.5s}
+#tierShape{font-size:10px;color:#888;margin-top:2px}
+/* FX */
+#dmgLayer{position:fixed;inset:0;z-index:60;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 8px currentColor;
+  animation:dmgUp 1.2s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-120px) scale(1.8)}}
+#cmt{position:fixed;bottom:150px;left:50%;transform:translateX(-50%);z-index:70;
+  background:rgba(0,0,0,0.8);border:1px solid #ff0;border-radius:12px;padding:8px 20px;
+  font-size:16px;color:#ff0;text-shadow:0 0 10px #f80;text-align:center;
+  max-width:500px;opacity:0;transition:opacity 0.3s;pointer-events:none}
+#cmt.show{opacity:1}
+#lb{position:fixed;right:10px;top:50%;transform:translateY(-50%);z-index:50;
+  background:rgba(0,0,0,0.75);border:1px solid #ff03;border-radius:8px;padding:10px;
+  min-width:180px;display:none;font-size:11px}
+#lb.on{display:block}
+#lb h3{color:#ff0;font-size:13px;margin-bottom:6px;text-align:center}
+#lb .row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #ff01}
+#lb .row .n{color:#0ff}#lb .row .s{color:#ff0}
+#lb .me{color:#0f0 !important}
+/* AUDIO PANEL */
+#audioPanel{position:fixed;left:10px;bottom:260px;z-index:56;width:240px;
+  background:rgba(0,0,0,0.85);border:1px solid #333;border-radius:8px;padding:8px;display:none}
+#audioPanel.on{display:block}
+#muteBtn{background:#111;border:1px solid #0f0;color:#0f0;padding:4px 12px;border-radius:4px;
+  font-family:inherit;font-size:11px;cursor:pointer;width:100%;margin-bottom:6px}
+#muteBtn:hover{background:#0f01}
+#muteBtn.muted{border-color:#f44;color:#f44}
+#masterVol{display:flex;align-items:center;gap:6px;font-size:10px;color:#888;margin-bottom:6px}
+#masterVol input{flex:1;height:4px;accent-color:#4af}
+#voicePeers{max-height:120px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#333 transparent}
+.vp{display:flex;align-items:center;gap:4px;padding:3px 0;border-bottom:1px solid #fff06;font-size:10px}
+.vp-indicator{width:6px;height:6px;border-radius:50%;background:#333;flex-shrink:0;transition:background 0.1s}
+.vp-indicator.speaking{background:#0f0;box-shadow:0 0 4px #0f0}
+.vp-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.vp input{width:50px;height:3px;accent-color:#4af}
+.vp-vol{width:24px;text-align:right;color:#666}
+/* HARMONY CONTROLS */
+#harmonyPanel{position:fixed;left:10px;bottom:150px;z-index:56;width:240px;
+  background:rgba(0,0,0,0.85);border:1px solid #333;border-radius:8px;padding:8px;display:none}
+#harmonyPanel.on{display:block}
+#harmonyPanel label{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px}
+.harm-row{display:flex;gap:4px;flex-wrap:wrap}
+.harm-btn{padding:3px 8px;font:10px monospace;background:rgba(255,255,255,0.03);
+  border:1px solid #222;border-radius:4px;color:#777;cursor:pointer;transition:all 0.2s}
+.harm-btn:hover{border-color:#ff88cc;color:#ff88cc}
+.harm-btn.active{border-color:#44ff88;color:#44ff88;background:rgba(68,255,136,0.05)}
+/* CHAT */
+#chat{position:fixed;left:10px;bottom:16px;z-index:56;width:240px;
+  background:rgba(0,0,0,0.75);border:1px solid #333;border-radius:8px;overflow:hidden;display:none;flex-direction:column}
+#chat.on{display:flex}
+#chatMsgs{height:100px;overflow-y:auto;padding:6px;font-size:11px;scrollbar-width:thin;scrollbar-color:#333 transparent}
+.chat-msg{padding:1px 0;word-break:break-word;line-height:1.3}
+.chat-msg .cn{font-weight:bold}
+.chat-sys{color:#555;font-style:italic}
+#chatInput{width:100%;background:#0a0a0a;border:none;border-top:1px solid #333;
+  color:#fff;padding:6px 8px;font-size:11px;font-family:inherit;outline:none}
+#chatInput::placeholder{color:#444}
+#chatInput:focus{background:#111;border-top-color:#4af}
+/* BADGES */
+#modBadges{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:55;
+  display:flex;gap:4px;pointer-events:none;flex-wrap:wrap;justify-content:center;max-width:90%}
+.mod-badge{background:#0002;border:1px solid #0ff3;border-radius:4px;padding:2px 6px;
+  font-size:8px;color:#0ff8}
+.mod-badge.active{color:#0f0;border-color:#0f04}
+/* CENTROID */
+#centroid{position:fixed;left:50%;bottom:62px;z-index:55;pointer-events:none;
+  font-size:9px;color:#888;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l">
+    <div id="score">0</div><div id="combo"></div><div id="blastType">—</div><div id="charge"></div>
+  </div>
+  <div class="hud-r">
+    <div id="nick" onclick="changeNick()" title="Click to change name"></div>
+    <div id="room">VOICE+</div><div id="peers"></div><div id="llmStatus"></div>
+  </div>
+</div>
+<div id="kanjiHUD"><div id="kanjiChar">気</div><div id="kanjiName">Spirit</div><div id="kanjiReading">KI</div></div>
+<div id="phonemes"></div>
+<div id="bandViz"></div>
+<div id="centroid"></div>
+<div id="tierHUD"><div id="tierName">Point</div><div id="tierShape">Tier 0</div></div>
+<div id="dmgLayer"></div>
+<div id="cmt"></div>
+<div id="lb"><h3>KI ARENA VOICE+ v2</h3><div id="lbRows"></div></div>
+
+<div id="audioPanel">
+  <button id="muteBtn" onclick="window._voiceChatToggleMute()">MIC ON — broadcasting voice</button>
+  <div id="masterVol"><span>ALL</span><input type="range" min="0" max="100" value="80" oninput="window._voiceChatSetMaster(this.value)"><span id="mvVal">80%</span></div>
+  <div id="voicePeers"></div>
+</div>
+
+<div id="harmonyPanel">
+  <label>Songbird Harmony</label>
+  <div class="harm-row">
+    <button class="harm-btn active" data-h="off" onclick="window._setHarmony('off')">Off</button>
+    <button class="harm-btn" data-h="third" onclick="window._setHarmony('third')">3rd</button>
+    <button class="harm-btn" data-h="fifth" onclick="window._setHarmony('fifth')">5th</button>
+    <button class="harm-btn" data-h="octave" onclick="window._setHarmony('octave')">Oct</button>
+    <button class="harm-btn" data-h="sixth" onclick="window._setHarmony('sixth')">6th</button>
+  </div>
+</div>
+
+<div id="chat">
+  <div id="chatMsgs"></div>
+  <input id="chatInput" type="text" placeholder="Type message... (Enter to send)" maxlength="200">
+</div>
+
+<div id="modBadges"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+// ============================================================
+// KI ARENA VOICE+ v2 — Full Modular Assembly
+// Voice Chat + 12-Band Spectrum + Geo Folder + Singing AI + Combat
+// ============================================================
+
+import { KI } from './modules/core.js';
+import * as Scene from './modules/scene.js';
+import * as VoiceEngine from './modules/voice-engine.js';
+import * as Kanji from './modules/kanji.js';
+import * as KiBlasts from './modules/ki-blasts.js';
+import * as Vortex from './modules/vortex.js';
+import * as EmojiSystem from './modules/emoji-system.js';
+import * as FX from './modules/fx.js';
+import * as Synths from './modules/synths.js';
+import * as Resonance from './modules/resonance.js';
+import * as MqttNet from './modules/mqtt-net.js';
+import * as WebRTCNet from './modules/webrtc-net.js';
+import * as Presence from './modules/presence.js';
+import * as Chat from './modules/chat.js';
+import * as VoiceChat from './modules/voice-chat.js';
+import * as FreqBands from './modules/freq-bands-12.js';
+import * as GeoFolder from './modules/geo-folder.js';
+import * as SingingVoice from './modules/singing-voice.js';
+
+// ============================================================
+// PLAYER SETUP
+// ============================================================
+KI.player.name = KI.genHash();
+window.changeNick = function() {
+  const n = prompt('Enter nickname (max 16):', KI.player.name);
+  if (n && n.trim()) {
+    KI.player.name = n.trim().slice(0, 16);
+    document.getElementById('nick').textContent = KI.player.name;
+    KI.emit('broadcast', { type: 'nick', name: KI.player.name, score: KI.player.score });
+  }
+};
+
+// Voice chat controls → window for onclick
+window._voiceChatToggleMute = () => VoiceChat.toggleMute();
+window._voiceChatSetMaster = (v) => VoiceChat.setMasterVolume(parseInt(v));
+
+// Harmony controls
+window._setHarmony = function(mode) {
+  document.querySelectorAll('.harm-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`.harm-btn[data-h="${mode}"]`);
+  if (btn) btn.classList.add('active');
+  if (mode === 'off') SingingVoice.stopSinging();
+  else SingingVoice.harmonizeWith(mode);
+};
+
+// ============================================================
+// HUD WIRING
+// ============================================================
+KI.on('charge:update', data => {
+  document.getElementById('blastType').textContent = data.blastType?.name || '';
+  document.getElementById('charge').textContent = data.chargeLevel > 0.05
+    ? 'CHARGE: ' + Math.round(data.chargeLevel * 100) + '%' : '';
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const khud = document.getElementById('kanjiHUD');
+  if (KI.voice.vowel && KI.voice.sounding && KANJI[KI.voice.vowel]) {
+    const kj = KANJI[KI.voice.vowel];
+    khud.classList.add('on');
+    document.getElementById('kanjiChar').textContent = kj.char;
+    document.getElementById('kanjiChar').style.color = kj.color;
+    document.getElementById('kanjiName').textContent = kj.name;
+    document.getElementById('kanjiReading').textContent = kj.reading;
+  } else { khud.classList.remove('on'); }
+  updatePhonemes();
+});
+
+KI.on('hit', data => {
+  document.getElementById('score').textContent = KI.player.score.toLocaleString();
+  document.getElementById('combo').textContent = KI.player.combo > 1 ? KI.player.combo + 'x COMBO' : '';
+  showDmg(data.dmg, data.type);
+  if (data.dmg > 300) showCmt(pickCmt('bigHit'));
+  if (data.combo === 5 || data.combo === 10) showCmt(pickCmt('combo'));
+});
+
+KI.on('ko', () => showCmt(pickCmt('ko')));
+
+// ============================================================
+// PHONEME UI
+// ============================================================
+function buildPhonemeUI() {
+  const kanji = KI.get('kanji');
+  if (!kanji) return;
+  const cont = document.getElementById('phonemes');
+  kanji.PH_KEYS.forEach(k => {
+    const ph = kanji.PHONEMES[k], kj = kanji.KANJI[k];
+    const d = document.createElement('div'); d.className = 'ph'; d.id = 'ph-' + k;
+    d.innerHTML = '<div class="ph-kanji" style="color:' + ph.color + '">' + kj.char + '</div>' +
+      '<div class="ph-label" style="color:' + ph.color + '">' + ph.label + '</div>' +
+      '<div class="ph-bar"><div class="ph-fill" style="background:' + ph.color + ';height:0%"></div></div>';
+    cont.appendChild(d);
+  });
+}
+
+function updatePhonemes() {
+  const kanji = KI.get('kanji');
+  if (!kanji) return;
+  kanji.PH_KEYS.forEach(k => {
+    const ph = kanji.PHONEMES[k];
+    if (KI.voice.vowel === k && KI.voice.sounding) ph.power = Math.min(1, ph.power + KI.voice.rms * 0.12);
+    else ph.power *= 0.985;
+    const el = document.getElementById('ph-' + k);
+    if (!el) return;
+    el.querySelector('.ph-fill').style.height = (ph.power * 100) + '%';
+    if (KI.voice.vowel === k && KI.voice.sounding) el.classList.add('active'); else el.classList.remove('active');
+  });
+}
+
+// ============================================================
+// 12-BAND SPECTRUM VISUALIZER
+// ============================================================
+function buildBandViz() {
+  const cont = document.getElementById('bandViz');
+  FreqBands.BANDS.forEach((band, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'band-bar'; bar.id = 'band-' + i;
+    bar.innerHTML =
+      '<div class="band-fill" style="background:' + band.color + ';height:0%;color:' + band.color + '"></div>' +
+      '<div class="band-peak" style="background:' + band.color + ';bottom:0"></div>' +
+      '<div class="band-label">' + band.label + '</div>';
+    cont.appendChild(bar);
+  });
+}
+
+KI.on('freq-bands-12:update', data => {
+  for (let i = 0; i < 12; i++) {
+    const fill = document.querySelector('#band-' + i + ' .band-fill');
+    const peak = document.querySelector('#band-' + i + ' .band-peak');
+    if (fill) fill.style.height = Math.min(100, data.energy[i] * 100) + '%';
+    if (peak) peak.style.bottom = Math.min(100, (data.energy[i] * 100) + 2) + '%';
+  }
+  const centEl = document.getElementById('centroid');
+  if (centEl && data.spectralCentroid > 0) centEl.textContent = Math.round(data.spectralCentroid) + ' Hz';
+});
+
+// ============================================================
+// GEO TIER HUD
+// ============================================================
+const TIER_COLORS = [
+  '#220044','#6600cc','#ff2244','#ff6600','#ffaa00','#ffdd00',
+  '#44ff44','#00ddaa','#0088ff','#4444ff','#aa44ff','#ff44ff'
+];
+KI.on('geo-folder:tier-change', data => {
+  const el = document.getElementById('tierName');
+  const sh = document.getElementById('tierShape');
+  if (el) { el.textContent = data.name; el.style.color = TIER_COLORS[data.tier] || '#4af'; }
+  if (sh) sh.textContent = 'Tier ' + data.tier;
+  if (data.tier >= 6) showCmt(data.name.toUpperCase() + ' UNLOCKED!');
+  if (data.tier >= 10) showCmt('DIMENSIONAL BREACH — ' + data.name.toUpperCase());
+});
+
+// ============================================================
+// VOICE CHAT EVENTS → REMOTE PLAYER AURA PULSE
+// ============================================================
+KI.on('voice-chat:peer-level', ({ name, level }) => {
+  // find remote player aura in presence and pulse it
+  // (presence module manages remote meshes)
+});
+
+KI.on('voice-chat:peer-joined', ({ name }) => {
+  showCmt(name + ' connected with voice!');
+});
+
+// ============================================================
+// DAMAGE / COMMENTARY
+// ============================================================
+function showDmg(amount, type) {
+  const kanji = KI.get('kanji');
+  const blasts = KI.get('ki-blasts');
+  const KANJI = kanji?.KANJI || {};
+  const BLAST_TYPES = blasts?.BLAST_TYPES || {};
+  const el = document.createElement('div'); el.className = 'dmg';
+  const bt = BLAST_TYPES[type];
+  const kj = KANJI[bt?.vowel || 'mm'];
+  el.textContent = (kj ? kj.char + ' ' : '') + Math.round(amount);
+  const c = bt ? '#' + bt.color.toString(16).padStart(6, '0') : '#ff0';
+  el.style.color = c;
+  el.style.fontSize = (18 + Math.min(amount / 10, 30)) + 'px';
+  el.style.left = (KI.W / 2 + (Math.random() - 0.5) * 120) + 'px';
+  el.style.top = (KI.H / 2 - 60 + (Math.random() - 0.5) * 40) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+
+const CMT = {
+  bigHit: ["INCREDIBLE POWER!", "WHAT A BLAST!", "UNBELIEVABLE FORCE!", "HARMONIC SHOCKWAVE!"],
+  combo: ["UNSTOPPABLE COMBO!", "RELENTLESS!", "FREQUENCY CASCADE!", "RESONANCE CHAIN!"],
+  ko: ["TARGET DESTROYED!", "全滅 ANNIHILATION!", "OBLITERATED!"]
+};
+function pickCmt(ev) { const a = CMT[ev] || CMT.bigHit; return a[Math.floor(Math.random() * a.length)]; }
+let cmtTimeout = null;
+function showCmt(text) {
+  if (cmtTimeout) return;
+  const el = document.getElementById('cmt');
+  el.textContent = text.slice(0, 80); el.classList.add('show');
+  cmtTimeout = setTimeout(() => { el.classList.remove('show'); cmtTimeout = null; }, 3000);
+}
+
+// ============================================================
+// MODULE BADGES
+// ============================================================
+function showBadge(name) {
+  const b = document.createElement('div');
+  b.className = 'mod-badge active';
+  b.textContent = name.toUpperCase();
+  document.getElementById('modBadges').appendChild(b);
+}
+
+// ============================================================
+// BOOT SEQUENCE
+// ============================================================
+async function boot() {
+  document.getElementById('nick').textContent = KI.player.name;
+  document.getElementById('hud').classList.add('on');
+  document.getElementById('lb').classList.add('on');
+  document.getElementById('phonemes').classList.add('on');
+  document.getElementById('audioPanel').classList.add('on');
+  document.getElementById('harmonyPanel').classList.add('on');
+  document.getElementById('chat').classList.add('on');
+
+  // 1. Scene — big starfield
+  Scene.init({ stars: 4000, fogDensity: 0.008 });
+  showBadge('scene');
+
+  // 2. Kanji
+  Kanji.init();
+  buildPhonemeUI();
+  showBadge('kanji');
+
+  // 3. Vortex
+  Vortex.init({ count: 1000, particleSize: 0.1 });
+  showBadge('vortex');
+
+  // 4. Ki Blasts
+  KiBlasts.init();
+  showBadge('blasts');
+
+  // 5. Emoji
+  EmojiSystem.init();
+  showBadge('emoji');
+
+  // 6. FX + Aurora
+  FX.init({ aurora: true });
+  showBadge('fx');
+
+  // 7. Synths
+  Synths.init();
+  showBadge('synths');
+
+  // 8. Resonance
+  Resonance.init();
+  showBadge('resonance');
+
+  // 9. 12-Band Frequency Splitter
+  FreqBands.init();
+  buildBandViz();
+  showBadge('12-bands');
+
+  // 10. Geometric Folder
+  GeoFolder.init({ position: [0, 3.5, -2], scale: 1.5 });
+  showBadge('geo-folder');
+
+  // 11. Singing Voice (AI companion)
+  SingingVoice.init();
+  showBadge('songbird');
+
+  // 12. Voice Engine (mic)
+  try {
+    await VoiceEngine.init();
+    showBadge('voice');
+  } catch (e) { console.warn('Voice init failed:', e); }
+
+  // 13. Voice Chat (WebRTC audio streams)
+  VoiceChat.init();
+  showBadge('voice-chat');
+
+  // 14. Networking
+  MqttNet.init({ room: 'VOICEPLUS' });
+  showBadge('mqtt');
+  WebRTCNet.init({ room: 'VOICEPLUS' });
+  showBadge('webrtc');
+
+  // 15. Presence
+  Presence.init();
+  showBadge('presence');
+
+  // 16. Chat
+  Chat.init();
+  showBadge('chat');
+
+  // === MAIN LOOP ===
+  KI.running = true;
+  const clock = KI.clock;
+  function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    KI.renderer.render(KI.scene, KI.camera);
+  }
+  animate();
+
+  console.log('%c KI ARENA VOICE+ v2 BOOTED ', 'background:#000;color:#0f0;font-size:20px;padding:10px');
+  console.log('Modules loaded:', Object.keys(KI._modules).join(', '));
+  showCmt('VOICE+ v2 ONLINE — SING & FIGHT!');
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
