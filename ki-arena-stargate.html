@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ki Arena STARGATE — Voice Combat + Geometric Folding + 12-Band Spectrum</title>
+<link rel="stylesheet" href="shared/styles.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#000;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
 canvas{position:fixed;top:0;left:0;width:100%;height:100%}
 #nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
 #nick:hover{color:#ff0}
@@ -152,6 +151,8 @@ import * as Resonance from './modules/resonance.js';
 import * as FreqBands from './modules/freq-bands-12.js';
 import * as GeoFolder from './modules/geo-folder.js';
 import * as Stargate from './modules/stargate.js';
+import * as PlayerProfile from './modules/player-profile.js';
+import * as NavOverlay from './modules/nav-overlay.js';
 
 // === PLAYER SETUP ===
 KI.player.name = KI.genHash();
@@ -441,6 +442,9 @@ async function boot() {
   // 15. Chat
   Chat.init();
   showBadge('chat');
+
+  PlayerProfile.init();
+  NavOverlay.init();
 
   // === START MAIN LOOP ===
   KI.running = true;
