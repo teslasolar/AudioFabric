@@ -69,7 +69,11 @@ const MODULE_CATALOG = {
   'rune-orb':        { path: './modules/rune-orb.js',             import: 'RuneOrb',        init: "RuneOrb.init({ position: %%RORB_POS%% });", default: { RORB_POS: '[0,2.5,-3.5]' } },
   'fractal-orb':     { path: './modules/fractal-orb.js',          import: 'FractalOrb',     init: "FractalOrb.init({ position: %%FORB_POS%% });", default: { FORB_POS: '[0,2.5,-3.5]' } },
   'ocean-orb':       { path: './modules/ocean-orb.js',            import: 'OceanOrb',       init: "OceanOrb.init({ position: %%OORB_POS%% });", default: { OORB_POS: '[0,2.5,-3.5]' } },
-  'storm-orb':       { path: './modules/storm-orb.js',            import: 'StormOrb',       init: "StormOrb.init({ position: %%STORB_POS%% });", default: { STORB_POS: '[0,2.5,-3.5]' } }
+  'storm-orb':       { path: './modules/storm-orb.js',            import: 'StormOrb',       init: "StormOrb.init({ position: %%STORB_POS%% });", default: { STORB_POS: '[0,2.5,-3.5]' } },
+  'ass-os-engine':   { path: './modules/ass-os-engine.js',        import: 'AssOsEngine',    init: "AssOsEngine.init();", default: {} },
+  'ass-os-bridge':   { path: './modules/ass-os-bridge.js',        import: 'AssOsBridge',    init: "AssOsBridge.init();", default: {} },
+  'ass-os-dashboard':{ path: './modules/ass-os-dashboard.js',     import: 'AssOsDashboard', init: "AssOsDashboard.init({ position: %%ASSOS_POS%% });", default: { ASSOS_POS: '[0,2.2,-3.5]' } },
+  'ass-os-agent':    { path: './modules/ass-os-agent.js',        import: 'AssOsAgent',     init: "AssOsAgent.init();", default: {} }
 };
 
 // Pre-defined arena presets
@@ -283,6 +287,11 @@ export const PRESETS = {
     title: 'Ki Arena Storm Orb',
     modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'storm-orb', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 200
+  },
+  assos: {
+    title: 'ASS-OS — AGI Soul System',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'ass-os-engine', 'ass-os-bridge', 'ass-os-dashboard', 'ass-os-agent', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 2000
   }
 };
 
@@ -726,6 +735,10 @@ export function makeOceanOrb(room, opts = {}) {
 
 export function makeStormOrb(room, opts = {}) {
   return assemble({ preset: 'stormorb', room, ...opts });
+}
+
+export function makeAssOs(room, opts = {}) {
+  return assemble({ preset: 'assos', room, ...opts });
 }
 
 // List all available modules
