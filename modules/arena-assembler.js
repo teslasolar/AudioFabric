@@ -60,7 +60,10 @@ const MODULE_CATALOG = {
   'layer-stack':     { path: './modules/layer-stack.js',          import: 'LayerStack',     init: "LayerStack.init({ position: %%LSTACK_POS%% });", default: { LSTACK_POS: '[0,2,-3]' } },
   'metaball-swarm':  { path: './modules/metaball-swarm.js',       import: 'MetaballSwarm',  init: "MetaballSwarm.init({ position: %%MBALL_POS%% });", default: { MBALL_POS: '[0,2.5,-3]' } },
   'prismatic-shatter':{ path: './modules/prismatic-shatter.js',   import: 'PrismaticShatter', init: "PrismaticShatter.init({ position: %%PRISM_POS%% });", default: { PRISM_POS: '[0,2.5,-3.5]' } },
-  'fluid-ribbons':   { path: './modules/fluid-ribbons.js',        import: 'FluidRibbons',   init: "FluidRibbons.init({ position: %%FRIBN_POS%% });", default: { FRIBN_POS: '[0,2,-3]' } }
+  'fluid-ribbons':   { path: './modules/fluid-ribbons.js',        import: 'FluidRibbons',   init: "FluidRibbons.init({ position: %%FRIBN_POS%% });", default: { FRIBN_POS: '[0,2,-3]' } },
+  'plasma-orb':      { path: './modules/plasma-orb.js',           import: 'PlasmaOrb',      init: "PlasmaOrb.init({ position: %%PORB_POS%% });", default: { PORB_POS: '[0,2.5,-3.5]' } },
+  'nebula-orb':      { path: './modules/nebula-orb.js',           import: 'NebulaOrb',      init: "NebulaOrb.init({ position: %%NORB_POS%% });", default: { NORB_POS: '[0,2.5,-3.5]' } },
+  'crystal-orb':     { path: './modules/crystal-orb.js',          import: 'CrystalOrb',     init: "CrystalOrb.init({ position: %%CORB_POS%% });", default: { CORB_POS: '[0,2.5,-3.5]' } }
 };
 
 // Pre-defined arena presets
@@ -228,6 +231,21 @@ export const PRESETS = {
   fluidribbons: {
     title: 'Ki Arena Fluid Ribbons',
     modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'fluid-ribbons', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 600
+  },
+  plasmaorb: {
+    title: 'Ki Arena Plasma Orb',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'plasma-orb', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 800
+  },
+  nebulaorb: {
+    title: 'Ki Arena Nebula Orb',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'nebula-orb', 'mqtt', 'webrtc', 'presence', 'chat'],
+    stars: 1200
+  },
+  crystalorb: {
+    title: 'Ki Arena Crystal Orb',
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'crystal-orb', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 600
   }
 };
@@ -636,6 +654,18 @@ export function makePrismaticShatter(room, opts = {}) {
 
 export function makeFluidRibbons(room, opts = {}) {
   return assemble({ preset: 'fluidribbons', room, ...opts });
+}
+
+export function makePlasmaOrb(room, opts = {}) {
+  return assemble({ preset: 'plasmaorb', room, ...opts });
+}
+
+export function makeNebulaOrb(room, opts = {}) {
+  return assemble({ preset: 'nebulaorb', room, ...opts });
+}
+
+export function makeCrystalOrb(room, opts = {}) {
+  return assemble({ preset: 'crystalorb', room, ...opts });
 }
 
 // List all available modules
