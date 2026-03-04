@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AudioFabric — Hub</title>
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+body{overflow-y:auto;overflow-x:hidden;cursor:default}
+canvas#c{position:fixed;z-index:0;pointer-events:none}
+
+/* Header */
+#header{position:fixed;top:0;left:0;right:0;z-index:100;
+  padding:16px 24px;display:flex;justify-content:space-between;align-items:center;
+  background:linear-gradient(180deg,rgba(0,0,0,0.8) 0%,rgba(0,0,0,0.4) 70%,transparent);
+  pointer-events:none}
+#header *{pointer-events:auto}
+#logo{font-size:18px;letter-spacing:4px;text-transform:uppercase;
+  background:linear-gradient(90deg,#0ff,#f0f,#ff0,#0f8);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-size:300% 100%;animation:logoShift 8s ease infinite}
+@keyframes logoShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+#logo-sub{font-size:9px;color:#666;letter-spacing:2px;margin-top:2px}
+#player-info{text-align:right}
+#player-name{font-size:13px;color:#0f8;cursor:pointer}
+#player-name:hover{color:#ff0}
+#player-stats{font-size:9px;color:#555}
+
+/* Main content */
+#main{position:relative;z-index:10;padding:80px 24px 40px;max-width:1200px;margin:0 auto}
+
+/* Voice prompt */
+#voice-prompt{text-align:center;margin:20px 0 40px;opacity:0;animation:afFadeIn 1s 0.5s forwards}
+#voice-prompt p{font-size:11px;color:#555;letter-spacing:2px}
+#voice-level{width:200px;height:3px;background:#111;border-radius:2px;margin:8px auto 0;overflow:hidden}
+#voice-fill{height:100%;width:0%;background:linear-gradient(90deg,#0ff,#0f8);
+  border-radius:2px;transition:width 0.1s}
+
+/* Category grid */
+.cat-section{margin-bottom:36px;opacity:0;animation:afFadeIn 0.6s ease forwards}
+.cat-section:nth-child(2){animation-delay:0.1s}
+.cat-section:nth-child(3){animation-delay:0.2s}
+.cat-section:nth-child(4){animation-delay:0.3s}
+.cat-section:nth-child(5){animation-delay:0.4s}
+.cat-section:nth-child(6){animation-delay:0.5s}
+.cat-section:nth-child(7){animation-delay:0.6s}
+.cat-section:nth-child(8){animation-delay:0.7s}
+.cat-section:nth-child(9){animation-delay:0.8s}
+.cat-section:nth-child(10){animation-delay:0.9s}
+.cat-section:nth-child(11){animation-delay:1.0s}
+
+.cat-title{font-size:10px;letter-spacing:4px;text-transform:uppercase;margin-bottom:12px;
+  padding-bottom:6px;border-bottom:1px solid #222}
+.cat-count{font-size:9px;color:#444;margin-left:8px}
+
+/* Arena cards */
+.arena-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.arena-card{position:relative;background:rgba(255,255,255,0.02);border:1px solid #1a1a2e;
+  border-radius:10px;padding:16px;cursor:pointer;transition:all 0.3s;overflow:hidden}
+.arena-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  border-radius:10px 10px 0 0;opacity:0.6;transition:opacity 0.3s}
+.arena-card:hover{border-color:#fff2;transform:translateY(-2px);
+  box-shadow:0 4px 20px rgba(0,255,255,0.1)}
+.arena-card:hover::before{opacity:1}
+.arena-card:active{transform:translateY(0)}
+
+.arena-name{font-size:14px;font-weight:bold;margin-bottom:4px}
+.arena-desc{font-size:10px;color:#666;line-height:1.4}
+.arena-badge{position:absolute;top:12px;right:12px;font-size:8px;padding:2px 6px;
+  border-radius:3px;border:1px solid;opacity:0.6}
+.arena-visited{color:#0f8;border-color:#0f84}
+.arena-new{color:#ff0;border-color:#ff04}
+.arena-score{position:absolute;bottom:12px;right:12px;font-size:9px;color:#555}
+
+/* Footer */
+#footer{position:relative;z-index:10;text-align:center;padding:40px 20px;
+  border-top:1px solid #111;margin-top:20px}
+#footer p{font-size:9px;color:#333;letter-spacing:2px}
+#arena-count{color:#666}
+
+/* Search */
+#search-bar{position:relative;margin:0 auto 30px;max-width:400px}
+#search{width:100%;background:rgba(255,255,255,0.03);border:1px solid #222;
+  border-radius:8px;padding:10px 16px 10px 36px;color:#fff;font-family:inherit;
+  font-size:12px;outline:none;transition:border-color 0.3s}
+#search:focus{border-color:#0ff4}
+#search::placeholder{color:#444}
+#search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  font-size:14px;color:#444;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="header">
+  <div>
+    <div id="logo">AudioFabric</div>
+    <div id="logo-sub">voice-reactive experiences</div>
+  </div>
+  <div id="player-info">
+    <div id="player-name" onclick="changeName()">---</div>
+    <div id="player-stats"></div>
+  </div>
+</div>
+
+<div id="main">
+  <div id="voice-prompt">
+    <p>SPEAK TO ENERGIZE</p>
+    <div id="voice-level"><div id="voice-fill"></div></div>
+  </div>
+
+  <div id="search-bar">
+    <span id="search-icon">&#x2315;</span>
+    <input id="search" type="text" placeholder="Search arenas..." autocomplete="off">
+  </div>
+
+  <div id="categories"></div>
+</div>
+
+<div id="footer">
+  <p><span id="arena-count">0</span> EXPERIENCES &middot; ALL VOICE-REACTIVE &middot; AUDIOFABRIC</p>
+</div>
+
+<div id="af-toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+import { KI } from './modules/core.js';
+import * as Scene from './modules/scene.js';
+import * as VoiceEngine from './modules/voice-engine.js';
+import * as PlayerProfile from './modules/player-profile.js';
+
+// ── Arena Directory ──
+const ARENAS = [
+  { name: 'Ki Arena', file: 'ki-arena.html', cat: 'arena', desc: 'Original voice combat arena' },
+  { name: 'Ki Arena v3', file: 'ki-arena-v3.html', cat: 'arena', desc: 'Enhanced combat with elements' },
+  { name: 'Ki Arena Ultra', file: 'ki-arena-ultra.html', cat: 'arena', desc: 'All features loaded' },
+  { name: 'Ki Arena Plus', file: 'ki-arena-plus.html', cat: 'arena', desc: 'Kanji + elemental system' },
+  { name: 'Stargate', file: 'ki-arena-stargate.html', cat: 'arena', desc: 'Voice-activated portal' },
+
+  { name: 'Kamehameha', file: 'kamehameha.html', cat: 'combat', desc: 'Charge and fire energy beams' },
+  { name: 'Kamehameha Duel', file: 'kamehameha-duel.html', cat: 'combat', desc: 'P2P voice fighting game' },
+  { name: 'PvP Battle', file: 'pvp-battle.html', cat: 'combat', desc: 'Real-time PvP combat' },
+  { name: 'Voice Duel', file: 'voice-duel.html', cat: 'combat', desc: 'One-on-one voice combat' },
+  { name: 'Voice Royale v2', file: 'ki-arena-voice-royale-v2.html', cat: 'combat', desc: 'Battle royale mode' },
+
+  { name: 'Boss: Colossus', file: 'ki-arena-boss-colossus.html', cat: 'boss', desc: 'Giant voice-reactive boss' },
+  { name: 'Boss: Elemental', file: 'ki-arena-boss-elemental.html', cat: 'boss', desc: 'Elemental forces boss' },
+  { name: 'Boss: Void', file: 'ki-arena-boss-void.html', cat: 'boss', desc: 'Void dimension guardian' },
+  { name: 'Boss Rush', file: 'ki-arena-boss-rush.html', cat: 'boss', desc: 'Back-to-back boss gauntlet' },
+
+  { name: 'Songbird', file: 'ki-arena-songbird.html', cat: 'music', desc: 'AI singing companion' },
+  { name: 'Voice Trainer', file: 'ki-arena-voice-trainer.html', cat: 'music', desc: 'Train your voice range' },
+  { name: 'Sing Self', file: 'sing-self.html', cat: 'music', desc: 'Sing with visualizations' },
+  { name: 'Sing Universe', file: 'sing-universe.html', cat: 'music', desc: 'Cosmic harmonic singing' },
+  { name: 'Jam Session', file: 'jam-session.html', cat: 'music', desc: 'Multi-player jam room' },
+  { name: 'Audio Gen', file: 'audio-gen.html', cat: 'music', desc: 'Sound & preset generator' },
+
+  { name: 'Voxel Craft', file: 'ki-arena-voxel-craft.html', cat: 'world', desc: 'Voice Minecraft + Web LLM' },
+  { name: 'Voxel Wormhole', file: 'ki-arena-voxel-wormhole.html', cat: 'world', desc: 'Voxel terrain with portal' },
+  { name: 'Genesis', file: 'ki-arena-genesis.html', cat: 'world', desc: 'Singularity to universe' },
+  { name: 'Deep Recursion', file: 'ki-arena-deep-recursion.html', cat: 'world', desc: 'Fractals, primes, landscapes' },
+  { name: 'Wrapped Geometry', file: 'ki-arena-wrapped-geo.html', cat: 'world', desc: 'Rainbow shape morphing' },
+  { name: 'Zen Garden', file: 'zen-garden.html', cat: 'world', desc: 'Meditation space' },
+
+  { name: 'Voice Room', file: 'voice-room.html', cat: 'social', desc: 'Voice chat with visuals' },
+  { name: 'Voice+ v2', file: 'ki-arena-voice-plus-v2.html', cat: 'social', desc: 'Enhanced voice chat' },
+  { name: 'Voice+ Chat', file: 'ki-arena-plus-chat.html', cat: 'social', desc: 'Chat-focused arena' },
+
+  { name: 'Periodic Table', file: 'periodic-table-arena.html', cat: 'knowledge', desc: 'Voice-reactive elements' },
+  { name: 'D2R Runewords', file: 'd2r-runeword-arena.html', cat: 'knowledge', desc: 'Diablo II rune combiner' },
+  { name: 'Risk Arena', file: 'risk-arena.html', cat: 'knowledge', desc: 'Voice strategy game' },
+
+  { name: 'Web LLM', file: 'web-llm-arena.html', cat: 'ai', desc: 'Browser-local AI chat' },
+  { name: 'Code Sandbox', file: 'web-llm-sandbox-v2.html', cat: 'ai', desc: 'AI-assisted code editor' },
+
+  { name: 'Shield 127D', file: 'shield-127d.html', cat: 'shield', desc: '127-dimensional shield viz' },
+  { name: 'Thomas Shield', file: 'thomas-shield.html', cat: 'shield', desc: 'Personal energy shield' },
+
+  { name: 'Vagal Engine', file: 'index.html', cat: 'vagal', desc: 'Vagal phoneme analysis' },
+];
+
+const CATS = [
+  { id: 'arena', label: 'ARENAS', color: '#0f8', icon: '&#x25C8;' },
+  { id: 'combat', label: 'COMBAT', color: '#f44', icon: '&#x2694;' },
+  { id: 'boss', label: 'BOSSES', color: '#f80', icon: '&#x2620;' },
+  { id: 'music', label: 'MUSIC & VOICE', color: '#f0f', icon: '&#x266B;' },
+  { id: 'world', label: 'WORLDS & VISUALS', color: '#4af', icon: '&#x2302;' },
+  { id: 'social', label: 'SOCIAL', color: '#ff0', icon: '&#x2637;' },
+  { id: 'knowledge', label: 'KNOWLEDGE', color: '#8f8', icon: '&#x2234;' },
+  { id: 'ai', label: 'AI', color: '#a8f', icon: '&#x2318;' },
+  { id: 'shield', label: 'SHIELDS', color: '#fa0', icon: '&#x2726;' },
+  { id: 'vagal', label: 'VAGAL', color: '#0ff', icon: '&#x221E;' },
+];
+
+document.getElementById('arena-count').textContent = ARENAS.length;
+
+// ── Build Categories ──
+const container = document.getElementById('categories');
+let visited = [];
+
+function buildGrid(filter) {
+  container.innerHTML = '';
+  const q = (filter || '').toLowerCase();
+
+  for (const cat of CATS) {
+    let arenas = ARENAS.filter(a => a.cat === cat.id);
+    if (q) arenas = arenas.filter(a =>
+      a.name.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q) || cat.label.toLowerCase().includes(q)
+    );
+    if (arenas.length === 0) continue;
+
+    const section = document.createElement('div');
+    section.className = 'cat-section';
+
+    section.innerHTML = `<div class="cat-title" style="color:${cat.color}">
+      ${cat.icon} ${cat.label}<span class="cat-count">${arenas.length}</span></div>`;
+
+    const grid = document.createElement('div');
+    grid.className = 'arena-grid';
+
+    for (const arena of arenas) {
+      const card = document.createElement('div');
+      card.className = 'arena-card';
+      card.style.setProperty('--card-color', cat.color);
+      card.querySelector;
+
+      const isVisited = visited.includes(arena.name) || visited.includes(arena.file.replace('.html', ''));
+      const pp = KI.get('player-profile');
+      const score = pp ? (pp.getHighScores()[arena.name] || 0) : 0;
+
+      card.innerHTML = `
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;border-radius:10px 10px 0 0;background:${cat.color};opacity:0.5"></div>
+        <div class="arena-name" style="color:${cat.color}">${arena.name}</div>
+        <div class="arena-desc">${arena.desc}</div>
+        ${isVisited ? '<div class="arena-badge arena-visited">VISITED</div>' : '<div class="arena-badge arena-new">NEW</div>'}
+        ${score > 0 ? '<div class="arena-score">' + score.toLocaleString() + ' pts</div>' : ''}
+      `;
+
+      card.addEventListener('click', () => {
+        document.body.style.transition = 'opacity 0.3s';
+        document.body.style.opacity = '0';
+        setTimeout(() => { window.location.href = arena.file; }, 300);
+      });
+
+      card.addEventListener('mouseenter', () => {
+        card.style.borderColor = cat.color + '44';
+        card.style.boxShadow = `0 4px 20px ${cat.color}22`;
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.borderColor = '#1a1a2e';
+        card.style.boxShadow = 'none';
+      });
+
+      grid.appendChild(card);
+    }
+
+    section.appendChild(grid);
+    container.appendChild(section);
+  }
+}
+
+buildGrid();
+
+// Search
+const searchInput = document.getElementById('search');
+searchInput.addEventListener('input', () => buildGrid(searchInput.value));
+
+// ── Name Change ──
+window.changeName = function() {
+  const pp = KI.get('player-profile');
+  const current = pp ? pp.getName() : KI.player.name;
+  const n = prompt('Your name:', current);
+  if (n && n.trim()) {
+    const name = n.trim().slice(0, 16);
+    if (pp) pp.setName(name);
+    else KI.player.name = name;
+    document.getElementById('player-name').textContent = name;
+  }
+};
+
+// ── Boot ──
+async function boot() {
+  // Minimal scene for background particles
+  Scene.init({ stars: 2000 });
+
+  // Voice engine for the energy bar
+  try { await VoiceEngine.init(); } catch(e) { /* ok without mic */ }
+
+  // Player profile
+  PlayerProfile.init();
+
+  const pp = KI.get('player-profile');
+  if (pp) {
+    visited = pp.getVisited();
+    document.getElementById('player-name').textContent = pp.getName();
+    const total = pp.getTotalScore();
+    const ach = pp.getAchievements().length;
+    document.getElementById('player-stats').textContent =
+      `${total.toLocaleString()} pts \u00b7 ${visited.length} arenas \u00b7 ${ach} achievements`;
+    buildGrid(); // rebuild with visited data
+  } else {
+    document.getElementById('player-name').textContent = KI.player.name || 'ANON';
+  }
+
+  // Voice energy bar
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+
+    // Voice level bar
+    const energy = KI.voice.energy || KI.voice.rms || 0;
+    const fill = document.getElementById('voice-fill');
+    if (fill) fill.style.width = (energy * 100) + '%';
+
+    // Background glow based on voice
+    if (energy > 0.1) {
+      const hue = (t * 20) % 360;
+      document.body.style.background = `radial-gradient(ellipse at 50% 30%, hsla(${hue},80%,5%,1) 0%, #000 70%)`;
+    }
+
+    KI.renderer.render(KI.scene, KI.camera);
+  })();
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

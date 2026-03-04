@@ -38,7 +38,9 @@ const MODULE_CATALOG = {
   'wrapped-geo':    { path: './modules/wrapped-geo.js',       import: 'WrappedGeo',     init: "WrappedGeo.init({ position: %%WRAPPED_POS%%, scale: %%WRAPPED_SCALE%% });", default: { WRAPPED_POS: '[0,3.5,-1]', WRAPPED_SCALE: 1.5 } },
   'voxel-wormhole': { path: './modules/voxel-wormhole.js',    import: 'VoxelWormhole',  init: "VoxelWormhole.init({ position: %%VOXEL_POS%%, scale: %%VOXEL_SCALE%% });", default: { VOXEL_POS: '[0,0.5,-3]', VOXEL_SCALE: 1.2 } },
   'genesis':        { path: './modules/genesis.js',            import: 'Genesis',        init: "Genesis.init({ position: %%GENESIS_POS%%, scale: %%GENESIS_SCALE%% });", default: { GENESIS_POS: '[0,3,-2]', GENESIS_SCALE: 1.5 } },
-  'voxel-world':    { path: './modules/voxel-world.js',        import: 'VoxelWorld',     init: "VoxelWorld.init({ position: %%VOXWORLD_POS%% });", default: { VOXWORLD_POS: '[0,0.5,-3]' } }
+  'voxel-world':    { path: './modules/voxel-world.js',        import: 'VoxelWorld',     init: "VoxelWorld.init({ position: %%VOXWORLD_POS%% });", default: { VOXWORLD_POS: '[0,0.5,-3]' } },
+  'player-profile': { path: './modules/player-profile.js',    import: 'PlayerProfile',  init: "PlayerProfile.init();" },
+  'nav-overlay':    { path: './modules/nav-overlay.js',        import: 'NavOverlay',     init: "NavOverlay.init();" }
 };
 
 // Pre-defined arena presets
@@ -204,6 +206,10 @@ export function assemble(config = {}) {
     extraScript = ''
   } = preset;
 
+  // Always include navigation and player profile
+  if (!modules.includes('player-profile')) modules.push('player-profile');
+  if (!modules.includes('nav-overlay')) modules.push('nav-overlay');
+
   // Build params object from config for template replacement
   const params = {
     ROOM: room,
@@ -358,6 +364,7 @@ KI.on('ko', () => showCmt('TARGET DESTROYED!'));
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escHtml(title)}</title>
+<link rel="stylesheet" href="shared/styles.css">
 <style>
 ${HUD_STYLES}
 ${extraStyles}
