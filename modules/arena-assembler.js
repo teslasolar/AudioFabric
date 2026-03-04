@@ -70,6 +70,9 @@ const MODULE_CATALOG = {
   'fractal-orb':     { path: './modules/fractal-orb.js',          import: 'FractalOrb',     init: "FractalOrb.init({ position: %%FORB_POS%% });", default: { FORB_POS: '[0,2.5,-3.5]' } },
   'ocean-orb':       { path: './modules/ocean-orb.js',            import: 'OceanOrb',       init: "OceanOrb.init({ position: %%OORB_POS%% });", default: { OORB_POS: '[0,2.5,-3.5]' } },
   'storm-orb':       { path: './modules/storm-orb.js',            import: 'StormOrb',       init: "StormOrb.init({ position: %%STORB_POS%% });", default: { STORB_POS: '[0,2.5,-3.5]' } },
+  'ass-os-udts':     { path: './modules/ass-os-udts.js',          import: 'AssOsUdts',      init: "AssOsUdts.init();", default: {} },
+  'ass-os-tags':     { path: './modules/ass-os-tags.js',          import: 'AssOsTags',      init: "AssOsTags.init();", default: {} },
+  'ass-os-db':       { path: './modules/ass-os-db.js',            import: 'AssOsDb',        init: "AssOsDb.init();", default: {} },
   'ass-os-engine':   { path: './modules/ass-os-engine.js',        import: 'AssOsEngine',    init: "AssOsEngine.init();", default: {} },
   'ass-os-bridge':   { path: './modules/ass-os-bridge.js',        import: 'AssOsBridge',    init: "AssOsBridge.init();", default: {} },
   'ass-os-dashboard':{ path: './modules/ass-os-dashboard.js',     import: 'AssOsDashboard', init: "AssOsDashboard.init({ position: %%ASSOS_POS%% });", default: { ASSOS_POS: '[0,2.2,-3.5]' } },
@@ -290,7 +293,7 @@ export const PRESETS = {
   },
   assos: {
     title: 'ASS-OS — AGI Soul System',
-    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'ass-os-engine', 'ass-os-bridge', 'ass-os-dashboard', 'ass-os-agent', 'mqtt', 'webrtc', 'presence', 'chat'],
+    modules: ['scene', 'voice', 'freq-bands-12', 'synths', 'resonance', 'ass-os-udts', 'ass-os-tags', 'ass-os-db', 'ass-os-engine', 'ass-os-bridge', 'ass-os-dashboard', 'ass-os-agent', 'mqtt', 'webrtc', 'presence', 'chat'],
     stars: 2000
   }
 };

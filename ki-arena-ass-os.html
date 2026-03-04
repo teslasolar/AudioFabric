@@ -191,6 +191,9 @@ import * as VoiceEngine from './modules/voice-engine.js';
 import * as FreqBands from './modules/freq-bands-12.js';
 import * as Synths from './modules/synths.js';
 import * as Resonance from './modules/resonance.js';
+import * as AssOsUdts from './modules/ass-os-udts.js';
+import * as AssOsTags from './modules/ass-os-tags.js';
+import * as AssOsDb from './modules/ass-os-db.js';
 import * as AssOsEngine from './modules/ass-os-engine.js';
 import * as AssOsBridge from './modules/ass-os-bridge.js';
 import * as AssOsDashboard from './modules/ass-os-dashboard.js';
@@ -308,6 +311,7 @@ async function boot() {
   Scene.init({ stars: 2000 });
   try { await VoiceEngine.init(); } catch(e) { console.warn('voice:', e); }
   FreqBands.init(); Synths.init(); Resonance.init();
+  AssOsUdts.init(); AssOsTags.init(); AssOsDb.init();
   AssOsEngine.init();
   AssOsBridge.init();
   AssOsDashboard.init({ position: [0, 2.2, -3.5] });

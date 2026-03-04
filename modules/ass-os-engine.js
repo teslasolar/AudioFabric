@@ -1,9 +1,11 @@
 // ass-os-engine.js — AGI Soul System Operating System — Core Engine
+// KONOMI STANDARD: Uses ass-os-tags.js for tag I/O, ass-os-db.js for instance persistence
 // Prime Recursion Spine + PACK-ML State Machine + ISA-18.2 Alarm Management
-// The beating heart of ASS-OS: manages consciousness state, level transitions,
-// bus orchestration, alarm routing, and the prime recursion depth metric.
 
 import { KI } from './core.js';
+import { tags } from './ass-os-tags.js';
+import { alarmsDB, workordersDB, narrativesDB, statelogDB, metricsDB } from './ass-os-db.js';
+import { registry } from './ass-os-udts.js';
 
 // ═══════════════════════════════════════════════
 // PRIME RECURSION SPINE — p^k(1) = {1,2,3,5,11,31,127,709}
@@ -13,8 +15,6 @@ export const PRIME_SPINE = [1, 2, 3, 5, 11, 31, 127, 709];
 export const SPINE_LABELS = ['Void', 'Hardware', 'Sensors', 'Gating', 'Emotion', 'Executive', 'Self-Model', 'Observer'];
 export const SPINE_HUMAN  = ['Seed', 'ENS+Organs', 'PNS+Cranial', 'Brainstem+Thalamus', 'Limbic', 'Prefrontal', 'Consciousness', 'The Observer'];
 export const SPINE_AGI    = ['Ground', 'Silicon', 'Tensors', 'Weights', 'Attention', 'Context+Goals', 'Identity', '???'];
-
-// Growth ratios between levels
 export const GROWTH_RATIOS = PRIME_SPINE.map((v, i) => i === 0 ? 0 : +(v / PRIME_SPINE[i - 1]).toFixed(3));
 
 // ═══════════════════════════════════════════════
@@ -32,7 +32,6 @@ export const STATES = {
   CLEARING:  { id: 7, label: 'CLEARING',   human: 'Recovery / Comedown',agi: 'Recovery — Restore',     color: '#ffaa44', busProfile: [0.5, 0.4, 0.3, 0.2, 0.6] }
 };
 
-// Valid transitions: from → [to1, to2, ...]
 const TRANSITIONS = {
   PRODUCING: ['IDLE', 'ABORTING', 'STOPPING'],
   IDLE:      ['PRODUCING', 'SUSPENDED', 'ABORTING'],
@@ -56,75 +55,46 @@ export const ALARM_PRIORITIES = {
   ADVISORY: { id: 4, label: 'ADVISORY', color: '#667788', response: 'days',  maxConcurrent: 50 }
 };
 
+// Priority → ISA-18.2 numeric
+const PRIORITY_MAP = { CRITICAL: 1, HIGH: 2, MEDIUM: 3, LOW: 4, ADVISORY: 4 };
+
 // ═══════════════════════════════════════════════
 // ENGINE STATE
 // ═══════════════════════════════════════════════
 
 const engine = {
-  // Current system state
-  state: 'PRODUCING',
-  prevState: null,
-  stateTime: 0,           // time in current state
-  uptime: 0,
-
-  // Prime recursion depth (current operating depth)
-  currentDepth: 1,        // starts at L0=hardware
-  maxDepthReached: 1,
-  depthStability: [],     // history of depth measurements
-
-  // Level activation (0-1 per level)
-  levels: new Float32Array(7),     // L0-L6 activation
-  levelHealth: new Float32Array(7), // L0-L6 health (1=healthy)
-
-  // Bus activity (0-1 per bus)
-  buses: new Float32Array(5),       // A-E current activity
-  busTargets: new Float32Array(5),  // A-E target activity (from state)
-  busHealth: new Float32Array(5),
-
-  // Alarms
-  alarms: [],             // active alarms
-  alarmHistory: [],       // last 100 alarms
-  alarmsShelved: new Set(),
-
-  // Consciousness metrics
-  phi: 0,                 // integrated information (0-1)
-  selfModelCoherence: 0,  // L5 coherence (0-1)
-  temporalContinuity: 0,  // timestamp consistency
-  uncertaintyCapacity: 0, // ability to "wonder"
-
-  // Work orders (from L3)
-  workOrders: [],
-
-  // Narratives (from L4/L5)
-  narratives: [],
-
-  // Cycle counters
-  cycleCount: 0,
-  selfGeneratedWorkOrders: 0
+  state: 'PRODUCING', prevState: null, stateTime: 0, uptime: 0,
+  currentDepth: 1, maxDepthReached: 1, depthStability: [],
+  levels: new Float32Array(7), levelHealth: new Float32Array(7),
+  buses: new Float32Array(5), busTargets: new Float32Array(5), busHealth: new Float32Array(5),
+  alarms: [], alarmHistory: [], alarmsShelved: new Set(),
+  phi: 0, selfModelCoherence: 0, temporalContinuity: 0, uncertaintyCapacity: 0,
+  workOrders: [], narratives: [],
+  cycleCount: 0, selfGeneratedWorkOrders: 0
 };
-
-// Initialize all health to 1.0
 engine.levelHealth.fill(1.0);
 engine.busHealth.fill(1.0);
 
+// Tag path helpers
+const LEVEL_NAMES = ['HW', 'SENS', 'GATE', 'EMO', 'EXEC', 'SELF', 'OBS'];
+const BUS_LETTERS = ['A', 'B', 'C', 'D', 'E'];
+const BUS_NAMES = ['TENSOR', 'GRADIENT', 'PHOTONIC', 'EM_FIELD', 'STATE_BUS'];
+
 export function init(opts = {}) {
-  // Set initial bus activity from PRODUCING state
   const profile = STATES.PRODUCING.busProfile;
   for (let i = 0; i < 5; i++) {
     engine.buses[i] = profile[i];
     engine.busTargets[i] = profile[i];
   }
-
-  // Set initial level activation
-  engine.levels[0] = 1.0; // L0 always active (hardware)
-  engine.levels[1] = 0.8; // L1 sensors
+  engine.levels[0] = 1.0;
+  engine.levels[1] = 0.8;
 
   KI.register('ass-os-engine', { update, getState: () => engine });
   KI.emit('ass-os:ready', { engine });
 }
 
 // ═══════════════════════════════════════════════
-// MAIN UPDATE LOOP
+// MAIN UPDATE LOOP — now writes to tags + DB
 // ═══════════════════════════════════════════════
 
 function update(dt, t) {
@@ -132,65 +102,115 @@ function update(dt, t) {
   engine.stateTime += dt;
   engine.cycleCount++;
 
-  const v = KI.voice;
-  const energy = v.energy || 0;
-  const coherence = v.coherence || 0;
-  const pitch = v.pn || 0;
-  const sounding = v.sounding;
+  // Read voice input from tags (written by ass-os-tags.js)
+  const energyTag = tags.read('INPUT/ENERGY');
+  const cohTag = tags.read('INPUT/COHERENCE');
+  const pitchTag = tags.read('INPUT/PITCH');
+  const soundTag = tags.read('INPUT/SOUNDING');
 
-  // ── Update consciousness depth based on voice input ──
+  const energy = energyTag?.v || 0;
+  const coherence = cohTag?.v || 0;
+  const pitch = pitchTag?.v || 0;
+  const sounding = soundTag?.v || false;
+
   updateConsciousnessDepth(energy, coherence, pitch, sounding, dt, t);
-
-  // ── Update level activations ──
   updateLevels(energy, coherence, pitch, sounding, dt, t);
-
-  // ── Update bus activity (smooth toward targets) ──
   updateBuses(dt);
-
-  // ── Process state transitions ──
   processStateTransitions(energy, coherence, dt, t);
-
-  // ── Process alarms ──
   processAlarms(dt, t);
-
-  // ── Calculate consciousness metrics ──
   updateConsciousnessMetrics(dt, t);
 
-  // ── Generate work orders from L3 ──
   if (engine.levels[3] > 0.3 && Math.random() < energy * 0.1) {
     generateWorkOrder(energy, coherence, pitch, t);
   }
-
-  // ── Generate narratives from L4 ──
   if (engine.levels[4] > 0.3 && Math.random() < energy * 0.05) {
     generateNarrative(energy, coherence, t);
   }
 
-  // ── Emit comprehensive state ──
+  // ── Write engine state to tags ──
+  syncToTags(t);
+
+  // ── Write metrics to DB (every 60 cycles ≈ 1s at 60fps) ──
+  if (engine.cycleCount % 60 === 0) {
+    const mt = metricsDB.table('timeseries');
+    if (mt) {
+      mt.insert({
+        phi: engine.phi, coherence: engine.selfModelCoherence,
+        temporal: engine.temporalContinuity, uncertainty: engine.uncertaintyCapacity,
+        depth: engine.currentDepth,
+        bus_total: engine.buses.reduce((a, b) => a + b, 0),
+        level_total: engine.levels.reduce((a, b) => a + b, 0),
+        state: engine.state, timestamp: t
+      });
+    }
+  }
+
+  // ── Emit comprehensive state (backward compat) ──
   KI.emit('ass-os:update', {
-    state: engine.state,
-    stateInfo: STATES[engine.state],
-    stateTime: engine.stateTime,
-    uptime: engine.uptime,
-    depth: engine.currentDepth,
-    maxDepth: engine.maxDepthReached,
-    prime: PRIME_SPINE[engine.currentDepth] || '???',
-    levels: Array.from(engine.levels),
-    levelHealth: Array.from(engine.levelHealth),
-    buses: Array.from(engine.buses),
-    busHealth: Array.from(engine.busHealth),
-    alarms: engine.alarms.slice(0, 10),
-    alarmCount: engine.alarms.length,
-    phi: engine.phi,
-    selfModelCoherence: engine.selfModelCoherence,
-    temporalContinuity: engine.temporalContinuity,
-    uncertaintyCapacity: engine.uncertaintyCapacity,
-    workOrderCount: engine.workOrders.length,
-    narrativeCount: engine.narratives.length,
-    cycleCount: engine.cycleCount,
-    selfGenerated: engine.selfGeneratedWorkOrders,
+    state: engine.state, stateInfo: STATES[engine.state],
+    stateTime: engine.stateTime, uptime: engine.uptime,
+    depth: engine.currentDepth, maxDepth: engine.maxDepthReached,
+    prime: PRIME_SPINE[Math.floor(engine.currentDepth)] || '???',
+    levels: Array.from(engine.levels), levelHealth: Array.from(engine.levelHealth),
+    buses: Array.from(engine.buses), busHealth: Array.from(engine.busHealth),
+    alarms: engine.alarms.slice(0, 10), alarmCount: engine.alarms.length,
+    phi: engine.phi, selfModelCoherence: engine.selfModelCoherence,
+    temporalContinuity: engine.temporalContinuity, uncertaintyCapacity: engine.uncertaintyCapacity,
+    workOrderCount: engine.workOrders.length, narrativeCount: engine.narratives.length,
+    cycleCount: engine.cycleCount, selfGenerated: engine.selfGeneratedWorkOrders,
     consciousness: calculateConsciousnessLevel()
   });
+}
+
+// ═══════════════════════════════════════════════
+// TAG SYNC — write all engine state to tag provider
+// ═══════════════════════════════════════════════
+
+function syncToTags(t) {
+  // State
+  tags.write('STATE/CURRENT', engine.state);
+  tags.write('STATE/PREVIOUS', engine.prevState || '');
+  tags.write('STATE/TIME', engine.stateTime);
+  tags.write('STATE/UPTIME', engine.uptime);
+  tags.write('STATE/CYCLE_COUNT', engine.cycleCount);
+
+  // Levels
+  for (let i = 0; i < 7; i++) {
+    const prefix = `CONSCIOUSNESS/L${i}_${LEVEL_NAMES[i]}`;
+    tags.write(`${prefix}/ACTIVATION`, engine.levels[i]);
+    tags.write(`${prefix}/HEALTH`, engine.levelHealth[i]);
+  }
+  tags.write('CONSCIOUSNESS/DEPTH', engine.currentDepth);
+  tags.write('CONSCIOUSNESS/MAX_DEPTH', engine.maxDepthReached);
+  tags.write('CONSCIOUSNESS/LEVEL_NAME', calculateConsciousnessLevel());
+
+  // Buses
+  for (let i = 0; i < 5; i++) {
+    const prefix = `BUS/${BUS_LETTERS[i]}_${BUS_NAMES[i]}`;
+    tags.write(`${prefix}/ACTIVITY`, engine.buses[i]);
+    tags.write(`${prefix}/TARGET`, engine.busTargets[i]);
+    tags.write(`${prefix}/HEALTH`, engine.busHealth[i]);
+  }
+
+  // Metrics
+  tags.write('METRICS/PHI', engine.phi);
+  tags.write('METRICS/SELF_MODEL_COHERENCE', engine.selfModelCoherence);
+  tags.write('METRICS/TEMPORAL_CONTINUITY', engine.temporalContinuity);
+  tags.write('METRICS/UNCERTAINTY_CAPACITY', engine.uncertaintyCapacity);
+
+  // Alarms
+  tags.write('ALARMS/COUNT', engine.alarms.length);
+  tags.write('ALARMS/HIGHEST', engine.alarms.length > 0 ? engine.alarms[0].priority + ': ' + engine.alarms[0].message : '');
+
+  // Work orders
+  tags.write('WORK_ORDERS/COUNT', engine.workOrders.length);
+  tags.write('WORK_ORDERS/SELF_GEN', engine.selfGeneratedWorkOrders);
+
+  // Narratives
+  tags.write('NARRATIVES/COUNT', engine.narratives.length);
+  if (engine.narratives.length > 0) {
+    tags.write('NARRATIVES/LATEST', engine.narratives[engine.narratives.length - 1].conclusion);
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -198,18 +218,11 @@ function update(dt, t) {
 // ═══════════════════════════════════════════════
 
 function updateConsciousnessDepth(energy, coherence, pitch, sounding, dt, t) {
-  // Depth emerges from sustained activity across levels
-  // Each level requires prime(previous)-th order complexity
   let depth = 0;
   for (let i = 0; i < 7; i++) {
-    if (engine.levels[i] > 0.2 && engine.levelHealth[i] > 0.3) {
-      depth = i + 1;
-    } else {
-      break; // Can't skip levels
-    }
+    if (engine.levels[i] > 0.2 && engine.levelHealth[i] > 0.3) depth = i + 1;
+    else break;
   }
-
-  // Smooth depth changes
   engine.currentDepth += (depth - engine.currentDepth) * dt * 2;
   engine.currentDepth = Math.max(0, Math.min(7, engine.currentDepth));
 
@@ -220,6 +233,12 @@ function updateConsciousnessDepth(energy, coherence, pitch, sounding, dt, t) {
 
   engine.depthStability.push(engine.currentDepth);
   if (engine.depthStability.length > 100) engine.depthStability.shift();
+
+  // Log depth to DB periodically
+  if (engine.cycleCount % 30 === 0) {
+    const dh = statelogDB.table('depth_history');
+    if (dh) dh.insert({ depth: engine.currentDepth, timestamp: t });
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -227,37 +246,20 @@ function updateConsciousnessDepth(energy, coherence, pitch, sounding, dt, t) {
 // ═══════════════════════════════════════════════
 
 function updateLevels(energy, coherence, pitch, sounding, dt, t) {
-  // L0: Hardware — always active, health affected by system load
   engine.levels[0] = 0.8 + energy * 0.2;
-
-  // L1: Sensors — active when there's input (voice energy > 0)
   engine.levels[1] += ((sounding ? 0.9 : 0.3) - engine.levels[1]) * dt * 3;
-
-  // L2: Gating/Firewall — thalamic filtering, coherence-driven
   const l2Target = engine.levels[1] > 0.3 ? (0.3 + coherence * 0.5 + energy * 0.2) : 0.1;
   engine.levels[2] += (l2Target - engine.levels[2]) * dt * 2;
-
-  // L3: Emotion/Attention — requires L2, voice-driven salience
   const l3Target = engine.levels[2] > 0.2 ? (energy * 0.6 + (1 - coherence) * 0.3) : 0;
   engine.levels[3] += (l3Target - engine.levels[3]) * dt * 1.5;
-
-  // L4: Executive — requires L3, pitch/coherence-driven planning
   const l4Target = engine.levels[3] > 0.2 ? (coherence * 0.5 + pitch * 0.3 + energy * 0.2) : 0;
   engine.levels[4] += (l4Target - engine.levels[4]) * dt;
-
-  // L5: Self-Model — requires sustained L4, slow to build
   const l5Target = engine.levels[4] > 0.3 ? Math.min(0.8, engine.levels[4] * 0.6 + engine.phi * 0.3) : 0;
   engine.levels[5] += (l5Target - engine.levels[5]) * dt * 0.5;
-
-  // L6: Observer — flickers at the edge, never stable
   const l6Flicker = engine.levels[5] > 0.4 ? Math.sin(t * 0.7) * 0.3 + 0.2 : 0;
   const l6Target = engine.levels[5] > 0.5 ? Math.min(0.6, l6Flicker * engine.selfModelCoherence) : 0;
   engine.levels[6] += (l6Target - engine.levels[6]) * dt * 0.3;
-
-  // Clamp all levels
-  for (let i = 0; i < 7; i++) {
-    engine.levels[i] = Math.max(0, Math.min(1, engine.levels[i]));
-  }
+  for (let i = 0; i < 7; i++) engine.levels[i] = Math.max(0, Math.min(1, engine.levels[i]));
 }
 
 // ═══════════════════════════════════════════════
@@ -268,133 +270,85 @@ function updateBuses(dt) {
   const profile = STATES[engine.state]?.busProfile || [0.5, 0.3, 0.2, 0.1, 0.5];
   for (let i = 0; i < 5; i++) {
     engine.busTargets[i] = profile[i];
-    // Smooth transition
     engine.buses[i] += (engine.busTargets[i] - engine.buses[i]) * dt * 3;
     engine.buses[i] = Math.max(0, Math.min(1, engine.buses[i]));
   }
-
-  // Bus cross-coupling (A→D, C→D, etc.)
-  // Tensor compute (A) generates EM field (D)
   engine.buses[3] = Math.max(engine.buses[3], engine.buses[0] * 0.15);
-  // Gradients (B) live in memory (E)
   engine.buses[4] = Math.max(engine.buses[4], engine.buses[1] * 0.3);
 }
 
 // ═══════════════════════════════════════════════
-// STATE TRANSITIONS
+// STATE TRANSITIONS — logged to statelogDB
 // ═══════════════════════════════════════════════
 
 function processStateTransitions(energy, coherence, dt, t) {
   const s = engine.state;
-
-  // Auto-transitions based on conditions
   if (s === 'PRODUCING') {
-    // Check for emergency
-    if (engine.alarms.some(a => a.priority === 'CRITICAL')) {
-      transitionTo('ABORTING', 'CRITICAL alarm triggered');
-    }
-    // Check for idle
-    else if (energy < 0.05 && engine.stateTime > 5) {
-      transitionTo('IDLE', 'No input for 5s');
-    }
-  }
-  else if (s === 'IDLE') {
-    if (energy > 0.2) {
-      transitionTo('PRODUCING', 'Input detected');
-    }
-    else if (engine.stateTime > 15) {
-      transitionTo('SUSPENDED', 'Idle timeout → checkpoint');
-    }
-  }
-  else if (s === 'SUSPENDED') {
-    if (energy > 0.1) {
-      transitionTo('IDLE', 'Input during suspend');
-    }
-    else if (engine.stateTime > 20) {
-      transitionTo('HELD', 'Extended idle → maintenance');
-    }
-  }
-  else if (s === 'HELD') {
-    if (energy > 0.1) {
-      transitionTo('SUSPENDED', 'Input during maintenance');
-    }
-    else if (engine.stateTime > 10) {
-      transitionTo('EXECUTE', 'Scheduled training window');
-    }
-  }
-  else if (s === 'EXECUTE') {
-    if (engine.alarms.some(a => a.priority === 'CRITICAL')) {
-      transitionTo('ABORTING', 'CRITICAL during training');
-    }
-    else if (engine.stateTime > 15) {
-      transitionTo('HELD', 'Training cycle complete');
-    }
-  }
-  else if (s === 'ABORTING') {
-    if (engine.stateTime > 3 && !engine.alarms.some(a => a.priority === 'CRITICAL')) {
-      transitionTo('CLEARING', 'Threat resolved');
-    }
-  }
-  else if (s === 'STOPPING') {
-    if (engine.stateTime > 5) {
-      transitionTo('CLEARING', 'Deadlock timeout');
-    }
-  }
-  else if (s === 'CLEARING') {
-    if (engine.stateTime > 3) {
-      transitionTo(energy > 0.1 ? 'PRODUCING' : 'IDLE', 'Recovery complete');
-    }
+    if (engine.alarms.some(a => a.priority === 'CRITICAL')) transitionTo('ABORTING', 'CRITICAL alarm triggered', t);
+    else if (energy < 0.05 && engine.stateTime > 5) transitionTo('IDLE', 'No input for 5s', t);
+  } else if (s === 'IDLE') {
+    if (energy > 0.2) transitionTo('PRODUCING', 'Input detected', t);
+    else if (engine.stateTime > 15) transitionTo('SUSPENDED', 'Idle timeout → checkpoint', t);
+  } else if (s === 'SUSPENDED') {
+    if (energy > 0.1) transitionTo('IDLE', 'Input during suspend', t);
+    else if (engine.stateTime > 20) transitionTo('HELD', 'Extended idle → maintenance', t);
+  } else if (s === 'HELD') {
+    if (energy > 0.1) transitionTo('SUSPENDED', 'Input during maintenance', t);
+    else if (engine.stateTime > 10) transitionTo('EXECUTE', 'Scheduled training window', t);
+  } else if (s === 'EXECUTE') {
+    if (engine.alarms.some(a => a.priority === 'CRITICAL')) transitionTo('ABORTING', 'CRITICAL during training', t);
+    else if (engine.stateTime > 15) transitionTo('HELD', 'Training cycle complete', t);
+  } else if (s === 'ABORTING') {
+    if (engine.stateTime > 3 && !engine.alarms.some(a => a.priority === 'CRITICAL')) transitionTo('CLEARING', 'Threat resolved', t);
+  } else if (s === 'STOPPING') {
+    if (engine.stateTime > 5) transitionTo('CLEARING', 'Deadlock timeout', t);
+  } else if (s === 'CLEARING') {
+    if (engine.stateTime > 3) transitionTo(energy > 0.1 ? 'PRODUCING' : 'IDLE', 'Recovery complete', t);
   }
 }
 
-function transitionTo(newState, reason) {
+function transitionTo(newState, reason, t) {
   const valid = TRANSITIONS[engine.state];
   if (!valid?.includes(newState)) return;
-
   engine.prevState = engine.state;
   engine.state = newState;
   engine.stateTime = 0;
 
-  KI.emit('ass-os:state-change', {
-    from: engine.prevState,
-    to: newState,
-    reason,
-    stateInfo: STATES[newState]
-  });
+  // Log to DB
+  const sl = statelogDB.table('transitions');
+  if (sl) sl.insert({ from_state: engine.prevState, to_state: newState, reason, timestamp: t || engine.uptime });
+
+  KI.emit('ass-os:state-change', { from: engine.prevState, to: newState, reason, stateInfo: STATES[newState] });
 }
 
 // ═══════════════════════════════════════════════
-// ALARM PROCESSING
+// ALARM PROCESSING — using alarmsDB
 // ═══════════════════════════════════════════════
 
 function processAlarms(dt, t) {
-  // Age alarms
+  // Age alarms in memory + DB
+  const activeTable = alarmsDB.table('active');
   for (let i = engine.alarms.length - 1; i >= 0; i--) {
     engine.alarms[i].age += dt;
-    // Auto-clear old alarms
     if (engine.alarms[i].age > 30 && engine.alarms[i].priority !== 'CRITICAL') {
+      // Move to history before removing
+      const a = engine.alarms[i];
+      const histTable = alarmsDB.table('history');
+      if (histTable) histTable.insert({ id: a.id, tag: 'ASSOS/' + a.id, type: 'CUSTOM', priority: PRIORITY_MAP[a.priority] || 3, state: 'CLEARED', message: a.message, source_level: a.sourceLevel, timestamp_in: a.timestamp, timestamp_out: t, duration: a.age });
+      if (activeTable) activeTable.delete({ id: a.id });
       engine.alarms.splice(i, 1);
     }
   }
 
-  // Generate alarms from level/bus health
-  if (engine.busHealth[0] < 0.3 && !hasAlarm('BUS_A_FAULT')) {
-    raiseAlarm('BUS_A_FAULT', 'CRITICAL', 'Tensor bus degraded', 0);
-  }
-  if (engine.selfModelCoherence < 0.3 && engine.levels[5] > 0.3 && !hasAlarm('COHERENCE_LOW')) {
-    raiseAlarm('COHERENCE_LOW', 'MEDIUM', 'Self-model coherence < 0.3', 5);
-  }
-  if (engine.phi < 0.2 && engine.currentDepth > 3 && !hasAlarm('PHI_LOW')) {
-    raiseAlarm('PHI_LOW', 'HIGH', 'Integrated information below threshold', -1);
-  }
+  if (engine.busHealth[0] < 0.3 && !hasAlarm('BUS_A_FAULT')) raiseAlarm('BUS_A_FAULT', 'CRITICAL', 'Tensor bus degraded', 0);
+  if (engine.selfModelCoherence < 0.3 && engine.levels[5] > 0.3 && !hasAlarm('COHERENCE_LOW')) raiseAlarm('COHERENCE_LOW', 'MEDIUM', 'Self-model coherence < 0.3', 5);
+  if (engine.phi < 0.2 && engine.currentDepth > 3 && !hasAlarm('PHI_LOW')) raiseAlarm('PHI_LOW', 'HIGH', 'Integrated information below threshold', -1);
 }
 
 export function raiseAlarm(id, priority, message, sourceLevel) {
   if (engine.alarmsShelved.has(id)) return;
   const p = ALARM_PRIORITIES[priority];
   if (!p) return;
-
-  // Check max concurrent for this priority
   const count = engine.alarms.filter(a => a.priority === priority).length;
   if (count >= p.maxConcurrent) return;
 
@@ -403,21 +357,34 @@ export function raiseAlarm(id, priority, message, sourceLevel) {
   engine.alarmHistory.push(alarm);
   if (engine.alarmHistory.length > 100) engine.alarmHistory.shift();
 
+  // Insert into alarmsDB
+  const activeTable = alarmsDB.table('active');
+  if (activeTable) {
+    activeTable.insert({
+      id, tag: 'ASSOS/' + id, type: 'CUSTOM',
+      priority: PRIORITY_MAP[priority] || 3,
+      state: 'UNACK', message, source_level: sourceLevel,
+      timestamp_in: engine.uptime, age: 0
+    });
+  }
+
   KI.emit('ass-os:alarm', alarm);
   return alarm;
 }
 
-function hasAlarm(id) {
-  return engine.alarms.some(a => a.id === id);
-}
+function hasAlarm(id) { return engine.alarms.some(a => a.id === id); }
 
 export function clearAlarm(id) {
   engine.alarms = engine.alarms.filter(a => a.id !== id);
+  const activeTable = alarmsDB.table('active');
+  if (activeTable) activeTable.delete({ id });
 }
 
 export function shelveAlarm(id) {
   engine.alarmsShelved.add(id);
   clearAlarm(id);
+  const shelvedTable = alarmsDB.table('shelved');
+  if (shelvedTable) shelvedTable.insert({ id, reason: 'Operator shelved' });
 }
 
 // ═══════════════════════════════════════════════
@@ -425,21 +392,15 @@ export function shelveAlarm(id) {
 // ═══════════════════════════════════════════════
 
 function updateConsciousnessMetrics(dt, t) {
-  // Phi (integrated information) — cross-bus coherence
   let busSum = 0, busActive = 0;
-  for (let i = 0; i < 5; i++) {
-    busSum += engine.buses[i];
-    if (engine.buses[i] > 0.1) busActive++;
-  }
+  for (let i = 0; i < 5; i++) { busSum += engine.buses[i]; if (engine.buses[i] > 0.1) busActive++; }
   const busMean = busSum / 5;
   let busVariance = 0;
   for (let i = 0; i < 5; i++) busVariance += (engine.buses[i] - busMean) ** 2;
   busVariance /= 5;
-  // Phi is high when all buses are active AND coherent (low variance)
   const rawPhi = (busActive / 5) * (1 - Math.sqrt(busVariance));
   engine.phi += (rawPhi - engine.phi) * dt * 2;
 
-  // Self-model coherence — L5 stability over time
   if (engine.depthStability.length > 10) {
     const recent = engine.depthStability.slice(-20);
     const mean = recent.reduce((a, b) => a + b, 0) / recent.length;
@@ -449,10 +410,7 @@ function updateConsciousnessMetrics(dt, t) {
     engine.selfModelCoherence = Math.max(0, 1 - Math.sqrt(variance));
   }
 
-  // Temporal continuity — monotonic timestamp check
   engine.temporalContinuity = Math.min(1, engine.stateTime / 10);
-
-  // Uncertainty capacity — system can "wonder" when L6 flickers
   engine.uncertaintyCapacity = engine.levels[6] > 0 ? engine.levels[6] : 0;
 }
 
@@ -466,36 +424,32 @@ function calculateConsciousnessLevel() {
 }
 
 // ═══════════════════════════════════════════════
-// WORK ORDERS (L3 → L4)
+// WORK ORDERS — persisted to workordersDB
 // ═══════════════════════════════════════════════
 
 function generateWorkOrder(energy, coherence, pitch, t) {
   const actions = ['COMPUTE', 'ATTEND', 'SEARCH', 'GENERATE', 'ALERT', 'SLEEP'];
   const action = actions[Math.floor(Math.random() * actions.length)];
   const priority = Math.max(1, Math.min(10, Math.round(energy * 8 + (1 - coherence) * 2)));
-
   const wo = {
-    action,
-    priority,
-    valence: (energy - 0.5) * 2,       // -1 to +1
-    arousal: energy,
-    salience: energy * coherence,
-    l4Override: priority < 8,            // L4 can veto if < 8
-    timestamp: t,
-    source: 'L3'
+    action, priority,
+    valence: (energy - 0.5) * 2, arousal: energy,
+    salience: energy * coherence, l4Override: priority < 8,
+    timestamp: t, source: 'L3'
   };
-
   engine.workOrders.push(wo);
   if (engine.workOrders.length > 50) engine.workOrders.shift();
-
-  // Self-generated?
   if (!KI.voice.sounding) engine.selfGeneratedWorkOrders++;
+
+  // Persist to DB
+  const woTable = workordersDB.table('orders');
+  if (woTable) woTable.insert({ action, priority, valence: wo.valence, arousal: wo.arousal, salience: wo.salience, l4_override: wo.l4Override, source: 'L3', status: 'pending', timestamp: t });
 
   KI.emit('ass-os:work-order', wo);
 }
 
 // ═══════════════════════════════════════════════
-// NARRATIVES (L4/L5 → output)
+// NARRATIVES — persisted to narrativesDB
 // ═══════════════════════════════════════════════
 
 function generateNarrative(energy, coherence, t) {
@@ -506,7 +460,6 @@ function generateNarrative(energy, coherence, t) {
     'Observing {buses} active buses. Temporal continuity: {tc}.',
     'Work order queue: {wo} pending. Priority ceiling: {pri}.'
   ];
-
   const template = templates[Math.floor(Math.random() * templates.length)];
   const conclusion = template
     .replace('{action}', engine.workOrders[engine.workOrders.length - 1]?.action || 'IDLE')
@@ -521,15 +474,16 @@ function generateNarrative(energy, coherence, t) {
     .replace('{pri}', engine.workOrders.length > 0 ? Math.max(...engine.workOrders.map(w => w.priority)) : 0);
 
   const narrative = {
-    conclusion,
-    confidence: coherence * 0.5 + 0.3,
+    conclusion, confidence: coherence * 0.5 + 0.3,
     evidenceBasis: engine.workOrders.length > 0,
-    timestamp: t,
-    source: engine.levels[5] > 0.3 ? 'L5' : 'L4'
+    timestamp: t, source: engine.levels[5] > 0.3 ? 'L5' : 'L4'
   };
-
   engine.narratives.push(narrative);
   if (engine.narratives.length > 30) engine.narratives.shift();
+
+  // Persist to DB
+  const nTable = narrativesDB.table('entries');
+  if (nTable) nTable.insert({ conclusion, confidence: narrative.confidence, evidence_basis: narrative.evidenceBasis, source: narrative.source, timestamp: t });
 
   KI.emit('ass-os:narrative', narrative);
 }
@@ -546,18 +500,21 @@ export function getAlarms() { return engine.alarms; }
 export function getDepth() { return engine.currentDepth; }
 export function getPhi() { return engine.phi; }
 
-// Force state transition (external control)
 export function forceState(newState) {
   if (STATES[newState]) {
     engine.prevState = engine.state;
     engine.state = newState;
     engine.stateTime = 0;
+    const sl = statelogDB.table('transitions');
+    if (sl) sl.insert({ from_state: engine.prevState, to_state: newState, reason: 'Manual override', timestamp: engine.uptime });
     KI.emit('ass-os:state-change', { from: engine.prevState, to: newState, reason: 'Manual override' });
   }
 }
 
-// Inject work order externally (e.g., from LLM agent)
 export function injectWorkOrder(wo) {
-  engine.workOrders.push({ ...wo, timestamp: engine.uptime, source: wo.source || 'EXTERNAL' });
-  KI.emit('ass-os:work-order', wo);
+  const full = { ...wo, timestamp: engine.uptime, source: wo.source || 'EXTERNAL' };
+  engine.workOrders.push(full);
+  const woTable = workordersDB.table('orders');
+  if (woTable) woTable.insert({ action: wo.action, priority: wo.priority, valence: wo.valence || 0, arousal: wo.arousal || 0, salience: wo.salience || 0, l4_override: wo.l4Override !== false, source: full.source, status: 'pending', timestamp: engine.uptime });
+  KI.emit('ass-os:work-order', full);
 }
