@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena — Ocean Orb</title>
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.7),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#oceanZone{font-size:16px;color:#4cf;text-shadow:0 0 12px #4cf;text-transform:uppercase;letter-spacing:3px}
+#bioInfo{font-size:11px;color:#888}
+#tideInfo{font-size:10px;color:#666}
+#zonePills{position:fixed;right:12px;bottom:12px;z-index:55;display:flex;gap:4px;pointer-events:none}
+.zone-pill{padding:3px 10px;font-size:9px;color:#446;border:1px solid #fff1;
+  border-radius:10px;background:rgba(0,0,0,0.4);transition:all 0.3s}
+.zone-pill.active{color:#4cf;border-color:#4cf4}
+#tideMeter{position:fixed;left:12px;bottom:12px;z-index:55;width:6px;height:80px;
+  background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;pointer-events:none}
+#tideFill{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(0deg,#024,#4cf,#8ef);
+  border-radius:3px;transition:height 0.15s}
+#tideLabel{position:fixed;left:22px;bottom:12px;z-index:55;font-size:8px;color:#468;
+  writing-mode:vertical-rl;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l">
+    <div style="font-size:9px;color:#555;letter-spacing:2px">OCEAN ORB</div>
+    <div id="oceanZone">surface</div>
+  </div>
+  <div class="hud-r">
+    <div id="nick" onclick="changeNick()"></div>
+    <div id="bioInfo">0 bioluminescent</div>
+    <div id="tideInfo">tide 0%</div>
+  </div>
+</div>
+<div id="zonePills">
+  <div class="zone-pill active">surface</div>
+  <div class="zone-pill">reef</div>
+  <div class="zone-pill">deep</div>
+  <div class="zone-pill">abyss</div>
+  <div class="zone-pill">maelstrom</div>
+</div>
+<div id="tideMeter"><div id="tideFill" style="height:0%"></div></div>
+<div id="tideLabel">TIDE</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+import { KI } from './modules/core.js';
+import * as Scene from './modules/scene.js';
+import * as VoiceEngine from './modules/voice-engine.js';
+import * as FreqBands from './modules/freq-bands-12.js';
+import * as Synths from './modules/synths.js';
+import * as Resonance from './modules/resonance.js';
+import * as OceanOrb from './modules/ocean-orb.js';
+import * as MqttNet from './modules/mqtt-net.js';
+import * as WebRTCNet from './modules/webrtc-net.js';
+import * as Presence from './modules/presence.js';
+import * as Chat from './modules/chat.js';
+import * as PlayerProfile from './modules/player-profile.js';
+import * as NavOverlay from './modules/nav-overlay.js';
+
+const ROOM = 'OCEN-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+KI.player.name = KI.genHash();
+document.getElementById('nick').textContent = KI.player.name;
+window.changeNick = function() {
+  const n = prompt('Nickname:', KI.player.name);
+  if (n && n.trim()) { KI.player.name = n.trim().slice(0,16); document.getElementById('nick').textContent = KI.player.name; }
+};
+
+KI.on('ocean-orb:update', data => {
+  document.getElementById('oceanZone').textContent = data.oceanZone;
+  document.getElementById('bioInfo').textContent = data.bioCount + ' bioluminescent';
+  document.getElementById('tideInfo').textContent = 'tide ' + data.tidePhase + '%';
+  document.getElementById('tideFill').style.height = data.tidePhase + '%';
+  document.querySelectorAll('.zone-pill').forEach(p => {
+    p.classList.toggle('active', p.textContent === data.oceanZone);
+  });
+});
+
+async function boot() {
+  document.getElementById('hud').classList.add('on');
+  Scene.init({ stars: 300 });
+  try { await VoiceEngine.init(); } catch(e) { console.warn('voice:', e); }
+  FreqBands.init(); Synths.init(); Resonance.init();
+  OceanOrb.init({ position: [0, 2.5, -3.5] });
+  MqttNet.init({ room: ROOM }); WebRTCNet.init({ room: ROOM });
+  Presence.init(); Chat.init(); PlayerProfile.init(); NavOverlay.init();
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return; requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t); KI.renderer.render(KI.scene, KI.camera);
+  })();
+  console.log('%c OCEAN ORB BOOTED ', 'background:#000;color:#4cf;font-size:22px;padding:12px');
+}
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
