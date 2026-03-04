@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Voice Trainer — Pitch Matching + Scale Exercises + FX Lab</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#06060e;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+
+#ui{position:fixed;inset:0;z-index:40;pointer-events:none;display:flex;flex-direction:column}
+#ui *{pointer-events:auto}
+
+/* TOP BAR */
+#topbar{height:36px;display:flex;align-items:center;padding:0 12px;gap:10px;
+  background:linear-gradient(180deg,rgba(10,8,20,0.9),rgba(10,8,20,0.2))}
+.title{font-size:13px;letter-spacing:2px;color:#44ffaa}
+.mode-btn{padding:3px 10px;font:11px monospace;background:rgba(255,255,255,0.03);
+  border:1px solid #222;border-radius:4px;color:#777;cursor:pointer;transition:all 0.2s}
+.mode-btn:hover{border-color:#44ffaa;color:#44ffaa}
+.mode-btn.active{border-color:#44ff88;color:#44ff88;background:rgba(68,255,136,0.08)}
+#topbar .score-display{margin-left:auto;font-size:14px;color:#ff0;text-shadow:0 0 8px #f80}
+#topbar .streak-display{font-size:11px;color:#f80}
+
+/* PITCH DISPLAY (center) */
+#pitch-area{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:42;
+  text-align:center;pointer-events:none;width:400px}
+#target-note{font-size:48px;color:#44ffaa;text-shadow:0 0 20px #44ffaa80;margin-bottom:8px;
+  transition:color 0.2s}
+#target-note.miss{color:#ff4466}
+#target-note.close{color:#ffaa22}
+#target-note.hit{color:#44ff88}
+#target-hz{font-size:12px;color:#666;margin-bottom:16px}
+#your-pitch{font-size:20px;color:#888;margin-bottom:4px}
+#your-hz{font-size:11px;color:#555}
+#pitch-diff{font-size:14px;margin-top:8px}
+.diff-sharp{color:#ff6644}
+.diff-flat{color:#4488ff}
+.diff-perfect{color:#44ff88}
+#accuracy-bar{width:300px;height:6px;background:#111;border-radius:3px;margin:12px auto 0;
+  overflow:hidden;border:1px solid #222}
+#accuracy-fill{height:100%;border-radius:2px;transition:width 0.1s,background 0.2s;width:0}
+
+/* EXERCISE QUEUE */
+#exercise-queue{position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:43;
+  display:flex;gap:8px;pointer-events:none}
+.eq-note{width:40px;height:40px;border-radius:50%;border:2px solid #333;
+  display:flex;align-items:center;justify-content:center;font-size:12px;color:#666;
+  transition:all 0.3s}
+.eq-note.current{border-color:#44ffaa;color:#44ffaa;background:rgba(68,255,170,0.1);
+  box-shadow:0 0 12px #44ffaa40}
+.eq-note.done{border-color:#44ff88;color:#44ff88;opacity:0.5}
+.eq-note.missed{border-color:#ff4466;color:#ff4466;opacity:0.4}
+
+/* PITCH HISTORY CANVAS */
+#pitchCanvas{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:41;
+  border:1px solid #1a1a2e;border-radius:8px;background:rgba(10,8,20,0.6)}
+
+/* LEFT PANEL — FX controls */
+#fx-panel{position:fixed;left:10px;top:50%;transform:translateY(-50%);z-index:45;
+  width:160px;background:rgba(10,8,20,0.85);border:1px solid #1a1a2e;border-radius:8px;
+  padding:8px;display:flex;flex-direction:column;gap:4px;max-height:70vh;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:#333 transparent}
+#fx-panel label{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:1px}
+.fx-row{display:flex;align-items:center;gap:6px}
+.fx-toggle{width:28px;height:16px;border-radius:8px;background:#222;border:1px solid #333;
+  cursor:pointer;position:relative;transition:all 0.2s}
+.fx-toggle.on{background:#44ff8830;border-color:#44ff88}
+.fx-toggle::after{content:'';width:12px;height:12px;border-radius:50%;background:#555;
+  position:absolute;top:1px;left:1px;transition:all 0.2s}
+.fx-toggle.on::after{left:13px;background:#44ff88}
+.fx-name{font-size:10px;color:#aaa;flex:1}
+.fx-param{display:flex;align-items:center;gap:4px;margin-left:12px;margin-bottom:3px}
+.fx-param span{font-size:8px;color:#555;width:40px}
+.fx-param input{flex:1;height:3px;accent-color:#44ffaa}
+
+/* RIGHT PANEL — exercise info */
+#info-panel{position:fixed;right:10px;top:50%;transform:translateY(-50%);z-index:45;
+  width:150px;background:rgba(10,8,20,0.85);border:1px solid #1a1a2e;border-radius:8px;padding:8px}
+#info-panel label{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px}
+.info-row{font-size:11px;color:#aaa;margin-bottom:3px;display:flex;justify-content:space-between}
+.info-val{color:#44ffaa}
+#stats-total{font-size:18px;color:#ff0;text-align:center;margin-top:8px}
+#stats-accuracy{font-size:12px;color:#888;text-align:center}
+
+/* 12-BAND */
+#bandViz{position:fixed;left:50%;bottom:4px;transform:translateX(-50%);z-index:55;
+  display:flex;gap:2px;pointer-events:none;align-items:flex-end;height:50px}
+.band-bar{width:12px;height:50px;position:relative;overflow:hidden}
+.band-fill{position:absolute;bottom:0;left:1px;right:1px;border-radius:2px 2px 0 0;transition:height 0.06s;
+  box-shadow:0 0 3px currentColor}
+.band-label{position:absolute;bottom:-11px;left:50%;transform:translateX(-50%);font-size:5px;color:#444;white-space:nowrap}
+
+/* MODULE BADGES */
+#modBadges{position:fixed;top:4px;right:10px;z-index:55;display:flex;gap:3px;pointer-events:none}
+.mod-badge{background:#0002;border:1px solid #0ff3;border-radius:3px;padding:1px 5px;font-size:7px;color:#0ff8}
+.mod-badge.active{color:#0f0;border-color:#0f04}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="topbar">
+    <span class="title">VOICE TRAINER</span>
+    <button class="mode-btn active" data-mode="pitch" onclick="setMode('pitch')">Pitch Match</button>
+    <button class="mode-btn" data-mode="scale" onclick="setMode('scale')">Scales</button>
+    <button class="mode-btn" data-mode="interval" onclick="setMode('interval')">Intervals</button>
+    <button class="mode-btn" data-mode="freeplay" onclick="setMode('freeplay')">Free Play</button>
+    <span class="score-display" id="scoreDisplay">0</span>
+    <span class="streak-display" id="streakDisplay"></span>
+  </div>
+</div>
+
+<div id="pitch-area">
+  <div id="target-note">C4</div>
+  <div id="target-hz">261.6 Hz</div>
+  <div id="your-pitch">—</div>
+  <div id="your-hz"></div>
+  <div id="pitch-diff"></div>
+  <div id="accuracy-bar"><div id="accuracy-fill"></div></div>
+</div>
+
+<div id="exercise-queue"></div>
+<canvas id="pitchCanvas" width="500" height="120"></canvas>
+
+<div id="fx-panel">
+  <label>Voice Effects Lab</label>
+  <!-- effects will be populated dynamically -->
+</div>
+
+<div id="info-panel">
+  <label>Session Stats</label>
+  <div class="info-row"><span>Hits</span><span class="info-val" id="stat-hits">0</span></div>
+  <div class="info-row"><span>Misses</span><span class="info-val" id="stat-misses">0</span></div>
+  <div class="info-row"><span>Best Streak</span><span class="info-val" id="stat-streak">0</span></div>
+  <div class="info-row"><span>Avg Cents Off</span><span class="info-val" id="stat-cents">—</span></div>
+  <div class="info-row"><span>Mode</span><span class="info-val" id="stat-mode">Pitch</span></div>
+  <div class="info-row"><span>Key</span><span class="info-val" id="stat-key">C</span></div>
+  <div id="stats-total">0</div>
+  <div id="stats-accuracy">0% accuracy</div>
+</div>
+
+<div id="bandViz"></div>
+<div id="modBadges"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+import { KI } from './modules/core.js';
+import * as Scene from './modules/scene.js';
+import * as VoiceEngine from './modules/voice-engine.js';
+import * as Vortex from './modules/vortex.js';
+import * as FX from './modules/fx.js';
+import * as Resonance from './modules/resonance.js';
+import * as FreqBands from './modules/freq-bands-12.js';
+import * as GeoFolder from './modules/geo-folder.js';
+import * as SingingVoice from './modules/singing-voice.js';
+import * as VoiceFX from './modules/voice-fx.js';
+
+// ============================================================
+// MUSIC THEORY
+// ============================================================
+const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const SCALES = {
+  major:      [0, 2, 4, 5, 7, 9, 11],
+  minor:      [0, 2, 3, 5, 7, 8, 10],
+  pentatonic: [0, 2, 4, 7, 9],
+  blues:      [0, 3, 5, 6, 7, 10],
+  chromatic:  [0,1,2,3,4,5,6,7,8,9,10,11]
+};
+const INTERVALS = [
+  { name: 'Unison', semitones: 0 },
+  { name: 'Minor 2nd', semitones: 1 },
+  { name: 'Major 2nd', semitones: 2 },
+  { name: 'Minor 3rd', semitones: 3 },
+  { name: 'Major 3rd', semitones: 4 },
+  { name: 'Perfect 4th', semitones: 5 },
+  { name: 'Tritone', semitones: 6 },
+  { name: 'Perfect 5th', semitones: 7 },
+  { name: 'Minor 6th', semitones: 8 },
+  { name: 'Major 6th', semitones: 9 },
+  { name: 'Minor 7th', semitones: 10 },
+  { name: 'Major 7th', semitones: 11 },
+  { name: 'Octave', semitones: 12 }
+];
+
+function midiToHz(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+function hzToMidi(hz) { return hz > 0 ? 12 * Math.log2(hz / 440) + 69 : 0; }
+function midiToName(midi) { return NOTES[((midi % 12) + 12) % 12] + Math.floor(midi / 12 - 1); }
+function hzToName(hz) { return hz > 0 ? midiToName(Math.round(hzToMidi(hz))) : '—'; }
+function centsDiff(hz1, hz2) { return hz1 > 0 && hz2 > 0 ? 1200 * Math.log2(hz1 / hz2) : 0; }
+
+// ============================================================
+// TRAINER STATE
+// ============================================================
+const trainer = {
+  mode: 'pitch',       // pitch | scale | interval | freeplay
+  key: 'C',
+  scale: 'major',
+  octave: 4,
+  targetMidi: 60,      // current target note
+  targetHz: 261.63,
+  score: 0,
+  streak: 0,
+  bestStreak: 0,
+  hits: 0,
+  misses: 0,
+  totalCentsOff: 0,
+  centsSamples: 0,
+  holdTime: 0,         // how long held on target
+  holdRequired: 0.8,   // seconds to hold for a "hit"
+  accuracy: 0,         // 0-1 current accuracy
+  exerciseQueue: [],
+  exerciseIndex: 0,
+  noteTimer: 0,
+  noteDuration: 3,     // seconds per note in exercises
+  pitchHistory: [],    // last 200 pitch readings for graph
+  targetHistory: []
+};
+
+// expose to onclick
+window.setMode = setMode;
+
+// ============================================================
+// EXERCISE GENERATORS
+// ============================================================
+function generatePitchExercise() {
+  const rootMidi = 60 + NOTES.indexOf(trainer.key); // C4 base
+  const scaleNotes = SCALES[trainer.scale];
+  const queue = [];
+  for (let i = 0; i < 8; i++) {
+    const idx = Math.floor(Math.random() * scaleNotes.length);
+    const octaveShift = Math.random() < 0.3 ? 12 : 0;
+    queue.push(rootMidi + scaleNotes[idx] + octaveShift);
+  }
+  return queue;
+}
+
+function generateScaleExercise() {
+  const rootMidi = 60 + NOTES.indexOf(trainer.key);
+  const scaleNotes = SCALES[trainer.scale];
+  const queue = [];
+  // ascending
+  for (const s of scaleNotes) queue.push(rootMidi + s);
+  // top note
+  queue.push(rootMidi + 12);
+  // descending
+  for (let i = scaleNotes.length - 1; i >= 0; i--) queue.push(rootMidi + scaleNotes[i]);
+  return queue;
+}
+
+function generateIntervalExercise() {
+  const rootMidi = 60 + NOTES.indexOf(trainer.key);
+  const queue = [];
+  for (let i = 0; i < 8; i++) {
+    const interval = INTERVALS[Math.floor(Math.random() * INTERVALS.length)];
+    queue.push(rootMidi); // reference note
+    queue.push(rootMidi + interval.semitones); // interval note
+  }
+  return queue;
+}
+
+function startExercise() {
+  switch (trainer.mode) {
+    case 'pitch':    trainer.exerciseQueue = generatePitchExercise(); break;
+    case 'scale':    trainer.exerciseQueue = generateScaleExercise(); break;
+    case 'interval': trainer.exerciseQueue = generateIntervalExercise(); break;
+    case 'freeplay': trainer.exerciseQueue = []; break;
+  }
+  trainer.exerciseIndex = 0;
+  trainer.noteTimer = trainer.noteDuration;
+  if (trainer.exerciseQueue.length > 0) {
+    setTarget(trainer.exerciseQueue[0]);
+  }
+  buildExerciseQueueUI();
+}
+
+function setTarget(midi) {
+  trainer.targetMidi = midi;
+  trainer.targetHz = midiToHz(midi);
+  trainer.holdTime = 0;
+  trainer.accuracy = 0;
+  document.getElementById('target-note').textContent = midiToName(midi);
+  document.getElementById('target-hz').textContent = trainer.targetHz.toFixed(1) + ' Hz';
+
+  // play the target note via singing voice
+  SingingVoice.singNote(trainer.targetHz, 'aa', 0.6, 0.1);
+}
+
+function advanceExercise(hit) {
+  // update queue UI
+  const notes = document.querySelectorAll('.eq-note');
+  if (notes[trainer.exerciseIndex]) {
+    notes[trainer.exerciseIndex].classList.add(hit ? 'done' : 'missed');
+    notes[trainer.exerciseIndex].classList.remove('current');
+  }
+
+  trainer.exerciseIndex++;
+  if (trainer.exerciseIndex < trainer.exerciseQueue.length) {
+    setTarget(trainer.exerciseQueue[trainer.exerciseIndex]);
+    trainer.noteTimer = trainer.noteDuration;
+    const nextNote = document.querySelectorAll('.eq-note')[trainer.exerciseIndex];
+    if (nextNote) nextNote.classList.add('current');
+  } else {
+    // exercise complete — restart
+    setTimeout(() => startExercise(), 1500);
+  }
+}
+
+function buildExerciseQueueUI() {
+  const cont = document.getElementById('exercise-queue');
+  cont.innerHTML = '';
+  trainer.exerciseQueue.forEach((midi, i) => {
+    const div = document.createElement('div');
+    div.className = 'eq-note' + (i === 0 ? ' current' : '');
+    div.textContent = midiToName(midi);
+    cont.appendChild(div);
+  });
+}
+
+// ============================================================
+// MODE SWITCHING
+// ============================================================
+function setMode(mode) {
+  trainer.mode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.getElementById('stat-mode').textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+  if (mode === 'freeplay') {
+    trainer.exerciseQueue = [];
+    document.getElementById('exercise-queue').innerHTML = '';
+    document.getElementById('target-note').textContent = '♪';
+    document.getElementById('target-hz').textContent = 'Sing freely!';
+  } else {
+    startExercise();
+  }
+}
+
+// ============================================================
+// FX PANEL BUILDER
+// ============================================================
+function buildFXPanel() {
+  const panel = document.getElementById('fx-panel');
+  const effects = [
+    { id: 'echo', name: 'Echo', params: [
+      { key: 'time', label: 'Time', min: 0.05, max: 1.0, step: 0.05 },
+      { key: 'feedback', label: 'Feedback', min: 0, max: 0.9, step: 0.05 },
+      { key: 'volume', label: 'Volume', min: 0, max: 1, step: 0.05 }
+    ]},
+    { id: 'distortion', name: 'Distortion', params: [
+      { key: 'amount', label: 'Drive', min: 1, max: 100, step: 1 },
+      { key: 'tone', label: 'Tone', min: 200, max: 8000, step: 100 }
+    ]},
+    { id: 'chorus', name: 'Chorus', params: [] },
+    { id: 'reverb', name: 'Reverb', params: [
+      { key: 'mix', label: 'Mix', min: 0, max: 1, step: 0.05 }
+    ]},
+    { id: 'choir', name: 'Choir', params: [] },
+    { id: 'autotune', name: 'Autotune', params: [] }
+  ];
+
+  effects.forEach(fx => {
+    const row = document.createElement('div');
+    row.className = 'fx-row';
+    const toggle = document.createElement('div');
+    toggle.className = 'fx-toggle';
+    toggle.dataset.fx = fx.id;
+    toggle.onclick = () => {
+      VoiceFX.toggleEffect(fx.id);
+      toggle.classList.toggle('on');
+    };
+    const name = document.createElement('span');
+    name.className = 'fx-name';
+    name.textContent = fx.name;
+    row.appendChild(toggle);
+    row.appendChild(name);
+    panel.appendChild(row);
+
+    // params
+    fx.params.forEach(p => {
+      const paramDiv = document.createElement('div');
+      paramDiv.className = 'fx-param';
+      paramDiv.innerHTML = `<span>${p.label}</span><input type="range" min="${p.min}" max="${p.max}" step="${p.step}" value="${VoiceFX.getChain ? VoiceFX.getChain()[fx.id]?.[p.key] || p.min : p.min}">`;
+      paramDiv.querySelector('input').oninput = function() {
+        VoiceFX.setParam(fx.id, p.key, parseFloat(this.value));
+      };
+      panel.appendChild(paramDiv);
+    });
+  });
+
+  // dry/wet
+  const dwRow = document.createElement('div');
+  dwRow.className = 'fx-param';
+  dwRow.innerHTML = '<span>Dry/Wet</span><input type="range" min="0" max="1" step="0.05" value="0.8">';
+  dwRow.querySelector('input').oninput = function() { VoiceFX.setDryWet(parseFloat(this.value)); };
+  panel.appendChild(dwRow);
+}
+
+// ============================================================
+// 12-BAND VIZ
+// ============================================================
+function buildBandViz() {
+  const cont = document.getElementById('bandViz');
+  FreqBands.BANDS.forEach((band, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'band-bar'; bar.id = 'band-' + i;
+    bar.innerHTML = '<div class="band-fill" style="background:' + band.color + ';height:0%;color:' + band.color + '"></div>' +
+      '<div class="band-label">' + band.label + '</div>';
+    cont.appendChild(bar);
+  });
+}
+
+KI.on('freq-bands-12:update', data => {
+  for (let i = 0; i < 12; i++) {
+    const fill = document.querySelector('#band-' + i + ' .band-fill');
+    if (fill) fill.style.height = Math.min(100, data.energy[i] * 100) + '%';
+  }
+});
+
+// ============================================================
+// PITCH HISTORY CANVAS
+// ============================================================
+const pitchCanvasEl = document.getElementById('pitchCanvas');
+const pCtx = pitchCanvasEl.getContext('2d');
+
+function drawPitchHistory() {
+  const w = pitchCanvasEl.width, h = pitchCanvasEl.height;
+  pCtx.clearRect(0, 0, w, h);
+
+  // background grid
+  pCtx.strokeStyle = '#1a1a2e';
+  pCtx.lineWidth = 0.5;
+  for (let i = 0; i < 12; i++) {
+    const y = (i / 12) * h;
+    pCtx.beginPath(); pCtx.moveTo(0, y); pCtx.lineTo(w, y); pCtx.stroke();
+  }
+
+  // target line
+  if (trainer.exerciseQueue.length > 0) {
+    const tMidi = trainer.targetMidi;
+    const tY = h - ((tMidi - 48) / 36) * h; // map MIDI 48-84 to canvas
+    pCtx.strokeStyle = '#44ffaa40';
+    pCtx.lineWidth = 8;
+    pCtx.beginPath(); pCtx.moveTo(0, tY); pCtx.lineTo(w, tY); pCtx.stroke();
+    pCtx.strokeStyle = '#44ffaa';
+    pCtx.lineWidth = 1;
+    pCtx.beginPath(); pCtx.moveTo(0, tY); pCtx.lineTo(w, tY); pCtx.stroke();
+  }
+
+  // pitch trail
+  if (trainer.pitchHistory.length < 2) return;
+  pCtx.beginPath();
+  pCtx.strokeStyle = '#ff88cc';
+  pCtx.lineWidth = 2;
+  const len = trainer.pitchHistory.length;
+  for (let i = 0; i < len; i++) {
+    const midi = trainer.pitchHistory[i];
+    if (midi <= 0) continue;
+    const x = (i / 200) * w;
+    const y = h - ((midi - 48) / 36) * h;
+    if (i === 0 || trainer.pitchHistory[i - 1] <= 0) pCtx.moveTo(x, y);
+    else pCtx.lineTo(x, y);
+  }
+  pCtx.stroke();
+}
+
+// ============================================================
+// MAIN UPDATE LOOP
+// ============================================================
+function trainerUpdate(dt) {
+  const v = KI.voice;
+  const userHz = v.f0;
+  const userMidi = hzToMidi(userHz);
+
+  // pitch display
+  if (userHz > 50) {
+    document.getElementById('your-pitch').textContent = hzToName(userHz);
+    document.getElementById('your-hz').textContent = userHz.toFixed(1) + ' Hz';
+  } else {
+    document.getElementById('your-pitch').textContent = '—';
+    document.getElementById('your-hz').textContent = '';
+  }
+
+  // pitch history
+  trainer.pitchHistory.push(userHz > 50 ? userMidi : 0);
+  if (trainer.pitchHistory.length > 200) trainer.pitchHistory.shift();
+
+  if (trainer.mode === 'freeplay') {
+    document.getElementById('pitch-diff').textContent = '';
+    document.getElementById('accuracy-fill').style.width = '0';
+    drawPitchHistory();
+    return;
+  }
+
+  // accuracy calculation
+  if (userHz > 50 && trainer.targetHz > 50) {
+    const cents = centsDiff(userHz, trainer.targetHz);
+    const absCents = Math.abs(cents);
+    trainer.accuracy = Math.max(0, 1 - absCents / 100); // 100 cents = 0%
+
+    // accuracy bar
+    const fill = document.getElementById('accuracy-fill');
+    fill.style.width = (trainer.accuracy * 100) + '%';
+    fill.style.background = trainer.accuracy > 0.8 ? '#44ff88' :
+      trainer.accuracy > 0.5 ? '#ffaa22' : '#ff4466';
+
+    // pitch difference display
+    const diffEl = document.getElementById('pitch-diff');
+    if (absCents < 10) {
+      diffEl.className = 'diff-perfect';
+      diffEl.textContent = 'PERFECT!';
+    } else if (cents > 0) {
+      diffEl.className = 'diff-sharp';
+      diffEl.textContent = Math.round(absCents) + ' cents sharp';
+    } else {
+      diffEl.className = 'diff-flat';
+      diffEl.textContent = Math.round(absCents) + ' cents flat';
+    }
+
+    // target note color
+    const noteEl = document.getElementById('target-note');
+    noteEl.classList.remove('miss', 'close', 'hit');
+    if (absCents < 15) noteEl.classList.add('hit');
+    else if (absCents < 50) noteEl.classList.add('close');
+    else noteEl.classList.add('miss');
+
+    // hold detection
+    if (absCents < 30) {
+      trainer.holdTime += dt;
+      if (trainer.holdTime >= trainer.holdRequired) {
+        // HIT!
+        trainer.hits++;
+        trainer.streak++;
+        trainer.bestStreak = Math.max(trainer.bestStreak, trainer.streak);
+        const bonus = Math.round(100 * trainer.accuracy * (1 + trainer.streak * 0.1));
+        trainer.score += bonus;
+        advanceExercise(true);
+      }
+    } else {
+      trainer.holdTime = Math.max(0, trainer.holdTime - dt * 2);
+    }
+
+    // stats
+    trainer.totalCentsOff += absCents;
+    trainer.centsSamples++;
+  } else {
+    document.getElementById('pitch-diff').textContent = '';
+    document.getElementById('accuracy-fill').style.width = '0';
+  }
+
+  // note timer (auto-advance on timeout)
+  trainer.noteTimer -= dt;
+  if (trainer.noteTimer <= 0 && trainer.exerciseQueue.length > 0) {
+    trainer.misses++;
+    trainer.streak = 0;
+    advanceExercise(false);
+  }
+
+  // update stats display
+  document.getElementById('scoreDisplay').textContent = trainer.score;
+  document.getElementById('streakDisplay').textContent = trainer.streak > 1 ? trainer.streak + 'x' : '';
+  document.getElementById('stat-hits').textContent = trainer.hits;
+  document.getElementById('stat-misses').textContent = trainer.misses;
+  document.getElementById('stat-streak').textContent = trainer.bestStreak;
+  document.getElementById('stat-cents').textContent = trainer.centsSamples > 0
+    ? Math.round(trainer.totalCentsOff / trainer.centsSamples) + '¢' : '—';
+  document.getElementById('stats-total').textContent = trainer.score;
+  const totalAttempts = trainer.hits + trainer.misses;
+  document.getElementById('stats-accuracy').textContent = totalAttempts > 0
+    ? Math.round(trainer.hits / totalAttempts * 100) + '% accuracy' : '—';
+
+  drawPitchHistory();
+}
+
+// ============================================================
+// BADGE HELPER
+// ============================================================
+function showBadge(name) {
+  const b = document.createElement('div');
+  b.className = 'mod-badge active';
+  b.textContent = name.toUpperCase();
+  document.getElementById('modBadges').appendChild(b);
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+async function boot() {
+  Scene.init({ stars: 2000, fogDensity: 0.01 });
+  showBadge('scene');
+
+  Vortex.init({ count: 600, particleSize: 0.08 });
+  showBadge('vortex');
+
+  FX.init({ aurora: true });
+  showBadge('fx');
+
+  Resonance.init();
+  showBadge('resonance');
+
+  FreqBands.init();
+  buildBandViz();
+  showBadge('12-bands');
+
+  GeoFolder.init({ position: [0, 2.5, -4], scale: 1.0 });
+  showBadge('geo-folder');
+
+  SingingVoice.init();
+  showBadge('songbird');
+
+  VoiceFX.init();
+  buildFXPanel();
+  showBadge('voice-fx');
+
+  try {
+    await VoiceEngine.init();
+    showBadge('voice');
+  } catch (e) {
+    console.warn('Voice init failed:', e);
+  }
+
+  // start first exercise
+  startExercise();
+
+  // main loop
+  KI.running = true;
+  const clock = KI.clock;
+  function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    trainerUpdate(dt);
+    KI.renderer.render(KI.scene, KI.camera);
+  }
+  animate();
+
+  console.log('%c VOICE TRAINER BOOTED ', 'background:#06060e;color:#44ffaa;font-size:18px;padding:8px');
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
