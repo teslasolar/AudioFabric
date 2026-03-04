@@ -203,6 +203,23 @@ let innerSphere = null;
 const MAX_EDGES = 80;     // hypercube has 80 edges
 const MAX_VERTS = 32;     // hypercube has 32 verts
 
+// === SUB-LAYER CONSTANTS ===
+const PRIME_ORB_N = 100;
+const SL_RING_COUNT = 6;
+const SL_RING_CUBES = 8;
+const WAVE_WRAP_N = 3;
+const WAVE_WRAP_PTS = 150;
+const BURST_N = 100;
+const BAND_PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37];
+
+// Sub-layer state
+let primeOrbit = null, primeOrbitPos = null, primeOrbitCol = null, primeSet = null;
+let wormholeRings = null;
+let waveWraps = [], waveWrapPos = [], waveWrapCol = [];
+let burstLayer = null, burstPos = null, burstCol = null, burstDir = null;
+let slBurstForce = 0;
+let slTimeData = null;
+
 export function init(opts = {}) {
   const scene = KI.scene;
   if (!scene) { KI.on('scene:ready', () => init(opts)); return; }
@@ -259,6 +276,8 @@ export function init(opts = {}) {
   });
   innerSphere = new THREE.Mesh(innerGeo, innerMat);
   group.add(innerSphere);
+
+  buildSubLayers();
 
   KI.register('geo-folder', {
     update, state: geoState, TIERS,
@@ -427,6 +446,12 @@ function update(dt, t) {
   // whole group subtle bob
   const baseY = group.userData.baseY || 3;
   group.position.y = baseY + Math.sin(t * 0.7) * 0.15 + energy * 0.3;
+
+  // Sub-layer updates — driven by band energy + tier
+  const bandEnergy = fbState
+    ? Array.from({ length: 12 }, (_, i) => fb.getEnergy(i))
+    : new Array(12).fill(0);
+  updateSubLayers(t, bandEnergy, energy);
 }
 
 // helper: blend edge sets during morph
@@ -458,4 +483,300 @@ export function getCurrentTier() {
     morphProgress: geoState.morphProgress,
     targetIndex: geoState.targetTier
   };
+}
+
+// ================================================================
+// === SUB-LAYERS — Prime Orbits, Wormhole Rings, Wave Wraps, Burst
+// ================================================================
+
+function isPrime(n) {
+  if (n < 2) return false;
+  if (n < 4) return true;
+  if (n % 2 === 0 || n % 3 === 0) return false;
+  for (let i = 5; i * i <= n; i += 6)
+    if (n % i === 0 || n % (i + 2) === 0) return false;
+  return true;
+}
+
+function getBoundingRadius() {
+  const verts = geoState.vertices;
+  if (!verts || verts.length === 0) return 1;
+  let maxR = 0;
+  for (const v of verts) {
+    const r = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+    if (r > maxR) maxR = r;
+  }
+  return Math.max(0.3, maxR);
+}
+
+function buildSubLayers() {
+  // --- Prime sieve ---
+  primeSet = new Set();
+  for (let i = 2; i <= PRIME_ORB_N; i++) if (isPrime(i)) primeSet.add(i);
+
+  // --- 1. Prime Orbit Points (Sacks spiral on sphere surface) ---
+  const poGeo = new THREE.BufferGeometry();
+  primeOrbitPos = new Float32Array(PRIME_ORB_N * 3);
+  primeOrbitCol = new Float32Array(PRIME_ORB_N * 3);
+  poGeo.setAttribute('position', new THREE.BufferAttribute(primeOrbitPos, 3));
+  poGeo.setAttribute('color', new THREE.BufferAttribute(primeOrbitCol, 3));
+  primeOrbit = new THREE.Points(poGeo, new THREE.PointsMaterial({
+    size: 0.06, vertexColors: true, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  }));
+  group.add(primeOrbit);
+
+  // --- 2. Wormhole Rings (InstancedMesh cubes in orbital rings) ---
+  const cubeGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+  const cubeMat = new THREE.MeshBasicMaterial({
+    transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const totalCubes = SL_RING_COUNT * SL_RING_CUBES;
+  wormholeRings = new THREE.InstancedMesh(cubeGeo, cubeMat, totalCubes);
+  wormholeRings.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  wormholeRings.count = totalCubes;
+  // init hidden
+  const d = new THREE.Object3D();
+  d.scale.setScalar(0.001);
+  d.updateMatrix();
+  for (let i = 0; i < totalCubes; i++) wormholeRings.setMatrixAt(i, d.matrix);
+  wormholeRings.instanceMatrix.needsUpdate = true;
+  group.add(wormholeRings);
+
+  // --- 3. Wave Wraps (3 rainbow lines spiraling around shape) ---
+  for (let w = 0; w < WAVE_WRAP_N; w++) {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(WAVE_WRAP_PTS * 3);
+    const col = new Float32Array(WAVE_WRAP_PTS * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, linewidth: 1.5
+    }));
+    group.add(line);
+    waveWraps.push(line);
+    waveWrapPos.push(pos);
+    waveWrapCol.push(col);
+  }
+
+  // --- 4. Burst Particles (sphere surface, energy spikes push outward) ---
+  const bGeo = new THREE.BufferGeometry();
+  burstPos = new Float32Array(BURST_N * 3);
+  burstCol = new Float32Array(BURST_N * 3);
+  burstDir = new Float32Array(BURST_N * 3); // pre-computed outward directions
+  bGeo.setAttribute('position', new THREE.BufferAttribute(burstPos, 3));
+  bGeo.setAttribute('color', new THREE.BufferAttribute(burstCol, 3));
+  // distribute on sphere via golden angle
+  for (let i = 0; i < BURST_N; i++) {
+    const y = 1 - (i / (BURST_N - 1)) * 2;
+    const radiusAtY = Math.sqrt(1 - y * y);
+    const theta = i * 2.399963; // golden angle
+    burstDir[i * 3]     = Math.cos(theta) * radiusAtY;
+    burstDir[i * 3 + 1] = y;
+    burstDir[i * 3 + 2] = Math.sin(theta) * radiusAtY;
+  }
+  burstLayer = new THREE.Points(bGeo, new THREE.PointsMaterial({
+    size: 0.05, vertexColors: true, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  }));
+  group.add(burstLayer);
+
+  // time-domain buffer for waveform displacement
+  slTimeData = new Float32Array(256);
+}
+
+// === Master sub-layer updater ===
+function updateSubLayers(t, bandEnergy, totalEnergy) {
+  const tier = geoState.currentTier;
+  const R = getBoundingRadius();
+
+  updatePrimeOrbit(t, bandEnergy, totalEnergy, tier, R);
+  updateWormholeRings(t, bandEnergy, totalEnergy, tier, R);
+  updateWaveWraps(t, bandEnergy, totalEnergy, tier, R);
+  updateBurstLayer(t, bandEnergy, totalEnergy, tier, R);
+}
+
+// --- 1. PRIME ORBITS ---
+function updatePrimeOrbit(t, bandEnergy, totalEnergy, tier, R) {
+  const fade = Math.min(1, Math.max(0, (tier - 1.5) * 0.5)); // visible tier >= 2
+  primeOrbit.material.opacity = fade * (0.4 + totalEnergy * 0.5);
+  if (fade < 0.01) return;
+
+  const orbR = R * 1.3;
+  const pos = primeOrbitPos, col = primeOrbitCol;
+
+  for (let i = 0; i < PRIME_ORB_N; i++) {
+    const n = i + 1;
+    // Sacks spiral mapped onto sphere
+    const sqrtN = Math.sqrt(n);
+    const angle = sqrtN * Math.PI * 2;
+    const phi = (sqrtN / Math.sqrt(PRIME_ORB_N)) * Math.PI; // latitude
+    const theta = angle + t * 0.3;
+
+    const sinPhi = Math.sin(phi), cosPhi = Math.cos(phi);
+    pos[i * 3]     = Math.cos(theta) * sinPhi * orbR;
+    pos[i * 3 + 1] = cosPhi * orbR;
+    pos[i * 3 + 2] = Math.sin(theta) * sinPhi * orbR;
+
+    // Primes glow with their band energy, composites dim
+    const isPr = primeSet.has(n);
+    const bIdx = n % 12;
+    const glow = isPr ? 0.5 + bandEnergy[bIdx] * 1.5 : 0.15;
+    const hue = (bIdx / 12 + t * 0.02) % 1;
+    const rgb = KI.hslToRgb(hue, isPr ? 0.9 : 0.3, Math.min(1, glow));
+    col[i * 3]     = rgb[0];
+    col[i * 3 + 1] = rgb[1];
+    col[i * 3 + 2] = rgb[2];
+  }
+
+  primeOrbit.geometry.attributes.position.needsUpdate = true;
+  primeOrbit.geometry.attributes.color.needsUpdate = true;
+  primeOrbit.material.size = 0.04 + totalEnergy * 0.08 + (tier > 6 ? 0.03 : 0);
+}
+
+// --- 2. WORMHOLE RINGS ---
+function updateWormholeRings(t, bandEnergy, totalEnergy, tier, R) {
+  const fade = Math.min(1, Math.max(0, (tier - 4.5) * 0.4)); // visible tier >= 5
+  wormholeRings.material.opacity = fade * (0.3 + totalEnergy * 0.6);
+  if (fade < 0.01) { wormholeRings.visible = false; return; }
+  wormholeRings.visible = true;
+
+  const ringR = R * 1.5;
+  const d = new THREE.Object3D();
+  const c = new THREE.Color();
+  let idx = 0;
+
+  for (let r = 0; r < SL_RING_COUNT; r++) {
+    // Each ring tilted at different angles
+    const tiltX = (r / SL_RING_COUNT) * Math.PI + Math.sin(t * 0.2 + r) * 0.1;
+    const tiltZ = r * 0.5 + Math.cos(t * 0.15 + r * 2) * 0.1;
+    const ringSpeed = 0.5 + r * 0.15 + totalEnergy * 0.8;
+    const rScale = ringR * (0.8 + r * 0.15);
+
+    for (let i = 0; i < SL_RING_CUBES; i++) {
+      const angle = (i / SL_RING_CUBES) * Math.PI * 2 + t * ringSpeed;
+      // Position on ring
+      let px = Math.cos(angle) * rScale;
+      let py = Math.sin(angle) * rScale;
+      let pz = 0;
+      // Apply ring tilt
+      const cosX = Math.cos(tiltX), sinX = Math.sin(tiltX);
+      const cosZ = Math.cos(tiltZ), sinZ = Math.sin(tiltZ);
+      const y1 = py * cosX - pz * sinX, z1 = py * sinX + pz * cosX;
+      py = y1; pz = z1;
+      const x2 = px * cosZ - py * sinZ, y2 = px * sinZ + py * cosZ;
+      px = x2; py = y2;
+
+      d.position.set(px, py, pz);
+      const cubeScale = (0.6 + bandEnergy[r % 12] * 2) * fade;
+      d.scale.setScalar(cubeScale);
+      d.rotation.set(t * 0.5 + r, t * 0.3 + i, t * 0.2);
+      d.updateMatrix();
+      wormholeRings.setMatrixAt(idx, d.matrix);
+
+      // Color: cosmic purple → cyan gradient with band glow
+      const hue = (0.75 + r * 0.04 + bandEnergy[(r + i) % 12] * 0.1) % 1;
+      c.setHSL(hue, 0.8, 0.3 + bandEnergy[(r + i) % 12] * 0.5);
+      wormholeRings.setColorAt(idx, c);
+      idx++;
+    }
+  }
+
+  wormholeRings.instanceMatrix.needsUpdate = true;
+  if (wormholeRings.instanceColor) wormholeRings.instanceColor.needsUpdate = true;
+}
+
+// --- 3. WAVE WRAPS ---
+function updateWaveWraps(t, bandEnergy, totalEnergy, tier, R) {
+  const fade = Math.min(1, Math.max(0, (tier - 2.5) * 0.5)); // visible tier >= 3
+  if (fade < 0.01) {
+    for (const w of waveWraps) w.material.opacity = 0;
+    return;
+  }
+
+  // Get time-domain data for waveform displacement
+  const ve = KI.get('voice-engine');
+  if (ve && ve.analyser) {
+    ve.analyser.getFloatTimeDomainData(slTimeData);
+  }
+
+  const wrapR = R * 1.1;
+
+  for (let w = 0; w < WAVE_WRAP_N; w++) {
+    waveWraps[w].material.opacity = fade * (0.3 + totalEnergy * 0.5);
+    const pos = waveWrapPos[w];
+    const col = waveWrapCol[w];
+    const phaseOffset = (w / WAVE_WRAP_N) * Math.PI * 2;
+
+    for (let i = 0; i < WAVE_WRAP_PTS; i++) {
+      const frac = i / (WAVE_WRAP_PTS - 1);
+      // Latitude: pole to pole
+      const phi = frac * Math.PI;
+      // Longitude: 3 full spirals + rotation
+      const theta = frac * Math.PI * 6 + phaseOffset + t * 0.4;
+
+      // Audio waveform displacement
+      const sampleIdx = Math.floor(frac * (slTimeData.length - 1));
+      const waveDisp = slTimeData[sampleIdx] * 0.3 * totalEnergy;
+      const r = wrapR + waveDisp;
+
+      const sinPhi = Math.sin(phi);
+      pos[i * 3]     = Math.cos(theta) * sinPhi * r;
+      pos[i * 3 + 1] = Math.cos(phi) * r;
+      pos[i * 3 + 2] = Math.sin(theta) * sinPhi * r;
+
+      // Rainbow color based on position + time
+      const hue = (frac + w * 0.33 + t * 0.05) % 1;
+      const lum = 0.35 + bandEnergy[Math.floor(frac * 11.99)] * 0.5;
+      const rgb = KI.hslToRgb(hue, 0.95, Math.min(1, lum));
+      col[i * 3]     = rgb[0];
+      col[i * 3 + 1] = rgb[1];
+      col[i * 3 + 2] = rgb[2];
+    }
+
+    waveWraps[w].geometry.attributes.position.needsUpdate = true;
+    waveWraps[w].geometry.attributes.color.needsUpdate = true;
+  }
+}
+
+// --- 4. BURST PARTICLES ---
+function updateBurstLayer(t, bandEnergy, totalEnergy, tier, R) {
+  const tierFade = Math.min(1, tier / 4); // scales with tier/4
+  burstLayer.material.opacity = tierFade * (0.3 + totalEnergy * 0.6);
+  if (tierFade < 0.01) return;
+
+  // Energy spike detection → burst force
+  if (totalEnergy > 0.6) slBurstForce = Math.max(slBurstForce, totalEnergy * 1.5);
+  slBurstForce *= 0.96; // decay
+
+  const baseR = R * 1.05;
+  const burstR = baseR + slBurstForce * R * 0.8;
+  const pos = burstPos, col = burstCol;
+
+  for (let i = 0; i < BURST_N; i++) {
+    const dx = burstDir[i * 3], dy = burstDir[i * 3 + 1], dz = burstDir[i * 3 + 2];
+    // Breathing + burst
+    const breath = 1 + Math.sin(t * 2 + i * 0.5) * 0.08;
+    const r = burstR * breath;
+    pos[i * 3]     = dx * r;
+    pos[i * 3 + 1] = dy * r;
+    pos[i * 3 + 2] = dz * r;
+
+    // Color: warm glow, primes in their band color
+    const bIdx = i % 12;
+    const isPr = primeSet.has(i + 1);
+    const hue = isPr ? (bIdx / 12) : (0.05 + t * 0.02) % 1;
+    const sat = isPr ? 0.9 : 0.6;
+    const lum = 0.3 + bandEnergy[bIdx] * 0.5 + slBurstForce * 0.2;
+    const rgb = KI.hslToRgb(hue, sat, Math.min(1, lum));
+    col[i * 3]     = rgb[0];
+    col[i * 3 + 1] = rgb[1];
+    col[i * 3 + 2] = rgb[2];
+  }
+
+  burstLayer.geometry.attributes.position.needsUpdate = true;
+  burstLayer.geometry.attributes.color.needsUpdate = true;
+  burstLayer.material.size = 0.04 + slBurstForce * 0.08 + totalEnergy * 0.04;
 }
