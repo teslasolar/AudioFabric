@@ -25,24 +25,35 @@ body{background:#0a0f1e}
 <div id="hud">
   <div id="title"><h1><span class="dot-live" style="background:#0f0"></span>GAIA LIVE</h1><h2>PLANETARY CONSCIOUSNESS MONITOR</h2></div>
   <div id="feeds">
-    <h3>&#x25b8; DATA FEEDS</h3>
+    <h3>&#x25b8; PRIMARY FEEDS</h3>
     <div class="feed"><div class="feed-header"><span class="icon">&#x1f30d;</span><span class="name">SEISMIC</span><span class="status sim" id="status-eq">SIM</span></div><div class="feed-value" id="val-eq">--</div><div class="feed-sub" id="sub-eq">Initializing...</div></div>
     <div class="feed"><div class="feed-header"><span class="icon">&#x2600;&#xfe0f;</span><span class="name">SOLAR WIND</span><span class="status sim" id="status-solar">SIM</span></div><div class="feed-value" id="val-solar">--</div><div class="feed-sub" id="sub-solar">Initializing...</div></div>
-    <div class="feed"><div class="feed-header"><span class="icon">&#x1f9f2;</span><span class="name">Kp INDEX</span><span class="status sim" id="status-kp">SIM</span></div><div class="feed-value" id="val-kp">--</div><div class="feed-sub" id="sub-kp">Geomagnetic</div></div>
-    <div class="feed"><div class="feed-header"><span class="icon">&#x26a1;</span><span class="name">SCHUMANN</span><span class="status live">LIVE</span></div><div class="feed-value" id="val-sch">7.83 Hz</div><div class="feed-sub">Earth resonance</div></div>
+    <div class="feed"><div class="feed-header"><span class="icon">&#x1f9f2;</span><span class="name">Kp / Dst</span><span class="status sim" id="status-kp">SIM</span></div><div class="feed-value" id="val-kp">--</div><div class="feed-sub" id="sub-kp">Geomagnetic</div></div>
+    <div class="feed"><div class="feed-header"><span class="icon">&#x2604;&#xfe0f;</span><span class="name">X-RAY</span><span class="status sim" id="status-xray">SIM</span></div><div class="feed-value" id="val-xray">--</div><div class="feed-sub" id="sub-xray">GOES flux</div></div>
+    <div class="feed"><div class="feed-header"><span class="icon">&#x26a1;</span><span class="name">SCHUMANN</span><span class="status live">CALC</span></div><div class="feed-value" id="val-sch">7.83 Hz</div><div class="feed-sub">Earth resonance</div></div>
   </div>
   <div id="kappa-panel"><div style="font-family:'JetBrains Mono';font-size:6px;color:rgba(255,255,255,0.2);letter-spacing:2px;margin-bottom:4px">&#x25b8; PLANETARY &#x03ba;</div><div id="kappa-display">0.6180</div><div id="kappa-phase">&#x1f338; KONOMI</div><div id="kappa-bar"><div id="kappa-fill"></div></div></div>
-  <div id="events"><h3>&#x25b8; EVENTS</h3><div id="event-list"></div></div>
-  <div id="metrics"><h3>&#x25b8; ADDITIONAL METRICS</h3>
-    <div class="metric-row"><span class="k">UV Index</span><span class="v" id="m-uv">--</span></div>
-    <div class="metric-row"><span class="k">Lightning</span><span class="v" id="m-lightning">--</span></div>
-    <div class="metric-row"><span class="k">CO&#x2082;</span><span class="v" id="m-co2">--</span></div>
-    <div class="metric-row"><span class="k">Cosmic Rays</span><span class="v" id="m-cosmic">--</span></div>
+  <div id="events"><h3>&#x25b8; EVENTS / ALERTS</h3><div id="event-list"></div></div>
+  <div id="metrics"><h3>&#x25b8; LIVE METRICS <span id="live-count" style="color:rgba(0,255,0,0.4)"></span></h3>
+    <div class="metric-row"><span class="k">Dst Index</span><span class="v" id="m-dst">--</span></div>
+    <div class="metric-row"><span class="k">X-ray Class</span><span class="v" id="m-xclass">--</span></div>
+    <div class="metric-row"><span class="k">Flare Prob</span><span class="v" id="m-flare-prob">--</span></div>
+    <div class="metric-row"><span class="k">Latest Flare</span><span class="v" id="m-flare">--</span></div>
+    <div class="metric-row"><span class="k">Proton >=10</span><span class="v" id="m-proton">--</span></div>
+    <div class="metric-row"><span class="k">Electron >=2</span><span class="v" id="m-electron">--</span></div>
     <div class="metric-row"><span class="k">F10.7 Flux</span><span class="v" id="m-f107">--</span></div>
-    <div class="metric-row"><span class="k">Proton Flux</span><span class="v" id="m-proton">--</span></div>
-    <div class="metric-row"><span class="k">Tidal Force</span><span class="v" id="m-tidal">--</span></div>
+    <div class="metric-row"><span class="k">Sunspots</span><span class="v" id="m-sunspot">--</span></div>
+    <div class="metric-row"><span class="k">NOAA G/S/R</span><span class="v" id="m-scales">--</span></div>
+    <div class="metric-row"><span class="k">Aurora Max</span><span class="v" id="m-aurora">--</span></div>
+    <div class="metric-row"><span class="k">Bz / Bt</span><span class="v" id="m-imf">--</span></div>
+    <div class="metric-row"><span class="k">Wind Temp</span><span class="v" id="m-stemp">--</span></div>
+    <div class="metric-row"><span class="k">Lightning</span><span class="v" id="m-lightning">--</span></div>
+    <div class="metric-row"><span class="k">UV Index</span><span class="v" id="m-uv">--</span></div>
+    <div class="metric-row"><span class="k">Cosmic Rays</span><span class="v" id="m-cosmic">--</span></div>
+    <div class="metric-row"><span class="k">CO&#x2082;</span><span class="v" id="m-co2">--</span></div>
+    <div class="metric-row"><span class="k">Tidal</span><span class="v" id="m-tidal">--</span></div>
   </div>
-  <div id="info"><p><em>Live data</em> via CORS proxy &middot; sim fallback</p></div>
+  <div id="info"><p><em id="info-live">--</em> of 13 feeds live</p><p>NOAA SWPC &middot; USGS &middot; GOES &middot; DSCOVR</p></div>
   <div id="alert"></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -99,21 +110,30 @@ onEvent((entry, all) => {
   const a=document.getElementById('alert');a.textContent=entry.msg;a.style.color={earthquake:'#f80',solar:'#ff0',geomag:'#f0f',lightning:'#0ff',uv:'#ff8'}[entry.type]||'#fff';a.style.opacity=1;setTimeout(()=>a.style.opacity=0,2500);
 });
 
+function setStatus(id, mode) {
+  const el = document.getElementById(id);
+  el.textContent = mode === 'live' ? 'LIVE' : 'SIM';
+  el.className = 'status ' + (mode === 'live' ? 'live' : 'sim');
+}
+
 function updateUI(){
   const M=metrics;
-  // Feeds
-  document.getElementById('status-eq').textContent=M.eqMode==='live'?'LIVE':'SIM';
-  document.getElementById('status-eq').className='status '+(M.eqMode==='live'?'live':'sim');
-  document.getElementById('status-solar').textContent=M.solarMode==='live'?'LIVE':'SIM';
-  document.getElementById('status-solar').className='status '+(M.solarMode==='live'?'live':'sim');
-  document.getElementById('status-kp').textContent=M.kpMode==='live'?'LIVE':'SIM';
-  document.getElementById('status-kp').className='status '+(M.kpMode==='live'?'live':'sim');
+  // Feed statuses
+  setStatus('status-eq', M.eqMode);
+  setStatus('status-solar', M.solarMode);
+  setStatus('status-kp', M.kpMode);
+  setStatus('status-xray', M.xrayMode);
+
+  // Primary feeds
   if(M.earthquakes.length){const e=M.earthquakes[0];document.getElementById('val-eq').textContent='M'+e.mag.toFixed(1);document.getElementById('sub-eq').textContent=(e.place||'').substring(0,22)}
   document.getElementById('val-solar').textContent=Math.round(M.solarSpeed)+' km/s';
   document.getElementById('sub-solar').textContent='\u03c1='+M.solarDensity.toFixed(1)+' p/cm\u00b3';
-  document.getElementById('val-kp').textContent='Kp '+M.kpIndex.toFixed(0);
+  document.getElementById('val-kp').textContent='Kp '+M.kpIndex.toFixed(0)+' / Dst '+Math.round(M.dst);
   document.getElementById('sub-kp').textContent=M.kpIndex>=5?'STORM!':M.kpIndex>=4?'Active':'Quiet';
+  document.getElementById('val-xray').textContent=M.xrayClass;
+  document.getElementById('sub-xray').textContent=M.xrayFluxLong.toExponential(1)+' W/m\u00b2';
   document.getElementById('val-sch').textContent=M.schumann.toFixed(2)+' Hz';
+
   // Kappa
   const p=getPhase(M.kappa);
   document.getElementById('kappa-display').textContent=M.kappa.toFixed(4);
@@ -121,14 +141,35 @@ function updateUI(){
   document.getElementById('kappa-phase').textContent=p.icon+' '+p.key;
   document.getElementById('kappa-fill').style.width=M.kappa*100+'%';
   document.getElementById('kappa-fill').style.background='#'+p.color.toString(16).padStart(6,'0');
-  // Additional metrics
-  document.getElementById('m-uv').textContent=M.uvIndex.toFixed(1);
-  document.getElementById('m-lightning').textContent=Math.round(M.lightningRate)+'/s';
-  document.getElementById('m-co2').textContent=M.co2ppm.toFixed(1)+' ppm';
-  document.getElementById('m-cosmic').textContent=Math.round(M.cosmicRayFlux)+' n/m';
-  document.getElementById('m-f107').textContent=M.f107Flux.toFixed(0)+' sfu';
+
+  // All metrics
+  document.getElementById('m-dst').textContent=Math.round(M.dst)+' nT';
+  document.getElementById('m-dst').style.color=M.dst<=-100?'#ff4444':M.dst<=-50?'#ff8800':'';
+  document.getElementById('m-xclass').textContent=M.xrayClass;
+  document.getElementById('m-xclass').style.color=M.xrayClass.startsWith('X')?'#ff4444':M.xrayClass.startsWith('M')?'#ff8800':'';
+  document.getElementById('m-flare-prob').textContent='C'+M.flareProbC+'% M'+M.flareProbM+'% X'+M.flareProbX+'%';
+  document.getElementById('m-flare').textContent=M.latestFlare?M.latestFlare.maxClass:'--';
   document.getElementById('m-proton').textContent=M.protonFlux.toFixed(1)+' pfu';
+  document.getElementById('m-proton').style.color=M.protonFlux>=10?'#ff4444':'';
+  document.getElementById('m-electron').textContent=Math.round(M.electronFlux)+' e/cm\u00b2';
+  document.getElementById('m-electron').style.color=M.electronFlux>=1000?'#ff8800':'';
+  document.getElementById('m-f107').textContent=M.f107Flux.toFixed(0)+' sfu';
+  document.getElementById('m-sunspot').textContent=M.sunspotNumber+' spots / '+M.sunspotRegions+' rgn';
+  document.getElementById('m-scales').textContent='G'+M.scaleG+' S'+M.scaleS+' R'+M.scaleR;
+  const scaleEl=document.getElementById('m-scales');
+  scaleEl.style.color=(M.scaleG>=3||M.scaleS>=3||M.scaleR>=3)?'#ff4444':(M.scaleG>=1||M.scaleS>=1||M.scaleR>=1)?'#ff8800':'';
+  document.getElementById('m-aurora').textContent=M.auroraMax+'/9';
+  document.getElementById('m-imf').textContent='Bz '+M.bz.toFixed(1)+' / Bt '+M.bt.toFixed(1)+' nT';
+  document.getElementById('m-imf').style.color=M.bz<-5?'#ff4444':'';
+  document.getElementById('m-stemp').textContent=(M.solarTemp/1000).toFixed(0)+'K \u00d710\u00b3';
+  document.getElementById('m-lightning').textContent=Math.round(M.lightningRate)+'/s';
+  document.getElementById('m-uv').textContent=M.uvIndex.toFixed(1);
+  document.getElementById('m-cosmic').textContent=Math.round(M.cosmicRayFlux)+' n/m';
+  document.getElementById('m-co2').textContent=M.co2ppm.toFixed(1)+' ppm';
   document.getElementById('m-tidal').textContent=(M.tidalForce>=0?'+':'')+M.tidalForce.toFixed(3);
+  document.getElementById('live-count').textContent=M.liveCount+'/'+M.totalFeeds+' live';
+  document.getElementById('info-live').textContent=M.liveCount;
+
   // Spawn new EQ visuals
   if(M.earthquakes.length>lastEQCount){for(let i=0;i<Math.min(3,M.earthquakes.length-lastEQCount);i++)spawnEQ(M.earthquakes[i])}
   lastEQCount=M.earthquakes.length;
