@@ -81,6 +81,14 @@ textarea.sys-prompt:focus{border-color:rgba(255,215,0,0.3)}
 #hud{position:fixed;top:16px;left:16px;z-index:10;font-size:9px;color:rgba(255,215,0,0.3);line-height:1.8;pointer-events:none}
 #hud .val{color:rgba(255,215,0,0.6)}
 #orb-label{position:fixed;top:16px;right:16px;z-index:10;font-size:9px;color:rgba(0,170,255,0.4);text-align:right;line-height:1.8;pointer-events:none}
+/* ── Emoji Popoff ── */
+.emoji-pop{position:fixed;z-index:25;pointer-events:none;font-size:28px;opacity:1;transition:none;animation:emojiFloat 1.8s ease-out forwards}
+@keyframes emojiFloat{
+  0%{transform:translateY(0) scale(0.3) rotate(0deg);opacity:0}
+  15%{transform:translateY(-10px) scale(1.2) rotate(-10deg);opacity:1}
+  40%{transform:translateY(-40px) scale(1) rotate(5deg);opacity:0.9}
+  100%{transform:translateY(-120px) scale(0.6) rotate(20deg);opacity:0}
+}
 </style>
 </head>
 <body>
@@ -485,6 +493,42 @@ const RECURSION_PROMPTS = [
   { ring: 6, orb: 'reye', label: 'R6² · RELEASE',
     prompt: 'You are at recursion depth 11 (final observer). Look at the assembled response. Is it true? Is it kind? Is it necessary? ONE word: YES or REFINE.' },
 ];
+// ─── MOOD EMOJIS — pop off during each recursion depth ───
+const MOOD_EMOJIS = {
+  0: ['⚡', '🔥', '💥', '🌋'],       // R0 GUT — raw instinct
+  1: ['👁️', '🔍', '👂', '🌊'],       // R1 SENSE — detection
+  2: ['🚪', '⚖️', '🎯', '🔑'],       // R2 GATE — filtering
+  3: ['💗', '🌹', '😊', '💫'],        // R3 AFFECT — emotion
+  4: ['🧠', '💡', '⚙️', '🔬'],       // R4 THINK — analysis
+  5: ['🪞', '👤', '🌀', '✨'],        // R5 SELF — identity
+  6: ['🦅', '🔮', '🌌', '👁️‍🗨️'],   // R6 OBSERVE — meta
+};
+// Spawn a floating emoji near the active orb
+function spawnMoodEmoji(orbId, ring) {
+  const orb = orbs[orbId];
+  if (!orb) return;
+  const emojis = MOOD_EMOJIS[ring] || ['✨'];
+  const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+  // Project orb 3D position to screen coords
+  const pos = new THREE.Vector3();
+  orb.group.getWorldPosition(pos);
+  pos.project(camera);
+  const screenX = (pos.x * 0.5 + 0.5) * window.innerWidth;
+  const screenY = (-pos.y * 0.5 + 0.5) * window.innerHeight;
+  // Spawn 1-3 emojis with slight offset
+  const count = 1 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'emoji-pop';
+    el.textContent = emoji;
+    el.style.left = (screenX + (Math.random() - 0.5) * 60) + 'px';
+    el.style.top = (screenY + (Math.random() - 0.5) * 30) + 'px';
+    el.style.animationDelay = (i * 0.15) + 's';
+    document.body.appendChild(el);
+    // Remove after animation
+    setTimeout(() => el.remove(), 2000);
+  }
+}
 // ─── BOOT SEQUENCE ───
 async function boot() {
   const bootText = document.getElementById('boot-text');
@@ -538,6 +582,16 @@ async function boot() {
   setTimeout(startGeometryDiscovery, 2000);
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+// Derepeat — strip repeated words/phrases from LLM output
+function derepeat(text) {
+  // Remove runs of 3+ identical consecutive words
+  text = text.replace(/\b(\w+)( \1){2,}/gi, '$1');
+  // Remove runs of 3+ identical consecutive characters (like sssss or ttttt)
+  text = text.replace(/(.)\1{4,}/g, '$1$1$1');
+  // Remove repeated phrases (3+ word sequences repeated)
+  text = text.replace(/(\b.{4,40}\b)\s*(\1\s*){2,}/gi, '$1');
+  return text.trim();
+}
 // ─── GEOMETRY DISCOVERY ───
 // The orbs are trying to discover what shape they form
 // Discovery edges fade in as the system maps its own topology
@@ -613,10 +667,14 @@ async function sendMessage() {
             { role: 'user', content: text },
           ],
           stream: false,
-          temperature: depth < 7 ? 0.9 : 0.7, // more creative early, more precise late
+          temperature: depth < 7 ? 0.9 : 0.7,
           max_tokens: 60,
+          frequency_penalty: 1.5,
+          presence_penalty: 1.0,
+          top_p: llmConfig.topP,
         });
-        const thought = result.choices[0]?.message?.content?.trim() || '...';
+        let thought = result.choices[0]?.message?.content?.trim() || '...';
+        thought = derepeat(thought);
         thoughtChain.push(thought);
         // Display thought in chain
         const tDiv = document.createElement('div');
@@ -648,20 +706,34 @@ async function sendMessage() {
       const finalContext = thoughtChain.map((t,i) =>
         `[${RECURSION_PROMPTS[i].label}]: ${t}`).join('\n');
       let response = '';
+      let repeatCount = 0;
+      let lastToken = '';
       const stream = await llmEngine.chat.completions.create({
         messages: [
           { role: 'system', content: SYSTEM_PROMPT + `\n\nYou have completed 12 recursions of thought. Here is your full thought chain:\n${finalContext}\n\nNow synthesize ALL of this into your final spoken response. Be warm, precise, embodied. Reference what you discovered in your recursion if relevant. Under 100 words.` },
           ...conversationHistory.slice(-6),
         ],
         stream: true,
-        temperature: 0.8,
-        max_tokens: 256,
+        temperature: llmConfig.temperature,
+        max_tokens: llmConfig.maxTokens,
+        frequency_penalty: 1.5,
+        presence_penalty: 1.0,
+        top_p: llmConfig.topP,
       });
       const msgDiv = document.createElement('div');
       msgDiv.className = 'msg cass';
       messagesEl.appendChild(msgDiv);
       for await (const chunk of stream) {
         const token = chunk.choices[0]?.delta?.content || '';
+        // Repetition guard — stop if same token repeats too many times
+        if (token === lastToken) {
+          repeatCount++;
+          if (repeatCount > 4) continue;  // skip repeated tokens
+          if (repeatCount > 8) break;     // abort stream if stuck
+        } else {
+          repeatCount = 0;
+          lastToken = token;
+        }
         response += token;
         msgDiv.textContent = response;
         messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -671,6 +743,9 @@ async function sendMessage() {
           orbs.lchest.rings.forEach(r => { if (r.ring === 4) r.spinEnergy = Math.min(1.2, r.spinEnergy + 0.05); });
         }
       }
+      // Clean up any residual repetition
+      response = derepeat(response);
+      msgDiv.textContent = response;
       conversationHistory.push({ role: 'assistant', content: response });
       // Fade thought chain after response
       setTimeout(() => {
@@ -735,6 +810,8 @@ function fireRingPulse(orbId, ring) {
   const orb = orbs[orbId];
   if (!orb) return;
   orb.pulse = 1;
+  // Spawn mood emoji popoff
+  spawnMoodEmoji(orbId, ring);
   orb.rings.forEach(r => {
     if (r.ring === ring) {
       r.integrity = Math.min(1, r.integrity + 0.15);
