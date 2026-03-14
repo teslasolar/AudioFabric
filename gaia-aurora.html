@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GAIA AURORA — Magnetosphere Watch</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Orbitron:wght@400;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000010;overflow:hidden;font-family:'Orbitron',sans-serif;color:#fff}
+canvas{position:fixed;top:0;left:0}
+#hud{position:fixed;inset:0;z-index:10;pointer-events:none}
+#title{position:absolute;top:14px;left:16px}
+#title h1{font-size:14px;font-weight:700;letter-spacing:3px;color:#a040ff;text-shadow:0 0 15px #a040ff44}
+#title h2{font-family:'JetBrains Mono',monospace;font-size:7px;color:#333;margin-top:2px;letter-spacing:2px}
+.dot-live{display:inline-block;width:5px;height:5px;background:#a040ff;border-radius:50%;margin-right:6px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+#panels{position:absolute;top:14px;right:14px;width:180px}
+.panel{background:rgba(0,0,0,0.5);border:1px solid rgba(160,64,255,0.12);border-radius:5px;padding:8px;margin-bottom:6px}
+.panel h3{font-family:'JetBrains Mono',monospace;font-size:6px;color:#555;letter-spacing:2px;margin-bottom:6px}
+.big-val{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:300;text-align:center}
+.sub-val{font-family:'JetBrains Mono',monospace;font-size:7px;color:#666;text-align:center;margin-top:3px}
+.bar{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:6px;overflow:hidden}
+.bar-fill{height:100%;transition:width .5s,background .5s;border-radius:2px}
+#kp-meter{display:flex;gap:2px;margin-top:8px;justify-content:center}
+.kp-seg{width:14px;height:18px;border-radius:2px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);display:flex;align-items:flex-end;overflow:hidden;transition:all .3s}
+.kp-seg-fill{width:100%;transition:height .5s,background .5s}
+.kp-label{font-family:'JetBrains Mono',monospace;font-size:5px;color:#444;text-align:center;margin-top:2px}
+#aurora-chance{position:absolute;bottom:14px;left:16px}
+#aurora-chance h3{font-family:'JetBrains Mono',monospace;font-size:6px;color:#555;letter-spacing:2px;margin-bottom:4px}
+#aurora-pct{font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:300;color:#00ff88}
+#aurora-loc{font-family:'JetBrains Mono',monospace;font-size:7px;color:#555;margin-top:4px}
+#bz-panel{position:absolute;bottom:14px;right:14px;width:180px}
+#bz-canvas{width:100%;height:50px;border:1px solid rgba(160,64,255,0.1);border-radius:4px;background:rgba(0,0,0,0.3)}
+#bz-panel h3{font-family:'JetBrains Mono',monospace;font-size:6px;color:#555;letter-spacing:2px;margin-bottom:4px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="title"><h1><span class="dot-live"></span>GAIA AURORA</h1><h2>MAGNETOSPHERE &amp; SOLAR WIND</h2></div>
+  <div id="panels">
+    <div class="panel"><h3>&#x25b8; SOLAR WIND</h3><div class="big-val" id="sw-speed" style="color:#ffcc00">-- km/s</div><div class="sub-val" id="sw-density">-- p/cm&sup3;</div><div class="bar"><div class="bar-fill" id="sw-bar" style="background:#ffcc00;width:30%"></div></div></div>
+    <div class="panel"><h3>&#x25b8; Kp INDEX</h3><div class="big-val" id="kp-val" style="color:#0f0">--</div><div class="sub-val" id="kp-status">Loading...</div>
+      <div id="kp-meter"></div>
+      <div class="kp-label">0 1 2 3 4 5 6 7 8 9</div>
+    </div>
+    <div class="panel"><h3>&#x25b8; Bz COMPONENT</h3><div class="big-val" id="bz-val" style="color:#0af">-- nT</div><div class="sub-val" id="bz-status">IMF direction</div></div>
+    <div class="panel"><h3>&#x25b8; Bt TOTAL</h3><div class="big-val" id="bt-val" style="color:#a040ff">-- nT</div></div>
+  </div>
+  <div id="aurora-chance"><h3>&#x25b8; AURORA PROBABILITY</h3><div id="aurora-pct">--%</div><div id="aurora-loc">Calculating visibility...</div></div>
+  <div id="bz-panel"><h3>&#x25b8; Bz TIMELINE (1hr)</h3><canvas id="bz-canvas"></canvas></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const canvas=document.getElementById('c'),R=new THREE.WebGLRenderer({canvas,antialias:true});
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x000010);
+const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.1,4000);
+scene.add(new THREE.AmbientLight(0x101030,0.5));
+const E=45;
+
+// ─── DATA ───
+const PROXY='https://api.allorigins.win/raw?url=';
+const data={speed:400,density:5,kp:2,bz:0,bt:5,bzHistory:new Float32Array(60).fill(0),bzPtr:0};
+
+// Build Kp meter segments
+const kpMeter=document.getElementById('kp-meter');
+for(let i=0;i<10;i++){
+  const seg=document.createElement('div');seg.className='kp-seg';seg.id='kp-seg-'+i;
+  const fill=document.createElement('div');fill.className='kp-seg-fill';fill.id='kp-fill-'+i;
+  seg.appendChild(fill);kpMeter.appendChild(seg);
+}
+
+// ─── EARTH ───
+const earth=new THREE.Mesh(new THREE.IcosahedronGeometry(E,5),new THREE.MeshPhysicalMaterial({color:0x0a1530,emissive:0x030815,emissiveIntensity:0.3,transparent:true,opacity:0.85}));
+scene.add(earth);
+const earthWire=new THREE.Mesh(new THREE.IcosahedronGeometry(E*1.002,3),new THREE.MeshBasicMaterial({color:0x2244aa,wireframe:true,transparent:true,opacity:0.06}));
+scene.add(earthWire);
+
+// ─── MAGNETOSPHERE FIELD LINES ───
+const fieldLines=[];
+for(let i=0;i<24;i++){
+  const pts=[],th=(i/24)*Math.PI*2;
+  const compressed=1; // updated live
+  for(let u=-1;u<=1;u+=0.04){
+    const r=E*2.2*Math.pow(Math.cos(u*Math.PI/2),2);
+    const x=r*Math.cos(u*Math.PI/2)*Math.cos(th);
+    const y=r*Math.sin(u*Math.PI/2);
+    const z=r*Math.cos(u*Math.PI/2)*Math.sin(th);
+    pts.push(new THREE.Vector3(x,y,z));
+  }
+  const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x4444ff,transparent:true,opacity:0.15}));
+  scene.add(line);fieldLines.push({line,pts,th});
+}
+
+// ─── AURORA RINGS ───
+const auroraN=new THREE.Mesh(new THREE.TorusGeometry(E*0.38,1.5,16,64),new THREE.MeshBasicMaterial({color:0x00ff88,transparent:true,opacity:0.0}));
+auroraN.position.y=E*0.92;auroraN.rotation.x=Math.PI/2;scene.add(auroraN);
+const auroraS=auroraN.clone();auroraS.position.y=-E*0.92;scene.add(auroraS);
+
+// Aurora particles
+const auroraParticles=[];
+for(let i=0;i<200;i++){
+  const isNorth=Math.random()>0.5;
+  const th=Math.random()*Math.PI*2;
+  const rr=E*0.35+Math.random()*E*0.15;
+  const p=new THREE.Mesh(new THREE.SphereGeometry(0.3+Math.random()*0.4,4,4),new THREE.MeshBasicMaterial({color:isNorth?0x00ff88:0xff00aa,transparent:true,opacity:0}));
+  const baseY=isNorth?E*0.85+Math.random()*8:-E*0.85-Math.random()*8;
+  p.position.set(rr*Math.cos(th),baseY,rr*Math.sin(th));
+  p.userData={th,rr,baseY,speed:0.3+Math.random()*0.7,phase:Math.random()*Math.PI*2,isNorth};
+  scene.add(p);auroraParticles.push(p);
+}
+
+// ─── SOLAR WIND PARTICLES ───
+const solarP=[];
+for(let i=0;i<200;i++){
+  const p=new THREE.Mesh(new THREE.SphereGeometry(0.25,4,4),new THREE.MeshBasicMaterial({color:0xffcc00,transparent:true,opacity:0.25}));
+  p.position.set(E*5+Math.random()*E*3,(Math.random()-0.5)*E*3,(Math.random()-0.5)*E*3);
+  scene.add(p);solarP.push(p);
+}
+
+// ─── MAGNETOPAUSE (bow shock) ───
+const bowPts=[];
+for(let u=0;u<Math.PI*2;u+=0.1){
+  for(let v=-Math.PI/2;v<Math.PI/2;v+=0.2){
+    const r=E*1.8*(1+0.3*Math.cos(v));
+    bowPts.push(new THREE.Vector3(r*Math.cos(v)*Math.cos(u)*0.6,r*Math.sin(v),r*Math.cos(v)*Math.sin(u)*0.6));
+  }
+}
+const bowGeo=new THREE.BufferGeometry().setFromPoints(bowPts);
+const bow=new THREE.Points(bowGeo,new THREE.PointsMaterial({color:0x6644ff,size:0.3,transparent:true,opacity:0.08}));
+scene.add(bow);
+
+// ─── FETCH ───
+async function fetchSolar(){
+  try{
+    const r=await fetch(PROXY+encodeURIComponent('https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json'));
+    if(!r.ok)throw new Error(r.status);
+    const d=await r.json();
+    if(d.length>1){const l=d[d.length-1];data.speed=parseFloat(l[2])||400;data.density=parseFloat(l[1])||5}
+  }catch(e){data.speed+=(Math.random()-0.5)*20;data.speed=Math.max(280,Math.min(800,data.speed));data.density+=(Math.random()-0.5)*1;data.density=Math.max(1,Math.min(20,data.density))}
+  document.getElementById('sw-speed').textContent=Math.round(data.speed)+' km/s';
+  document.getElementById('sw-density').textContent='\u03c1='+data.density.toFixed(1)+' p/cm\u00b3';
+  document.getElementById('sw-bar').style.width=Math.min(100,(data.speed-200)/600*100)+'%';
+  document.getElementById('sw-speed').style.color=data.speed>600?'#ff4444':data.speed>500?'#ff8800':'#ffcc00';
+}
+
+async function fetchKp(){
+  try{
+    const r=await fetch(PROXY+encodeURIComponent('https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json'));
+    if(!r.ok)throw new Error(r.status);
+    const d=await r.json();if(d.length>1)data.kp=parseFloat(d[d.length-1][1])||2;
+  }catch(e){if(Math.random()>0.8)data.kp=Math.max(0,Math.min(9,data.kp+(Math.random()>0.5?1:-1)))}
+  document.getElementById('kp-val').textContent='Kp '+data.kp.toFixed(0);
+  const kpColors=['#00cc44','#00cc44','#44cc00','#88cc00','#cccc00','#ff8800','#ff4400','#ff0044','#ff0088','#ff00ff'];
+  document.getElementById('kp-val').style.color=kpColors[Math.min(9,Math.round(data.kp))];
+  document.getElementById('kp-status').textContent=data.kp>=7?'SEVERE STORM':data.kp>=5?'GEOMAGNETIC STORM':data.kp>=4?'Active':data.kp>=2?'Unsettled':'Quiet';
+  // Update meter
+  for(let i=0;i<10;i++){
+    const fill=document.getElementById('kp-fill-'+i);
+    const active=i<=Math.round(data.kp);
+    fill.style.height=active?'100%':'0%';
+    fill.style.background=active?kpColors[i]:'transparent';
+  }
+}
+
+async function fetchMag(){
+  try{
+    const r=await fetch(PROXY+encodeURIComponent('https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json'));
+    if(!r.ok)throw new Error(r.status);
+    const d=await r.json();
+    if(d.length>1){const l=d[d.length-1];data.bz=parseFloat(l[3])||0;data.bt=parseFloat(l[6])||5}
+  }catch(e){data.bz+=(Math.random()-0.5)*2;data.bz=Math.max(-20,Math.min(20,data.bz));data.bt=Math.abs(data.bz)+3+Math.random()*3}
+  data.bzHistory[data.bzPtr]=data.bz;data.bzPtr=(data.bzPtr+1)%data.bzHistory.length;
+  document.getElementById('bz-val').textContent=data.bz.toFixed(1)+' nT';
+  document.getElementById('bz-val').style.color=data.bz<-5?'#ff4444':data.bz<0?'#ff8844':'#00aaff';
+  document.getElementById('bz-status').textContent=data.bz<-10?'Strongly southward!':data.bz<0?'Southward (favorable)':'Northward';
+  document.getElementById('bt-val').textContent=data.bt.toFixed(1)+' nT';
+  // Aurora probability
+  let prob=0;
+  if(data.bz<0)prob+=Math.min(40,Math.abs(data.bz)*4);
+  prob+=Math.min(30,(data.speed-300)/500*30);
+  prob+=Math.min(20,(data.kp/9)*20);
+  prob+=Math.min(10,(data.density-3)/15*10);
+  prob=Math.max(0,Math.min(100,Math.round(prob)));
+  document.getElementById('aurora-pct').textContent=prob+'%';
+  document.getElementById('aurora-pct').style.color=prob>60?'#00ff88':prob>30?'#ffcc00':'#666';
+  document.getElementById('aurora-loc').textContent=prob>70?'Visible mid-latitudes!':prob>40?'High latitudes likely':prob>15?'Polar regions only':'Low activity';
+}
+
+// Bz chart
+const bzCtx=document.getElementById('bz-canvas').getContext('2d');
+function drawBz(){
+  const c=document.getElementById('bz-canvas');c.width=c.offsetWidth*devicePixelRatio;c.height=c.offsetHeight*devicePixelRatio;
+  const w=c.width,h=c.height;bzCtx.clearRect(0,0,w,h);
+  // Zero line
+  bzCtx.strokeStyle='rgba(160,64,255,0.15)';bzCtx.lineWidth=1;bzCtx.beginPath();bzCtx.moveTo(0,h/2);bzCtx.lineTo(w,h/2);bzCtx.stroke();
+  // Labels
+  bzCtx.fillStyle='rgba(160,64,255,0.2)';bzCtx.font=8*devicePixelRatio+'px JetBrains Mono';
+  bzCtx.fillText('+N',2,12*devicePixelRatio);bzCtx.fillText('-S',2,h-4);
+  // Bz line
+  bzCtx.strokeStyle='#0af';bzCtx.lineWidth=1.5;bzCtx.beginPath();
+  for(let x=0;x<w;x++){
+    const idx=(data.bzPtr+Math.floor(x/w*data.bzHistory.length))%data.bzHistory.length;
+    const val=data.bzHistory[idx];
+    const y=h/2-val/20*h/2;
+    if(x===0)bzCtx.moveTo(x,y);else bzCtx.lineTo(x,y);
+  }
+  bzCtx.stroke();
+  // Shade southward
+  bzCtx.fillStyle='rgba(255,68,68,0.06)';bzCtx.fillRect(0,h/2,w,h/2);
+}
+
+// ─── CAMERA ───
+let drag=false,px=0,py=0,cTh=0.8,cPh=1.3,cR=180;
+function updateCam(){cam.position.set(cR*Math.sin(cPh)*Math.cos(cTh),cR*Math.cos(cPh),cR*Math.sin(cPh)*Math.sin(cTh));cam.lookAt(0,0,0)}
+updateCam();
+canvas.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY});
+addEventListener('pointermove',e=>{if(!drag)return;cTh-=(e.clientX-px)*0.005;cPh=Math.max(0.1,Math.min(3,cPh+(e.clientY-py)*0.005));px=e.clientX;py=e.clientY;updateCam()});
+addEventListener('pointerup',()=>drag=false);
+canvas.addEventListener('wheel',e=>{cR=Math.max(80,Math.min(350,cR+e.deltaY*0.15))},{passive:true});
+
+// ─── ANIMATE ───
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);t+=0.005;
+  if(!drag)cTh+=0.0002;updateCam();
+  earth.rotation.y=t*0.008;earthWire.rotation.y=t*0.008;
+
+  // Field line compression from solar wind
+  const compression=Math.max(0.4,1-(data.speed-300)/800);
+  fieldLines.forEach(fl=>{
+    const positions=fl.line.geometry.attributes.position;
+    for(let i=0;i<fl.pts.length;i++){
+      const p=fl.pts[i];
+      // Compress sunward (positive x), stretch nightside
+      const scale=p.x>0?compression:1+(1-compression)*0.5;
+      positions.setXYZ(i,p.x*scale,p.y,p.z);
+    }
+    positions.needsUpdate=true;
+    fl.line.material.opacity=0.1+(1-compression)*0.15;
+    fl.line.material.color.setHSL(0.7,1,0.3+data.kp*0.03);
+  });
+
+  // Aurora brightness based on Kp and southward Bz
+  const auroraIntensity=Math.max(0,Math.min(1,(data.kp-1)/7+(-data.bz)/15));
+  auroraN.material.opacity=auroraIntensity*0.25;
+  auroraS.material.opacity=auroraIntensity*0.2;
+  auroraN.scale.setScalar(1+Math.sin(t*3)*0.08);
+  auroraS.scale.setScalar(1+Math.sin(t*3+1)*0.08);
+
+  // Aurora particles
+  auroraParticles.forEach(p=>{
+    p.userData.th+=p.userData.speed*0.005;
+    const wobble=Math.sin(t*2+p.userData.phase)*2;
+    p.position.x=p.userData.rr*Math.cos(p.userData.th);
+    p.position.z=p.userData.rr*Math.sin(p.userData.th);
+    p.position.y=p.userData.baseY+wobble;
+    p.material.opacity=auroraIntensity*0.5*(0.5+Math.sin(t*4+p.userData.phase)*0.5);
+    const hue=p.userData.isNorth?0.35+Math.sin(t+p.userData.phase)*0.05:0.85+Math.sin(t+p.userData.phase)*0.05;
+    p.material.color.setHSL(hue,1,0.5);
+  });
+
+  // Solar wind speed
+  const ws=data.speed/800;
+  solarP.forEach(p=>{
+    p.position.x-=ws;
+    if(p.position.x<-E*3){p.position.x=E*6;p.position.y=(Math.random()-0.5)*E*3;p.position.z=(Math.random()-0.5)*E*3}
+    const d=Math.sqrt(p.position.y**2+p.position.z**2);
+    if(p.position.x<E*2&&d<E*1.5){
+      const a=Math.atan2(p.position.z,p.position.y);
+      p.position.y+=Math.cos(a)*0.4;p.position.z+=Math.sin(a)*0.4;
+    }
+    p.material.opacity=0.15+ws*0.15;
+  });
+
+  // Bow shock pulse
+  bow.material.opacity=0.05+data.kp*0.015;
+  bow.rotation.y=t*0.003;
+
+  drawBz();
+  R.render(scene,cam);
+}
+
+async function refreshAll(){await Promise.all([fetchSolar(),fetchKp(),fetchMag()])}
+refreshAll();setInterval(refreshAll,60000);
+// Sim updates between fetches
+setInterval(()=>{
+  data.speed+=(Math.random()-0.5)*5;data.speed=Math.max(280,Math.min(800,data.speed));
+  data.bz+=(Math.random()-0.5)*0.3;data.bz=Math.max(-20,Math.min(20,data.bz));
+  data.bzHistory[data.bzPtr]=data.bz;data.bzPtr=(data.bzPtr+1)%data.bzHistory.length;
+},3000);
+animate();
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>

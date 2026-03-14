@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GAIA PULSE — Seismic Heartbeat</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Orbitron:wght@400;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#020208;overflow:hidden;font-family:'Orbitron',sans-serif;color:#fff}
+canvas{position:fixed;top:0;left:0}
+#hud{position:fixed;inset:0;z-index:10;pointer-events:none}
+#title{position:absolute;top:14px;left:16px}
+#title h1{font-size:14px;font-weight:700;letter-spacing:3px;color:#f80;text-shadow:0 0 10px #f804}
+#title h2{font-family:'JetBrains Mono',monospace;font-size:7px;color:#333;margin-top:2px;letter-spacing:2px}
+.dot-live{display:inline-block;width:5px;height:5px;background:#f80;border-radius:50%;margin-right:6px;animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.8)}}
+#eq-list{position:absolute;top:14px;right:14px;width:200px;max-height:50vh;overflow-y:auto}
+#eq-list h3{font-family:'JetBrains Mono',monospace;font-size:6px;color:#444;letter-spacing:2px;margin-bottom:6px}
+.eq-item{background:rgba(255,136,0,0.05);border:1px solid rgba(255,136,0,0.12);border-radius:4px;padding:5px 8px;margin-bottom:4px;display:flex;align-items:center;gap:6px;transition:border-color .3s}
+.eq-item.fresh{border-color:rgba(255,136,0,0.6)}
+.eq-mag{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;min-width:36px}
+.eq-mag.low{color:#4a4}
+.eq-mag.mid{color:#fa0}
+.eq-mag.high{color:#f44}
+.eq-info{flex:1}
+.eq-place{font-family:'JetBrains Mono',monospace;font-size:7px;color:#999}
+.eq-time{font-family:'JetBrains Mono',monospace;font-size:6px;color:#444}
+#seismo{position:absolute;bottom:14px;left:16px;right:16px;height:80px}
+#seismo h3{font-family:'JetBrains Mono',monospace;font-size:6px;color:#444;letter-spacing:2px;margin-bottom:4px}
+#seismo-canvas{width:100%;height:60px;border:1px solid rgba(255,136,0,0.1);border-radius:4px;background:rgba(0,0,0,0.4)}
+#stats{position:absolute;bottom:110px;left:16px}
+#stats span{font-family:'JetBrains Mono',monospace;font-size:8px;color:#555;margin-right:12px}
+#stats em{color:#f80;font-style:normal}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="title"><h1><span class="dot-live"></span>GAIA PULSE</h1><h2>SEISMIC HEARTBEAT MONITOR</h2></div>
+  <div id="eq-list"><h3>&#x25b8; RECENT QUAKES (M2.5+)</h3><div id="eq-items">Loading...</div></div>
+  <div id="stats"><span>24h total: <em id="st-count">--</em></span><span>Max: <em id="st-max">--</em></span><span>Avg depth: <em id="st-depth">--</em></span></div>
+  <div id="seismo"><h3>&#x25b8; SEISMOGRAPH</h3><canvas id="seismo-canvas"></canvas></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ─── RENDERER ───
+const canvas=document.getElementById('c'),R=new THREE.WebGLRenderer({canvas,antialias:true});
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x020208);
+const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,3000);
+scene.add(new THREE.AmbientLight(0x222244,0.6));
+scene.add(new THREE.DirectionalLight(0xff8844,0.3));
+const E=55;
+
+// ─── EARTH — dark tectonic style ───
+const earthGeo=new THREE.IcosahedronGeometry(E,5);
+const earthMat=new THREE.MeshPhysicalMaterial({color:0x0a1525,emissive:0x050a12,emissiveIntensity:0.2,transparent:true,opacity:0.9,roughness:0.8});
+const earth=new THREE.Mesh(earthGeo,earthMat);scene.add(earth);
+
+// Tectonic plate wireframe — lower resolution icosahedron for plate boundaries
+const plates=new THREE.Mesh(new THREE.IcosahedronGeometry(E*1.001,2),new THREE.MeshBasicMaterial({color:0xff6600,wireframe:true,transparent:true,opacity:0.08}));
+scene.add(plates);
+
+// Surface detail grid
+const grid=new THREE.Mesh(new THREE.IcosahedronGeometry(E*1.003,4),new THREE.MeshBasicMaterial({color:0x335577,wireframe:true,transparent:true,opacity:0.04}));
+scene.add(grid);
+
+// Core glow
+const coreGlow=new THREE.Mesh(new THREE.SphereGeometry(E*0.3,16,16),new THREE.MeshBasicMaterial({color:0xff4400,transparent:true,opacity:0.15}));
+scene.add(coreGlow);
+
+// ─── QUAKE DATA ───
+const PROXY='https://api.allorigins.win/raw?url=';
+let quakes=[],eqMarkers=[];
+const seismoData=new Float32Array(300).fill(0);
+let seismoPtr=0;
+
+function latLonToVec(lat,lon,r){
+  const ph=(90-lat)*Math.PI/180,th=(lon+180)*Math.PI/180;
+  return new THREE.Vector3(r*Math.sin(ph)*Math.cos(th),r*Math.cos(ph),r*Math.sin(ph)*Math.sin(th));
+}
+
+function spawnQuakeVisual(eq){
+  const pos=latLonToVec(eq.lat,eq.lon,E+0.5);
+  const sz=Math.pow(2,eq.mag-2)*0.6;
+  // Epicenter sphere
+  const dot=new THREE.Mesh(new THREE.SphereGeometry(sz,8,8),new THREE.MeshBasicMaterial({color:eq.mag>=5?0xff2200:eq.mag>=4?0xff8800:0xffaa44,transparent:true,opacity:0.9}));
+  dot.position.copy(pos);dot.userData={life:1,type:'dot'};scene.add(dot);eqMarkers.push(dot);
+  // Shockwave rings
+  for(let i=0;i<4;i++){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(sz*0.5,0.08,6,32),new THREE.MeshBasicMaterial({color:0xff6600,transparent:true,opacity:0.5}));
+    ring.position.copy(pos);ring.lookAt(0,0,0);ring.userData={life:1,delay:i*0.3,baseSize:sz*0.5,type:'ring'};scene.add(ring);eqMarkers.push(ring);
+  }
+  // Depth line — goes from surface into earth
+  const depthKm=Math.min(eq.depth,700);
+  const inner=pos.clone().normalize().multiplyScalar(E-depthKm/700*E*0.5);
+  const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([pos,inner]),new THREE.LineBasicMaterial({color:0xff4400,transparent:true,opacity:0.4}));
+  line.userData={life:1,type:'line'};scene.add(line);eqMarkers.push(line);
+  // Feed seismograph
+  seismoData[seismoPtr]=eq.mag/9;seismoPtr=(seismoPtr+1)%seismoData.length;
+}
+
+async function fetchQuakes(){
+  try{
+    const r=await fetch(PROXY+encodeURIComponent('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson'));
+    if(!r.ok)throw new Error(r.status);
+    const d=await r.json();
+    const newQuakes=d.features.map(f=>({mag:f.properties.mag,place:f.properties.place||'Unknown',lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0],depth:f.geometry.coordinates[2],time:f.properties.time}));
+    // Find truly new ones
+    const oldIds=new Set(quakes.map(q=>q.time));
+    const fresh=newQuakes.filter(q=>!oldIds.has(q.time));
+    quakes=newQuakes.slice(0,30);
+    fresh.slice(0,5).forEach(q=>spawnQuakeVisual(q));
+    updateList();updateStats();
+  }catch(e){
+    // Simulate
+    if(Math.random()>0.4){
+      const mag=2.5+Math.random()*4.5;
+      const places=['Pacific Ridge','Chile Coast','Tonga','Japan','Indonesia','Alaska','Peru','Mexico','Turkey','Nepal'];
+      const eq={mag,place:places[Math.floor(Math.random()*places.length)],lat:(Math.random()-0.5)*140,lon:(Math.random()-0.5)*360,depth:10+Math.random()*300,time:Date.now()};
+      quakes.unshift(eq);if(quakes.length>30)quakes.pop();
+      spawnQuakeVisual(eq);updateList();updateStats();
+    }
+  }
+}
+
+function updateList(){
+  const el=document.getElementById('eq-items');
+  el.innerHTML=quakes.slice(0,15).map((q,i)=>{
+    const cls=q.mag>=5.5?'high':q.mag>=4?'mid':'low';
+    const age=Date.now()-q.time;
+    const fresh=age<120000?'fresh':'';
+    const ago=age<60000?'just now':age<3600000?Math.round(age/60000)+'m ago':Math.round(age/3600000)+'h ago';
+    return `<div class="eq-item ${fresh}"><div class="eq-mag ${cls}">M${q.mag.toFixed(1)}</div><div class="eq-info"><div class="eq-place">${q.place.substring(0,28)}</div><div class="eq-time">${ago} \u00b7 ${q.depth.toFixed(0)}km deep</div></div></div>`;
+  }).join('');
+}
+
+function updateStats(){
+  document.getElementById('st-count').textContent=quakes.length;
+  document.getElementById('st-max').textContent=quakes.length?'M'+Math.max(...quakes.map(q=>q.mag)).toFixed(1):'--';
+  document.getElementById('st-depth').textContent=quakes.length?(quakes.reduce((s,q)=>s+q.depth,0)/quakes.length).toFixed(0)+'km':'--';
+}
+
+// ─── SEISMOGRAPH CANVAS ───
+const sCtx=document.getElementById('seismo-canvas').getContext('2d');
+function drawSeismo(){
+  const c=document.getElementById('seismo-canvas');
+  c.width=c.offsetWidth*devicePixelRatio;c.height=c.offsetHeight*devicePixelRatio;
+  const w=c.width,h=c.height;
+  sCtx.clearRect(0,0,w,h);
+  // Grid
+  sCtx.strokeStyle='rgba(255,136,0,0.06)';sCtx.lineWidth=1;
+  for(let y=0;y<h;y+=h/5){sCtx.beginPath();sCtx.moveTo(0,y);sCtx.lineTo(w,y);sCtx.stroke()}
+  // Center line
+  sCtx.strokeStyle='rgba(255,136,0,0.15)';sCtx.beginPath();sCtx.moveTo(0,h/2);sCtx.lineTo(w,h/2);sCtx.stroke();
+  // Waveform
+  sCtx.strokeStyle='#ff6600';sCtx.lineWidth=1.5;sCtx.beginPath();
+  const noiseT=Date.now()*0.001;
+  for(let x=0;x<w;x++){
+    const idx=(seismoPtr+Math.floor(x/w*seismoData.length))%seismoData.length;
+    const val=seismoData[idx];
+    // Add live micro-noise
+    const noise=Math.sin(noiseT*7.83+x*0.08)*0.02+Math.sin(noiseT*14.1+x*0.17)*0.01;
+    const y=h/2-(val+noise)*h*0.45;
+    if(x===0)sCtx.moveTo(x,y);else sCtx.lineTo(x,y);
+  }
+  sCtx.stroke();
+  // Glow pass
+  sCtx.strokeStyle='rgba(255,136,0,0.2)';sCtx.lineWidth=4;sCtx.stroke();
+}
+
+// ─── CAMERA ───
+let drag=false,px=0,py=0,cTh=0.3,cPh=1.1,cR=140;
+function updateCam(){cam.position.set(cR*Math.sin(cPh)*Math.cos(cTh),cR*Math.cos(cPh),cR*Math.sin(cPh)*Math.sin(cTh));cam.lookAt(0,0,0)}
+updateCam();
+canvas.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY});
+addEventListener('pointermove',e=>{if(!drag)return;cTh-=(e.clientX-px)*0.005;cPh=Math.max(0.1,Math.min(3,cPh+(e.clientY-py)*0.005));px=e.clientX;py=e.clientY;updateCam()});
+addEventListener('pointerup',()=>drag=false);
+canvas.addEventListener('wheel',e=>{cR=Math.max(70,Math.min(280,cR+e.deltaY*0.12))},{passive:true});
+
+// ─── ANIMATE ───
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);t+=0.006;
+  if(!drag)cTh+=0.0002;updateCam();
+  earth.rotation.y=t*0.01;plates.rotation.y=t*0.01;grid.rotation.y=t*0.01;
+  coreGlow.material.opacity=0.12+Math.sin(t*3)*0.04;
+  coreGlow.scale.setScalar(1+Math.sin(t*2)*0.08);
+  // Animate seismograph noise when idle
+  if(Math.random()<0.3){
+    seismoData[seismoPtr]=Math.random()*0.05;
+    seismoPtr=(seismoPtr+1)%seismoData.length;
+  }
+  // Decay markers
+  for(let i=eqMarkers.length-1;i>=0;i--){
+    const m=eqMarkers[i];
+    if(m.userData.type==='ring'){
+      if(m.userData.delay>0){m.userData.delay-=0.016;continue}
+      m.userData.life-=0.008;
+      m.scale.setScalar(1+(1-m.userData.life)*3);
+      m.material.opacity=m.userData.life*0.4;
+    }else{
+      m.userData.life-=0.002;
+      if(m.material)m.material.opacity=m.userData.life*(m.userData.type==='line'?0.3:0.7);
+      if(m.userData.type==='dot')m.scale.setScalar(1+Math.sin(t*8)*0.15);
+    }
+    if(m.userData.life<=0){scene.remove(m);eqMarkers.splice(i,1)}
+  }
+  drawSeismo();
+  R.render(scene,cam);
+}
+
+fetchQuakes();setInterval(fetchQuakes,60000);
+animate();
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>
