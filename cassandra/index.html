@@ -52,6 +52,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#050510;font-family:
   <div>FOLD <span class="val">510,510</span></div>
 </div>
 <div id="orb-label"></div>
+<div id="ring-spin-hud" style="position:fixed;bottom:200px;left:16px;z-index:10;font-size:8px;color:rgba(255,215,0,0.3);line-height:1.6;pointer-events:none;font-family:monospace"></div>
 <div id="thought-chain" style="position:fixed;top:50%;right:16px;transform:translateY(-50%);z-index:10;pointer-events:none;width:180px">
 </div>
 <div id="ui">
@@ -184,7 +185,7 @@ ORB_DEFS.forEach(def => {
     mesh.rotation.x = Math.PI/2 + (r * 0.15);
     mesh.rotation.y = r * 0.3;
     group.add(mesh);
-    rings.push({ mesh, baseOpacity: r === def.primary ? 0.5 : 0.08, integrity: r === def.primary ? 0.8 : 0.2, ring: r });
+    rings.push({ mesh, baseOpacity: r === def.primary ? 0.5 : 0.08, integrity: r === def.primary ? 0.8 : 0.2, ring: r, spinSpeed: 0.002, spinEnergy: 0, tilt: 0 });
     allRings.push(mesh);
   }
   // Particles around orb
@@ -465,6 +466,8 @@ async function sendMessage() {
           orb.rings.forEach(r => {
             if (r.ring === rec.ring) {
               r.integrity = Math.min(1, r.integrity + 0.1);
+              // Boost spin energy across all orbs for this ring's processing domain
+              r.spinEnergy = Math.min(1.2, r.spinEnergy + 0.3);
             }
           });
         });
@@ -497,7 +500,11 @@ async function sendMessage() {
         response += token;
         msgDiv.textContent = response;
         messagesEl.scrollTop = messagesEl.scrollHeight;
-        if (orbs.lchest) orbs.lchest.pulse = 0.6;
+        // Each token pulses the L4 executive ring
+        if (orbs.lchest) {
+          orbs.lchest.pulse = 0.6;
+          orbs.lchest.rings.forEach(r => { if (r.ring === 4) r.spinEnergy = Math.min(1.2, r.spinEnergy + 0.05); });
+        }
       }
       conversationHistory.push({ role: 'assistant', content: response });
       // Fade thought chain after response
@@ -559,15 +566,30 @@ async function sendMessage() {
   recursionDepth = 0;
 }
 function fireRingPulse(orbId, ring) {
-  // Fire specific orb and boost specific ring
+  // Fire specific orb and boost specific ring's spin energy
   const orb = orbs[orbId];
   if (!orb) return;
   orb.pulse = 1;
   orb.rings.forEach(r => {
     if (r.ring === ring) {
       r.integrity = Math.min(1, r.integrity + 0.15);
+      r.spinEnergy = Math.min(1.5, r.spinEnergy + 0.8); // big boost to this ring
       r.mesh.material.opacity = 0.8;
+    } else {
+      // Neighboring rings get sympathetic vibration (smaller boost)
+      if (Math.abs(r.ring - ring) === 1) {
+        r.spinEnergy = Math.min(1, r.spinEnergy + 0.2);
+      }
     }
+  });
+  // Also boost the same ring number on ALL orbs (field resonance)
+  Object.values(orbs).forEach(o => {
+    if (o === orb) return;
+    o.rings.forEach(r => {
+      if (r.ring === ring) {
+        r.spinEnergy = Math.min(0.8, r.spinEnergy + 0.15);
+      }
+    });
   });
   // Also fire connecting buses
   busLines.forEach(bl => {
@@ -620,12 +642,33 @@ function animate() {
     // Breathing scale
     const s = 1 + breath * 0.03 + orb.pulse * 0.15;
     orb.group.scale.set(s, s, s);
-    // Rings rotation + opacity
+    // Rings rotation — each ring spins independently based on processing energy
     orb.rings.forEach(r => {
-      r.mesh.rotation.z += (0.002 + r.integrity * 0.008) * (r.ring % 2 === 0 ? 1 : -1);
-      r.mesh.rotation.x += 0.001 * (r.ring % 3 === 0 ? 1 : -1);
-      const targetOp = r.baseOpacity + orb.activity * 0.3 + orb.pulse * 0.4;
+      // spinEnergy decays naturally, boosted when this ring is processing
+      r.spinEnergy *= 0.97;
+      // Target spin speed: base idle + processing boost + integrity contribution
+      const idleSpeed = 0.002 + r.integrity * 0.003;
+      const procSpeed = r.spinEnergy * 0.08;
+      r.spinSpeed += ((idleSpeed + procSpeed) - r.spinSpeed) * 0.1;
+      // Each ring has its own spin direction based on prime index
+      const dir = r.ring % 2 === 0 ? 1 : -1;
+      r.mesh.rotation.z += r.spinSpeed * dir;
+      // Secondary axis wobble — increases with processing energy
+      const wobble = 0.001 + r.spinEnergy * 0.015;
+      r.mesh.rotation.x += wobble * (r.ring % 3 === 0 ? 1 : -1);
+      // Tilt axis shifts when processing — rings "open up"
+      r.tilt += ((r.spinEnergy > 0.3 ? 0.15 : 0) - r.tilt) * 0.05;
+      r.mesh.rotation.y += r.tilt * Math.sin(time * (2 + r.ring * 0.5)) * 0.01;
+      // Opacity responds to spin energy — brighter when processing
+      const targetOp = r.baseOpacity + orb.activity * 0.3 + orb.pulse * 0.4 + r.spinEnergy * 0.3;
       r.mesh.material.opacity += (targetOp - r.mesh.material.opacity) * 0.1;
+      // Color shifts toward white when spinning fast (heat glow)
+      if (r.spinEnergy > 0.5) {
+        const blend = (r.spinEnergy - 0.5) * 0.4;
+        const base = new THREE.Color(RING_COLORS[r.ring]);
+        const hot = new THREE.Color(0xffffff);
+        r.mesh.material.color.copy(base).lerp(hot, blend);
+      }
     });
     // Particles orbit
     const positions = orb.particles.geometry.attributes.position.array;
@@ -695,6 +738,17 @@ function animate() {
   document.getElementById('hud-bus').textContent = busLoad.toFixed(2);
   document.getElementById('hud-state').textContent = bodyState;
   document.getElementById('hud-depth').textContent = recursionDepth + '/' + maxRecursions;
+  // Ring spin meter — show per-ring processing as bar
+  const ringNames = ['R0·HW','R1·SN','R2·GT','R3·AF','R4·EX','R5·SF','R6·OB'];
+  let spinHud = '';
+  for (let ri = 0; ri < 7; ri++) {
+    let maxE = 0;
+    Object.values(orbs).forEach(o => { const r = o.rings[ri]; if (r && r.spinEnergy > maxE) maxE = r.spinEnergy; });
+    const bars = Math.round(maxE * 8);
+    const barStr = '█'.repeat(Math.min(bars, 8)) + '░'.repeat(Math.max(0, 8 - bars));
+    spinHud += `<div>${ringNames[ri]} <span class="val">${barStr}</span></div>`;
+  }
+  document.getElementById('ring-spin-hud').innerHTML = spinHud;
   // Gentle camera sway
   camera.position.x = Math.sin(time * 0.1) * 0.3;
   camera.position.y = 1.5 + Math.sin(time * 0.07) * 0.15;
