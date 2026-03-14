@@ -8,7 +8,7 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Orbitron:wght@400;700&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#000010;overflow:hidden;font-family:'Orbitron',sans-serif;color:#fff}
-canvas{position:fixed;top:0;left:0}
+#c{position:fixed;top:0;left:0}
 #hud{position:fixed;inset:0;z-index:10;pointer-events:none}
 #title{position:absolute;top:14px;left:16px}
 #title h1{font-size:14px;font-weight:700;letter-spacing:3px;color:#a040ff;text-shadow:0 0 15px #a040ff44}
@@ -97,7 +97,8 @@ for(let i=0;i<24;i++){
 // ─── AURORA RINGS ───
 const auroraN=new THREE.Mesh(new THREE.TorusGeometry(E*0.38,1.5,16,64),new THREE.MeshBasicMaterial({color:0x00ff88,transparent:true,opacity:0.0}));
 auroraN.position.y=E*0.92;auroraN.rotation.x=Math.PI/2;scene.add(auroraN);
-const auroraS=auroraN.clone();auroraS.position.y=-E*0.92;scene.add(auroraS);
+const auroraS=new THREE.Mesh(new THREE.TorusGeometry(E*0.38,1.5,16,64),new THREE.MeshBasicMaterial({color:0xff00aa,transparent:true,opacity:0.0}));
+auroraS.position.y=-E*0.92;auroraS.rotation.x=Math.PI/2;scene.add(auroraS);
 
 // Aurora particles
 const auroraParticles=[];
