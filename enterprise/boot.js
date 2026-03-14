@@ -1,48 +1,54 @@
 // enterprise/boot.js — Boot the full ISA-95 enterprise hierarchy
-// Call boot() to instantiate: Enterprise → Site → Areas → WorkCenters → WorkUnits → Equipment
+// Call boot() to instantiate: Enterprise → Sites → Areas → WorkCenters → WorkUnits → Equipment
 // Then wire to ASS-OS runtime (tags, engine, db).
 
 import { enterprise, registerSite, rollupKPI, getEnterprise } from './index.js';
-import { build as buildAssosPrime, inventory } from './sites/assos-prime/index.js';
+import { build as buildAssosPrime, inventory as assosInventory } from './sites/assos-prime/index.js';
+import { build as buildCassandra, inventory as cassInventory } from './sites/cassandra/index.js';
 import { wireRuntime, updateEnterprise } from './runtime.js';
 
-let _site = null;
+const _sites = [];
 
 export function boot() {
-  const site = buildAssosPrime();
-  registerSite(site);
-  _site = site;
+  // ── Site 1: ASS-OS Prime (consciousness engine) ──
+  const assos = buildAssosPrime();
+  registerSite(assos);
+  wireRuntime(assos);
+  _sites.push(assos);
 
-  // Wire enterprise hierarchy to ASS-OS tags/engine
-  wireRuntime(site);
+  // ── Site 2: Cassandra (personal assistant / secretary) ──
+  const cass = buildCassandra();
+  registerSite(cass);
+  wireRuntime(cass);
+  _sites.push(cass);
 
   // Initial KPI rollup
-  site.rollupKPI();
+  for (const s of _sites) s.rollupKPI();
   rollupKPI();
 
-  const inv = inventory(site);
+  const assosInv = assosInventory(assos);
+  const cassInv = cassInventory(cass);
   const summary = {
     enterprise: enterprise.id,
-    site: site.id,
-    areas: inv.areas.length,
-    workcenters: inv.workcenters.length,
-    workunits: inv.workunits.length,
-    equipment: inv.equipment.length,
-    controlModules: inv.controlModules?.length || 0,
-    processSegments: inv.processSegments?.length || 0,
-    tags: inv.tags.length
+    sites: _sites.map(s => s.id),
+    totalAreas: assosInv.areas.length + cassInv.areas.length,
+    totalWorkcenters: assosInv.workcenters.length + cassInv.workcenters.length,
+    totalWorkunits: assosInv.workunits.length + cassInv.workunits.length,
+    totalEquipment: assosInv.equipment.length + cassInv.equipment.length,
+    totalControlModules: (assosInv.controlModules?.length || 0) + (cassInv.controlModules?.length || 0),
+    totalTags: assosInv.tags.length + cassInv.tags.length,
   };
 
   console.log('[Enterprise] Booted:', summary);
-  return { enterprise, site, inventory: inv, summary };
+  return { enterprise, sites: { assos, cass }, summary };
 }
 
 // Call from animation loop after engine update
 export function update(dt, t) {
-  if (_site) {
-    updateEnterprise(_site, dt, t);
-    if (Math.floor(t) % 5 === 0) rollupKPI();
+  for (const site of _sites) {
+    updateEnterprise(site, dt, t);
   }
+  if (Math.floor(t) % 5 === 0) rollupKPI();
 }
 
 export function printHierarchy() {
@@ -81,4 +87,4 @@ export function printHierarchy() {
   return lines.join('\n');
 }
 
-export { getEnterprise, rollupKPI, inventory };
+export { getEnterprise, rollupKPI };

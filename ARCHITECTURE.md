@@ -1,7 +1,7 @@
 # AudioFabric Architecture
 
 > Auto-generated architecture document with timestamped changelog.
-> Last updated: 2026-03-04T12:00:00Z
+> Last updated: 2026-03-14T10:00:00Z
 
 ---
 
@@ -53,6 +53,26 @@ AudioFabric/
 │               └── autonomic/  # State machine + Alarms + Buses
 │                   ├── index.js
 │                   └── io-map.js # L0 CMs (State, Alarm, BusBalance)
+│       └── cassandra/          # ◆ CASSANDRA — Personal Assistant Site ◆
+│           ├── index.js        # Site assembly + inventory
+│           └── areas/
+│               ├── intake/      # Signal acquisition + NLU parsing
+│               │   ├── index.js
+│               │   └── io-map.js # CMs (TextIn, VoiceIn, Intent)
+│               ├── reasoning/   # 12-recursion GPU compute blades
+│               │   ├── index.js
+│               │   └── io-map.js # CMs (ThoughtGate, LLM, SelfCheck)
+│               ├── memory/      # NVMe + Redis storage array
+│               │   ├── index.js
+│               │   └── io-map.js # CMs (Context, Storage, RAG)
+│               ├── scheduling/  # Task queue + calendar
+│               │   ├── index.js
+│               │   └── io-map.js # CMs (TaskQueue, Calendar)
+│               └── comms/       # Output synthesis + action dispatch
+│                   ├── index.js
+│                   └── io-map.js # CMs (RespSynth, TTS, ToolExec)
+├── cassandra/                # Cassandra embodied consciousness UI
+│   └── index.html            # 9-orb body, 12-recursion thought, WebLLM
 └── modules/                  # ~95 ES modules
     ├── core.js               # KI event bus + module registry
     ├── scene.js              # Three.js scene manager
@@ -229,6 +249,42 @@ Enterprise: AUDIOFABRIC
                           ├── Equipment: BUS_C (bus: Photonic)
                           └── Equipment: BUS_BALANCE (processor)
                                 └── CM: CM_BUS_BAL [5 AI, 1 AO, 2 PID]
+
+  └── Site: CASSANDRA (Personal Assistant — Server Rack)
+        ├── Area: INTAKE (Signal Acquisition + NLU)
+        │     ├── WorkCenter: R0_INPUT (p=2)
+        │     │     └── WorkUnit: SIGNAL_CAPTURE [2 sensors, 2 CM]
+        │     └── WorkCenter: R1_PARSE (p=3)
+        │           └── WorkUnit: NLU_PARSE [3 processors, 1 CM]
+        │
+        ├── Area: REASONING (12-Recursion GPU Compute)
+        │     ├── WorkCenter: R2_R3_GATE (p=5)
+        │     │     └── WorkUnit: THOUGHT_GATE [2 processors, 1 CM + PID]
+        │     ├── WorkCenter: R4_EXEC (p=31)
+        │     │     └── WorkUnit: LLM_INFERENCE [3 processors (GPU×2 + KV), 1 CM]
+        │     └── WorkCenter: R5_R6_SELF (p=127)
+        │           └── WorkUnit: SELF_CHECK [2 processors, 1 CM]
+        │
+        ├── Area: MEMORY (NVMe + Redis Storage Array)
+        │     ├── WorkCenter: STM_CACHE
+        │     │     └── WorkUnit: CONTEXT_WINDOW [2 processors, 1 CM]
+        │     └── WorkCenter: LTM_STORE
+        │           ├── WorkUnit: CONV_HISTORY [3 processors, 1 CM]
+        │           └── WorkUnit: KNOWLEDGE_BASE [2 processors, 1 CM]
+        │
+        ├── Area: SCHEDULING (Task + Calendar Orchestration)
+        │     ├── WorkCenter: TASK_QUEUE
+        │     │     └── WorkUnit: TASK_MGR [2 processors, 1 CM]
+        │     └── WorkCenter: CALENDAR
+        │           └── WorkUnit: CAL_MGR [2 processors, 1 CM]
+        │
+        └── Area: COMMS (Output Synthesis + Actions)
+              ├── WorkCenter: RESP_SYNTH
+              │     └── WorkUnit: TEXT_SYNTH [2 processors, 1 CM]
+              ├── WorkCenter: VOICE_OUT
+              │     └── WorkUnit: TTS_ENGINE [2 processors, 1 CM]
+              └── WorkCenter: ACTION_EXEC
+                    └── WorkUnit: TOOL_DISPATCH [2 processors, 1 CM]
 ```
 
 ### ISA-95 Level Mapping
@@ -236,7 +292,7 @@ Enterprise: AUDIOFABRIC
 | ISA-95 Level | Timescale | ASS-OS Mapping | File |
 |:---:|:---:|---|---|
 | L4 Enterprise | days-months | AUDIOFABRIC — system identity, KPI rollup | `enterprise/index.js` |
-| L3 Site (MOM) | shifts-days | ASSOS-PRIME — consciousness instance | `enterprise/sites/assos-prime/` |
+| L3 Site (MOM) | shifts-days | ASSOS-PRIME (consciousness), CASSANDRA (assistant) | `enterprise/sites/*/` |
 | L2 Area | sec-hours | SENSORY, COGNITIVE, EXECUTIVE, INTEGRATION, AUTONOMIC | `areas/*/index.js` |
 | L2 WorkCenter | sec-min | L0_HW, L1_SENS, L2_GATE, L3_EMO, L4_EXEC, L5_SELF, L6_OBS, + cross-level | `workcenter.js` |
 | L1 WorkUnit | ms-sec | SUBSTRATE, VOICE_INPUT, FILTER, SALIENCE, GOAL_STACK, etc. | `workunit.js` |
@@ -249,17 +305,17 @@ Enterprise: AUDIOFABRIC
 | Entity | Count |
 |--------|-------|
 | Enterprise | 1 |
-| Sites | 1 |
-| Areas | 5 |
-| WorkCenters | 10 |
-| WorkUnits | 13 |
-| Equipment | 27 |
-| ControlModules | 18 |
+| Sites | 2 (ASSOS-PRIME + CASSANDRA) |
+| Areas | 10 (5 + 5) |
+| WorkCenters | 20 (10 + 10) |
+| WorkUnits | 24 (13 + 11) |
+| Equipment | 51 (27 + 24) |
+| ControlModules | 29 (18 + 11) |
 | ProcessSegments | 10 |
-| I/O Points | 55+ (AI/AO/DI/DO) |
-| PID Loops | 5 |
-| Modbus Registers | 40+ |
-| Tag paths | 80+ |
+| I/O Points | 90+ (AI/AO/DI/DO) |
+| PID Loops | 7 |
+| Modbus Registers | 70+ |
+| Tag paths | 130+ |
 
 ---
 
@@ -438,6 +494,12 @@ Microphone → voice-engine → KI.voice → ass-os-tags (INPUT/*)
 
 All timestamps in UTC.
 
+### 2026-03-14
+
+| Time | Commit | Change |
+|------|--------|--------|
+| 10:00 | `-------` | Add CASSANDRA — embodied AI personal assistant/secretary. 9-orb body with 12-recursion thought engine (WebLLM), server rack enterprise site (5 areas: Intake, Reasoning, Memory, Scheduling, Comms), 11 ControlModules, 24 equipment (GPU blades, NVMe arrays, Redis cache, TTS), 50+ I/O points, 30+ Modbus registers, 50+ CASS/* tags. Multi-site enterprise (ASSOS-PRIME + CASSANDRA). |
+
 ### 2026-03-04
 
 | Time | Commit | Change |
@@ -546,7 +608,8 @@ All timestamps in UTC.
 | AI/LLM modules | 6 (web-llm, mcp-tools, voice-ai, sandbox, etc.) |
 | ASS-OS modules | 24 (across udts/, tags/, db/, + engine files) |
 | ASS-OS re-exports | 5 (backward compatibility wrappers) |
-| Enterprise hierarchy | 21 (enterprise/, sites/, areas/, io-maps) |
+| Enterprise hierarchy | 32 (enterprise/, 2 sites, areas/, io-maps) |
+| Cassandra UI | 1 (cassandra/index.html) |
 | Voice modules | 8 (voice-engine, voice-fx, voice-chat, singing, etc.) |
 | Game modules | 6 (ki-blasts, d2r, periodic, risk, etc.) |
-| **Total** | **~118+** |
+| **Total** | **~130+** |

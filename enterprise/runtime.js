@@ -5,11 +5,11 @@
 import { tags } from '../modules/ass-os/tags/index.js';
 import { getEngine } from '../modules/ass-os/engine.js';
 
-let wired = false;
+let wiredSites = new Set();
 
 export function wireRuntime(site) {
-  if (wired) return;
-  wired = true;
+  if (wiredSites.has(site.id)) return;
+  wiredSites.add(site.id);
 
   // Walk hierarchy, bind each node
   for (const area of Object.values(site.areas)) {
@@ -24,7 +24,7 @@ export function wireRuntime(site) {
       }
     }
   }
-  console.log('[Runtime] Enterprise hierarchy wired to ASS-OS tags');
+  console.log(`[Runtime] ${site.id} hierarchy wired to ASS-OS tags`);
 }
 
 function wireArea(area) {
@@ -88,7 +88,7 @@ function wireEquipment(eq, wu, wc) {
 
 // ── Master update: call from animation loop ──
 export function updateEnterprise(site, dt, t) {
-  if (!wired) return;
+  if (!wiredSites.has(site.id)) return;
   for (const area of Object.values(site.areas)) {
     for (const wc of Object.values(area.workcenters)) {
       if (wc.update) wc.update(dt, t);
