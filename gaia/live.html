@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GAIA LIVE — Planetary Mind</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+body{background:#0a0f1e}
+#title h1{color:#0f0;text-shadow:0 0 10px #0f0}
+#info em{color:#0f0}
+#feeds{position:absolute;top:12px;right:12px;width:170px}
+#feeds h3{font-family:'JetBrains Mono',monospace;font-size:6px;color:rgba(255,255,255,0.2);letter-spacing:2px;margin-bottom:6px}
+#kappa-panel{position:absolute;top:270px;right:12px;width:170px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:8px;backdrop-filter:blur(4px)}
+#kappa-display{font-size:22px;font-weight:300;text-align:center;font-family:'JetBrains Mono',monospace}
+#kappa-phase{font-size:8px;text-align:center;color:rgba(255,255,255,0.5);margin-top:4px}
+#kappa-bar{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:8px;overflow:hidden}
+#kappa-fill{height:100%;transition:width .5s,background .5s}
+#events{position:absolute;bottom:80px;right:12px;width:170px;max-height:160px;overflow-y:auto}
+#events h3{font-family:'JetBrains Mono',monospace;font-size:6px;color:rgba(255,255,255,0.2);letter-spacing:2px;margin-bottom:6px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="title"><h1><span class="dot-live" style="background:#0f0"></span>GAIA LIVE</h1><h2>PLANETARY CONSCIOUSNESS MONITOR</h2></div>
+  <div id="feeds">
+    <h3>&#x25b8; DATA FEEDS</h3>
+    <div class="feed"><div class="feed-header"><span class="icon">&#x1f30d;</span><span class="name">SEISMIC</span><span class="status sim" id="status-eq">SIM</span></div><div class="feed-value" id="val-eq">--</div><div class="feed-sub" id="sub-eq">Initializing...</div></div>
+    <div class="feed"><div class="feed-header"><span class="icon">&#x2600;&#xfe0f;</span><span class="name">SOLAR WIND</span><span class="status sim" id="status-solar">SIM</span></div><div class="feed-value" id="val-solar">--</div><div class="feed-sub" id="sub-solar">Initializing...</div></div>
+    <div class="feed"><div class="feed-header"><span class="icon">&#x1f9f2;</span><span class="name">Kp INDEX</span><span class="status sim" id="status-kp">SIM</span></div><div class="feed-value" id="val-kp">--</div><div class="feed-sub" id="sub-kp">Geomagnetic</div></div>
+    <div class="feed"><div class="feed-header"><span class="icon">&#x26a1;</span><span class="name">SCHUMANN</span><span class="status live">LIVE</span></div><div class="feed-value" id="val-sch">7.83 Hz</div><div class="feed-sub">Earth resonance</div></div>
+  </div>
+  <div id="kappa-panel"><div style="font-family:'JetBrains Mono';font-size:6px;color:rgba(255,255,255,0.2);letter-spacing:2px;margin-bottom:4px">&#x25b8; PLANETARY &#x03ba;</div><div id="kappa-display">0.6180</div><div id="kappa-phase">&#x1f338; KONOMI</div><div id="kappa-bar"><div id="kappa-fill"></div></div></div>
+  <div id="events"><h3>&#x25b8; EVENTS</h3><div id="event-list"></div></div>
+  <div id="metrics"><h3>&#x25b8; ADDITIONAL METRICS</h3>
+    <div class="metric-row"><span class="k">UV Index</span><span class="v" id="m-uv">--</span></div>
+    <div class="metric-row"><span class="k">Lightning</span><span class="v" id="m-lightning">--</span></div>
+    <div class="metric-row"><span class="k">CO&#x2082;</span><span class="v" id="m-co2">--</span></div>
+    <div class="metric-row"><span class="k">Cosmic Rays</span><span class="v" id="m-cosmic">--</span></div>
+    <div class="metric-row"><span class="k">F10.7 Flux</span><span class="v" id="m-f107">--</span></div>
+    <div class="metric-row"><span class="k">Proton Flux</span><span class="v" id="m-proton">--</span></div>
+    <div class="metric-row"><span class="k">Tidal Force</span><span class="v" id="m-tidal">--</span></div>
+  </div>
+  <div id="info"><p><em>Live data</em> via CORS proxy &middot; sim fallback</p></div>
+  <div id="alert"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+import { metrics, getPhase, onEvent, getEvents, startPolling } from './metrics.js';
+
+const canvas=document.getElementById('c'),R=new THREE.WebGLRenderer({canvas,antialias:true});
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x0a0f1e);
+const cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,5000);
+scene.add(new THREE.AmbientLight(0x223344,0.6));
+scene.add(new THREE.DirectionalLight(0x4488cc,0.3));
+const E=50;
+
+// Earth
+const earthCore=new THREE.Mesh(new THREE.IcosahedronGeometry(E,4),new THREE.MeshPhysicalMaterial({color:0x1a4a8a,emissive:0x0a2040,emissiveIntensity:0.3,transparent:true,opacity:0.8}));scene.add(earthCore);
+const earthWire=new THREE.Mesh(new THREE.IcosahedronGeometry(E*1.002,3),new THREE.MeshBasicMaterial({color:0x00ff88,wireframe:true,transparent:true,opacity:0.08}));scene.add(earthWire);
+
+// Surface nodes
+const nodes=[];
+for(let i=0;i<1200;i++){const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),r=E+0.5+Math.random()*1.5;const n=new THREE.Mesh(new THREE.SphereGeometry(0.22,5,5),new THREE.MeshBasicMaterial({color:0x00ff88,transparent:true,opacity:0.4}));n.position.set(r*Math.sin(ph)*Math.cos(th),r*Math.sin(ph)*Math.sin(th),r*Math.cos(ph));n.userData={ph:Math.random()*Math.PI*2};scene.add(n);nodes.push(n)}
+
+// Schumann waves
+const schWaves=[];
+for(let i=0;i<5;i++){const w=new THREE.Mesh(new THREE.TorusGeometry(E+11,0.2,8,64),new THREE.MeshBasicMaterial({color:0x00ffff,transparent:true,opacity:0.08}));w.rotation.x=(i/5)*Math.PI;w.rotation.y=(i/5)*Math.PI*0.5;scene.add(w);schWaves.push(w)}
+
+// Ionosphere
+const iono=new THREE.Mesh(new THREE.IcosahedronGeometry(E+22,3),new THREE.MeshBasicMaterial({color:0xff00ff,wireframe:true,transparent:true,opacity:0.04}));scene.add(iono);
+
+// Field lines
+const fieldLines=[];
+for(let i=0;i<16;i++){const pts=[],th=(i/16)*Math.PI*2;for(let t=-1;t<=1;t+=0.06){const r=E*2*Math.pow(Math.cos(t*Math.PI/2),2);pts.push(new THREE.Vector3(r*Math.cos(t*Math.PI/2)*Math.cos(th),r*Math.sin(t*Math.PI/2),r*Math.cos(t*Math.PI/2)*Math.sin(th)))}const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x4444ff,transparent:true,opacity:0.1}));scene.add(l);fieldLines.push(l)}
+
+// Solar wind particles
+const solarP=[];
+for(let i=0;i<120;i++){const p=new THREE.Mesh(new THREE.SphereGeometry(0.35,4,4),new THREE.MeshBasicMaterial({color:0xffff00,transparent:true,opacity:0.25}));p.position.set(E*4+Math.random()*E*2,(Math.random()-0.5)*E*2,(Math.random()-0.5)*E*2);scene.add(p);solarP.push(p)}
+
+// EQ markers + bolts
+const eqMarkers=[],bolts=[];
+function spawnEQ(eq){
+  const ph=(90-eq.lat)*Math.PI/180,th=(eq.lon+180)*Math.PI/180;
+  const pos=new THREE.Vector3((E+1)*Math.sin(ph)*Math.cos(th),(E+1)*Math.cos(ph),(E+1)*Math.sin(ph)*Math.sin(th));
+  const sz=Math.pow(2,eq.mag-2.5)*1.2;
+  const m=new THREE.Mesh(new THREE.SphereGeometry(sz,10,10),new THREE.MeshBasicMaterial({color:0xff4400,transparent:true,opacity:0.85}));
+  m.position.copy(pos);m.userData={life:1};scene.add(m);eqMarkers.push(m);
+  for(let i=0;i<3;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(sz,0.12,6,24),new THREE.MeshBasicMaterial({color:0xff8800,transparent:true,opacity:0.45}));ring.position.copy(pos);ring.lookAt(0,0,0);ring.userData={life:1,delay:i*0.22,bs:sz};scene.add(ring);eqMarkers.push(ring)}
+}
+function spawnBolt(){const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),g=new THREE.Vector3(E*Math.sin(ph)*Math.cos(th),E*Math.sin(ph)*Math.sin(th),E*Math.cos(ph)),io=g.clone().normalize().multiplyScalar(E+18),pts=[io];for(let i=1;i<5;i++){const p=io.clone().lerp(g,i/5);p.x+=(Math.random()-0.5)*3.5;p.y+=(Math.random()-0.5)*3.5;p.z+=(Math.random()-0.5)*3.5;pts.push(p)}pts.push(g);const b=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0xffff00,transparent:true,opacity:1}));b.userData={life:1,dec:0.11};scene.add(b);bolts.push(b)}
+
+// Events → UI
+let lastEQCount=0;
+onEvent((entry, all) => {
+  document.getElementById('event-list').innerHTML=all.map(e=>'<div class="event '+e.type+'"><div>'+e.msg+'</div><div class="event-time">'+e.time+'</div></div>').join('');
+  const a=document.getElementById('alert');a.textContent=entry.msg;a.style.color={earthquake:'#f80',solar:'#ff0',geomag:'#f0f',lightning:'#0ff',uv:'#ff8'}[entry.type]||'#fff';a.style.opacity=1;setTimeout(()=>a.style.opacity=0,2500);
+});
+
+function updateUI(){
+  const M=metrics;
+  // Feeds
+  document.getElementById('status-eq').textContent=M.eqMode==='live'?'LIVE':'SIM';
+  document.getElementById('status-eq').className='status '+(M.eqMode==='live'?'live':'sim');
+  document.getElementById('status-solar').textContent=M.solarMode==='live'?'LIVE':'SIM';
+  document.getElementById('status-solar').className='status '+(M.solarMode==='live'?'live':'sim');
+  document.getElementById('status-kp').textContent=M.kpMode==='live'?'LIVE':'SIM';
+  document.getElementById('status-kp').className='status '+(M.kpMode==='live'?'live':'sim');
+  if(M.earthquakes.length){const e=M.earthquakes[0];document.getElementById('val-eq').textContent='M'+e.mag.toFixed(1);document.getElementById('sub-eq').textContent=(e.place||'').substring(0,22)}
+  document.getElementById('val-solar').textContent=Math.round(M.solarSpeed)+' km/s';
+  document.getElementById('sub-solar').textContent='\u03c1='+M.solarDensity.toFixed(1)+' p/cm\u00b3';
+  document.getElementById('val-kp').textContent='Kp '+M.kpIndex.toFixed(0);
+  document.getElementById('sub-kp').textContent=M.kpIndex>=5?'STORM!':M.kpIndex>=4?'Active':'Quiet';
+  document.getElementById('val-sch').textContent=M.schumann.toFixed(2)+' Hz';
+  // Kappa
+  const p=getPhase(M.kappa);
+  document.getElementById('kappa-display').textContent=M.kappa.toFixed(4);
+  document.getElementById('kappa-display').style.color='#'+p.color.toString(16).padStart(6,'0');
+  document.getElementById('kappa-phase').textContent=p.icon+' '+p.key;
+  document.getElementById('kappa-fill').style.width=M.kappa*100+'%';
+  document.getElementById('kappa-fill').style.background='#'+p.color.toString(16).padStart(6,'0');
+  // Additional metrics
+  document.getElementById('m-uv').textContent=M.uvIndex.toFixed(1);
+  document.getElementById('m-lightning').textContent=Math.round(M.lightningRate)+'/s';
+  document.getElementById('m-co2').textContent=M.co2ppm.toFixed(1)+' ppm';
+  document.getElementById('m-cosmic').textContent=Math.round(M.cosmicRayFlux)+' n/m';
+  document.getElementById('m-f107').textContent=M.f107Flux.toFixed(0)+' sfu';
+  document.getElementById('m-proton').textContent=M.protonFlux.toFixed(1)+' pfu';
+  document.getElementById('m-tidal').textContent=(M.tidalForce>=0?'+':'')+M.tidalForce.toFixed(3);
+  // Spawn new EQ visuals
+  if(M.earthquakes.length>lastEQCount){for(let i=0;i<Math.min(3,M.earthquakes.length-lastEQCount);i++)spawnEQ(M.earthquakes[i])}
+  lastEQCount=M.earthquakes.length;
+}
+
+// Camera
+let drag=false,px=0,py=0,cTh=0.5,cPh=1.2,cR=150;
+function updateCam(){cam.position.set(cR*Math.sin(cPh)*Math.cos(cTh),cR*Math.cos(cPh),cR*Math.sin(cPh)*Math.sin(cTh));cam.lookAt(0,0,0)}
+updateCam();
+canvas.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY});
+addEventListener('pointermove',e=>{if(!drag)return;cTh-=(e.clientX-px)*0.005;cPh=Math.max(0.1,Math.min(3,cPh+(e.clientY-py)*0.005));px=e.clientX;py=e.clientY;updateCam()});
+addEventListener('pointerup',()=>drag=false);
+canvas.addEventListener('wheel',e=>{cR=Math.max(70,Math.min(300,cR+e.deltaY*0.12))},{passive:true});
+
+const KAPPA_STAR=1/((1+Math.sqrt(5))/2);
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);t+=0.007;if(!drag)cTh+=0.0003;updateCam();updateUI();
+  earthCore.rotation.y=t*0.012;earthWire.rotation.y=t*0.012;
+  const pulse=Math.sin(t*metrics.schumann*0.35);
+  nodes.forEach(n=>{n.material.opacity=0.25+pulse*0.12+Math.sin(t*2+n.userData.ph)*0.08;n.material.color.setHSL(0.35+(metrics.kappa-KAPPA_STAR)*0.4,1,0.5)});
+  schWaves.forEach((w,i)=>{w.scale.setScalar(1+Math.sin(t*(metrics.schumann+i*6)*0.22)*0.07);w.material.opacity=0.05+Math.sin(t*metrics.schumann*0.25)*0.03});
+  iono.material.opacity=0.03+metrics.kpIndex*0.01;
+  const comp=1-(metrics.solarSpeed-300)/700;
+  fieldLines.forEach(l=>{l.scale.x=comp;l.material.opacity=0.06+(1-comp)*0.1});
+  const ws=metrics.solarSpeed/1100;
+  solarP.forEach(p=>{p.position.x-=ws;if(p.position.x<-E*2.5){p.position.x=E*5;p.position.y=(Math.random()-0.5)*E*2;p.position.z=(Math.random()-0.5)*E*2}const d=Math.sqrt(p.position.y**2+p.position.z**2);if(p.position.x<E*1.7&&d<E*1.2){const a=Math.atan2(p.position.z,p.position.y);p.position.y+=Math.cos(a)*0.35;p.position.z+=Math.sin(a)*0.35}});
+  // Lightning bolts scale with lightning rate
+  if(Math.random()<metrics.lightningRate/4000)spawnBolt();
+  for(let i=bolts.length-1;i>=0;i--){bolts[i].userData.life-=bolts[i].userData.dec;bolts[i].material.opacity=bolts[i].userData.life;if(bolts[i].userData.life<=0){scene.remove(bolts[i]);bolts.splice(i,1)}}
+  for(let i=eqMarkers.length-1;i>=0;i--){const m=eqMarkers[i];if(m.userData.delay!==undefined){m.userData.delay-=0.016;if(m.userData.delay<=0){m.userData.life-=0.012;m.scale.setScalar(1+(1-m.userData.life)*2.2);m.material.opacity=m.userData.life*0.45}}else{m.userData.life-=0.003;m.material.opacity=m.userData.life*0.75;m.scale.setScalar(1+Math.sin(t*7)*0.12)}if(m.userData.life<=0){scene.remove(m);eqMarkers.splice(i,1)}}
+  R.render(scene,cam);
+}
+startPolling();animate();
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>
