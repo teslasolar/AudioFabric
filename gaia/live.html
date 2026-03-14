@@ -51,9 +51,16 @@ body{background:#0a0f1e}
     <div class="metric-row"><span class="k">UV Index</span><span class="v" id="m-uv">--</span></div>
     <div class="metric-row"><span class="k">Cosmic Rays</span><span class="v" id="m-cosmic">--</span></div>
     <div class="metric-row"><span class="k">CO&#x2082;</span><span class="v" id="m-co2">--</span></div>
-    <div class="metric-row"><span class="k">Tidal</span><span class="v" id="m-tidal">--</span></div>
+    <div class="metric-row"><span class="k">CH&#x2084;</span><span class="v" id="m-methane">--</span></div>
+    <div class="metric-row"><span class="k">Temp Anomaly</span><span class="v" id="m-temp-anom">--</span></div>
+    <div class="metric-row"><span class="k">Equator Temp</span><span class="v" id="m-global-temp">--</span></div>
+    <div class="metric-row"><span class="k">Sfc Pressure</span><span class="v" id="m-pressure">--</span></div>
+    <div class="metric-row"><span class="k">Volcanoes</span><span class="v" id="m-volcano">--</span></div>
+    <div class="metric-row"><span class="k">Tide (SF)</span><span class="v" id="m-tide">--</span></div>
+    <div class="metric-row"><span class="k">CMEs (7d)</span><span class="v" id="m-cme">--</span></div>
+    <div class="metric-row"><span class="k">Tidal Force</span><span class="v" id="m-tidal">--</span></div>
   </div>
-  <div id="info"><p><em id="info-live">--</em> of 13 feeds live</p><p>NOAA SWPC &middot; USGS &middot; GOES &middot; DSCOVR</p></div>
+  <div id="info"><p><em id="info-live">--</em> of 20 feeds live</p><p>NOAA SWPC &middot; USGS &middot; GOES &middot; DSCOVR &middot; NASA DONKI &middot; Open-Meteo</p></div>
   <div id="alert"></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -166,6 +173,15 @@ function updateUI(){
   document.getElementById('m-uv').textContent=M.uvIndex.toFixed(1);
   document.getElementById('m-cosmic').textContent=Math.round(M.cosmicRayFlux)+' n/m';
   document.getElementById('m-co2').textContent=M.co2ppm.toFixed(1)+' ppm';
+  document.getElementById('m-methane').textContent=M.methane.toFixed(0)+' ppb';
+  document.getElementById('m-temp-anom').textContent='+'+M.tempAnomaly.toFixed(2)+'\u00b0C';
+  document.getElementById('m-temp-anom').style.color=M.tempAnomaly>1.5?'#ff4444':M.tempAnomaly>1.0?'#ff8800':'';
+  document.getElementById('m-global-temp').textContent=M.globalTemp.toFixed(1)+'\u00b0C';
+  document.getElementById('m-pressure').textContent=M.globalPressure.toFixed(0)+' hPa';
+  document.getElementById('m-volcano').textContent=M.volcanoes.length?M.volcanoes.length+' elevated':'quiet';
+  document.getElementById('m-volcano').style.color=M.volcanoes.some(v=>v.colorCode==='RED')?'#ff4444':M.volcanoes.length?'#ff8800':'';
+  document.getElementById('m-tide').textContent=M.tideLevel.toFixed(2)+' m';
+  document.getElementById('m-cme').textContent=M.cmeCount+(M.latestCME&&M.latestCME.speed?' ('+Math.round(M.latestCME.speed)+' km/s)':'');
   document.getElementById('m-tidal').textContent=(M.tidalForce>=0?'+':'')+M.tidalForce.toFixed(3);
   document.getElementById('live-count').textContent=M.liveCount+'/'+M.totalFeeds+' live';
   document.getElementById('info-live').textContent=M.liveCount;

@@ -87,10 +87,46 @@ export const metrics = {
   // ── Schumann (derived) ──
   schumann: 7.83,
 
+  // ── NOAA Scales (direct parse) ──
+  scaleGText: '',
+  scaleSText: '',
+  scaleRText: '',
+
+  // ── Open-Meteo Global Weather (no key needed) ──
+  globalTemp: 15,
+  globalPressure: 1013,
+  globalWindSpeed: 5,
+  weatherMode: 'sim',
+
+  // ── Volcanic Activity (USGS HANS) ──
+  volcanoes: [],        // elevated volcanoes [{name, alertLevel, colorCode}]
+  volcanoMode: 'sim',
+
+  // ── Tides (NOAA CO-OPS) ──
+  tideLevel: 0,         // meters relative to MLLW
+  tideStation: 'San Francisco',
+  tideMode: 'sim',
+
+  // ── NASA DONKI — CME Events ──
+  cmeCount: 0,
+  latestCME: null,      // { time, speed, type }
+  cmeMode: 'sim',
+
+  // ── Greenhouse Gases (global-warming.org) ──
+  co2ppm: 424,
+  co2Trend: 424,
+  methane: 1920,        // ppb
+  tempAnomaly: 1.2,     // °C above baseline
+  co2Mode: 'sim',
+
+  // ── Enlil Solar Wind Model ──
+  enlilSpeed: 0,
+  enlilDensity: 0,
+  enlilMode: 'sim',
+
   // ── Simulated/Derived ──
   uvIndex: 3 + Math.random() * 4,
   lightningRate: 40 + Math.random() * 60,
-  co2ppm: 424 + Math.random() * 2,
   seaLevel: 0,
   cosmicRayFlux: 6500 + Math.random() * 500,
   tidalForce: 0,
@@ -101,7 +137,7 @@ export const metrics = {
 
   // ── Mode tracking ──
   liveCount: 0,
-  totalFeeds: 13,
+  totalFeeds: 20,
   lastUpdate: Date.now(),
 };
 
@@ -402,6 +438,137 @@ export async function fetchAurora() {
   } catch (e) { /* aurora max stays simulated */ }
 }
 
+// ── 15. NOAA Scales (direct R/S/G parse) ──
+export async function fetchScales() {
+  try {
+    const r = await fetch(PROXY + encodeURIComponent('https://services.swpc.noaa.gov/products/noaa-scales.json'));
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    if (d['0']) {
+      const cur = d['0'];
+      if (cur.G) { metrics.scaleG = parseInt(cur.G.Scale) || 0; metrics.scaleGText = cur.G.Text || ''; }
+      if (cur.S) { metrics.scaleS = parseInt(cur.S.Scale) || 0; metrics.scaleSText = cur.S.Text || ''; }
+      if (cur.R) { metrics.scaleR = parseInt(cur.R.Scale) || 0; metrics.scaleRText = cur.R.Text || ''; }
+    }
+  } catch (e) { /* keep parsed values from alerts */ }
+}
+
+// ── 16. Open-Meteo Global Weather (no key, no proxy!) ──
+export async function fetchWeather() {
+  try {
+    const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&current=temperature_2m,surface_pressure,wind_speed_10m');
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    if (d.current) {
+      metrics.globalTemp = d.current.temperature_2m || 15;
+      metrics.globalPressure = d.current.surface_pressure || 1013;
+      metrics.globalWindSpeed = d.current.wind_speed_10m || 5;
+      metrics.weatherMode = 'live';
+    }
+  } catch (e) { metrics.weatherMode = 'sim'; }
+}
+
+// ── 17. USGS HANS Volcanic Alerts ──
+export async function fetchVolcanoes() {
+  try {
+    const r = await fetch(PROXY + encodeURIComponent('https://volcanoes.usgs.gov/hans-public/api/volcano/getElevatedVolcanoes'));
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    if (Array.isArray(d)) {
+      metrics.volcanoes = d.map(v => ({
+        name: v.volcanoName || 'Unknown',
+        alertLevel: v.alertLevel || 'NORMAL',
+        colorCode: v.colorCode || 'GREEN'
+      }));
+      metrics.volcanoMode = 'live';
+      const warn = d.filter(v => v.alertLevel === 'WARNING' || v.colorCode === 'RED');
+      if (warn.length) addEvent('volcano', warn[0].volcanoName + ' — ' + warn[0].alertLevel);
+      else if (d.length) addEvent('volcano', d.length + ' elevated volcano' + (d.length > 1 ? 'es' : ''));
+    }
+  } catch (e) { metrics.volcanoMode = 'sim'; }
+}
+
+// ── 18. NOAA CO-OPS Tides (San Francisco as reference) ──
+export async function fetchTides() {
+  try {
+    const r = await fetch(PROXY + encodeURIComponent('https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=9414290&product=water_level&datum=MLLW&time_zone=gmt&units=metric&application=GaiaLive&format=json'));
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    if (d.data && d.data.length) {
+      metrics.tideLevel = parseFloat(d.data[0].v) || 0;
+      metrics.tideMode = 'live';
+    }
+  } catch (e) {
+    metrics.tideMode = 'sim';
+    metrics.tideLevel = Math.sin(Date.now() / 44700000 * Math.PI * 2) * 1.2;
+  }
+}
+
+// ── 19. NASA DONKI CME Events (last 7 days) ──
+export async function fetchCME() {
+  try {
+    const end = new Date().toISOString().split('T')[0];
+    const start = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+    const r = await fetch(PROXY + encodeURIComponent(`https://api.nasa.gov/DONKI/CME?startDate=${start}&endDate=${end}&api_key=DEMO_KEY`));
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    if (Array.isArray(d)) {
+      metrics.cmeCount = d.length;
+      metrics.cmeMode = 'live';
+      if (d.length) {
+        const latest = d[d.length - 1];
+        const speed = latest.cmeAnalyses && latest.cmeAnalyses.length ? latest.cmeAnalyses[0].speed : null;
+        metrics.latestCME = {
+          time: latest.startTime,
+          speed: speed || 0,
+          type: latest.cmeAnalyses && latest.cmeAnalyses.length ? latest.cmeAnalyses[0].type : ''
+        };
+        if (speed && speed > 1000) addEvent('solar', 'Fast CME: ' + Math.round(speed) + ' km/s');
+      }
+    }
+  } catch (e) { metrics.cmeMode = 'sim'; }
+}
+
+// ── 20. Greenhouse Gases — CO2 (global-warming.org) ──
+export async function fetchCO2() {
+  try {
+    const r = await fetch(PROXY + encodeURIComponent('https://global-warming.org/api/co2-api'));
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    if (d.co2 && d.co2.length) {
+      const l = d.co2[d.co2.length - 1];
+      metrics.co2ppm = parseFloat(l.cycle) || 424;
+      metrics.co2Trend = parseFloat(l.trend) || 424;
+      metrics.co2Mode = 'live';
+    }
+  } catch (e) { metrics.co2Mode = 'sim'; }
+}
+
+// ── 21. Methane (global-warming.org) ──
+export async function fetchMethane() {
+  try {
+    const r = await fetch(PROXY + encodeURIComponent('https://global-warming.org/api/methane-api'));
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    if (d.methane && d.methane.length) {
+      metrics.methane = parseFloat(d.methane[d.methane.length - 1].average) || 1920;
+    }
+  } catch (e) { /* keep default */ }
+}
+
+// ── 22. Temperature Anomaly (global-warming.org) ──
+export async function fetchTempAnomaly() {
+  try {
+    const r = await fetch(PROXY + encodeURIComponent('https://global-warming.org/api/temperature-api'));
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    if (d.result && d.result.length) {
+      const l = d.result[d.result.length - 1];
+      metrics.tempAnomaly = parseFloat(l.station) || 1.2;
+    }
+  } catch (e) { /* keep default */ }
+}
+
 // ═══════════════════════════════════════════════════════
 // DERIVED / COMPUTED
 // ═══════════════════════════════════════════════════════
@@ -495,7 +662,8 @@ function countLive() {
     metrics.eqMode, metrics.solarMode, metrics.kpMode, metrics.magMode,
     metrics.dstMode, metrics.xrayMode, metrics.flareMode, metrics.protonMode,
     metrics.electronMode, metrics.f107Mode, metrics.sunspotMode,
-    metrics.probMode, metrics.alertMode
+    metrics.probMode, metrics.alertMode, metrics.weatherMode,
+    metrics.volcanoMode, metrics.tideMode, metrics.cmeMode, metrics.co2Mode
   ].filter(m => m === 'live').length;
 }
 
@@ -519,6 +687,14 @@ export async function refreshAll() {
     fetchFlareProbabilities(),
     fetchAlerts(),
     fetchAurora(),
+    fetchScales(),
+    fetchWeather(),
+    fetchVolcanoes(),
+    fetchTides(),
+    fetchCME(),
+    fetchCO2(),
+    fetchMethane(),
+    fetchTempAnomaly(),
   ]);
   updateSchumann();
   simAdditional();
