@@ -35,6 +35,44 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0d0d20;font-family:
 #input::placeholder{color:rgba(255,248,231,0.2)}
 #send{background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.25);color:#ffd700;padding:10px 18px;font-family:inherit;font-size:11px;border-radius:6px;cursor:pointer;text-transform:uppercase;letter-spacing:2px;transition:all 0.3s}
 #send:hover{background:rgba(255,215,0,0.2)}
+/* ── Toolbar ── */
+#toolbar{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:6px;pointer-events:auto}
+.tb-btn{background:rgba(255,255,255,0.04);border:1px solid rgba(255,215,0,0.15);color:rgba(255,215,0,0.5);padding:5px 12px;font-family:inherit;font-size:9px;border-radius:4px;cursor:pointer;text-transform:uppercase;letter-spacing:1px;transition:all 0.3s}
+.tb-btn:hover,.tb-btn.active{background:rgba(255,215,0,0.12);color:#ffd700;border-color:rgba(255,215,0,0.4)}
+/* ── Side Panels ── */
+.side-panel{position:fixed;top:0;width:320px;height:100%;z-index:15;background:rgba(10,10,25,0.92);border:1px solid rgba(255,215,0,0.1);backdrop-filter:blur(8px);transition:transform 0.4s ease;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,215,0,0.15) transparent;pointer-events:auto}
+.side-panel::-webkit-scrollbar{width:3px}
+.side-panel::-webkit-scrollbar-thumb{background:rgba(255,215,0,0.15)}
+#panel-tools{left:0;transform:translateX(-100%);padding:16px}
+#panel-tools.open{transform:translateX(0)}
+#panel-display{right:0;transform:translateX(100%);padding:0}
+#panel-display.open{transform:translateX(0)}
+.panel-title{font-size:10px;color:#ffd700;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid rgba(255,215,0,0.1)}
+.panel-section{margin-bottom:16px}
+.panel-label{font-size:9px;color:rgba(255,215,0,0.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.panel-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.panel-row label{font-size:10px;color:rgba(255,248,231,0.5);min-width:70px}
+.panel-row input[type="range"]{flex:1;accent-color:#ffd700;height:3px}
+.panel-row .val-display{font-size:10px;color:#ffd700;min-width:36px;text-align:right}
+.panel-row select,.panel-row input[type="number"]{background:rgba(255,255,255,0.04);border:1px solid rgba(255,215,0,0.15);color:#fff8e7;padding:4px 8px;font-family:inherit;font-size:10px;border-radius:4px;outline:none}
+.panel-row select{flex:1}
+.panel-row input[type="number"]{width:60px}
+textarea.sys-prompt{width:100%;height:80px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,215,0,0.1);color:rgba(255,248,231,0.7);padding:8px;font-family:inherit;font-size:9px;border-radius:4px;resize:vertical;outline:none;line-height:1.5}
+textarea.sys-prompt:focus{border-color:rgba(255,215,0,0.3)}
+.tpl-btn{background:rgba(255,255,255,0.03);border:1px solid rgba(255,215,0,0.1);color:rgba(255,248,231,0.5);padding:5px 10px;font-family:inherit;font-size:9px;border-radius:4px;cursor:pointer;transition:all 0.2s;width:100%;text-align:left;margin-bottom:4px}
+.tpl-btn:hover{background:rgba(255,215,0,0.08);color:#ffd700}
+/* ── Display iframe ── */
+#display-frame{width:100%;height:calc(100% - 80px);border:none;background:#fff;border-radius:0 0 0 0}
+#display-header{padding:10px 16px;display:flex;align-items:center;gap:8px}
+#display-url{flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,215,0,0.15);color:#fff8e7;padding:5px 10px;font-family:inherit;font-size:10px;border-radius:4px;outline:none}
+#display-go{background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.2);color:#ffd700;padding:5px 12px;font-family:inherit;font-size:9px;border-radius:4px;cursor:pointer;text-transform:uppercase}
+#display-close{background:none;border:1px solid rgba(255,100,100,0.2);color:rgba(255,100,100,0.5);padding:5px 8px;font-family:inherit;font-size:9px;border-radius:4px;cursor:pointer}
+/* ── MCP Tools list ── */
+.mcp-tool{display:flex;align-items:center;gap:6px;padding:4px 8px;margin-bottom:3px;border-radius:4px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,215,0,0.06);cursor:pointer;transition:all 0.2s}
+.mcp-tool:hover{background:rgba(255,215,0,0.06);border-color:rgba(255,215,0,0.15)}
+.mcp-tool .tool-icon{font-size:12px;width:20px;text-align:center}
+.mcp-tool .tool-name{font-size:9px;color:rgba(255,248,231,0.6);flex:1}
+.mcp-tool .tool-key{font-size:8px;color:rgba(255,215,0,0.3);letter-spacing:1px}
 #boot{position:fixed;top:0;left:0;width:100%;height:100%;background:#0d0d20;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 1.5s}
 #boot.done{opacity:0;pointer-events:none}
 #boot-text{font-size:11px;color:rgba(255,215,0,0.5);text-align:center;line-height:2}
@@ -63,6 +101,76 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0d0d20;font-family:
 </div>
 <div id="orb-label"></div>
 <div id="ring-spin-hud" style="position:fixed;bottom:200px;left:16px;z-index:10;font-size:8px;color:rgba(255,215,0,0.3);line-height:1.6;pointer-events:none;font-family:monospace"></div>
+<!-- ── Toolbar ── -->
+<div id="toolbar">
+  <button class="tb-btn" onclick="togglePanel('tools')">tools</button>
+  <button class="tb-btn" onclick="togglePanel('display')">display</button>
+</div>
+
+<!-- ── Tools Panel (left) ── -->
+<div id="panel-tools" class="side-panel">
+  <div class="panel-title">LLM Parameters</div>
+  <div class="panel-section">
+    <div class="panel-row">
+      <label>Model</label>
+      <select id="cfg-model" onchange="updateConfig()">
+        <option value="SmolLM2-360M-Instruct-q4f16_1-MLC">SmolLM2-360M</option>
+        <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama-3.2-1B</option>
+        <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5-0.5B</option>
+        <option value="gemma-2-2b-it-q4f16_1-MLC">Gemma-2-2B</option>
+      </select>
+    </div>
+    <div class="panel-row">
+      <label>Temperature</label>
+      <input type="range" id="cfg-temp" min="0" max="200" value="80" oninput="updateConfig()">
+      <span class="val-display" id="cfg-temp-val">0.80</span>
+    </div>
+    <div class="panel-row">
+      <label>Max Tokens</label>
+      <input type="number" id="cfg-max-tok" min="16" max="2048" value="256" onchange="updateConfig()">
+    </div>
+    <div class="panel-row">
+      <label>Top-P</label>
+      <input type="range" id="cfg-top-p" min="0" max="100" value="95" oninput="updateConfig()">
+      <span class="val-display" id="cfg-top-p-val">0.95</span>
+    </div>
+    <div class="panel-row">
+      <label>Recursions</label>
+      <input type="range" id="cfg-recursions" min="1" max="12" value="12" oninput="updateConfig()">
+      <span class="val-display" id="cfg-rec-val">12</span>
+    </div>
+  </div>
+
+  <div class="panel-title">System Prompt</div>
+  <div class="panel-section">
+    <textarea class="sys-prompt" id="cfg-sysprompt" oninput="updateConfig()"></textarea>
+  </div>
+
+  <div class="panel-title">Prompt Templates</div>
+  <div class="panel-section" id="templates-list"></div>
+
+  <div class="panel-title">MCP Tools</div>
+  <div class="panel-section">
+    <div class="mcp-tool" onclick="mcpTool('html')"><span class="tool-icon">&#x1f4c4;</span><span class="tool-name">Render HTML</span><span class="tool-key">/html</span></div>
+    <div class="mcp-tool" onclick="mcpTool('browse')"><span class="tool-icon">&#x1f310;</span><span class="tool-name">Load URL in Display</span><span class="tool-key">/browse</span></div>
+    <div class="mcp-tool" onclick="mcpTool('code')"><span class="tool-icon">&#x1f4bb;</span><span class="tool-name">Code Sandbox</span><span class="tool-key">/code</span></div>
+    <div class="mcp-tool" onclick="mcpTool('clear')"><span class="tool-icon">&#x1f5d1;</span><span class="tool-name">Clear Context</span><span class="tool-key">/clear</span></div>
+    <div class="mcp-tool" onclick="mcpTool('export')"><span class="tool-icon">&#x1f4be;</span><span class="tool-name">Export Conversation</span><span class="tool-key">/export</span></div>
+    <div class="mcp-tool" onclick="mcpTool('summary')"><span class="tool-icon">&#x1f4cb;</span><span class="tool-name">Summarize Thread</span><span class="tool-key">/summary</span></div>
+    <div class="mcp-tool" onclick="mcpTool('snapshot')"><span class="tool-icon">&#x1f4f8;</span><span class="tool-name">Snapshot State</span><span class="tool-key">/snap</span></div>
+  </div>
+</div>
+
+<!-- ── Display Panel (right) ── -->
+<div id="panel-display" class="side-panel">
+  <div id="display-header">
+    <input id="display-url" placeholder="URL or paste HTML..." autocomplete="off">
+    <button id="display-go" onclick="loadDisplay()">Go</button>
+    <button id="display-close" onclick="togglePanel('display')">X</button>
+  </div>
+  <iframe id="display-frame" sandbox="allow-scripts allow-same-origin" srcdoc="<body style='background:#1a1a2e;color:#fff;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0'><div style='text-align:center;opacity:0.3'><div style='font-size:32px'>&#x1f4c4;</div><div style='font-size:11px;margin-top:8px'>Display Panel</div><div style='font-size:9px;margin-top:4px'>Use /html to render · /browse to load URL</div></div></body>"></iframe>
+</div>
+
 <div id="thought-chain" style="position:fixed;top:50%;right:16px;transform:translateY(-50%);z-index:10;pointer-events:none;width:180px">
 </div>
 <div id="ui">
@@ -210,9 +318,19 @@ ORB_DEFS.forEach(def => {
       notch.position.y = Math.sin(angle) * ringR;
       ringGroup.add(notch);
     }
-    // Varied initial tilt per ring
-    ringGroup.rotation.x = Math.PI/2 + (r * 0.15);
-    ringGroup.rotation.y = r * 0.3;
+    // Gyroscopic orientations — each ring on a different axis plane
+    // Distribute rings across 3 axes like gyroscope gimbals
+    const gyroAngles = [
+      { x: Math.PI/2, y: 0,          z: 0 },           // R0: XY plane (horizontal)
+      { x: 0,          y: 0,          z: 0 },           // R1: XZ plane (vertical front)
+      { x: Math.PI/2, y: Math.PI/2, z: 0 },           // R2: YZ plane (vertical side)
+      { x: Math.PI/4, y: Math.PI/4, z: 0 },           // R3: 45° diagonal
+      { x: Math.PI/2, y: 0,          z: Math.PI/4 },  // R4: tilted horizontal
+      { x: Math.PI/3, y: -Math.PI/3, z: Math.PI/6 },  // R5: oblique
+      { x: 0,          y: Math.PI/4, z: Math.PI/2 },   // R6: another orthogonal
+    ];
+    const ga = gyroAngles[r];
+    ringGroup.rotation.set(ga.x, ga.y, ga.z);
     group.add(ringGroup);
     rings.push({ mesh: ringGroup, torus, baseOpacity: r === def.primary ? 0.6 : 0.12, integrity: r === def.primary ? 0.8 : 0.2, ring: r, spinSpeed: 0.002, spinEnergy: 0, tilt: 0, mat, notchCount });
     allRings.push(ringGroup);
@@ -658,8 +776,10 @@ function fireSignalCascade(type) {
     setTimeout(() => { if(orbs.lhip) orbs.lhip.pulse = 1; if(orbs.rhip) orbs.rhip.pulse = 1; }, 400);
   }
 }
-inputEl.addEventListener('keydown', e => { if(e.key === 'Enter') sendMessage(); });
-document.getElementById('send').addEventListener('click', sendMessage);
+// Input handlers — will be rebound after MCP command processing is set up
+inputEl.addEventListener('keydown', e => { if(e.key === 'Enter') handleSend(); });
+document.getElementById('send').addEventListener('click', () => handleSend());
+let handleSend = sendMessage;
 // ─── MOUSE TRACKING (eye follow) ───
 window.addEventListener('mousemove', e => {
   mouseX = (e.clientX / window.innerWidth) * 2 - 1;
@@ -689,7 +809,7 @@ function animate() {
     // Breathing scale
     const s = 1 + breath * 0.03 + orb.pulse * 0.15;
     orb.group.scale.set(s, s, s);
-    // Rings rotation — each ring spins independently based on processing energy
+    // Rings rotation — gyroscopic multi-axis spin
     orb.rings.forEach(r => {
       // spinEnergy decays naturally, boosted when this ring is processing
       r.spinEnergy *= 0.97;
@@ -697,16 +817,29 @@ function animate() {
       const idleSpeed = 0.005 + r.integrity * 0.005;
       const procSpeed = r.spinEnergy * 0.12;
       r.spinSpeed += ((idleSpeed + procSpeed) - r.spinSpeed) * 0.15;
-      // Each ring spins around LOCAL Z (the ring's own plane normal)
-      // The notch markers make this rotation clearly visible
+      // Gyroscopic spin: each ring spins around its LOCAL Z axis (the normal of its plane)
+      // Since rings are oriented at different angles, this creates multi-axis gyroscope motion
       const dir = r.ring % 2 === 0 ? 1 : -1;
-      r.mesh.rotation.z += r.spinSpeed * dir;
-      // Secondary axis wobble — increases with processing energy
-      const wobble = 0.002 + r.spinEnergy * 0.02;
-      r.mesh.rotation.x += wobble * (r.ring % 3 === 0 ? 1 : -1) * 0.3;
-      // Tilt oscillation when processing — rings "breathe" on a different axis
-      r.tilt += ((r.spinEnergy > 0.2 ? 0.2 : 0) - r.tilt) * 0.05;
-      r.mesh.rotation.y += r.tilt * Math.sin(time * (2 + r.ring * 0.7)) * 0.015;
+      // Use quaternion to rotate around the ring's own local Z axis
+      const spinQ = new THREE.Quaternion();
+      spinQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), r.spinSpeed * dir);
+      r.mesh.quaternion.multiply(spinQ);
+      // Secondary gyroscopic axis — spin around local X too for gyroscope tumble
+      if (r.spinEnergy > 0.1) {
+        const tumbleQ = new THREE.Quaternion();
+        const tumbleSpeed = r.spinEnergy * 0.015 * (r.ring % 3 === 0 ? 1 : -1);
+        tumbleQ.setFromAxisAngle(new THREE.Vector3(1, 0, 0), tumbleSpeed);
+        r.mesh.quaternion.multiply(tumbleQ);
+      }
+      // Third axis precession when highly active — full gyroscope effect
+      if (r.spinEnergy > 0.4) {
+        const precQ = new THREE.Quaternion();
+        const precSpeed = (r.spinEnergy - 0.4) * 0.008;
+        precQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), precSpeed * dir);
+        r.mesh.quaternion.multiply(precQ);
+      }
+      // Normalize quaternion to prevent drift
+      r.mesh.quaternion.normalize();
       // Update torus material opacity + color
       const targetOp = r.baseOpacity + orb.activity * 0.3 + orb.pulse * 0.4 + r.spinEnergy * 0.4;
       r.mat.opacity += (targetOp - r.mat.opacity) * 0.1;
@@ -815,6 +948,222 @@ function animate() {
   }
   renderer.render(scene, camera);
 }
+// ═══════════════════════════════════════════════════════
+// MCP TOOLS — Panel controls, templates, tool commands
+// ═══════════════════════════════════════════════════════
+const llmConfig = { model: 'SmolLM2-360M-Instruct-q4f16_1-MLC', temperature: 0.8, maxTokens: 256, topP: 0.95, recursions: 12 };
+
+// Prompt templates
+const PROMPT_TEMPLATES = [
+  { name: 'Analyze', prompt: 'Analyze the following in depth, considering multiple perspectives:' },
+  { name: 'Summarize', prompt: 'Provide a concise summary of the key points:' },
+  { name: 'Creative', prompt: 'Respond creatively and imaginatively to:' },
+  { name: 'Debug', prompt: 'Help me debug and fix the following issue:' },
+  { name: 'Explain', prompt: 'Explain this concept simply, as if to a curious beginner:' },
+  { name: 'Brainstorm', prompt: 'Brainstorm 5 creative ideas for:' },
+  { name: 'Refine', prompt: 'Refine and improve the following text while keeping its voice:' },
+];
+
+function togglePanel(name) {
+  const panel = document.getElementById('panel-' + name);
+  const btn = [...document.querySelectorAll('.tb-btn')].find(b => b.textContent === name);
+  if (!panel) return;
+  const isOpen = panel.classList.contains('open');
+  // Close all panels first
+  document.querySelectorAll('.side-panel').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.tb-btn').forEach(b => b.classList.remove('active'));
+  // Toggle the requested one
+  if (!isOpen) {
+    panel.classList.add('open');
+    if (btn) btn.classList.add('active');
+  }
+}
+
+function updateConfig() {
+  const temp = document.getElementById('cfg-temp');
+  const topP = document.getElementById('cfg-top-p');
+  const recs = document.getElementById('cfg-recursions');
+  const maxTok = document.getElementById('cfg-max-tok');
+  const model = document.getElementById('cfg-model');
+  if (temp) {
+    llmConfig.temperature = parseInt(temp.value) / 100;
+    document.getElementById('cfg-temp-val').textContent = llmConfig.temperature.toFixed(2);
+  }
+  if (topP) {
+    llmConfig.topP = parseInt(topP.value) / 100;
+    document.getElementById('cfg-top-p-val').textContent = llmConfig.topP.toFixed(2);
+  }
+  if (recs) {
+    llmConfig.recursions = parseInt(recs.value);
+    maxRecursions = llmConfig.recursions;
+    document.getElementById('cfg-rec-val').textContent = llmConfig.recursions;
+  }
+  if (maxTok) llmConfig.maxTokens = parseInt(maxTok.value);
+  if (model) llmConfig.model = model.value;
+}
+
+function mcpTool(name) {
+  switch (name) {
+    case 'html': {
+      const html = prompt('Paste HTML to render in display panel:');
+      if (html) {
+        const frame = document.getElementById('display-frame');
+        frame.srcdoc = html;
+        // Open display panel
+        togglePanel('display');
+      }
+      break;
+    }
+    case 'browse': {
+      togglePanel('display');
+      document.getElementById('display-url').focus();
+      break;
+    }
+    case 'code': {
+      const code = prompt('Enter JavaScript to execute:');
+      if (code) {
+        try {
+          const result = eval(code);
+          addMessage('sys', 'code result: ' + String(result));
+        } catch(e) {
+          addMessage('sys', 'code error: ' + e.message);
+        }
+      }
+      break;
+    }
+    case 'clear': {
+      conversationHistory = [];
+      thoughtChain = [];
+      document.getElementById('messages').innerHTML = '';
+      document.getElementById('thought-chain').innerHTML = '';
+      addMessage('sys', 'context cleared · fold reset');
+      break;
+    }
+    case 'export': {
+      const data = JSON.stringify({ config: llmConfig, history: conversationHistory, thoughts: thoughtChain }, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'cassandra-export.json'; a.click();
+      URL.revokeObjectURL(url);
+      addMessage('sys', 'conversation exported');
+      break;
+    }
+    case 'summary': {
+      if (conversationHistory.length === 0) {
+        addMessage('sys', 'no conversation to summarize');
+        return;
+      }
+      const turns = conversationHistory.length;
+      const userMsgs = conversationHistory.filter(m => m.role === 'user').length;
+      const cassMsgs = conversationHistory.filter(m => m.role === 'assistant').length;
+      addMessage('sys', `thread: ${turns} turns (${userMsgs} user, ${cassMsgs} cassandra) · coherence: ${globalCoherence.toFixed(3)} · state: ${bodyState}`);
+      break;
+    }
+    case 'snapshot': {
+      const state = {
+        coherence: globalCoherence,
+        busLoad,
+        bodyState,
+        recursionDepth,
+        discovery: discoveryState,
+        orbActivity: {},
+        ringEnergy: {},
+      };
+      Object.entries(orbs).forEach(([id, o]) => {
+        state.orbActivity[id] = o.activity.toFixed(3);
+        state.ringEnergy[id] = o.rings.map(r => r.spinEnergy.toFixed(3));
+      });
+      addMessage('sys', 'snapshot: ' + JSON.stringify(state, null, 1).substring(0, 300));
+      break;
+    }
+  }
+}
+
+function loadDisplay() {
+  const urlInput = document.getElementById('display-url');
+  const frame = document.getElementById('display-frame');
+  const val = urlInput.value.trim();
+  if (!val) return;
+  // If it looks like HTML, render as srcdoc
+  if (val.startsWith('<') || val.startsWith('<!')) {
+    frame.srcdoc = val;
+  } else {
+    // Treat as URL
+    frame.removeAttribute('srcdoc');
+    frame.src = val;
+  }
+}
+
+// Populate templates
+(function initTemplates() {
+  const list = document.getElementById('templates-list');
+  if (!list) return;
+  PROMPT_TEMPLATES.forEach(tpl => {
+    const btn = document.createElement('button');
+    btn.className = 'tpl-btn';
+    btn.textContent = tpl.name;
+    btn.onclick = () => {
+      const input = document.getElementById('input');
+      input.value = tpl.prompt + ' ';
+      input.focus();
+      togglePanel('tools'); // close panel
+    };
+    list.appendChild(btn);
+  });
+})();
+
+// Populate system prompt textarea
+(function initSysPrompt() {
+  const ta = document.getElementById('cfg-sysprompt');
+  if (ta) ta.value = SYSTEM_PROMPT;
+})();
+
+// Chat command processing — intercept /commands
+const _origSendMessage = sendMessage;
+async function sendMessageWithCommands() {
+  const text = inputEl.value.trim();
+  if (text.startsWith('/')) {
+    const parts = text.split(/\s+/);
+    const cmd = parts[0].toLowerCase();
+    const arg = parts.slice(1).join(' ');
+    inputEl.value = '';
+    switch (cmd) {
+      case '/html':
+        if (arg) {
+          document.getElementById('display-frame').srcdoc = arg;
+          togglePanel('display');
+          addMessage('sys', 'rendering HTML in display panel');
+        } else {
+          mcpTool('html');
+        }
+        return;
+      case '/browse':
+        if (arg) {
+          document.getElementById('display-url').value = arg;
+          loadDisplay();
+          togglePanel('display');
+        } else {
+          mcpTool('browse');
+        }
+        return;
+      case '/code':
+        if (arg) {
+          try { addMessage('sys', 'result: ' + String(eval(arg))); }
+          catch(e) { addMessage('sys', 'error: ' + e.message); }
+        } else { mcpTool('code'); }
+        return;
+      case '/clear': mcpTool('clear'); return;
+      case '/export': mcpTool('export'); return;
+      case '/summary': mcpTool('summary'); return;
+      case '/snap': mcpTool('snapshot'); return;
+    }
+  }
+  return _origSendMessage();
+}
+// Wire command processing into input handler
+handleSend = sendMessageWithCommands;
+
 // ─── START ───
 animate();
 boot();
