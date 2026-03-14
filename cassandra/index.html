@@ -181,23 +181,41 @@ ORB_DEFS.forEach(def => {
     opacity: 0.08,
   });
   group.add(new THREE.Mesh(shellGeo, shellMat));
-  // 7 shield rings
+  // 7 shield rings — each with notch markers so spin is visible
   const rings = [];
   for (let r = 0; r < 7; r++) {
     const ringR = def.r * (0.5 + r * 0.12);
-    const geo = new THREE.TorusGeometry(ringR, 0.008, 8, 48);
+    const ringGroup = new THREE.Group();
+    // Main torus ring — thicker tube for visibility
+    const geo = new THREE.TorusGeometry(ringR, 0.015, 8, 48);
     const mat = new THREE.MeshBasicMaterial({
       color: RING_COLORS[r],
       transparent: true,
-      opacity: r === def.primary ? 0.5 : 0.08,
+      opacity: r === def.primary ? 0.6 : 0.12,
     });
-    const mesh = new THREE.Mesh(geo, mat);
-    // Varied rotation axes
-    mesh.rotation.x = Math.PI/2 + (r * 0.15);
-    mesh.rotation.y = r * 0.3;
-    group.add(mesh);
-    rings.push({ mesh, baseOpacity: r === def.primary ? 0.5 : 0.08, integrity: r === def.primary ? 0.8 : 0.2, ring: r, spinSpeed: 0.002, spinEnergy: 0, tilt: 0 });
-    allRings.push(mesh);
+    const torus = new THREE.Mesh(geo, mat);
+    ringGroup.add(torus);
+    // Notch markers — small spheres on the ring so you can SEE spin
+    const notchCount = 3 + r; // 3-9 notches per ring (different per ring)
+    for (let n = 0; n < notchCount; n++) {
+      const angle = (n / notchCount) * Math.PI * 2;
+      const nGeo = new THREE.SphereGeometry(0.02 + (r === def.primary ? 0.01 : 0), 6, 6);
+      const nMat = new THREE.MeshBasicMaterial({
+        color: RING_COLORS[r],
+        transparent: true,
+        opacity: r === def.primary ? 0.8 : 0.2,
+      });
+      const notch = new THREE.Mesh(nGeo, nMat);
+      notch.position.x = Math.cos(angle) * ringR;
+      notch.position.y = Math.sin(angle) * ringR;
+      ringGroup.add(notch);
+    }
+    // Varied initial tilt per ring
+    ringGroup.rotation.x = Math.PI/2 + (r * 0.15);
+    ringGroup.rotation.y = r * 0.3;
+    group.add(ringGroup);
+    rings.push({ mesh: ringGroup, torus, baseOpacity: r === def.primary ? 0.6 : 0.12, integrity: r === def.primary ? 0.8 : 0.2, ring: r, spinSpeed: 0.002, spinEnergy: 0, tilt: 0, mat, notchCount });
+    allRings.push(ringGroup);
   }
   // Particles around orb
   const partCount = Math.floor(300 * def.r / 0.3);
@@ -603,7 +621,7 @@ function fireRingPulse(orbId, ring) {
     if (r.ring === ring) {
       r.integrity = Math.min(1, r.integrity + 0.15);
       r.spinEnergy = Math.min(1.5, r.spinEnergy + 0.8); // big boost to this ring
-      r.mesh.material.opacity = 0.8;
+      r.mat.opacity = 0.8;
     } else {
       // Neighboring rings get sympathetic vibration (smaller boost)
       if (Math.abs(r.ring - ring) === 1) {
@@ -676,28 +694,33 @@ function animate() {
       // spinEnergy decays naturally, boosted when this ring is processing
       r.spinEnergy *= 0.97;
       // Target spin speed: base idle + processing boost + integrity contribution
-      const idleSpeed = 0.002 + r.integrity * 0.003;
-      const procSpeed = r.spinEnergy * 0.08;
-      r.spinSpeed += ((idleSpeed + procSpeed) - r.spinSpeed) * 0.1;
-      // Each ring has its own spin direction based on prime index
+      const idleSpeed = 0.005 + r.integrity * 0.005;
+      const procSpeed = r.spinEnergy * 0.12;
+      r.spinSpeed += ((idleSpeed + procSpeed) - r.spinSpeed) * 0.15;
+      // Each ring spins around LOCAL Z (the ring's own plane normal)
+      // The notch markers make this rotation clearly visible
       const dir = r.ring % 2 === 0 ? 1 : -1;
       r.mesh.rotation.z += r.spinSpeed * dir;
       // Secondary axis wobble — increases with processing energy
-      const wobble = 0.001 + r.spinEnergy * 0.015;
-      r.mesh.rotation.x += wobble * (r.ring % 3 === 0 ? 1 : -1);
-      // Tilt axis shifts when processing — rings "open up"
-      r.tilt += ((r.spinEnergy > 0.3 ? 0.15 : 0) - r.tilt) * 0.05;
-      r.mesh.rotation.y += r.tilt * Math.sin(time * (2 + r.ring * 0.5)) * 0.01;
-      // Opacity responds to spin energy — brighter when processing
-      const targetOp = r.baseOpacity + orb.activity * 0.3 + orb.pulse * 0.4 + r.spinEnergy * 0.3;
-      r.mesh.material.opacity += (targetOp - r.mesh.material.opacity) * 0.1;
-      // Color shifts toward white when spinning fast (heat glow)
-      if (r.spinEnergy > 0.5) {
-        const blend = (r.spinEnergy - 0.5) * 0.4;
-        const base = new THREE.Color(RING_COLORS[r.ring]);
-        const hot = new THREE.Color(0xffffff);
-        r.mesh.material.color.copy(base).lerp(hot, blend);
-      }
+      const wobble = 0.002 + r.spinEnergy * 0.02;
+      r.mesh.rotation.x += wobble * (r.ring % 3 === 0 ? 1 : -1) * 0.3;
+      // Tilt oscillation when processing — rings "breathe" on a different axis
+      r.tilt += ((r.spinEnergy > 0.2 ? 0.2 : 0) - r.tilt) * 0.05;
+      r.mesh.rotation.y += r.tilt * Math.sin(time * (2 + r.ring * 0.7)) * 0.015;
+      // Update torus material opacity + color
+      const targetOp = r.baseOpacity + orb.activity * 0.3 + orb.pulse * 0.4 + r.spinEnergy * 0.4;
+      r.mat.opacity += (targetOp - r.mat.opacity) * 0.1;
+      // Update all children (torus + notches) opacity + color
+      const hotBlend = r.spinEnergy > 0.3 ? (r.spinEnergy - 0.3) * 0.6 : 0;
+      const baseColor = new THREE.Color(RING_COLORS[r.ring]);
+      const hotColor = new THREE.Color(0xffffff);
+      const finalColor = baseColor.clone().lerp(hotColor, hotBlend);
+      r.mesh.children.forEach(child => {
+        if (child.material) {
+          child.material.opacity = targetOp;
+          child.material.color.copy(finalColor);
+        }
+      });
     });
     // Particles orbit
     const positions = orb.particles.geometry.attributes.position.array;
