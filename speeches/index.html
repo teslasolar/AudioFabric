@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Speech Practice Arena — AudioFabric</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a12;--card:#12121f;--border:#1e1e3a;--text:#e0e0f0;
+  --accent:#6c5ce7;--green:#00b894;--red:#e74c3c;--orange:#f39c12;
+  --gold:#ffd700;--pink:#fd79a8;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+h1{text-align:center;padding:20px;font-size:1.8em;background:linear-gradient(135deg,var(--accent),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+h1 small{display:block;font-size:0.4em;-webkit-text-fill-color:var(--text);opacity:0.5;margin-top:4px}
+
+/* Layout */
+#app{max-width:1400px;margin:0 auto;padding:0 20px 40px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:900px){#app{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+.panel h2{font-size:1.1em;margin-bottom:12px;color:var(--accent)}
+.full-width{grid-column:1/-1}
+
+/* Stage / Audience */
+#stage{position:relative;height:320px;background:linear-gradient(180deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);border-radius:12px;overflow:hidden;border:2px solid var(--border)}
+#podium{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:120px;height:60px;background:linear-gradient(180deg,#8b6914,#a07828);border-radius:8px 8px 0 0;display:flex;align-items:center;justify-content:center}
+#podium .mic{font-size:1.6em}
+#audience-container{position:absolute;top:10px;left:10px;right:10px;bottom:90px;display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-end;gap:2px;padding:10px}
+.audience-member{font-size:1.4em;transition:transform 0.3s;cursor:default;position:relative;line-height:1}
+.audience-member.clapping{animation:clap 0.3s infinite alternate}
+.audience-member.standing{animation:stand 0.5s ease-out forwards}
+.audience-member.booing{animation:boo 0.4s infinite alternate}
+.audience-member.throwing{animation:throw 0.3s ease-out}
+.audience-member.crying{animation:cry 0.6s infinite alternate}
+.audience-member.sleeping{animation:sleep 2s infinite alternate;opacity:0.4}
+.audience-member.laughing{animation:laugh 0.2s infinite alternate}
+.audience-member.phone{opacity:0.3}
+@keyframes clap{0%{transform:scale(1) rotate(-5deg)}100%{transform:scale(1.15) rotate(5deg)}}
+@keyframes stand{0%{transform:scale(1)}100%{transform:scale(1.3) translateY(-8px)}}
+@keyframes boo{0%{transform:scale(1) translateY(0)}100%{transform:scale(0.9) translateY(3px)}}
+@keyframes throw{0%{transform:rotate(0)}100%{transform:rotate(20deg) scale(1.2)}}
+@keyframes cry{0%{transform:scale(1)}100%{transform:scale(1.05)}}
+@keyframes sleep{0%{transform:translateY(0)}100%{transform:translateY(2px)}}
+@keyframes laugh{0%{transform:rotate(-3deg)}100%{transform:rotate(3deg) scale(1.1)}}
+
+/* Projectiles */
+.projectile{position:absolute;font-size:1.5em;pointer-events:none;z-index:10;animation:fly 1.2s ease-in forwards}
+@keyframes fly{0%{opacity:1;transform:translate(0,0) rotate(0)}80%{opacity:1}100%{opacity:0;transform:translate(var(--tx),var(--ty)) rotate(720deg)}}
+
+/* Reaction bubbles floating up */
+.reaction-bubble{position:absolute;font-size:1.8em;pointer-events:none;z-index:20;animation:floatUp 2s ease-out forwards}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-120px) scale(0.5)}}
+
+/* Controls */
+#controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:center;padding:15px}
+button{background:var(--accent);color:white;border:none;padding:10px 24px;border-radius:8px;font-size:1em;cursor:pointer;transition:all 0.2s}
+button:hover{filter:brightness(1.2);transform:scale(1.05)}
+button:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+#btn-start{background:var(--green);font-size:1.2em;padding:12px 32px}
+#btn-start.recording{background:var(--red);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(231,76,60,0.5)}50%{box-shadow:0 0 0 15px rgba(231,76,60,0)}}
+
+/* Timer */
+#timer{font-size:2.5em;font-family:'Courier New',monospace;text-align:center;color:var(--gold);padding:10px}
+#timer small{font-size:0.35em;color:var(--text);opacity:0.5;display:block}
+
+/* Meters */
+.meter{margin:8px 0}
+.meter label{font-size:0.85em;display:flex;justify-content:space-between;margin-bottom:4px}
+.meter-bar{height:8px;background:#1a1a2e;border-radius:4px;overflow:hidden}
+.meter-fill{height:100%;border-radius:4px;transition:width 0.3s,background 0.3s}
+
+/* Stats */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:#1a1a2e;border-radius:8px;padding:10px;text-align:center}
+.stat .val{font-size:1.6em;font-weight:bold;color:var(--accent)}
+.stat .lbl{font-size:0.75em;opacity:0.6;margin-top:2px}
+
+/* Transcript */
+#transcript{max-height:200px;overflow-y:auto;font-size:0.9em;line-height:1.6;padding:10px;background:#0a0a12;border-radius:8px;white-space:pre-wrap}
+#transcript:empty::after{content:'Your speech will appear here as you speak...';opacity:0.3}
+
+/* Feedback */
+#feedback{max-height:300px;overflow-y:auto;font-size:0.9em;line-height:1.6}
+.fb-item{padding:8px;margin:4px 0;border-radius:6px;border-left:3px solid var(--accent)}
+.fb-item.good{border-color:var(--green);background:rgba(0,184,148,0.1)}
+.fb-item.warn{border-color:var(--orange);background:rgba(243,156,18,0.1)}
+.fb-item.bad{border-color:var(--red);background:rgba(231,76,60,0.1)}
+
+/* Style tips */
+.style-tips{margin-top:10px;padding:12px;background:#0a0a12;border-radius:8px;font-size:0.85em;line-height:1.6}
+.style-tips h3{color:var(--pink);margin-bottom:6px;font-size:1em}
+.style-tips ul{padding-left:16px;margin:4px 0}
+.style-tips .technique{color:var(--gold);font-weight:bold}
+.style-tips .example{color:var(--accent);font-style:italic;display:block;margin:4px 0 8px;padding-left:12px;border-left:2px solid var(--border)}
+
+/* Live style coaching banner */
+#style-coach{display:none;grid-column:1/-1;text-align:center;padding:8px 16px;background:linear-gradient(90deg,rgba(108,92,231,0.15),rgba(253,121,168,0.15));border:1px solid var(--border);border-radius:8px;font-size:0.95em}
+#style-coach .coach-icon{font-size:1.3em;margin-right:6px}
+
+/* Audience mood indicator */
+#mood-display{text-align:center;font-size:1.4em;padding:10px}
+#mood-label{font-size:0.7em;display:block;opacity:0.6}
+
+/* Settings */
+.setting{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:0.9em}
+.setting input[type=range]{flex:1;accent-color:var(--accent)}
+.setting input[type=number]{width:60px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px;text-align:center}
+select{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px}
+
+/* Filler word highlights */
+.filler{background:rgba(231,76,60,0.3);border-radius:3px;padding:0 2px}
+
+/* Applause-o-meter */
+#applause-meter{height:40px;background:#1a1a2e;border-radius:8px;overflow:hidden;position:relative;margin:10px 0}
+#applause-fill{height:100%;background:linear-gradient(90deg,var(--red),var(--orange),var(--gold),var(--green),var(--accent));width:50%;transition:width 0.5s;border-radius:8px}
+#applause-label{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-weight:bold;font-size:0.9em;text-shadow:0 1px 3px rgba(0,0,0,0.8)}
+</style>
+</head>
+<body>
+<h1>Speech Practice Arena<small>AudioFabric &mdash; for Alex's Vienna talk &amp; beyond</small></h1>
+
+<div id="app">
+  <!-- Stage with virtual audience -->
+  <div class="panel full-width">
+    <div id="stage">
+      <div id="audience-container"></div>
+      <div id="podium"><span class="mic">🎤</span></div>
+    </div>
+    <div id="controls">
+      <button id="btn-start">Start Speech</button>
+      <button id="btn-pause" disabled>Pause</button>
+      <button id="btn-reset" disabled>Reset</button>
+      <div id="timer">00:00<small>elapsed</small></div>
+      <div id="mood-display">😐<span id="mood-label">Audience Mood</span></div>
+    </div>
+    <div id="applause-meter"><div id="applause-fill"></div><div id="applause-label">Audience Engagement: 50%</div></div>
+  </div>
+
+  <!-- Live Analysis -->
+  <div class="panel">
+    <h2>Live Analysis</h2>
+    <div class="meter"><label><span>Volume</span><span id="vol-val">--</span></label><div class="meter-bar"><div class="meter-fill" id="vol-fill" style="width:0;background:var(--green)"></div></div></div>
+    <div class="meter"><label><span>Pace (WPM)</span><span id="pace-val">--</span></label><div class="meter-bar"><div class="meter-fill" id="pace-fill" style="width:0;background:var(--accent)"></div></div></div>
+    <div class="meter"><label><span>Clarity</span><span id="clarity-val">--</span></label><div class="meter-bar"><div class="meter-fill" id="clarity-fill" style="width:0;background:var(--gold)"></div></div></div>
+    <div class="meter"><label><span>Energy</span><span id="energy-val">--</span></label><div class="meter-bar"><div class="meter-fill" id="energy-fill" style="width:0;background:var(--pink)"></div></div></div>
+
+    <div class="stat-grid" style="margin-top:16px">
+      <div class="stat"><div class="val" id="s-words">0</div><div class="lbl">Words</div></div>
+      <div class="stat"><div class="val" id="s-fillers">0</div><div class="lbl">Filler Words</div></div>
+      <div class="stat"><div class="val" id="s-pauses">0</div><div class="lbl">Long Pauses</div></div>
+      <div class="stat"><div class="val" id="s-sentences">0</div><div class="lbl">Sentences</div></div>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="panel">
+    <h2>Settings</h2>
+    <div class="setting"><span>Audience Size</span><input type="range" id="set-size" min="10" max="100" value="40"><span id="set-size-val">40</span></div>
+    <div class="setting"><span>Audience Mood</span><select id="set-mood"><option value="friendly">Friendly</option><option value="neutral" selected>Neutral</option><option value="tough">Tough Crowd</option><option value="hostile">Hostile (Hard Mode)</option></select></div>
+    <div class="setting"><span>Target Duration</span><input type="number" id="set-duration" min="1" max="120" value="15"> min</div>
+    <div class="setting"><span>Audience Reactivity</span><input type="range" id="set-react" min="1" max="10" value="5"><span id="set-react-val">5</span></div>
+    <div class="setting"><span>Sound FX</span><input type="checkbox" id="set-sfx" checked></div>
+    <h2 style="margin-top:16px">Talk Style Coach</h2>
+    <div class="setting"><span>Style</span><select id="set-style">
+      <option value="standard">Standard</option>
+      <option value="hitchcockian">Hitchcockian (Suspense)</option>
+      <option value="tedtalk">TED Talk</option>
+      <option value="keynote">Steve Jobs Keynote</option>
+      <option value="academic">Academic / Conference</option>
+      <option value="storyteller">Storyteller</option>
+      <option value="comedian">Stand-up Comedy</option>
+      <option value="motivational">Motivational</option>
+    </select></div>
+    <div id="style-tips" class="style-tips"></div>
+  </div>
+
+  <!-- Transcript -->
+  <div class="panel">
+    <h2>Live Transcript</h2>
+    <div id="transcript"></div>
+  </div>
+
+  <!-- Live Style Coach Banner -->
+  <div id="style-coach"><span class="coach-icon">🎬</span><span id="coach-text"></span></div>
+
+  <!-- Post-speech Feedback -->
+  <div class="panel full-width">
+    <h2>Feedback &amp; Tips</h2>
+    <div id="feedback"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// AUDIO CONTEXT & SPEECH RECOGNITION
+// ═══════════════════════════════════════════
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition, audioCtx, analyser, micSource, dataArray;
+let isRecording = false, isPaused = false;
+let startTime = 0, elapsed = 0, pauseStart = 0, totalPaused = 0;
+let timerInterval;
+
+// Speech state
+const speech = {
+  words: [], allText: '', wordCount: 0, sentenceCount: 0,
+  fillerCount: 0, fillerWords: [],
+  lastWordTime: 0, pauseCount: 0, longestPause: 0,
+  volumeHistory: [], paceHistory: [], clarityHistory: [],
+  currentVolume: 0, currentPace: 0, currentEnergy: 0, currentClarity: 80,
+  silenceDuration: 0, isSilent: false
+};
+
+const FILLER_WORDS = ['um','uh','ah','er','like','you know','basically','actually','literally','so','right','okay','well','i mean','sort of','kind of','honestly','anyway'];
+
+// ═══════════════════════════════════════════
+// VIRTUAL AUDIENCE
+// ═══════════════════════════════════════════
+const AUDIENCE_FACES = ['😐','🙂','😊','🤓','👨','👩','🧑','👴','👵','🧔','👨‍🦳','👩‍🦰','🧑‍🦱','👨‍🦲','👩‍🦳','🧑‍💼','👨‍💼','👩‍💼','👨‍🔬','👩‍🎓'];
+const REACTIONS = {
+  clap: ['👏','👏','👏','👏','👏'],
+  boo: ['👎','😒','🙄','😤','💢'],
+  tomato: ['🍅'],
+  cry: ['😭','🥹','😢','💧'],
+  laugh: ['😂','🤣','😆','😄'],
+  standing: ['🙌','🎉','🔥','⭐'],
+  sleep: ['😴','💤'],
+  phone: ['📱'],
+  love: ['❤️','💕','🥰','💖'],
+  mind: ['🤯','🧠','💡','✨'],
+};
+
+let audience = [];
+let audienceMood = 50; // 0=hostile, 50=neutral, 100=ecstatic
+let moodMomentum = 0;
+const stage = document.getElementById('stage');
+const container = document.getElementById('audience-container');
+
+function populateAudience() {
+  container.innerHTML = '';
+  audience = [];
+  const size = parseInt(document.getElementById('set-size').value);
+  for (let i = 0; i < size; i++) {
+    const el = document.createElement('span');
+    el.className = 'audience-member';
+    el.textContent = AUDIENCE_FACES[Math.floor(Math.random() * AUDIENCE_FACES.length)];
+    el.style.fontSize = (1.1 + Math.random() * 0.6) + 'em';
+    container.appendChild(el);
+    audience.push({ el, baseFace: el.textContent, state: 'neutral', reactivity: 0.3 + Math.random() * 0.7 });
+  }
+}
+
+function setAudienceMood(mood) {
+  audienceMood = Math.max(0, Math.min(100, mood));
+  const display = document.getElementById('mood-display');
+  const label = document.getElementById('mood-label');
+  if (audienceMood >= 90) { display.firstChild.textContent = '🤩'; label.textContent = 'ECSTATIC!'; }
+  else if (audienceMood >= 75) { display.firstChild.textContent = '😍'; label.textContent = 'Loving It'; }
+  else if (audienceMood >= 60) { display.firstChild.textContent = '😊'; label.textContent = 'Engaged'; }
+  else if (audienceMood >= 45) { display.firstChild.textContent = '😐'; label.textContent = 'Neutral'; }
+  else if (audienceMood >= 30) { display.firstChild.textContent = '😕'; label.textContent = 'Losing Interest'; }
+  else if (audienceMood >= 15) { display.firstChild.textContent = '😒'; label.textContent = 'Bored'; }
+  else { display.firstChild.textContent = '😡'; label.textContent = 'Hostile'; }
+
+  document.getElementById('applause-fill').style.width = audienceMood + '%';
+  document.getElementById('applause-label').textContent = 'Audience Engagement: ' + Math.round(audienceMood) + '%';
+}
+
+function triggerAudienceReaction(type, fraction = 0.3) {
+  const reactivity = parseInt(document.getElementById('set-react').value) / 10;
+  const count = Math.floor(audience.length * fraction * reactivity);
+  const indices = [];
+  while (indices.length < count) {
+    const i = Math.floor(Math.random() * audience.length);
+    if (!indices.includes(i)) indices.push(i);
+  }
+  indices.forEach((i, idx) => {
+    setTimeout(() => {
+      const m = audience[i];
+      m.el.className = 'audience-member ' + type;
+      if (type === 'clapping' || type === 'standing') {
+        m.el.textContent = REACTIONS.clap[Math.floor(Math.random() * REACTIONS.clap.length)];
+      } else if (type === 'booing') {
+        m.el.textContent = REACTIONS.boo[Math.floor(Math.random() * REACTIONS.boo.length)];
+      } else if (type === 'crying') {
+        m.el.textContent = REACTIONS.cry[Math.floor(Math.random() * REACTIONS.cry.length)];
+      } else if (type === 'laughing') {
+        m.el.textContent = REACTIONS.laugh[Math.floor(Math.random() * REACTIONS.laugh.length)];
+      } else if (type === 'sleeping') {
+        m.el.textContent = REACTIONS.sleep[Math.floor(Math.random() * REACTIONS.sleep.length)];
+      } else if (type === 'phone') {
+        m.el.textContent = REACTIONS.phone[0];
+      }
+      setTimeout(() => {
+        m.el.className = 'audience-member';
+        m.el.textContent = m.baseFace;
+      }, 2000 + Math.random() * 2000);
+    }, idx * 80);
+  });
+}
+
+function spawnProjectile(emoji) {
+  const el = document.createElement('span');
+  el.className = 'projectile';
+  el.textContent = emoji;
+  const sx = Math.random() * stage.offsetWidth;
+  el.style.left = sx + 'px';
+  el.style.top = (stage.offsetHeight - 30) + 'px';
+  const tx = (stage.offsetWidth / 2 - sx) * 0.8;
+  const ty = -(stage.offsetHeight * 0.5 + Math.random() * 100);
+  el.style.setProperty('--tx', tx + 'px');
+  el.style.setProperty('--ty', ty + 'px');
+  stage.appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+
+function spawnReactionBubble(emoji) {
+  const el = document.createElement('span');
+  el.className = 'reaction-bubble';
+  el.textContent = emoji;
+  el.style.left = (20 + Math.random() * 60) + '%';
+  el.style.bottom = '100px';
+  stage.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
+function throwTomatoes(count = 3) {
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => spawnProjectile('🍅'), i * 300);
+  }
+  playSFX('boo');
+}
+
+// ═══════════════════════════════════════════
+// SOUND EFFECTS (Web Audio synthesis)
+// ═══════════════════════════════════════════
+function playSFX(type) {
+  if (!document.getElementById('set-sfx').checked) return;
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  gain.gain.value = 0.08;
+
+  if (type === 'clap') {
+    // White noise burst for clapping
+    const bufSize = ctx.sampleRate * 0.1;
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = ctx.createGain(); g.gain.value = 0.15;
+    src.connect(g); g.connect(ctx.destination);
+    src.start(); src.stop(ctx.currentTime + 0.1);
+    osc.disconnect(); return;
+  } else if (type === 'boo') {
+    osc.frequency.value = 120; osc.type = 'sawtooth';
+    gain.gain.setValueAtTime(0.06, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
+    osc.start(); osc.stop(ctx.currentTime + 0.5);
+  } else if (type === 'cheer') {
+    osc.frequency.value = 800; osc.type = 'sine';
+    osc.frequency.linearRampToValueAtTime(1200, ctx.currentTime + 0.3);
+    gain.gain.setValueAtTime(0.05, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
+    osc.start(); osc.stop(ctx.currentTime + 0.5);
+  } else if (type === 'ovation') {
+    // Multiple clap bursts
+    for (let i = 0; i < 8; i++) {
+      setTimeout(() => playSFX('clap'), i * 120);
+    }
+    return;
+  }
+}
+
+// ═══════════════════════════════════════════
+// MICROPHONE & VOLUME ANALYSIS
+// ═══════════════════════════════════════════
+async function setupAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  micSource = audioCtx.createMediaStreamSource(stream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 1024;
+  analyser.smoothingTimeConstant = 0.8;
+  micSource.connect(analyser);
+  dataArray = new Uint8Array(analyser.frequencyBinCount);
+}
+
+function getVolume() {
+  if (!analyser) return 0;
+  analyser.getByteFrequencyData(dataArray);
+  let sum = 0;
+  for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+  return sum / dataArray.length;
+}
+
+function getEnergy() {
+  if (!analyser) return 0;
+  analyser.getByteTimeDomainData(dataArray);
+  let sum = 0;
+  for (let i = 0; i < dataArray.length; i++) {
+    const v = (dataArray[i] - 128) / 128;
+    sum += v * v;
+  }
+  return Math.sqrt(sum / dataArray.length) * 100;
+}
+
+// ═══════════════════════════════════════════
+// SPEECH RECOGNITION
+// ═══════════════════════════════════════════
+function setupRecognition() {
+  if (!SpeechRecognition) {
+    alert('Speech recognition not supported in this browser. Try Chrome or Edge.');
+    return false;
+  }
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+  recognition.maxAlternatives = 1;
+
+  recognition.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      const conf = e.results[i][0].confidence;
+      if (e.results[i].isFinal) {
+        final += t;
+        processFinalized(t, conf);
+      } else {
+        interim += t;
+      }
+    }
+    updateTranscript(final, interim);
+    speech.lastWordTime = Date.now();
+    speech.silenceDuration = 0;
+    speech.isSilent = false;
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'no-speech') return;
+    console.warn('Speech recognition error:', e.error);
+  };
+
+  recognition.onend = () => {
+    if (isRecording && !isPaused) recognition.start();
+  };
+  return true;
+}
+
+function processFinalized(text, confidence) {
+  const words = text.trim().split(/\s+/).filter(w => w);
+  speech.wordCount += words.length;
+
+  // Detect filler words
+  const lower = text.toLowerCase();
+  for (const filler of FILLER_WORDS) {
+    const regex = new RegExp('\\b' + filler + '\\b', 'gi');
+    const matches = lower.match(regex);
+    if (matches) {
+      speech.fillerCount += matches.length;
+      speech.fillerWords.push(...matches.map(() => filler));
+    }
+  }
+
+  // Count sentences
+  const sentences = text.match(/[.!?]+/g);
+  if (sentences) speech.sentenceCount += sentences.length;
+
+  // Confidence → clarity
+  speech.currentClarity = Math.round(confidence * 100);
+  speech.clarityHistory.push(confidence * 100);
+
+  // Calculate pace (words per minute over last 30 seconds)
+  const elapsedMin = Math.max((Date.now() - startTime + totalPaused) / 60000, 0.1);
+  speech.currentPace = Math.round(speech.wordCount / elapsedMin);
+  speech.paceHistory.push(speech.currentPace);
+
+  // Update audience mood based on quality
+  updateMoodFromSpeech(confidence);
+}
+
+function updateTranscript(final, interim) {
+  const el = document.getElementById('transcript');
+  // Highlight fillers
+  let html = speech.allText;
+  if (final) {
+    let highlighted = final;
+    for (const filler of FILLER_WORDS) {
+      const regex = new RegExp('\\b(' + filler + ')\\b', 'gi');
+      highlighted = highlighted.replace(regex, '<span class="filler">$1</span>');
+    }
+    speech.allText += highlighted + ' ';
+    html = speech.allText;
+  }
+  if (interim) html += '<span style="opacity:0.4">' + interim + '</span>';
+  el.innerHTML = html;
+  el.scrollTop = el.scrollHeight;
+}
+
+// ═══════════════════════════════════════════
+// AUDIENCE MOOD ENGINE
+// ═══════════════════════════════════════════
+function updateMoodFromSpeech(confidence) {
+  const baseMoodStr = document.getElementById('set-mood').value;
+  const baseBias = { friendly: 0.6, neutral: 0, tough: -0.3, hostile: -0.6 }[baseMoodStr];
+
+  // Good pace (120-160 WPM) = positive
+  let paceFactor = 0;
+  if (speech.currentPace > 100 && speech.currentPace < 180) paceFactor = 0.3;
+  else if (speech.currentPace >= 180) paceFactor = -0.2; // too fast
+  else if (speech.currentPace < 80 && speech.currentPace > 0) paceFactor = -0.1; // too slow
+
+  // High confidence = positive
+  const confFactor = (confidence - 0.7) * 2;
+
+  // Fillers = negative
+  const fillerRatio = speech.wordCount > 0 ? speech.fillerCount / speech.wordCount : 0;
+  const fillerPenalty = -fillerRatio * 10;
+
+  moodMomentum += (paceFactor + confFactor + fillerPenalty + baseBias) * 2;
+  moodMomentum *= 0.95; // decay
+  setAudienceMood(audienceMood + moodMomentum * 0.1);
+}
+
+function audienceTick() {
+  if (!isRecording || isPaused) return;
+
+  const vol = getVolume();
+  const energy = getEnergy();
+  speech.currentVolume = vol;
+  speech.currentEnergy = energy;
+  speech.volumeHistory.push(vol);
+
+  // Check for silence
+  if (vol < 5) {
+    speech.silenceDuration += 0.5;
+    if (speech.silenceDuration > 3) {
+      speech.isSilent = true;
+      // Long silence — audience gets bored
+      if (speech.silenceDuration > 5) {
+        setAudienceMood(audienceMood - 0.5);
+        if (Math.random() < 0.1) triggerAudienceReaction('sleeping', 0.1);
+        if (Math.random() < 0.05) triggerAudienceReaction('phone', 0.05);
+      }
+      if (speech.silenceDuration > 3 && !speech.pauseCounted) {
+        speech.pauseCount++;
+        speech.pauseCounted = true;
+      }
+    }
+  } else {
+    if (speech.isSilent && speech.silenceDuration > 3) {
+      speech.longestPause = Math.max(speech.longestPause, speech.silenceDuration);
+    }
+    speech.silenceDuration = 0;
+    speech.isSilent = false;
+    speech.pauseCounted = false;
+  }
+
+  // Spontaneous audience reactions based on mood
+  if (audienceMood > 80 && Math.random() < 0.03) {
+    triggerAudienceReaction('clapping', 0.15);
+    spawnReactionBubble(REACTIONS.love[Math.floor(Math.random() * REACTIONS.love.length)]);
+    playSFX('clap');
+  }
+  if (audienceMood > 90 && Math.random() < 0.02) {
+    spawnReactionBubble(REACTIONS.mind[Math.floor(Math.random() * REACTIONS.mind.length)]);
+  }
+  if (audienceMood < 20 && Math.random() < 0.04) {
+    triggerAudienceReaction('booing', 0.1);
+    if (Math.random() < 0.3) throwTomatoes(1);
+  }
+  if (audienceMood < 30 && Math.random() < 0.05) {
+    triggerAudienceReaction('phone', 0.08);
+  }
+
+  // Energy spikes → positive reaction
+  if (energy > 40 && vol > 30) {
+    setAudienceMood(audienceMood + 0.2);
+    if (Math.random() < 0.05) {
+      spawnReactionBubble('🔥');
+    }
+  }
+
+  // Update UI meters
+  updateMeters();
+}
+
+function updateMeters() {
+  const v = Math.min(speech.currentVolume / 50 * 100, 100);
+  document.getElementById('vol-fill').style.width = v + '%';
+  document.getElementById('vol-fill').style.background = v > 80 ? 'var(--red)' : v > 50 ? 'var(--orange)' : 'var(--green)';
+  document.getElementById('vol-val').textContent = Math.round(v) + '%';
+
+  const p = Math.min(speech.currentPace / 200 * 100, 100);
+  document.getElementById('pace-fill').style.width = p + '%';
+  document.getElementById('pace-fill').style.background = speech.currentPace > 180 ? 'var(--red)' : speech.currentPace > 160 ? 'var(--orange)' : speech.currentPace < 80 ? 'var(--orange)' : 'var(--accent)';
+  document.getElementById('pace-val').textContent = speech.currentPace + ' WPM';
+
+  const c = speech.currentClarity;
+  document.getElementById('clarity-fill').style.width = c + '%';
+  document.getElementById('clarity-fill').style.background = c > 80 ? 'var(--green)' : c > 50 ? 'var(--gold)' : 'var(--red)';
+  document.getElementById('clarity-val').textContent = c + '%';
+
+  const e = Math.min(speech.currentEnergy / 50 * 100, 100);
+  document.getElementById('energy-fill').style.width = e + '%';
+  document.getElementById('energy-fill').style.background = e > 70 ? 'var(--pink)' : e > 40 ? 'var(--accent)' : 'var(--border)';
+  document.getElementById('energy-val').textContent = Math.round(e) + '%';
+
+  document.getElementById('s-words').textContent = speech.wordCount;
+  document.getElementById('s-fillers').textContent = speech.fillerCount;
+  document.getElementById('s-pauses').textContent = speech.pauseCount;
+  document.getElementById('s-sentences').textContent = speech.sentenceCount;
+}
+
+// ═══════════════════════════════════════════
+// TIMER
+// ═══════════════════════════════════════════
+function updateTimer() {
+  if (!isRecording || isPaused) return;
+  const now = Date.now();
+  elapsed = now - startTime - totalPaused;
+  const sec = Math.floor(elapsed / 1000);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  document.getElementById('timer').innerHTML = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0') + '<small>elapsed</small>';
+
+  // Live coaching triggers
+  if (typeof checkCoachTriggers === 'function') checkCoachTriggers(sec);
+
+  // Target duration warning
+  const target = parseInt(document.getElementById('set-duration').value) * 60;
+  if (sec > target && sec < target + 5) {
+    spawnReactionBubble('⏰');
+    document.getElementById('timer').style.color = 'var(--red)';
+  }
+  if (sec > target * 1.1) {
+    // Audience gets restless if way overtime
+    if (Math.random() < 0.03) triggerAudienceReaction('sleeping', 0.1);
+    setAudienceMood(audienceMood - 0.1);
+  }
+}
+
+// ═══════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════
+document.getElementById('btn-start').addEventListener('click', async () => {
+  if (isRecording) {
+    stopSpeech();
+    return;
+  }
+  if (!setupRecognition()) return;
+  await setupAudio();
+  populateAudience();
+
+  // Set initial mood based on audience type
+  const baseMood = { friendly: 65, neutral: 50, tough: 35, hostile: 20 };
+  setAudienceMood(baseMood[document.getElementById('set-mood').value]);
+
+  isRecording = true; isPaused = false;
+  startTime = Date.now(); totalPaused = 0;
+  Object.assign(speech, {
+    words: [], allText: '', wordCount: 0, sentenceCount: 0,
+    fillerCount: 0, fillerWords: [], lastWordTime: Date.now(),
+    pauseCount: 0, longestPause: 0, volumeHistory: [], paceHistory: [],
+    clarityHistory: [], silenceDuration: 0, isSilent: false, pauseCounted: false
+  });
+  document.getElementById('transcript').innerHTML = '';
+  document.getElementById('feedback').innerHTML = '';
+  document.getElementById('timer').style.color = 'var(--gold)';
+
+  recognition.start();
+  timerInterval = setInterval(updateTimer, 1000);
+  setInterval(audienceTick, 500);
+
+  document.getElementById('btn-start').textContent = 'Stop Speech';
+  document.getElementById('btn-start').classList.add('recording');
+  document.getElementById('btn-pause').disabled = false;
+  document.getElementById('btn-reset').disabled = false;
+
+  // Opening reaction — light clapping
+  setTimeout(() => {
+    triggerAudienceReaction('clapping', 0.3);
+    playSFX('clap');
+  }, 500);
+});
+
+document.getElementById('btn-pause').addEventListener('click', () => {
+  if (isPaused) {
+    isPaused = false;
+    totalPaused += Date.now() - pauseStart;
+    recognition.start();
+    document.getElementById('btn-pause').textContent = 'Pause';
+  } else {
+    isPaused = true;
+    pauseStart = Date.now();
+    recognition.stop();
+    document.getElementById('btn-pause').textContent = 'Resume';
+  }
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  stopSpeech();
+  document.getElementById('transcript').innerHTML = '';
+  document.getElementById('feedback').innerHTML = '';
+  document.getElementById('timer').innerHTML = '00:00<small>elapsed</small>';
+  document.getElementById('timer').style.color = 'var(--gold)';
+  setAudienceMood(50);
+  populateAudience();
+});
+
+function stopSpeech() {
+  isRecording = false;
+  if (recognition) recognition.stop();
+  clearInterval(timerInterval);
+
+  document.getElementById('btn-start').textContent = 'Start Speech';
+  document.getElementById('btn-start').classList.remove('recording');
+  document.getElementById('btn-pause').disabled = true;
+
+  // Closing audience reaction
+  if (audienceMood >= 70) {
+    triggerAudienceReaction('standing', 0.5);
+    triggerAudienceReaction('clapping', 0.8);
+    playSFX('ovation');
+    for (let i = 0; i < 5; i++) setTimeout(() => spawnReactionBubble(REACTIONS.standing[Math.floor(Math.random() * REACTIONS.standing.length)]), i * 400);
+  } else if (audienceMood >= 50) {
+    triggerAudienceReaction('clapping', 0.5);
+    playSFX('clap');
+  } else if (audienceMood < 30) {
+    triggerAudienceReaction('booing', 0.3);
+    throwTomatoes(5);
+  }
+
+  generateFeedback();
+}
+
+// ═══════════════════════════════════════════
+// POST-SPEECH FEEDBACK
+// ═══════════════════════════════════════════
+function generateFeedback() {
+  const fb = document.getElementById('feedback');
+  const items = [];
+  const elapsedSec = elapsed / 1000;
+  const elapsedMin = elapsedSec / 60;
+  const targetMin = parseInt(document.getElementById('set-duration').value);
+
+  // Duration
+  if (elapsedMin < targetMin * 0.8) {
+    items.push({ type: 'warn', text: `Speech was ${elapsedMin.toFixed(1)} min — ${(targetMin - elapsedMin).toFixed(1)} min shorter than your ${targetMin} min target. You have room to expand on your points.` });
+  } else if (elapsedMin > targetMin * 1.15) {
+    items.push({ type: 'warn', text: `Went ${(elapsedMin - targetMin).toFixed(1)} min over your ${targetMin} min target. Consider tightening some sections.` });
+  } else {
+    items.push({ type: 'good', text: `Great timing! ${elapsedMin.toFixed(1)} min is right on target for your ${targetMin} min slot.` });
+  }
+
+  // Pace
+  const avgPace = speech.paceHistory.length ? speech.paceHistory.reduce((a, b) => a + b, 0) / speech.paceHistory.length : 0;
+  if (avgPace > 170) {
+    items.push({ type: 'warn', text: `Average pace: ${Math.round(avgPace)} WPM — you're speaking quite fast. Try to slow down, especially on key points. Ideal range: 120-160 WPM.` });
+  } else if (avgPace < 90 && avgPace > 0) {
+    items.push({ type: 'warn', text: `Average pace: ${Math.round(avgPace)} WPM — a bit slow. Pick up the energy to keep the audience engaged.` });
+  } else if (avgPace > 0) {
+    items.push({ type: 'good', text: `Average pace: ${Math.round(avgPace)} WPM — excellent conversational pace.` });
+  }
+
+  // Filler words
+  const fillerRatio = speech.wordCount > 0 ? (speech.fillerCount / speech.wordCount * 100) : 0;
+  if (speech.fillerCount > 0) {
+    const topFillers = {};
+    speech.fillerWords.forEach(f => topFillers[f] = (topFillers[f] || 0) + 1);
+    const sorted = Object.entries(topFillers).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const fillerStr = sorted.map(([w, c]) => `"${w}" (${c}x)`).join(', ');
+    if (fillerRatio > 5) {
+      items.push({ type: 'bad', text: `${speech.fillerCount} filler words (${fillerRatio.toFixed(1)}% of speech) — this is distracting. Top culprits: ${fillerStr}. Practice pausing instead of filling.` });
+    } else if (fillerRatio > 2) {
+      items.push({ type: 'warn', text: `${speech.fillerCount} filler words detected: ${fillerStr}. Not bad, but awareness helps you reduce them further.` });
+    } else {
+      items.push({ type: 'good', text: `Only ${speech.fillerCount} filler words — very clean delivery!` });
+    }
+  } else if (speech.wordCount > 20) {
+    items.push({ type: 'good', text: 'Zero filler words detected — impressive articulation!' });
+  }
+
+  // Pauses
+  if (speech.pauseCount > 5) {
+    items.push({ type: 'warn', text: `${speech.pauseCount} long pauses (3+ sec). Brief pauses are powerful for emphasis, but too many can lose the audience.` });
+  } else if (speech.pauseCount > 0) {
+    items.push({ type: 'good', text: `${speech.pauseCount} strategic pauses — good use of silence for emphasis.` });
+  }
+
+  // Volume
+  const avgVol = speech.volumeHistory.length ? speech.volumeHistory.reduce((a, b) => a + b, 0) / speech.volumeHistory.length : 0;
+  if (avgVol < 10 && speech.volumeHistory.length > 5) {
+    items.push({ type: 'warn', text: 'Your volume was quite low overall. Project your voice more — imagine speaking to the back row!' });
+  } else if (avgVol > 40) {
+    items.push({ type: 'warn', text: 'You were quite loud overall. Vary your volume for emphasis rather than staying at one level.' });
+  }
+
+  // Clarity (confidence)
+  const avgClarity = speech.clarityHistory.length ? speech.clarityHistory.reduce((a, b) => a + b, 0) / speech.clarityHistory.length : 0;
+  if (avgClarity > 85) {
+    items.push({ type: 'good', text: `Speech clarity: ${Math.round(avgClarity)}% — very clear and well-articulated.` });
+  } else if (avgClarity > 60) {
+    items.push({ type: 'warn', text: `Speech clarity: ${Math.round(avgClarity)}% — some words were hard to catch. Enunciate more, especially technical terms.` });
+  }
+
+  // Word count
+  items.push({ type: 'good', text: `Total: ${speech.wordCount} words, ${speech.sentenceCount} sentences in ${elapsedMin.toFixed(1)} minutes.` });
+
+  // Style-specific feedback
+  const style = document.getElementById('set-style').value;
+  const styleData = STYLES[style];
+  if (style !== 'standard') {
+    const idealPace = styleData.idealPace;
+    if (avgPace < idealPace[0]) {
+      items.push({ type: 'warn', text: `${styleData.icon} For ${styleData.name} style, aim for ${idealPace[0]}-${idealPace[1]} WPM. You were a bit slow at ${Math.round(avgPace)} WPM.` });
+    } else if (avgPace > idealPace[1]) {
+      items.push({ type: 'warn', text: `${styleData.icon} For ${styleData.name} style, slow down to ${idealPace[0]}-${idealPace[1]} WPM. You were at ${Math.round(avgPace)} WPM.` });
+    } else {
+      items.push({ type: 'good', text: `${styleData.icon} Perfect pace for ${styleData.name} style: ${Math.round(avgPace)} WPM (ideal: ${idealPace[0]}-${idealPace[1]}).` });
+    }
+  }
+  if (style === 'hitchcockian') {
+    if (speech.pauseCount >= 3 && speech.longestPause > 3) {
+      items.push({ type: 'good', text: '🎬 Excellent use of dramatic pauses — Hitchcock would approve. The silence creates tension.' });
+    } else {
+      items.push({ type: 'warn', text: '🎬 More dramatic pauses needed! Hitchcock said "There is no terror in the bang, only in the anticipation." Let silence do the work.' });
+    }
+    const avgV = speech.volumeHistory.length ? speech.volumeHistory.reduce((a,b) => a+b, 0) / speech.volumeHistory.length : 20;
+    const minV = speech.volumeHistory.length ? Math.min(...speech.volumeHistory.slice(-20)) : 20;
+    const maxV = speech.volumeHistory.length ? Math.max(...speech.volumeHistory.slice(-20)) : 20;
+    if (maxV - minV > 15) {
+      items.push({ type: 'good', text: '🎬 Great dynamic range! Dropping your voice for key moments builds suspense.' });
+    } else {
+      items.push({ type: 'warn', text: '🎬 Try more volume contrast — whisper the important parts, then crescendo. Make them lean in.' });
+    }
+  }
+  if (style === 'tedtalk') {
+    if (elapsedMin <= 18 && elapsedMin >= 10) {
+      items.push({ type: 'good', text: '🔴 Perfect TED Talk length — engaging without overstaying.' });
+    } else if (elapsedMin > 18) {
+      items.push({ type: 'warn', text: '🔴 Over 18 minutes — classic TED Talks stay under 18 for maximum impact.' });
+    }
+  }
+  if (style === 'comedian') {
+    const pauseAfterSpeech = speech.pauseCount;
+    if (pauseAfterSpeech >= 2) {
+      items.push({ type: 'good', text: '🎭 Good rhythm — you left room for the audience to laugh. Never step on your punchline!' });
+    } else {
+      items.push({ type: 'warn', text: '🎭 Pause more after joke setups! Give the audience TIME to laugh before continuing.' });
+    }
+  }
+
+  // Final audience verdict
+  if (audienceMood >= 85) {
+    items.push({ type: 'good', text: '🎉 STANDING OVATION! The audience absolutely loved your talk. Alex would be proud!' });
+  } else if (audienceMood >= 65) {
+    items.push({ type: 'good', text: '👏 Solid performance! The audience was engaged and appreciative.' });
+  } else if (audienceMood >= 45) {
+    items.push({ type: 'warn', text: '😐 The audience was lukewarm. Work on energy and engagement to really captivate them.' });
+  } else {
+    items.push({ type: 'bad', text: '🍅 Tough crowd... but every great speaker bombs a practice round. Focus on pace, energy, and cutting filler words.' });
+  }
+
+  fb.innerHTML = items.map(i => `<div class="fb-item ${i.type}">${i.text}</div>`).join('');
+}
+
+// Settings UI
+document.getElementById('set-size').addEventListener('input', (e) => {
+  document.getElementById('set-size-val').textContent = e.target.value;
+  if (!isRecording) populateAudience();
+});
+document.getElementById('set-react').addEventListener('input', (e) => {
+  document.getElementById('set-react-val').textContent = e.target.value;
+});
+
+// ═══════════════════════════════════════════
+// TALK STYLE COACHING SYSTEM
+// ═══════════════════════════════════════════
+const STYLES = {
+  standard: {
+    name: 'Standard',
+    icon: '🎤',
+    tips: '<h3>Standard Talk</h3><p>Focus on clarity, pacing, and audience engagement. No specific style constraints.</p>',
+    idealPace: [120, 160],
+    coachingTriggers: []
+  },
+  hitchcockian: {
+    name: 'Hitchcockian Suspense',
+    icon: '🎬',
+    tips: `<h3>🎬 The Hitchcockian Talk</h3>
+      <p>"There is no terror in the bang, only in the anticipation of it." — Alfred Hitchcock</p>
+      <ul>
+        <li><span class="technique">The Bomb Under the Table:</span> Reveal a shocking fact or problem EARLY, then let the audience sit with it while you build toward the resolution.
+          <span class="example">"In 5 years, 40% of the code we write today will be obsolete. Now let me tell you why that's actually exciting..."</span></li>
+        <li><span class="technique">Dramatic Pauses:</span> Hitchcock used silence like a weapon. Pause 3-5 seconds before key reveals. Let tension build. The audience should LEAN IN.
+          <span class="example">After stating the problem, count to 4 in your head before revealing the solution.</span></li>
+        <li><span class="technique">The MacGuffin:</span> Introduce a mystery early that drives the whole talk. Something the audience NEEDS to know the answer to.
+          <span class="example">"There's one architectural pattern that changed everything for us. I'll show you what it is... but first, you need to understand why everything else failed."</span></li>
+        <li><span class="technique">Slow Reveal / Striptease:</span> Don't dump info. Peel back layers. Each slide or point should reveal ONE more piece of the puzzle.
+          <span class="example">Show a problem → show a naive fix → show it failing → THEN reveal the elegant solution.</span></li>
+        <li><span class="technique">The Audience Knows More Than The Characters:</span> Tell the audience what's coming ("In 3 minutes I'll show you why this crashes") — classic Hitchcockian dramatic irony.
+          <span class="example">"You're looking at code that works perfectly in development. But in production... well, let me show you what happens."</span></li>
+        <li><span class="technique">Lower Your Voice:</span> Hitchcock's best scenes were QUIET. Drop your volume for the most important points. Force people to listen harder.</li>
+        <li><span class="technique">The Clock:</span> Create time pressure. "We had 2 hours to fix this before the release." Stakes + countdown = suspense.</li>
+      </ul>`,
+    idealPace: [100, 140],
+    coachingTriggers: [
+      { at: 30, msg: "🎬 Set up your 'bomb under the table' — reveal the central tension NOW" },
+      { at: 90, msg: "🎬 Time for a dramatic pause... let the tension build" },
+      { at: 180, msg: "🎬 Drop your voice for the next key point — make them lean in" },
+      { at: 300, msg: "🎬 Plant a clue about the resolution but don't reveal it yet..." },
+      { at: 420, msg: "🎬 The audience should be on the edge of their seats. Build to the climax!" },
+      { at: 600, msg: "🎬 Time for the reveal — deliver the payoff they've been waiting for" },
+    ],
+    silenceBonus: true, // Hitchcockian style rewards strategic pauses
+    volumeDropBonus: true,
+  },
+  tedtalk: {
+    name: 'TED Talk',
+    icon: '🔴',
+    tips: `<h3>🔴 TED Talk Style</h3>
+      <ul>
+        <li><span class="technique">The Hook (first 30 sec):</span> Start with a personal story, a surprising stat, or a provocative question. NEVER start with "Today I'm going to talk about..."</li>
+        <li><span class="technique">Rule of Three:</span> Present exactly 3 main ideas. No more. The audience remembers 3.</li>
+        <li><span class="technique">Personal Stories:</span> Make it vulnerable and real. "I" statements connect more than "we" or "research shows."</li>
+        <li><span class="technique">The Call to Action:</span> End with a clear, simple thing the audience can DO.</li>
+        <li><span class="technique">18-Minute Rule:</span> TED talks max at 18 min for a reason — it's the sweet spot for attention.</li>
+      </ul>`,
+    idealPace: [130, 170],
+    coachingTriggers: [
+      { at: 15, msg: "🔴 Open with your hook — a story, question, or shocking fact" },
+      { at: 120, msg: "🔴 Transition to your first big idea. Make it personal." },
+      { at: 360, msg: "🔴 Second idea — connect it back to the first" },
+      { at: 600, msg: "🔴 Third idea — bring it home" },
+      { at: 900, msg: "🔴 Begin wrapping up — circle back to your opening" },
+      { at: 1020, msg: "🔴 Call to action! What should they DO with this?" },
+    ]
+  },
+  keynote: {
+    name: 'Steve Jobs Keynote',
+    icon: '🍎',
+    tips: `<h3>🍎 Steve Jobs Keynote Style</h3>
+      <ul>
+        <li><span class="technique">"One More Thing...":</span> Save your best feature/point for last as a surprise encore.</li>
+        <li><span class="technique">Simple Slides:</span> One word. One image. One number. Let YOUR voice carry the content.</li>
+        <li><span class="technique">Demo, Don't Tell:</span> Show it working. Live demos are electrifying (and terrifying).</li>
+        <li><span class="technique">Numbers in Context:</span> Don't say "1 million downloads." Say "That's one download every 3 seconds since launch."</li>
+        <li><span class="technique">The Villain:</span> Establish a clear enemy (complexity, legacy systems, etc.), then position your idea as the hero.</li>
+      </ul>`,
+    idealPace: [110, 150],
+    coachingTriggers: [
+      { at: 30, msg: '🍎 Set the stage — what\'s the "villain" your audience fights every day?' },
+      { at: 180, msg: '🍎 Demo time — show, don\'t tell' },
+      { at: 500, msg: '🍎 Put numbers in human context' },
+      { at: 780, msg: '🍎 Build to your "One More Thing..." moment' },
+    ]
+  },
+  academic: {
+    name: 'Academic / Conference',
+    icon: '🎓',
+    tips: `<h3>🎓 Academic Conference Style</h3>
+      <ul>
+        <li><span class="technique">Problem → Method → Results → Discussion:</span> Classic structure that academics expect.</li>
+        <li><span class="technique">Cite Sources:</span> Reference prior work and collaborators. Build credibility.</li>
+        <li><span class="technique">Q&A Prep:</span> Anticipate the hardest question someone could ask, and have the answer ready.</li>
+        <li><span class="technique">Limitations:</span> Acknowledge what you DIDN'T solve. Shows intellectual honesty.</li>
+        <li><span class="technique">Future Work:</span> End with open questions and next steps.</li>
+      </ul>`,
+    idealPace: [110, 140],
+    coachingTriggers: [
+      { at: 30, msg: '🎓 State the problem clearly — what gap are you filling?' },
+      { at: 180, msg: '🎓 Describe your methodology' },
+      { at: 400, msg: '🎓 Present your key results' },
+      { at: 600, msg: '🎓 Discussion — what does this mean for the field?' },
+    ]
+  },
+  storyteller: {
+    name: 'Storyteller',
+    icon: '📖',
+    tips: `<h3>📖 Storyteller Style</h3>
+      <ul>
+        <li><span class="technique">The Journey:</span> Take the audience on a narrative arc — beginning, conflict, climax, resolution.</li>
+        <li><span class="technique">Characters:</span> Introduce real people (colleagues, users, mentors). Give them names.</li>
+        <li><span class="technique">Sensory Details:</span> "It was 2 AM, the office was dark, and the on-call pager wouldn't stop buzzing."</li>
+        <li><span class="technique">Dialogue:</span> Quote people directly. "She turned to me and said: 'This is never going to work.'"</li>
+        <li><span class="technique">The Lesson:</span> Every story needs a moral — what did you learn?</li>
+      </ul>`,
+    idealPace: [100, 150],
+    coachingTriggers: [
+      { at: 30, msg: '📖 Set the scene — where are we? Who\'s the protagonist?' },
+      { at: 120, msg: '📖 Introduce the conflict — what went wrong?' },
+      { at: 300, msg: '📖 Build tension — use dialogue and sensory details' },
+      { at: 500, msg: '📖 Climax — the turning point of the story' },
+      { at: 700, msg: '📖 Resolution and lesson learned' },
+    ]
+  },
+  comedian: {
+    name: 'Stand-up Comedy',
+    icon: '🎭',
+    tips: `<h3>🎭 Comedy Style</h3>
+      <ul>
+        <li><span class="technique">Setup + Punchline:</span> Every joke is a mini-story. Setup creates expectation, punchline subverts it.</li>
+        <li><span class="technique">Rule of Three:</span> List two normal things, then a ridiculous third. "We use microservices, Kubernetes, and... prayer."</li>
+        <li><span class="technique">Callback:</span> Reference an earlier joke later — audiences LOVE this.</li>
+        <li><span class="technique">Self-Deprecation:</span> Make fun of yourself, never the audience.</li>
+        <li><span class="technique">Pause After Jokes:</span> Give them time to laugh! Don't step on your own punchline.</li>
+      </ul>`,
+    idealPace: [120, 160],
+    coachingTriggers: [
+      { at: 20, msg: '🎭 Open with a relatable joke — get that first laugh early!' },
+      { at: 120, msg: '🎭 Time for a callback — reference something from earlier' },
+      { at: 300, msg: '🎭 Rule of three — set up the list, subvert the third item' },
+    ]
+  },
+  motivational: {
+    name: 'Motivational',
+    icon: '🔥',
+    tips: `<h3>🔥 Motivational Style</h3>
+      <ul>
+        <li><span class="technique">Start with Struggle:</span> Share a real challenge you or someone faced.</li>
+        <li><span class="technique">Build Energy:</span> Start calm, get progressively more intense.</li>
+        <li><span class="technique">Repetition:</span> Repeat key phrases for impact. "Yes. You. Can."</li>
+        <li><span class="technique">Direct Address:</span> Talk TO the audience, not AT them. Use "you" frequently.</li>
+        <li><span class="technique">End on Fire:</span> The last 60 seconds should be the most energetic of the whole talk.</li>
+      </ul>`,
+    idealPace: [120, 180],
+    coachingTriggers: [
+      { at: 30, msg: '🔥 Start with the struggle — make it raw and real' },
+      { at: 180, msg: '🔥 Turn the corner — from struggle to possibility' },
+      { at: 400, msg: '🔥 Increase your energy — build the momentum' },
+      { at: 600, msg: '🔥 Peak energy! This is your fire moment!' },
+    ]
+  }
+};
+
+let activeCoachTriggers = [];
+let triggeredCoach = new Set();
+
+function updateStyleTips() {
+  const style = document.getElementById('set-style').value;
+  const data = STYLES[style];
+  document.getElementById('style-tips').innerHTML = data.tips;
+  activeCoachTriggers = (data.coachingTriggers || []).slice();
+  triggeredCoach.clear();
+}
+
+document.getElementById('set-style').addEventListener('change', updateStyleTips);
+updateStyleTips();
+
+// Live coaching check — called from timer
+function checkCoachTriggers(elapsedSec) {
+  const style = document.getElementById('set-style').value;
+  const data = STYLES[style];
+  if (!data.coachingTriggers) return;
+
+  const banner = document.getElementById('style-coach');
+  const text = document.getElementById('coach-text');
+
+  for (const t of data.coachingTriggers) {
+    if (elapsedSec >= t.at && !triggeredCoach.has(t.at)) {
+      triggeredCoach.add(t.at);
+      banner.style.display = 'block';
+      text.textContent = t.msg;
+      // Auto-hide after 10 seconds
+      setTimeout(() => { if (text.textContent === t.msg) banner.style.display = 'none'; }, 10000);
+      break;
+    }
+  }
+
+  // Hitchcockian bonus: reward pauses and volume drops
+  if (style === 'hitchcockian') {
+    if (speech.silenceDuration > 2 && speech.silenceDuration < 6) {
+      setAudienceMood(audienceMood + 0.3); // reward strategic pauses
+    }
+    if (speech.currentVolume < 15 && speech.currentVolume > 2 && speech.wordCount > 20) {
+      setAudienceMood(audienceMood + 0.1); // reward quiet intensity
+    }
+  }
+
+  // Comedian bonus: reward laughter-length pauses after speech bursts
+  if (style === 'comedian' && speech.silenceDuration > 1.5 && speech.silenceDuration < 4 && speech.currentPace > 100) {
+    if (Math.random() < 0.1) {
+      triggerAudienceReaction('laughing', 0.3);
+      spawnReactionBubble('😂');
+      setAudienceMood(audienceMood + 1);
+    }
+  }
+}
+
+// Patch the timer to include coach triggers
+const origUpdateTimer = updateTimer;
+// Override is done inline below
+
+// ═══════════════════════════════════════════
+// STYLE-AWARE FEEDBACK (injected into generateFeedback)
+// ═══════════════════════════════════════════
+const origGenerateFeedback = generateFeedback;
+
+// Init
+populateAudience();
+</script>
+</body>
+</html>
