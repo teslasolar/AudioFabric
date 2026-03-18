@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hamming Space Navigator — fold(HASH)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#030308;--card:rgba(12,12,28,0.92);--border:rgba(100,80,200,0.25);--text:#d0d0f0;--accent:#7c6cf0;--cyan:#00f0ff;--pink:#ff4488;--gold:#ffd700;--green:#00ff88;--dim:rgba(200,200,240,0.4)}
+body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:
+  radial-gradient(ellipse at 20% 50%,rgba(124,108,240,0.08),transparent 60%),
+  radial-gradient(ellipse at 80% 30%,rgba(0,240,255,0.06),transparent 50%),
+  radial-gradient(ellipse at 50% 80%,rgba(255,68,136,0.05),transparent 50%);z-index:-1;pointer-events:none}
+
+header{text-align:center;padding:20px 20px 10px}
+header h1{font-size:1.8em;background:linear-gradient(90deg,var(--cyan),var(--accent),var(--pink),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:2px}
+header .sub{font-size:0.7em;opacity:0.4;margin-top:4px}
+
+.main-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:1400px;margin:0 auto;padding:12px}
+.left-col{display:flex;flex-direction:column;gap:12px}
+.right-col{display:flex;flex-direction:column;gap:12px}
+
+.panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;backdrop-filter:blur(10px)}
+.panel h3{font-size:0.8em;color:var(--accent);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px}
+
+input[type="text"]{width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--cyan);font-family:inherit;font-size:0.85em;outline:none;transition:border-color 0.3s}
+input[type="text"]:focus{border-color:var(--accent)}
+input[type="text"]::placeholder{color:var(--dim);opacity:0.5}
+
+.hash-display{font-size:0.75em;word-break:break-all;line-height:1.8;padding:8px;background:rgba(0,0,0,0.3);border-radius:6px;min-height:2.8em}
+.hash-display .byte{padding:1px 2px;border-radius:2px}
+
+.canvas-wrap{position:relative;width:100%;aspect-ratio:1/1;max-height:600px}
+.canvas-wrap canvas{width:100%;height:100%;border-radius:10px;cursor:crosshair}
+
+.bit-inspector{font-size:0.72em;min-height:3.5em;line-height:1.6;color:var(--dim)}
+.bit-inspector .val{color:var(--cyan)}
+.bit-inspector .arrow{color:var(--pink);margin:0 4px}
+
+.trail{max-height:160px;overflow-y:auto;font-size:0.65em;line-height:1.8}
+.trail .step{display:flex;gap:8px;align-items:center;cursor:pointer;padding:2px 4px;border-radius:4px;transition:background 0.2s}
+.trail .step:hover{background:rgba(124,108,240,0.15)}
+.trail .step-num{color:var(--gold);min-width:28px}
+.trail .step-hash{color:var(--cyan);word-break:break-all}
+
+.stats-row{display:flex;gap:16px;flex-wrap:wrap;font-size:0.75em}
+.stat{display:flex;flex-direction:column;align-items:center;gap:2px}
+.stat .label{color:var(--dim);font-size:0.85em}
+.stat .value{color:var(--gold);font-size:1.2em}
+
+.btn{background:rgba(124,108,240,0.2);border:1px solid var(--accent);border-radius:8px;padding:8px 16px;color:var(--accent);font-family:inherit;font-size:0.75em;cursor:pointer;transition:all 0.2s;text-transform:uppercase;letter-spacing:1px}
+.btn:hover{background:rgba(124,108,240,0.35);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+.histogram{display:flex;align-items:flex-end;gap:1px;height:60px;padding-top:4px}
+.histogram .bar{flex:1;min-width:2px;background:var(--accent);border-radius:1px 1px 0 0;transition:height 0.3s}
+
+.walk-controls{display:flex;gap:8px;align-items:center}
+.walk-controls input[type="number"]{width:60px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--gold);font-family:inherit;font-size:0.8em;outline:none;text-align:center}
+.walk-controls label{font-size:0.75em;color:var(--dim)}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+@media(max-width:900px){
+  .main-grid{grid-template-columns:1fr}
+  .canvas-wrap{max-height:400px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Hamming Space Navigator</h1>
+  <div class="sub">fold(HASH) — Walk the 256-dimensional hypercube, edge by edge</div>
+</header>
+
+<div class="main-grid">
+  <div class="left-col">
+    <div class="panel">
+      <h3>Input</h3>
+      <input type="text" id="inputField" placeholder="Type text to hash, or paste a 64-char hex hash..." spellcheck="false">
+      <div style="margin-top:8px;font-size:0.65em;color:var(--dim)" id="inputMode">Mode: text → SHA-256</div>
+    </div>
+
+    <div class="panel">
+      <h3>Current Hash</h3>
+      <div class="hash-display" id="hashDisplay">—</div>
+    </div>
+
+    <div class="panel" style="flex:1">
+      <h3>Neighborhood Map</h3>
+      <div class="canvas-wrap">
+        <canvas id="vizCanvas"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Bit Inspector</h3>
+      <div class="bit-inspector" id="bitInspector">Hover a neighbor node to inspect the bit flip.</div>
+    </div>
+  </div>
+
+  <div class="right-col">
+    <div class="panel">
+      <h3>Distance from Origin</h3>
+      <div class="stats-row" id="distancePanel">
+        <div class="stat"><span class="label">Hamming</span><span class="value" id="dHamming">0</span></div>
+        <div class="stat"><span class="label">Percent</span><span class="value" id="dPercent">0%</span></div>
+        <div class="stat"><span class="label">Steps</span><span class="value" id="dSteps">0</span></div>
+        <div class="stat"><span class="label">Min Hops Back</span><span class="value" id="dHops">0</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Controls</h3>
+      <div class="btn-row" style="margin-bottom:8px">
+        <button class="btn" id="btnSound" title="Toggle sound">Sound: OFF</button>
+        <button class="btn" id="btnReset">Reset to Origin</button>
+      </div>
+      <div class="walk-controls">
+        <button class="btn" id="btnRandomWalk">Random Walk</button>
+        <label>Steps: <input type="number" id="walkSteps" value="32" min="1" max="512"></label>
+        <button class="btn" id="btnStopWalk" style="display:none">Stop</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Walk Trail</h3>
+      <div class="trail" id="trail"><em style="color:var(--dim);font-size:0.9em">No steps yet.</em></div>
+    </div>
+
+    <div class="panel">
+      <h3>Byte Histogram (Current Hash)</h3>
+      <div class="histogram" id="histogram"></div>
+      <div style="display:flex;justify-content:space-between;font-size:0.6em;color:var(--dim);margin-top:4px">
+        <span>0x00</span><span>0xFF</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Neighbor Diversity</h3>
+      <div class="stats-row" id="diversityPanel">
+        <div class="stat"><span class="label">Unique Bytes</span><span class="value" id="divUnique">0</span></div>
+        <div class="stat"><span class="label">Entropy</span><span class="value" id="divEntropy">0</span></div>
+        <div class="stat"><span class="label">Avg Byte Δ</span><span class="value" id="divAvgDelta">0</span></div>
+        <div class="stat"><span class="label">Max Byte Δ</span><span class="value" id="divMaxDelta">0</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── SHA-256 (pure JS) ──
+const SHA256 = (() => {
+  const K = new Uint32Array([
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ]);
+  function rotr(n,x){return(x>>>n)|(x<<(32-n))}
+  function ch(x,y,z){return(x&y)^(~x&z)}
+  function maj(x,y,z){return(x&y)^(x&z)^(y&z)}
+  function sigma0(x){return rotr(2,x)^rotr(13,x)^rotr(22,x)}
+  function sigma1(x){return rotr(6,x)^rotr(11,x)^rotr(25,x)}
+  function gamma0(x){return rotr(7,x)^rotr(18,x)^(x>>>3)}
+  function gamma1(x){return rotr(17,x)^rotr(19,x)^(x>>>10)}
+  return function sha256(msg) {
+    const utf8 = new TextEncoder().encode(msg);
+    const bitLen = utf8.length * 8;
+    const padLen = (((utf8.length + 8) >> 6) + 1) << 6;
+    const padded = new Uint8Array(padLen);
+    padded.set(utf8);
+    padded[utf8.length] = 0x80;
+    const view = new DataView(padded.buffer);
+    view.setUint32(padLen - 4, bitLen, false);
+    let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a;
+    let h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;
+    for (let offset = 0; offset < padLen; offset += 64) {
+      const W = new Uint32Array(64);
+      for (let i = 0; i < 16; i++) W[i] = view.getUint32(offset + i*4, false);
+      for (let i = 16; i < 64; i++) W[i] = (gamma1(W[i-2]) + W[i-7] + gamma0(W[i-15]) + W[i-16]) | 0;
+      let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;
+      for (let i = 0; i < 64; i++) {
+        const T1 = (h + sigma1(e) + ch(e,f,g) + K[i] + W[i]) | 0;
+        const T2 = (sigma0(a) + maj(a,b,c)) | 0;
+        h=g; g=f; f=e; e=(d+T1)|0; d=c; c=b; b=a; a=(T1+T2)|0;
+      }
+      h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;
+      h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+h)|0;
+    }
+    const out = new Uint8Array(32);
+    const dv = new DataView(out.buffer);
+    [h0,h1,h2,h3,h4,h5,h6,h7].forEach((v,i) => dv.setUint32(i*4, v, false));
+    return out;
+  };
+})();
+
+// ── Utilities ──
+function bytesToHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function hexToBytes(hex) {
+  const out = new Uint8Array(32);
+  for (let i = 0; i < 32; i++) out[i] = parseInt(hex.substr(i*2, 2), 16);
+  return out;
+}
+function isHex64(s) {
+  return /^[0-9a-fA-F]{64}$/.test(s.trim());
+}
+function hammingDistance(a, b) {
+  let d = 0;
+  for (let i = 0; i < 32; i++) {
+    let x = a[i] ^ b[i];
+    while (x) { d += x & 1; x >>= 1; }
+  }
+  return d;
+}
+function flipBit(bytes, bitIndex) {
+  const out = new Uint8Array(bytes);
+  const byteIdx = bitIndex >> 3;
+  const bitIdx = 7 - (bitIndex & 7);
+  out[byteIdx] ^= (1 << bitIdx);
+  return out;
+}
+function byteColor(v) {
+  const t = v / 255;
+  if (t < 0.33) {
+    const s = t / 0.33;
+    return `rgb(${Math.round(0 + 124*s)},${Math.round(240 - 132*s)},${Math.round(255 - 187*s)})`;
+  } else if (t < 0.66) {
+    const s = (t - 0.33) / 0.33;
+    return `rgb(${Math.round(124 + 131*s)},${Math.round(108 - 40*s)},${Math.round(68 + 172*s)})`;
+  } else {
+    const s = (t - 0.66) / 0.34;
+    return `rgb(${Math.round(255)},${Math.round(68 + 149*s)},${Math.round(240 - 152*s)})`;
+  }
+}
+function byteHue(v) {
+  return (v / 255) * 360;
+}
+
+// ── State ──
+let currentHash = null;
+let originHash = null;
+let trail = [];
+let neighbors = [];
+let hoveredNeighbor = -1;
+let soundEnabled = false;
+let audioCtx = null;
+let activeOscs = [];
+let walkRunning = false;
+let walkAbort = false;
+
+// ── Audio ──
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function hashToFreqs(hash, count) {
+  const freqs = [];
+  const positions = [];
+  const step = Math.floor(32 / count);
+  for (let i = 0; i < count; i++) positions.push(i * step);
+  for (const p of positions) {
+    const note = 36 + (hash[p] % 48);
+    freqs.push(440 * Math.pow(2, (note - 69) / 12));
+  }
+  return freqs;
+}
+
+function playChord(hash, gain = 0.06, duration = 0) {
+  if (!soundEnabled) return;
+  ensureAudio();
+  stopChord();
+  const freqs = hashToFreqs(hash, 4);
+  const now = audioCtx.currentTime;
+  const master = audioCtx.createGain();
+  master.gain.setValueAtTime(0, now);
+  master.gain.linearRampToValueAtTime(gain, now + 0.1);
+  if (duration > 0) {
+    master.gain.setValueAtTime(gain, now + duration - 0.1);
+    master.gain.linearRampToValueAtTime(0, now + duration);
+  }
+  master.connect(audioCtx.destination);
+  for (const f of freqs) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = f;
+    osc.connect(master);
+    osc.start(now);
+    if (duration > 0) osc.stop(now + duration);
+    activeOscs.push({ osc, gain: master });
+  }
+}
+
+function stopChord() {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  for (const { osc, gain } of activeOscs) {
+    try {
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(0, now + 0.08);
+      osc.stop(now + 0.1);
+    } catch(e) {}
+  }
+  activeOscs = [];
+}
+
+function playHoverNote(neighborHash) {
+  if (!soundEnabled || !audioCtx) return;
+  const freqs = hashToFreqs(neighborHash, 2);
+  const now = audioCtx.currentTime;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(0.04, now + 0.05);
+  g.gain.linearRampToValueAtTime(0, now + 0.4);
+  g.connect(audioCtx.destination);
+  for (const f of freqs) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = f;
+    osc.connect(g);
+    osc.start(now);
+    osc.stop(now + 0.4);
+  }
+}
+
+function playFootstep(oldHash, newHash) {
+  if (!soundEnabled) return;
+  ensureAudio();
+  const dist = hammingDistance(oldHash, newHash);
+  const base = 200 + (dist * 8);
+  const now = audioCtx.currentTime;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.08, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+  g.connect(audioCtx.destination);
+  const osc = audioCtx.createOscillator();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(base, now);
+  osc.frequency.exponentialRampToValueAtTime(base * 0.5, now + 0.2);
+  osc.connect(g);
+  osc.start(now);
+  osc.stop(now + 0.3);
+}
+
+// ── Compute neighbors ──
+function computeNeighbors(hash) {
+  const result = [];
+  for (let bit = 0; bit < 256; bit++) {
+    const flipped = flipBit(hash, bit);
+    const byteIdx = bit >> 3;
+    const bitInByte = 7 - (bit & 7);
+    const oldVal = hash[byteIdx];
+    const newVal = flipped[byteIdx];
+    result.push({ bit, byteIdx, bitInByte, flipped, oldVal, newVal, delta: Math.abs(newVal - oldVal) });
+  }
+  return result;
+}
+
+// ── Navigation ──
+function setHash(hash, fromInput = false) {
+  const prev = currentHash;
+  currentHash = new Uint8Array(hash);
+  if (!originHash) originHash = new Uint8Array(hash);
+  neighbors = computeNeighbors(currentHash);
+  if (prev && !fromInput) {
+    trail.push({ hash: bytesToHex(prev) });
+  }
+  if (fromInput) {
+    originHash = new Uint8Array(hash);
+    trail = [];
+  }
+  updateUI();
+  playChord(currentHash);
+  if (prev && !fromInput) playFootstep(prev, currentHash);
+}
+
+function navigateToNeighbor(idx) {
+  if (idx < 0 || idx >= neighbors.length) return;
+  setHash(neighbors[idx].flipped, false);
+}
+
+// ── UI Updates ──
+function updateUI() {
+  // Hash display
+  const hex = bytesToHex(currentHash);
+  const disp = document.getElementById('hashDisplay');
+  disp.innerHTML = '';
+  for (let i = 0; i < 32; i++) {
+    const span = document.createElement('span');
+    span.className = 'byte';
+    span.textContent = hex.substr(i*2, 2);
+    span.style.color = byteColor(currentHash[i]);
+    disp.appendChild(span);
+    if (i < 31 && (i+1) % 8 === 0) disp.appendChild(document.createTextNode(' '));
+  }
+
+  // Distance
+  const hd = hammingDistance(currentHash, originHash);
+  document.getElementById('dHamming').textContent = hd;
+  document.getElementById('dPercent').textContent = (hd / 256 * 100).toFixed(1) + '%';
+  document.getElementById('dSteps').textContent = trail.length;
+  document.getElementById('dHops').textContent = hd;
+
+  // Trail
+  const trailEl = document.getElementById('trail');
+  if (trail.length === 0) {
+    trailEl.innerHTML = '<em style="color:var(--dim);font-size:0.9em">No steps yet.</em>';
+  } else {
+    trailEl.innerHTML = '';
+    const showTrail = trail.slice(-50);
+    const offset = trail.length - showTrail.length;
+    showTrail.forEach((s, i) => {
+      const div = document.createElement('div');
+      div.className = 'step';
+      div.innerHTML = `<span class="step-num">#${offset + i}</span><span class="step-hash">${s.hash.substring(0,16)}...</span>`;
+      div.onclick = () => {
+        const h = hexToBytes(s.hash);
+        trail.push({ hash: bytesToHex(currentHash) });
+        currentHash = h;
+        neighbors = computeNeighbors(currentHash);
+        updateUI();
+        playChord(currentHash);
+      };
+      trailEl.appendChild(div);
+    });
+    // Current
+    const cur = document.createElement('div');
+    cur.className = 'step';
+    cur.style.background = 'rgba(124,108,240,0.1)';
+    cur.innerHTML = `<span class="step-num">#${trail.length}</span><span class="step-hash" style="color:var(--gold)">${hex.substring(0,16)}... ← here</span>`;
+    trailEl.appendChild(cur);
+    trailEl.scrollTop = trailEl.scrollHeight;
+  }
+
+  // Histogram
+  updateHistogram();
+  updateDiversity();
+  drawViz();
+}
+
+function updateHistogram() {
+  const counts = new Array(32).fill(0);
+  for (let i = 0; i < 32; i++) {
+    const bucket = Math.floor(currentHash[i] / 8);
+    counts[bucket]++;
+  }
+  const max = Math.max(...counts, 1);
+  const el = document.getElementById('histogram');
+  el.innerHTML = '';
+  for (let i = 0; i < 32; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    const h = (counts[i] / max) * 56;
+    bar.style.height = Math.max(1, h) + 'px';
+    const hue = (i / 32) * 360;
+    bar.style.background = `hsl(${hue},70%,55%)`;
+    el.appendChild(bar);
+  }
+}
+
+function updateDiversity() {
+  const unique = new Set(currentHash).size;
+  document.getElementById('divUnique').textContent = unique + '/32';
+
+  // Shannon entropy on bytes
+  const freq = {};
+  for (let i = 0; i < 32; i++) freq[currentHash[i]] = (freq[currentHash[i]] || 0) + 1;
+  let entropy = 0;
+  for (const k in freq) {
+    const p = freq[k] / 32;
+    entropy -= p * Math.log2(p);
+  }
+  document.getElementById('divEntropy').textContent = entropy.toFixed(2);
+
+  // Avg and max byte delta from neighbors
+  let totalDelta = 0, maxDelta = 0;
+  for (const n of neighbors) {
+    totalDelta += n.delta;
+    if (n.delta > maxDelta) maxDelta = n.delta;
+  }
+  document.getElementById('divAvgDelta').textContent = (totalDelta / 256).toFixed(1);
+  document.getElementById('divMaxDelta').textContent = maxDelta;
+}
+
+// ── Canvas Visualization ──
+const canvas = document.getElementById('vizCanvas');
+const ctx = canvas.getContext('2d');
+let canvasW, canvasH, cx, cy, radius;
+let neighborPositions = [];
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  canvasW = rect.width;
+  canvasH = rect.height;
+  cx = canvasW / 2;
+  cy = canvasH / 2;
+  radius = Math.min(cx, cy) * 0.78;
+  if (currentHash) drawViz();
+}
+
+function drawViz() {
+  if (!currentHash) return;
+  ctx.clearRect(0, 0, canvasW, canvasH);
+  neighborPositions = [];
+
+  // Draw byte group arcs (32 groups of 8 bits)
+  for (let g = 0; g < 32; g++) {
+    const startAngle = (g / 32) * Math.PI * 2 - Math.PI / 2;
+    const endAngle = ((g + 1) / 32) * Math.PI * 2 - Math.PI / 2;
+    const hue = byteHue(currentHash[g]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius + 14, startAngle, endAngle);
+    ctx.strokeStyle = `hsla(${hue},60%,50%,0.25)`;
+    ctx.lineWidth = 8;
+    ctx.stroke();
+  }
+
+  // Draw lines from center to each neighbor
+  for (let i = 0; i < 256; i++) {
+    const n = neighbors[i];
+    const angle = (i / 256) * Math.PI * 2 - Math.PI / 2;
+    const nx = cx + Math.cos(angle) * radius;
+    const ny = cy + Math.sin(angle) * radius;
+    neighborPositions.push({ x: nx, y: ny, bit: i });
+
+    const opacity = 0.06 + (n.delta / 255) * 0.25;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(nx, ny);
+    ctx.strokeStyle = `rgba(124,108,240,${opacity})`;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  // Draw neighbor nodes
+  for (let i = 0; i < 256; i++) {
+    const n = neighbors[i];
+    const pos = neighborPositions[i];
+    const nodeR = (i === hoveredNeighbor) ? 5 : 3;
+    const color = byteColor(n.newVal);
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, nodeR, 0, Math.PI * 2);
+    ctx.fillStyle = (i === hoveredNeighbor) ? '#ffffff' : color;
+    ctx.fill();
+    if (i === hoveredNeighbor) {
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 9, 0, Math.PI * 2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  // Draw center node
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 18);
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+  grad.addColorStop(0.4, 'rgba(124,108,240,0.7)');
+  grad.addColorStop(1, 'rgba(124,108,240,0)');
+  ctx.beginPath();
+  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+
+  // Byte group labels (every 4th group for clarity)
+  ctx.font = '9px Courier New';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let g = 0; g < 32; g += 4) {
+    const midAngle = ((g + 0.5) / 32) * Math.PI * 2 - Math.PI / 2;
+    const lx = cx + Math.cos(midAngle) * (radius + 28);
+    const ly = cy + Math.sin(midAngle) * (radius + 28);
+    ctx.fillStyle = 'rgba(200,200,240,0.35)';
+    ctx.fillText('B' + g, lx, ly);
+  }
+
+  // Highlight line if hovered
+  if (hoveredNeighbor >= 0) {
+    const pos = neighborPositions[hoveredNeighbor];
+    const n = neighbors[hoveredNeighbor];
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = byteColor(n.newVal);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+}
+
+// ── Canvas interaction ──
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  let closest = -1, closestDist = Infinity;
+  for (let i = 0; i < neighborPositions.length; i++) {
+    const p = neighborPositions[i];
+    const d = Math.hypot(p.x - mx, p.y - my);
+    if (d < closestDist) { closestDist = d; closest = i; }
+  }
+  const prev = hoveredNeighbor;
+  hoveredNeighbor = closestDist < 15 ? closest : -1;
+  if (hoveredNeighbor !== prev) {
+    drawViz();
+    if (hoveredNeighbor >= 0) {
+      updateBitInspector(hoveredNeighbor);
+      playHoverNote(neighbors[hoveredNeighbor].flipped);
+    } else {
+      document.getElementById('bitInspector').innerHTML = 'Hover a neighbor node to inspect the bit flip.';
+    }
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoveredNeighbor = -1;
+  drawViz();
+  document.getElementById('bitInspector').innerHTML = 'Hover a neighbor node to inspect the bit flip.';
+});
+
+canvas.addEventListener('click', () => {
+  if (hoveredNeighbor >= 0) navigateToNeighbor(hoveredNeighbor);
+});
+
+function updateBitInspector(idx) {
+  const n = neighbors[idx];
+  const byteHex = (v) => '0x' + v.toString(16).padStart(2, '0');
+  const byteBin = (v) => v.toString(2).padStart(8, '0');
+  const oldBin = byteBin(n.oldVal);
+  const newBin = byteBin(n.newVal);
+  let diffBin = '';
+  for (let i = 0; i < 8; i++) {
+    if (oldBin[i] !== newBin[i]) {
+      diffBin += `<span style="color:var(--pink);font-weight:bold">${newBin[i]}</span>`;
+    } else {
+      diffBin += newBin[i];
+    }
+  }
+  document.getElementById('bitInspector').innerHTML =
+    `<div>Bit <span class="val">${n.bit}</span> (byte <span class="val">${n.byteIdx}</span>, bit <span class="val">${n.bitInByte}</span> in byte)</div>` +
+    `<div><span class="val">${byteHex(n.oldVal)}</span> (${oldBin})<span class="arrow">→</span><span class="val">${byteHex(n.newVal)}</span> (${diffBin})</div>` +
+    `<div>Byte delta: <span class="val">${n.delta}</span> | Color shift: <span style="color:${byteColor(n.oldVal)}">■</span> → <span style="color:${byteColor(n.newVal)}">■</span></div>`;
+}
+
+// ── Input handling ──
+const inputField = document.getElementById('inputField');
+let inputDebounce = null;
+inputField.addEventListener('input', () => {
+  clearTimeout(inputDebounce);
+  inputDebounce = setTimeout(() => {
+    const val = inputField.value;
+    if (!val) return;
+    if (isHex64(val)) {
+      document.getElementById('inputMode').textContent = 'Mode: raw hex hash detected';
+      setHash(hexToBytes(val.trim()), true);
+    } else {
+      document.getElementById('inputMode').textContent = 'Mode: text → SHA-256';
+      setHash(SHA256(val), true);
+    }
+  }, 200);
+});
+
+// ── Buttons ──
+document.getElementById('btnSound').addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  document.getElementById('btnSound').textContent = soundEnabled ? 'Sound: ON' : 'Sound: OFF';
+  if (soundEnabled) {
+    ensureAudio();
+    playChord(currentHash);
+  } else {
+    stopChord();
+  }
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  if (!originHash) return;
+  trail.push({ hash: bytesToHex(currentHash) });
+  currentHash = new Uint8Array(originHash);
+  neighbors = computeNeighbors(currentHash);
+  updateUI();
+  playChord(currentHash);
+});
+
+document.getElementById('btnRandomWalk').addEventListener('click', async () => {
+  if (walkRunning) return;
+  const steps = parseInt(document.getElementById('walkSteps').value) || 32;
+  walkRunning = true;
+  walkAbort = false;
+  document.getElementById('btnStopWalk').style.display = '';
+  for (let i = 0; i < steps; i++) {
+    if (walkAbort) break;
+    const bit = Math.floor(Math.random() * 256);
+    navigateToNeighbor(bit);
+    await new Promise(r => setTimeout(r, Math.max(40, 300 - steps)));
+  }
+  walkRunning = false;
+  document.getElementById('btnStopWalk').style.display = 'none';
+});
+
+document.getElementById('btnStopWalk').addEventListener('click', () => {
+  walkAbort = true;
+});
+
+// ── Init ──
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+// Start with hash of "hello"
+inputField.value = 'hello';
+setHash(SHA256('hello'), true);
+</script>
+</body>
+</html>

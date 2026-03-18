@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Round-by-Round Diffusion Tracker — fold(HASH)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#030308;--card:rgba(12,12,28,0.9);--border:rgba(100,80,200,0.25);--text:#d0d0f0;--accent:#7c6cf0;--cyan:#00f0ff;--pink:#ff4488;--gold:#ffd700;--green:#00ff88;
+--var-a:#ff4444;--var-b:#ff8844;--var-c:#ffcc00;--var-d:#44cc44;--var-e:#00f0ff;--var-f:#4488ff;--var-g:#aa66ff;--var-h:#ff4488}
+body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:
+  radial-gradient(ellipse at 20% 50%,rgba(124,108,240,0.08),transparent 60%),
+  radial-gradient(ellipse at 80% 30%,rgba(0,240,255,0.06),transparent 50%),
+  radial-gradient(ellipse at 50% 80%,rgba(255,68,136,0.05),transparent 50%);
+  z-index:-1;pointer-events:none}
+
+header{text-align:center;padding:24px 20px 8px}
+header h1{font-size:1.8em;background:linear-gradient(90deg,var(--cyan),var(--accent),var(--pink),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:3px}
+header .sub{font-size:0.72em;opacity:0.4;margin:6px 0;line-height:1.6}
+.back-link{position:absolute;top:16px;left:20px;color:var(--accent);text-decoration:none;font-size:0.8em;opacity:0.6;transition:opacity 0.3s}
+.back-link:hover{opacity:1}
+
+.container{max-width:1260px;margin:0 auto;padding:8px 20px 40px}
+
+/* Inputs */
+.input-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0}
+.input-group{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;backdrop-filter:blur(10px)}
+.input-group label{display:block;font-size:0.78em;color:var(--accent);margin-bottom:5px;font-weight:bold}
+.input-group input{width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:inherit;font-size:0.88em;outline:none;transition:border-color 0.3s}
+.input-group input:focus{border-color:var(--accent)}
+.hash-out{font-size:0.62em;margin-top:6px;word-break:break-all;opacity:0.45;min-height:1.4em}
+
+/* Controls */
+.controls{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin:12px 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap;backdrop-filter:blur(10px)}
+.controls label{font-size:0.75em;color:var(--accent);white-space:nowrap}
+.round-slider{flex:1;min-width:200px;-webkit-appearance:none;appearance:none;height:6px;background:rgba(124,108,240,0.2);border-radius:3px;outline:none}
+.round-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 8px rgba(124,108,240,0.5)}
+.round-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer;border:none}
+.round-num{font-size:1.4em;color:var(--cyan);min-width:50px;text-align:center;font-weight:bold}
+.btn{background:rgba(124,108,240,0.2);border:1px solid var(--accent);border-radius:8px;padding:6px 14px;color:var(--accent);font-family:inherit;font-size:0.78em;cursor:pointer;transition:all 0.2s}
+.btn:hover{background:rgba(124,108,240,0.4)}
+.btn.active{background:var(--accent);color:#030308}
+.speed-control{display:flex;align-items:center;gap:6px}
+.speed-control input{width:60px;-webkit-appearance:none;appearance:none;height:4px;background:rgba(0,240,255,0.2);border-radius:2px;outline:none}
+.speed-control input::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--cyan);cursor:pointer}
+
+/* Annotation */
+.annotation{background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px 16px;margin:10px 0;font-size:0.75em;color:var(--gold);text-align:center;min-height:38px;display:flex;align-items:center;justify-content:center;transition:all 0.3s}
+
+/* Bit matrix */
+.matrix-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0;backdrop-filter:blur(10px);overflow-x:auto}
+.matrix-title{font-size:0.8em;color:var(--accent);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.matrix-title::before{content:'';width:3px;height:14px;background:var(--accent);border-radius:2px}
+.matrix{display:grid;grid-template-columns:auto repeat(32,1fr);gap:1px;align-items:center}
+.var-label{font-size:0.7em;padding:2px 8px 2px 0;text-align:right;white-space:nowrap;font-weight:bold}
+.var-label.a{color:var(--var-a)}.var-label.b{color:var(--var-b)}.var-label.c{color:var(--var-c)}.var-label.d{color:var(--var-d)}
+.var-label.e{color:var(--var-e)}.var-label.f{color:var(--var-f)}.var-label.g{color:var(--var-g)}.var-label.h{color:var(--var-h)}
+.bit{width:100%;aspect-ratio:1;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:min(0.55em,9px);transition:background 0.15s,box-shadow 0.15s;cursor:default;line-height:1}
+.bit.same{background:rgba(40,40,60,0.5);color:rgba(120,120,150,0.35)}
+.bit.diff{box-shadow:0 0 4px currentColor;animation:glow 0.3s ease-out}
+@keyframes glow{0%{transform:scale(0.6);opacity:0.3}60%{transform:scale(1.1)}100%{transform:scale(1)}}
+.col-hdr{font-size:0.42em;text-align:center;opacity:0.25;padding:0 0 3px}
+
+/* Hex row */
+.hex-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:10px 0}
+.hex-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;backdrop-filter:blur(10px)}
+.hex-panel h3{font-size:0.72em;color:var(--accent);margin-bottom:8px}
+.hex-vars{display:grid;grid-template-columns:repeat(4,1fr);gap:4px 10px;font-size:0.68em}
+.hex-var{display:flex;gap:6px;align-items:center}
+.hex-var .vn{font-weight:bold;min-width:14px}
+.hex-var .vv{opacity:0.6;font-size:0.92em}
+
+/* Diffusion stats */
+.diff-stats{display:grid;grid-template-columns:200px 1fr;gap:14px;margin:12px 0}
+.diff-meter{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;backdrop-filter:blur(10px);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.diff-count{font-size:2em;font-weight:bold;color:var(--cyan)}
+.diff-label{font-size:0.68em;opacity:0.45;margin-top:2px}
+.diff-bar-wrap{width:100%;height:8px;background:rgba(255,255,255,0.06);border-radius:4px;margin-top:10px;overflow:hidden}
+.diff-bar-fill{height:100%;border-radius:4px;transition:width 0.25s;background:linear-gradient(90deg,var(--accent),var(--cyan),var(--pink))}
+.diff-pct{font-size:0.75em;color:var(--gold);margin-top:4px}
+
+.graph-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;backdrop-filter:blur(10px)}
+.graph-panel h3{font-size:0.72em;color:var(--accent);margin-bottom:8px}
+.graph-canvas{width:100%;height:160px;display:block;border-radius:6px}
+
+/* Responsive */
+@media(max-width:800px){
+  .input-row,.hex-row{grid-template-columns:1fr}
+  .diff-stats{grid-template-columns:1fr}
+  .controls{flex-direction:column;align-items:stretch}
+  .round-slider{min-width:100%}
+}
+</style>
+</head>
+<body>
+<a href="index.html" class="back-link">&#8592; fold(HASH)</a>
+<header>
+  <h1>DIFFUSION TRACKER</h1>
+  <div class="sub">Round-by-round SHA-256 compression &mdash; watch bits propagate through 64 rounds</div>
+</header>
+
+<div class="container">
+  <div class="input-row">
+    <div class="input-group">
+      <label>Input A</label>
+      <input type="text" id="inputA" value="abc" spellcheck="false">
+      <div class="hash-out" id="hashA"></div>
+    </div>
+    <div class="input-group">
+      <label>Input B</label>
+      <input type="text" id="inputB" value="abd" spellcheck="false">
+      <div class="hash-out" id="hashB"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <label>Round</label>
+    <input type="range" class="round-slider" id="roundSlider" min="0" max="64" value="0">
+    <div class="round-num" id="roundNum">0</div>
+    <button class="btn" id="playBtn">Play</button>
+    <div class="speed-control">
+      <label>Speed</label>
+      <input type="range" id="speedSlider" min="1" max="10" value="4">
+    </div>
+    <button class="btn" id="resetBtn">Reset</button>
+  </div>
+
+  <div class="annotation" id="annotation">Initial state &mdash; only message-schedule bits differ</div>
+
+  <div class="matrix-wrap">
+    <div class="matrix-title">Working Variables &mdash; Bit Difference Matrix (8 &times; 32 = 256 bits)</div>
+    <div class="matrix" id="bitMatrix"></div>
+  </div>
+
+  <div class="hex-row">
+    <div class="hex-panel">
+      <h3>Input A &mdash; Working Variables</h3>
+      <div class="hex-vars" id="hexA"></div>
+    </div>
+    <div class="hex-panel">
+      <h3>Input B &mdash; Working Variables</h3>
+      <div class="hex-vars" id="hexB"></div>
+    </div>
+  </div>
+
+  <div class="diff-stats">
+    <div class="diff-meter">
+      <div class="diff-count" id="diffCount">0</div>
+      <div class="diff-label">of 256 bits differ</div>
+      <div class="diff-bar-wrap"><div class="diff-bar-fill" id="diffBar"></div></div>
+      <div class="diff-pct" id="diffPct">0%</div>
+    </div>
+    <div class="graph-panel">
+      <h3>Diffusion Curve (bits differing per round)</h3>
+      <canvas class="graph-canvas" id="graphCanvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- SHA-256 with round-state capture ---
+function sha256WithRounds(msg) {
+  const K = new Uint32Array([
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ]);
+  function rotr(n,x){return(x>>>n)|(x<<(32-n))}
+  function ch(x,y,z){return(x&y)^(~x&z)}
+  function maj(x,y,z){return(x&y)^(x&z)^(y&z)}
+  function sigma0(x){return rotr(2,x)^rotr(13,x)^rotr(22,x)}
+  function sigma1(x){return rotr(6,x)^rotr(11,x)^rotr(25,x)}
+  function gamma0(x){return rotr(7,x)^rotr(18,x)^(x>>>3)}
+  function gamma1(x){return rotr(17,x)^rotr(19,x)^(x>>>10)}
+
+  const utf8 = new TextEncoder().encode(msg);
+  const bitLen = utf8.length * 8;
+  const padLen = (((utf8.length + 8) >> 6) + 1) << 6;
+  const padded = new Uint8Array(padLen);
+  padded.set(utf8);
+  padded[utf8.length] = 0x80;
+  const view = new DataView(padded.buffer);
+  view.setUint32(padLen - 4, bitLen, false);
+
+  let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a;
+  let h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;
+
+  const rounds = [];
+
+  for (let offset = 0; offset < padLen; offset += 64) {
+    const W = new Uint32Array(64);
+    for (let i = 0; i < 16; i++) W[i] = view.getUint32(offset + i*4, false);
+    for (let i = 16; i < 64; i++) W[i] = (gamma1(W[i-2]) + W[i-7] + gamma0(W[i-15]) + W[i-16]) | 0;
+
+    let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;
+    rounds.push({round:-1, state:[a,b,c,d,e,f,g,h], W:Array.from(W)});
+
+    for (let i = 0; i < 64; i++) {
+      const T1 = (h + sigma1(e) + ch(e,f,g) + K[i] + W[i]) | 0;
+      const T2 = (sigma0(a) + maj(a,b,c)) | 0;
+      h=g; g=f; f=e; e=(d+T1)|0; d=c; c=b; b=a; a=(T1+T2)|0;
+      rounds.push({round:i, state:[a,b,c,d,e,f,g,h]});
+    }
+    h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;
+    h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+h)|0;
+  }
+
+  const out = new Uint8Array(32);
+  const dv = new DataView(out.buffer);
+  [h0,h1,h2,h3,h4,h5,h6,h7].forEach((v,i) => dv.setUint32(i*4, v, false));
+  return { hash: out, rounds };
+}
+
+function hashHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function toHex32(v) {
+  return (v >>> 0).toString(16).padStart(8,'0');
+}
+function bitDiff(a, b) {
+  let x = (a ^ b) >>> 0, c = 0;
+  while (x) { c += x & 1; x >>>= 1; }
+  return c;
+}
+
+// --- State ---
+let roundsA = [], roundsB = [];
+let diffPerRound = [];
+const varNames = ['a','b','c','d','e','f','g','h'];
+const varColors = ['#ff4444','#ff8844','#ffcc00','#44cc44','#00f0ff','#4488ff','#aa66ff','#ff4488'];
+
+// --- Audio ---
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function playTone(diffBits) {
+  ensureAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const freq = 200 + (diffBits / 256) * 800;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.15);
+}
+
+// --- DOM ---
+const $inputA = document.getElementById('inputA');
+const $inputB = document.getElementById('inputB');
+const $hashA = document.getElementById('hashA');
+const $hashB = document.getElementById('hashB');
+const $slider = document.getElementById('roundSlider');
+const $roundNum = document.getElementById('roundNum');
+const $playBtn = document.getElementById('playBtn');
+const $resetBtn = document.getElementById('resetBtn');
+const $speedSlider = document.getElementById('speedSlider');
+const $annotation = document.getElementById('annotation');
+const $matrix = document.getElementById('bitMatrix');
+const $hexA = document.getElementById('hexA');
+const $hexB = document.getElementById('hexB');
+const $diffCount = document.getElementById('diffCount');
+const $diffBar = document.getElementById('diffBar');
+const $diffPct = document.getElementById('diffPct');
+const $graphCanvas = document.getElementById('graphCanvas');
+const graphCtx = $graphCanvas.getContext('2d');
+
+// Build bit matrix DOM
+function buildMatrix() {
+  $matrix.innerHTML = '';
+  // Column headers
+  const corner = document.createElement('div');
+  $matrix.appendChild(corner);
+  for (let c = 0; c < 32; c++) {
+    const hdr = document.createElement('div');
+    hdr.className = 'col-hdr';
+    hdr.textContent = c;
+    $matrix.appendChild(hdr);
+  }
+  // Rows
+  for (let r = 0; r < 8; r++) {
+    const lbl = document.createElement('div');
+    lbl.className = 'var-label ' + varNames[r];
+    lbl.textContent = varNames[r];
+    $matrix.appendChild(lbl);
+    for (let c = 0; c < 32; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'bit same';
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+      cell.textContent = '0';
+      $matrix.appendChild(cell);
+    }
+  }
+}
+buildMatrix();
+
+// --- Compute ---
+function compute() {
+  const resA = sha256WithRounds($inputA.value);
+  const resB = sha256WithRounds($inputB.value);
+  roundsA = resA.rounds;
+  roundsB = resB.rounds;
+  $hashA.textContent = hashHex(resA.hash);
+  $hashB.textContent = hashHex(resB.hash);
+
+  // Precompute diffusion per round
+  diffPerRound = [];
+  for (let i = 0; i <= 64; i++) {
+    const sA = roundsA[i].state;
+    const sB = roundsB[i].state;
+    let total = 0;
+    for (let v = 0; v < 8; v++) total += bitDiff(sA[v], sB[v]);
+    diffPerRound.push(total);
+  }
+  updateView();
+}
+
+function getAnnotation(round) {
+  if (round === 0) return 'Initial state &mdash; only message-schedule bits differ';
+  if (round <= 2) return 'Round ' + round + ' &mdash; differences entering through T1 computation';
+  if (round <= 5) return 'Round ' + round + ' &mdash; diffusion spreading through Ch and Maj functions';
+  if (round <= 10) return 'Round ' + round + ' &mdash; cascading through shift register structure';
+  if (round <= 16) return 'Round ' + round + ' &mdash; approaching full diffusion &mdash; most bits now affected';
+  if (round <= 20) return 'Round ' + round + ' &mdash; full diffusion achieved &mdash; every variable affected';
+  if (round <= 40) return 'Round ' + round + ' &mdash; deep mixing &mdash; state indistinguishable from random';
+  if (round <= 63) return 'Round ' + round + ' &mdash; 4&times; overdiffusion provides security margin';
+  return 'Round 64 &mdash; final state &mdash; 4&times; overdiffusion complete &mdash; maximum security margin';
+}
+
+function updateView() {
+  const r = parseInt($slider.value);
+  $roundNum.textContent = r;
+
+  // Annotation
+  $annotation.innerHTML = getAnnotation(r);
+
+  // Bit matrix
+  const sA = roundsA[r].state;
+  const sB = roundsB[r].state;
+  const cells = $matrix.querySelectorAll('.bit');
+  let idx = 0;
+  for (let v = 0; v < 8; v++) {
+    const xor = (sA[v] ^ sB[v]) >>> 0;
+    const bitsA = sA[v] >>> 0;
+    for (let b = 31; b >= 0; b--) {
+      const cell = cells[idx++];
+      const differs = (xor >>> b) & 1;
+      const bitVal = (bitsA >>> b) & 1;
+      cell.textContent = bitVal;
+      if (differs) {
+        cell.className = 'bit diff';
+        cell.style.background = varColors[v] + '30';
+        cell.style.color = varColors[v];
+        cell.style.boxShadow = '0 0 4px ' + varColors[v] + '80';
+      } else {
+        cell.className = 'bit same';
+        cell.style.background = '';
+        cell.style.color = '';
+        cell.style.boxShadow = '';
+      }
+    }
+  }
+
+  // Hex values
+  $hexA.innerHTML = '';
+  $hexB.innerHTML = '';
+  for (let v = 0; v < 8; v++) {
+    const makeEl = (state) => {
+      const d = document.createElement('div');
+      d.className = 'hex-var';
+      d.innerHTML = '<span class="vn" style="color:' + varColors[v] + '">' + varNames[v] + '</span><span class="vv">' + toHex32(state[v]) + '</span>';
+      return d;
+    };
+    $hexA.appendChild(makeEl(sA));
+    $hexB.appendChild(makeEl(sB));
+  }
+
+  // Diffusion meter
+  const diff = diffPerRound[r];
+  $diffCount.textContent = diff;
+  $diffBar.style.width = (diff / 256 * 100) + '%';
+  $diffPct.textContent = (diff / 256 * 100).toFixed(1) + '%';
+
+  // Graph
+  drawGraph(r);
+}
+
+function drawGraph(currentRound) {
+  const canvas = $graphCanvas;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = graphCtx;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = rect.width, H = rect.height;
+  const pad = {l:40, r:16, t:12, b:24};
+  const gw = W - pad.l - pad.r, gh = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(124,108,240,0.12)';
+  ctx.lineWidth = 0.5;
+  for (let y = 0; y <= 256; y += 64) {
+    const py = pad.t + gh - (y / 256) * gh;
+    ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(pad.l + gw, py); ctx.stroke();
+    ctx.fillStyle = 'rgba(200,200,240,0.3)';
+    ctx.font = '9px Courier New';
+    ctx.textAlign = 'right';
+    ctx.fillText(y, pad.l - 4, py + 3);
+  }
+  // X labels
+  ctx.textAlign = 'center';
+  for (let x = 0; x <= 64; x += 16) {
+    const px = pad.l + (x / 64) * gw;
+    ctx.fillStyle = 'rgba(200,200,240,0.3)';
+    ctx.fillText(x, px, H - 4);
+  }
+
+  // 50% ideal line
+  const idealY = pad.t + gh * 0.5;
+  ctx.strokeStyle = 'rgba(255,215,0,0.2)';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(pad.l, idealY); ctx.lineTo(pad.l + gw, idealY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,215,0,0.3)';
+  ctx.font = '8px Courier New';
+  ctx.textAlign = 'left';
+  ctx.fillText('ideal 50%', pad.l + gw - 50, idealY - 4);
+
+  // Curve (filled area up to current round)
+  if (diffPerRound.length > 0) {
+    const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + gh);
+    grad.addColorStop(0, 'rgba(0,240,255,0.3)');
+    grad.addColorStop(1, 'rgba(124,108,240,0.05)');
+
+    // Filled area
+    ctx.beginPath();
+    ctx.moveTo(pad.l, pad.t + gh);
+    for (let i = 0; i <= currentRound && i < diffPerRound.length; i++) {
+      const px = pad.l + (i / 64) * gw;
+      const py = pad.t + gh - (diffPerRound[i] / 256) * gh;
+      ctx.lineTo(px, py);
+    }
+    const lastX = pad.l + (currentRound / 64) * gw;
+    ctx.lineTo(lastX, pad.t + gh);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    for (let i = 0; i <= currentRound && i < diffPerRound.length; i++) {
+      const px = pad.l + (i / 64) * gw;
+      const py = pad.t + gh - (diffPerRound[i] / 256) * gh;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = '#00f0ff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Current point
+    if (currentRound < diffPerRound.length) {
+      const cx = pad.l + (currentRound / 64) * gw;
+      const cy = pad.t + gh - (diffPerRound[currentRound] / 256) * gh;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#00f0ff';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0,240,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+}
+
+// --- Playback ---
+let playing = false;
+let playInterval = null;
+
+function getDelay() {
+  const speed = parseInt($speedSlider.value);
+  return 600 - (speed - 1) * 55; // 600ms (slow) to 105ms (fast)
+}
+
+function startPlay() {
+  ensureAudio();
+  playing = true;
+  $playBtn.textContent = 'Pause';
+  $playBtn.classList.add('active');
+  playInterval = setInterval(() => {
+    let r = parseInt($slider.value);
+    if (r >= 64) { stopPlay(); return; }
+    r++;
+    $slider.value = r;
+    playTone(diffPerRound[r]);
+    updateView();
+  }, getDelay());
+}
+
+function stopPlay() {
+  playing = false;
+  $playBtn.textContent = 'Play';
+  $playBtn.classList.remove('active');
+  if (playInterval) { clearInterval(playInterval); playInterval = null; }
+}
+
+$playBtn.addEventListener('click', () => {
+  if (playing) stopPlay(); else startPlay();
+});
+
+$resetBtn.addEventListener('click', () => {
+  stopPlay();
+  $slider.value = 0;
+  updateView();
+});
+
+$speedSlider.addEventListener('input', () => {
+  if (playing) { stopPlay(); startPlay(); }
+});
+
+$slider.addEventListener('input', () => {
+  stopPlay();
+  updateView();
+});
+
+$inputA.addEventListener('input', () => { stopPlay(); compute(); });
+$inputB.addEventListener('input', () => { stopPlay(); compute(); });
+
+// Resize graph
+window.addEventListener('resize', () => drawGraph(parseInt($slider.value)));
+
+// Init
+compute();
+</script>
+</body>
+</html>

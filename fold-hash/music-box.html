@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hash Music Box — fold(HASH)</title>
+<style>
+:root {
+  --bg: #030308;
+  --accent: #7c6cf0;
+  --cyan: #00f0ff;
+  --pink: #ff4488;
+  --gold: #ffd700;
+  --green: #00ff88;
+  --surface: #0a0a14;
+  --surface2: #12121f;
+  --border: #1a1a2e;
+  --text: #c8c8d4;
+  --dim: #555570;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Courier New', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+h1 {
+  text-align: center;
+  padding: 20px 0 6px;
+  font-size: 1.5rem;
+  color: var(--accent);
+  letter-spacing: 2px;
+}
+h1 span { color: var(--cyan); }
+.subtitle {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--dim);
+  margin-bottom: 16px;
+}
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 16px 40px;
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.panel-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--dim);
+  margin-bottom: 10px;
+}
+/* Input area */
+.input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+#textInput {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  padding: 10px 14px;
+  border-radius: 6px;
+  outline: none;
+}
+#textInput:focus { border-color: var(--accent); }
+textarea#compInput {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  padding: 10px 14px;
+  border-radius: 6px;
+  outline: none;
+  resize: vertical;
+  min-height: 70px;
+  display: none;
+}
+textarea#compInput:focus { border-color: var(--accent); }
+.btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); color: #fff; }
+.btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.btn.play { border-color: var(--green); color: var(--green); }
+.btn.play:hover { background: var(--green); color: #000; }
+.btn.stop { border-color: var(--pink); color: var(--pink); }
+.btn.stop:hover { background: var(--pink); color: #000; }
+.btn.chain { border-color: var(--gold); color: var(--gold); }
+.btn.chain:hover { background: var(--gold); color: #000; }
+
+.controls-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.control-group label {
+  font-size: 0.7rem;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+.control-group input[type="range"] {
+  width: 80px;
+  accent-color: var(--accent);
+}
+.control-group .val {
+  font-size: 0.75rem;
+  color: var(--cyan);
+  min-width: 32px;
+}
+
+/* Piano roll canvas */
+#pianoRoll {
+  width: 100%;
+  height: 260px;
+  border-radius: 6px;
+  display: block;
+  background: var(--surface2);
+}
+
+/* Info display */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+.info-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+}
+.info-card .label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--dim);
+  margin-bottom: 4px;
+}
+.info-card .value {
+  font-size: 1rem;
+  font-weight: bold;
+}
+.info-card .value.note { color: var(--cyan); }
+.info-card .value.scale { color: var(--accent); }
+.info-card .value.tempo { color: var(--gold); }
+.info-card .value.chord { color: var(--pink); }
+
+/* Hash display */
+.hash-display {
+  font-size: 0.7rem;
+  line-height: 1.8;
+  word-break: break-all;
+  padding: 10px;
+  background: var(--surface2);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.hash-display .byte { padding: 2px 3px; border-radius: 3px; margin: 0 1px; }
+.byte-melody { background: rgba(0,240,255,0.15); color: var(--cyan); }
+.byte-rhythm { background: rgba(124,108,240,0.15); color: var(--accent); }
+.byte-chord { background: rgba(255,68,136,0.15); color: var(--pink); }
+.byte-velocity { background: rgba(255,215,0,0.15); color: var(--gold); }
+.byte-bass { background: rgba(0,255,136,0.15); color: var(--green); }
+.byte-arp { background: rgba(0,240,255,0.1); color: #5bd; }
+.byte-fx { background: rgba(124,108,240,0.1); color: #a8a; }
+.byte-tempo { background: rgba(255,215,0,0.1); color: #ba8; }
+.byte-root { background: rgba(255,255,255,0.1); color: #fff; }
+.byte-scale { background: rgba(124,108,240,0.2); color: #b8a8f0; }
+
+.hash-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.65rem;
+}
+.hash-legend span { display: flex; align-items: center; gap: 4px; }
+.legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* Chain counter */
+.chain-info {
+  font-size: 0.75rem;
+  color: var(--gold);
+  margin-left: 8px;
+}
+</style>
+</head>
+<body>
+
+<h1>Hash Music Box — <span>fold(HASH)</span></h1>
+<p class="subtitle">Each hash is a musical phrase. The blockchain is a symphony.</p>
+
+<div class="container">
+  <!-- Input -->
+  <div class="panel">
+    <div class="panel-title">Input</div>
+    <div class="input-row">
+      <input type="text" id="textInput" placeholder="Type words, sentences... or use Chain Mode" autocomplete="off">
+      <button class="btn" id="hashBtn" onclick="hashAndParse()">Hash</button>
+      <button class="btn" id="compToggle" onclick="toggleComp()">Composition</button>
+    </div>
+    <textarea id="compInput" placeholder="Enter multiple lines — each line becomes a hash phrase.&#10;Play them in sequence as a composition."></textarea>
+    <div class="controls-row">
+      <button class="btn play" id="playBtn" onclick="startPlay()">&#9654; Play</button>
+      <button class="btn stop" onclick="stopPlay()">&#9632; Stop</button>
+      <button class="btn chain" id="chainBtn" onclick="chainHash()">&#8635; Chain</button>
+      <span class="chain-info" id="chainInfo"></span>
+      <div style="flex:1"></div>
+      <div class="control-group">
+        <label>Tempo</label>
+        <input type="range" id="tempoSlider" min="60" max="251" value="120">
+        <span class="val" id="tempoVal">120</span>
+      </div>
+      <div class="control-group">
+        <label>Vol</label>
+        <input type="range" id="volSlider" min="0" max="100" value="60">
+        <span class="val" id="volVal">60</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info display -->
+  <div class="panel">
+    <div class="panel-title">Current Phrase</div>
+    <div class="info-grid">
+      <div class="info-card"><div class="label">Root</div><div class="value note" id="infoRoot">--</div></div>
+      <div class="info-card"><div class="label">Scale</div><div class="value scale" id="infoScale">--</div></div>
+      <div class="info-card"><div class="label">Tempo</div><div class="value tempo" id="infoTempo">--</div></div>
+      <div class="info-card"><div class="label">Chord</div><div class="value chord" id="infoChord">--</div></div>
+      <div class="info-card"><div class="label">Playing</div><div class="value note" id="infoPlaying">--</div></div>
+      <div class="info-card"><div class="label">Beat</div><div class="value" id="infoBeat" style="color:var(--green)">--</div></div>
+    </div>
+  </div>
+
+  <!-- Piano Roll -->
+  <div class="panel">
+    <div class="panel-title">Staff Visualization</div>
+    <canvas id="pianoRoll"></canvas>
+  </div>
+
+  <!-- Hash Display -->
+  <div class="panel">
+    <div class="panel-title">Hash Byte Mapping</div>
+    <div class="hash-display" id="hashDisplay">Hash a phrase to see byte mapping...</div>
+    <div class="hash-legend">
+      <span><i class="legend-dot" style="background:var(--cyan)"></i> Melody</span>
+      <span><i class="legend-dot" style="background:var(--accent)"></i> Rhythm</span>
+      <span><i class="legend-dot" style="background:var(--pink)"></i> Chords</span>
+      <span><i class="legend-dot" style="background:var(--gold)"></i> Velocity</span>
+      <span><i class="legend-dot" style="background:var(--green)"></i> Bass</span>
+      <span><i class="legend-dot" style="background:#5bd"></i> Arpeggio</span>
+      <span><i class="legend-dot" style="background:#a8a"></i> Effects</span>
+      <span><i class="legend-dot" style="background:#ba8"></i> Tempo</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── SHA-256 ─────────────────────────────────────────────────
+const SHA256 = (() => {
+  const K = new Uint32Array([
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ]);
+  function rotr(n,x){return(x>>>n)|(x<<(32-n))}
+  function ch(x,y,z){return(x&y)^(~x&z)}
+  function maj(x,y,z){return(x&y)^(x&z)^(y&z)}
+  function sigma0(x){return rotr(2,x)^rotr(13,x)^rotr(22,x)}
+  function sigma1(x){return rotr(6,x)^rotr(11,x)^rotr(25,x)}
+  function gamma0(x){return rotr(7,x)^rotr(18,x)^(x>>>3)}
+  function gamma1(x){return rotr(17,x)^rotr(19,x)^(x>>>10)}
+  return function sha256(msg) {
+    const utf8 = new TextEncoder().encode(msg);
+    const bitLen = utf8.length * 8;
+    const padLen = (((utf8.length + 8) >> 6) + 1) << 6;
+    const padded = new Uint8Array(padLen);
+    padded.set(utf8);
+    padded[utf8.length] = 0x80;
+    const view = new DataView(padded.buffer);
+    view.setUint32(padLen - 4, bitLen, false);
+    let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a;
+    let h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;
+    for (let offset = 0; offset < padLen; offset += 64) {
+      const W = new Uint32Array(64);
+      for (let i = 0; i < 16; i++) W[i] = view.getUint32(offset + i*4, false);
+      for (let i = 16; i < 64; i++) W[i] = (gamma1(W[i-2]) + W[i-7] + gamma0(W[i-15]) + W[i-16]) | 0;
+      let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;
+      for (let i = 0; i < 64; i++) {
+        const T1 = (h + sigma1(e) + ch(e,f,g) + K[i] + W[i]) | 0;
+        const T2 = (sigma0(a) + maj(a,b,c)) | 0;
+        h=g; g=f; f=e; e=(d+T1)|0; d=c; c=b; b=a; a=(T1+T2)|0;
+      }
+      h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;
+      h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+h)|0;
+    }
+    const out = new Uint8Array(32);
+    const dv = new DataView(out.buffer);
+    [h0,h1,h2,h3,h4,h5,h6,h7].forEach((v,i) => dv.setUint32(i*4, v, false));
+    return out;
+  };
+})();
+
+function bytesToHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// ── Musical constants ───────────────────────────────────────
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const SCALE_TYPES = [
+  { name:'Major',       intervals:[0,2,4,5,7,9,11] },
+  { name:'Minor',       intervals:[0,2,3,5,7,8,10] },
+  { name:'Dorian',      intervals:[0,2,3,5,7,9,10] },
+  { name:'Mixolydian',  intervals:[0,2,4,5,7,9,10] },
+  { name:'Pentatonic',  intervals:[0,2,4,7,9] },
+  { name:'Blues',        intervals:[0,3,5,6,7,10] },
+  { name:'Phrygian',    intervals:[0,1,3,5,7,8,10] },
+  { name:'Lydian',      intervals:[0,2,4,6,7,9,11] }
+];
+const CHORD_SUFFIXES = ['I','II','III','IV','V','VI','VII'];
+
+// ── State ───────────────────────────────────────────────────
+let currentHash = null;
+let currentParams = null;
+let audioCtx = null;
+let isPlaying = false;
+let playTimeouts = [];
+let chainCount = 0;
+let lastHashHex = '';
+let compositionMode = false;
+let compositionQueue = [];
+let compositionIndex = 0;
+let pianoRollNotes = []; // {row, col, color, active}
+let animFrame = null;
+let currentBeat = 0;
+let playStartTime = 0;
+
+// ── Parse hash into musical parameters ──────────────────────
+function parseHash(bytes) {
+  const rootNote = bytes[0] % 12;
+  const scaleType = bytes[1] % 8;
+  const scale = SCALE_TYPES[scaleType];
+  const melody = [];
+  for (let i = 2; i <= 5; i++) melody.push(bytes[i] % scale.intervals.length);
+  const rhythmBits = (bytes[6] << 8) | bytes[7];
+  const rhythm = [];
+  for (let i = 15; i >= 0; i--) rhythm.push((rhythmBits >> i) & 1);
+  const chords = [];
+  for (let i = 8; i <= 11; i++) chords.push(bytes[i] % 7);
+  const velocity = [];
+  for (let i = 12; i <= 15; i++) velocity.push(bytes[i] / 255);
+  const bass = [];
+  for (let i = 16; i <= 19; i++) bass.push(bytes[i] % scale.intervals.length);
+  const arp = [];
+  for (let i = 20; i <= 23; i++) arp.push(bytes[i] % scale.intervals.length);
+  const fx = {
+    reverb: bytes[24] / 255,
+    delay: bytes[25] / 255,
+    filter: bytes[26] / 255,
+    fxMix: bytes[27] / 255
+  };
+  const bpm = 60 + bytes[28] * 0.75;
+  const oscType = bytes[29] % 2 === 0 ? 'sine' : 'triangle';
+  return { rootNote, scaleType, scale, melody, rhythm, chords, velocity, bass, arp, fx, bpm, oscType };
+}
+
+// ── Frequency from MIDI-like note ───────────────────────────
+function noteFreq(rootSemitone, scaleDegreeInterval, octave) {
+  const midi = 60 + rootSemitone + scaleDegreeInterval + (octave - 4) * 12;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function noteName(rootSemitone, interval) {
+  return NOTE_NAMES[(rootSemitone + interval) % 12];
+}
+
+// ── Hash and parse ──────────────────────────────────────────
+function hashAndParse(text) {
+  const input = text !== undefined ? text : document.getElementById('textInput').value;
+  if (!input && !text && text !== '') return;
+  const bytes = SHA256(input);
+  currentHash = bytes;
+  lastHashHex = bytesToHex(bytes);
+  currentParams = parseHash(bytes);
+  updateDisplay();
+  buildPianoRollData();
+  return bytes;
+}
+
+function chainHash() {
+  if (!lastHashHex) {
+    hashAndParse('genesis');
+    chainCount = 1;
+  } else {
+    hashAndParse(lastHashHex);
+    chainCount++;
+  }
+  document.getElementById('chainInfo').textContent = 'Chain depth: ' + chainCount;
+  if (isPlaying) {
+    stopPlay();
+    startPlay();
+  }
+}
+
+function toggleComp() {
+  compositionMode = !compositionMode;
+  const ta = document.getElementById('compInput');
+  const btn = document.getElementById('compToggle');
+  ta.style.display = compositionMode ? 'block' : 'none';
+  btn.classList.toggle('active', compositionMode);
+}
+
+// ── Update info display ─────────────────────────────────────
+function updateDisplay() {
+  if (!currentParams) return;
+  const p = currentParams;
+  document.getElementById('infoRoot').textContent = NOTE_NAMES[p.rootNote];
+  document.getElementById('infoScale').textContent = p.scale.name;
+  const tempoOverride = parseInt(document.getElementById('tempoSlider').value);
+  document.getElementById('infoTempo').textContent = tempoOverride + ' BPM';
+  const chordNames = p.chords.map(c => NOTE_NAMES[(p.rootNote + p.scale.intervals[c % p.scale.intervals.length]) % 12]);
+  document.getElementById('infoChord').textContent = chordNames.join(' - ');
+
+  // Hash display
+  const hex = lastHashHex;
+  const classes = [
+    'byte-root','byte-scale',
+    'byte-melody','byte-melody','byte-melody','byte-melody',
+    'byte-rhythm','byte-rhythm',
+    'byte-chord','byte-chord','byte-chord','byte-chord',
+    'byte-velocity','byte-velocity','byte-velocity','byte-velocity',
+    'byte-bass','byte-bass','byte-bass','byte-bass',
+    'byte-arp','byte-arp','byte-arp','byte-arp',
+    'byte-fx','byte-fx','byte-fx','byte-fx',
+    'byte-tempo','byte-tempo','byte-tempo','byte-tempo'
+  ];
+  const labels = [
+    'root','scale',
+    'mel','mel','mel','mel',
+    'rhy','rhy',
+    'chd','chd','chd','chd',
+    'vel','vel','vel','vel',
+    'bas','bas','bas','bas',
+    'arp','arp','arp','arp',
+    'fx','fx','fx','fx',
+    'bpm','osc','tim','tim'
+  ];
+  let html = '';
+  for (let i = 0; i < 32; i++) {
+    const byteHex = hex.substr(i*2, 2);
+    html += `<span class="byte ${classes[i]}" title="${labels[i]}: 0x${byteHex} (${currentHash[i]})">${byteHex}</span>`;
+  }
+  document.getElementById('hashDisplay').innerHTML = html;
+}
+
+// ── Piano Roll Data ─────────────────────────────────────────
+function buildPianoRollData() {
+  if (!currentParams) return;
+  pianoRollNotes = [];
+  const p = currentParams;
+  const rows = ['Melody','Chords','Bass','Arp','Rhythm','Velocity','FX','Tempo'];
+  // 16 columns (16th notes)
+  for (let col = 0; col < 16; col++) {
+    // Melody
+    if (p.rhythm[col]) {
+      const deg = p.melody[col % p.melody.length];
+      pianoRollNotes.push({ row: 0, col, color: '#00f0ff', intensity: p.velocity[col % 4], degree: deg });
+    }
+    // Chords (one per 4 beats)
+    if (col % 4 === 0) {
+      const ci = col / 4;
+      pianoRollNotes.push({ row: 1, col, color: '#ff4488', intensity: 0.7, span: 4, degree: p.chords[ci] });
+    }
+    // Bass
+    if (col % 4 === 0) {
+      const bi = col / 4;
+      pianoRollNotes.push({ row: 2, col, color: '#00ff88', intensity: 0.6, span: 4, degree: p.bass[bi] });
+    }
+    // Arp (every 2 16ths)
+    if (col % 2 === 0) {
+      const ai = (col / 2) % p.arp.length;
+      pianoRollNotes.push({ row: 3, col, color: '#5bbbd8', intensity: 0.5, span: 2, degree: p.arp[ai] });
+    }
+    // Rhythm indicator
+    if (p.rhythm[col]) {
+      pianoRollNotes.push({ row: 4, col, color: '#7c6cf0', intensity: 0.8 });
+    }
+    // Velocity bar
+    pianoRollNotes.push({ row: 5, col, color: '#ffd700', intensity: p.velocity[col % 4] });
+    // FX
+    if (col < 4) {
+      const fxVals = [p.fx.reverb, p.fx.delay, p.fx.filter, p.fx.fxMix];
+      pianoRollNotes.push({ row: 6, col, color: '#aa88aa', intensity: fxVals[col], span: 4 });
+    }
+  }
+  // Tempo row
+  pianoRollNotes.push({ row: 7, col: 0, color: '#bb9955', intensity: (p.bpm - 60) / 191, span: 16 });
+}
+
+// ── Piano Roll Canvas ───────────────────────────────────────
+const canvas = document.getElementById('pianoRoll');
+const ctx = canvas.getContext('2d');
+const ROW_LABELS = ['Melody','Chords','Bass','Arp','Rhythm','Vel','FX','Tempo'];
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width - 32;
+  canvas.height = 260;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function drawPianoRoll() {
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#0a0a14';
+  ctx.fillRect(0, 0, w, h);
+
+  const labelW = 56;
+  const gridW = w - labelW;
+  const rowH = h / 8;
+  const colW = gridW / 16;
+
+  // Grid lines
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 0.5;
+  for (let r = 0; r <= 8; r++) {
+    ctx.beginPath();
+    ctx.moveTo(labelW, r * rowH);
+    ctx.lineTo(w, r * rowH);
+    ctx.stroke();
+  }
+  for (let c = 0; c <= 16; c++) {
+    ctx.beginPath();
+    ctx.moveTo(labelW + c * colW, 0);
+    ctx.lineTo(labelW + c * colW, h);
+    if (c % 4 === 0) { ctx.strokeStyle = '#2a2a3e'; ctx.lineWidth = 1; }
+    else { ctx.strokeStyle = '#1a1a2e'; ctx.lineWidth = 0.5; }
+    ctx.stroke();
+  }
+
+  // Row labels
+  ctx.fillStyle = '#555570';
+  ctx.font = '10px Courier New';
+  ctx.textAlign = 'right';
+  for (let r = 0; r < 8; r++) {
+    ctx.fillText(ROW_LABELS[r], labelW - 6, r * rowH + rowH / 2 + 3);
+  }
+
+  // Notes
+  for (const note of pianoRollNotes) {
+    const span = note.span || 1;
+    const x = labelW + note.col * colW + 1;
+    const y = note.row * rowH + 2;
+    const nw = colW * span - 2;
+    const nh = rowH - 4;
+    const alpha = 0.2 + note.intensity * 0.6;
+    ctx.fillStyle = note.color + Math.round(alpha * 255).toString(16).padStart(2,'0');
+    ctx.beginPath();
+    ctx.roundRect(x, y, nw, nh, 3);
+    ctx.fill();
+    // Border
+    ctx.strokeStyle = note.color;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  // Playhead
+  if (isPlaying && currentParams) {
+    const bpm = parseInt(document.getElementById('tempoSlider').value);
+    const beatDur = 60 / bpm / 4; // 16th note duration
+    const elapsed = (audioCtx.currentTime - playStartTime);
+    const beatPos = (elapsed / beatDur) % 16;
+    const px = labelW + beatPos * colW;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(px, 0);
+    ctx.lineTo(px, h);
+    ctx.stroke();
+
+    // Glow on active column
+    const activeCol = Math.floor(beatPos);
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillRect(labelW + activeCol * colW, 0, colW, h);
+
+    currentBeat = activeCol;
+    document.getElementById('infoBeat').textContent = (activeCol + 1) + ' / 16';
+  }
+
+  animFrame = requestAnimationFrame(drawPianoRoll);
+}
+drawPianoRoll();
+
+// ── Audio Engine ────────────────────────────────────────────
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playNote(freq, startTime, duration, type, volume, pan) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const panner = audioCtx.createStereoPanner();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, startTime);
+  // Envelope
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(volume, startTime + 0.01);
+  gain.gain.setValueAtTime(volume, startTime + duration * 0.7);
+  gain.gain.linearRampToValueAtTime(0, startTime + duration);
+  panner.pan.setValueAtTime(pan || 0, startTime);
+  osc.connect(gain).connect(panner).connect(masterGain);
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.05);
+}
+
+let masterGain = null;
+let delayNode = null;
+let delayGain = null;
+
+function setupAudioGraph() {
+  ensureAudio();
+  if (masterGain) { try { masterGain.disconnect(); } catch(e){} }
+  masterGain = audioCtx.createGain();
+  const vol = parseInt(document.getElementById('volSlider').value) / 100;
+  masterGain.gain.setValueAtTime(vol, audioCtx.currentTime);
+
+  // Delay effect
+  delayNode = audioCtx.createDelay(1.0);
+  delayGain = audioCtx.createGain();
+  const delayAmt = currentParams ? currentParams.fx.delay * 0.4 : 0.2;
+  delayNode.delayTime.setValueAtTime(0.25, audioCtx.currentTime);
+  delayGain.gain.setValueAtTime(delayAmt, audioCtx.currentTime);
+
+  masterGain.connect(audioCtx.destination);
+  masterGain.connect(delayNode);
+  delayNode.connect(delayGain);
+  delayGain.connect(audioCtx.destination);
+  delayGain.connect(delayNode); // feedback loop
+}
+
+function playPhrase(params, onDone) {
+  setupAudioGraph();
+  const p = params;
+  const bpm = parseInt(document.getElementById('tempoSlider').value);
+  const sixteenth = 60 / bpm / 4;
+  const now = audioCtx.currentTime + 0.05;
+  playStartTime = now;
+  const vol = parseInt(document.getElementById('volSlider').value) / 100;
+
+  for (let step = 0; step < 16; step++) {
+    const t = now + step * sixteenth;
+    const beatIdx = Math.floor(step / 4);
+
+    // Melody
+    if (p.rhythm[step]) {
+      const deg = p.melody[step % p.melody.length];
+      const interval = p.scale.intervals[deg % p.scale.intervals.length];
+      const freq = noteFreq(p.rootNote, interval, 5);
+      const v = p.velocity[step % 4] * 0.35 * vol;
+      playNote(freq, t, sixteenth * 0.8, p.oscType, v, -0.3);
+      const mn = noteName(p.rootNote, interval);
+      const tid = setTimeout(() => {
+        document.getElementById('infoPlaying').textContent = mn + '5';
+      }, (t - audioCtx.currentTime) * 1000);
+      playTimeouts.push(tid);
+    }
+
+    // Chords (every 4 steps)
+    if (step % 4 === 0) {
+      const chordDeg = p.chords[beatIdx];
+      const baseInterval = p.scale.intervals[chordDeg % p.scale.intervals.length];
+      // Play triad
+      const thirdDeg = (chordDeg + 2) % p.scale.intervals.length;
+      const fifthDeg = (chordDeg + 4) % p.scale.intervals.length;
+      const intervals = [baseInterval, p.scale.intervals[thirdDeg], p.scale.intervals[fifthDeg]];
+      for (let ci = 0; ci < 3; ci++) {
+        const freq = noteFreq(p.rootNote, intervals[ci], 4);
+        playNote(freq, t, sixteenth * 3.5, 'sine', 0.08 * vol, 0.3);
+      }
+    }
+
+    // Bass (every 4 steps)
+    if (step % 4 === 0) {
+      const bassDeg = p.bass[beatIdx];
+      const interval = p.scale.intervals[bassDeg % p.scale.intervals.length];
+      const freq = noteFreq(p.rootNote, interval, 3);
+      playNote(freq, t, sixteenth * 3.5, 'sawtooth', 0.15 * vol, 0);
+    }
+
+    // Arpeggio (every 2 steps)
+    if (step % 2 === 0) {
+      const ai = (step / 2) % p.arp.length;
+      const arpDeg = p.arp[ai];
+      const interval = p.scale.intervals[arpDeg % p.scale.intervals.length];
+      const freq = noteFreq(p.rootNote, interval, 5);
+      playNote(freq, t, sixteenth * 1.5, 'triangle', 0.06 * vol, 0.5);
+    }
+  }
+
+  const totalDur = 16 * sixteenth;
+  if (onDone) {
+    const tid = setTimeout(onDone, totalDur * 1000 + 50);
+    playTimeouts.push(tid);
+  }
+}
+
+// ── Play / Stop ─────────────────────────────────────────────
+function startPlay() {
+  if (!currentHash && !compositionMode) {
+    hashAndParse('hello world');
+  }
+  stopPlay();
+  isPlaying = true;
+  document.getElementById('playBtn').classList.add('active');
+
+  if (compositionMode) {
+    const lines = document.getElementById('compInput').value.split('\n').filter(l => l.trim());
+    if (lines.length === 0) return;
+    compositionQueue = lines;
+    compositionIndex = 0;
+    playCompositionStep();
+  } else if (currentParams) {
+    playLoop();
+  }
+}
+
+function playLoop() {
+  if (!isPlaying) return;
+  playPhrase(currentParams, () => {
+    if (isPlaying) playLoop();
+  });
+}
+
+function playCompositionStep() {
+  if (!isPlaying || compositionIndex >= compositionQueue.length) {
+    if (isPlaying && compositionQueue.length > 0) {
+      compositionIndex = 0;
+      playCompositionStep();
+    }
+    return;
+  }
+  const line = compositionQueue[compositionIndex];
+  hashAndParse(line);
+  document.getElementById('textInput').value = line;
+  compositionIndex++;
+  playPhrase(currentParams, () => {
+    playCompositionStep();
+  });
+}
+
+function stopPlay() {
+  isPlaying = false;
+  document.getElementById('playBtn').classList.remove('active');
+  for (const t of playTimeouts) clearTimeout(t);
+  playTimeouts = [];
+  document.getElementById('infoPlaying').textContent = '--';
+  document.getElementById('infoBeat').textContent = '--';
+}
+
+// ── Slider events ───────────────────────────────────────────
+document.getElementById('tempoSlider').addEventListener('input', function() {
+  document.getElementById('tempoVal').textContent = this.value;
+  if (currentParams) {
+    document.getElementById('infoTempo').textContent = this.value + ' BPM';
+  }
+});
+document.getElementById('volSlider').addEventListener('input', function() {
+  document.getElementById('volVal').textContent = this.value;
+  if (masterGain) {
+    masterGain.gain.setValueAtTime(this.value / 100, audioCtx.currentTime);
+  }
+});
+
+// Enter key to hash
+document.getElementById('textInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    hashAndParse();
+    if (isPlaying) { stopPlay(); startPlay(); }
+  }
+});
+
+// Set initial tempo slider from hash when available
+function syncTempoFromHash() {
+  if (currentParams) {
+    const bpm = Math.round(currentParams.bpm);
+    document.getElementById('tempoSlider').value = bpm;
+    document.getElementById('tempoVal').textContent = bpm;
+  }
+}
+
+// Override hashAndParse to sync tempo
+const _origHash = hashAndParse;
+hashAndParse = function(text) {
+  const result = _origHash(text);
+  syncTempoFromHash();
+  return result;
+};
+</script>
+</body>
+</html>

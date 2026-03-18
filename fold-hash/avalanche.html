@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avalanche Explorer — fold(HASH)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#030308;--card:rgba(12,12,28,0.9);--border:rgba(100,80,200,0.25);--text:#d0d0f0;--accent:#7c6cf0;--cyan:#00f0ff;--pink:#ff4488;--gold:#ffd700;--green:#00ff88}
+body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:
+  radial-gradient(ellipse at 20% 50%,rgba(124,108,240,0.08),transparent 60%),
+  radial-gradient(ellipse at 80% 30%,rgba(0,240,255,0.06),transparent 50%),
+  radial-gradient(ellipse at 50% 80%,rgba(255,68,136,0.05),transparent 50%);
+  z-index:-1;pointer-events:none}
+
+header{text-align:center;padding:30px 20px 10px}
+header h1{font-size:2em;background:linear-gradient(90deg,var(--cyan),var(--accent),var(--pink),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:3px}
+header .sub{font-size:0.75em;opacity:0.4;margin:6px 0;line-height:1.6}
+
+.container{max-width:1200px;margin:0 auto;padding:10px 20px 40px}
+
+/* Input section */
+.input-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}
+.input-group{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;backdrop-filter:blur(10px)}
+.input-group label{display:block;font-size:0.8em;color:var(--accent);margin-bottom:6px;font-weight:bold}
+.input-group input{width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:inherit;font-size:0.9em;outline:none;transition:border-color 0.3s}
+.input-group input:focus{border-color:var(--accent)}
+.hash-display{font-size:0.65em;margin-top:8px;word-break:break-all;opacity:0.5;min-height:2.4em;line-height:1.2em}
+
+/* Bit grid */
+.section-title{font-size:0.85em;color:var(--accent);margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+.section-title::before{content:'';flex:0 0 3px;height:14px;background:var(--accent);border-radius:2px}
+
+.bit-grid{display:grid;grid-template-columns:repeat(32,1fr);gap:2px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;backdrop-filter:blur(10px)}
+.bit-cell{aspect-ratio:1;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:0.5em;transition:background 0.15s,transform 0.15s,box-shadow 0.15s;cursor:default;position:relative}
+.bit-cell.same{background:rgba(60,60,80,0.4);color:rgba(160,160,180,0.4)}
+.bit-cell.flipped{transform:scale(1.15);box-shadow:0 0 8px currentColor;animation:pop 0.3s ease-out}
+.bit-cell.flipped.hidden{transform:scale(0.8);opacity:0;box-shadow:none}
+
+@keyframes pop{
+  0%{transform:scale(0.5);opacity:0}
+  60%{transform:scale(1.25)}
+  100%{transform:scale(1.15)}
+}
+
+/* Stats panel */
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin:16px 0}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;backdrop-filter:blur(10px);text-align:center}
+.stat-card .value{font-size:2em;font-weight:bold;color:var(--cyan)}
+.stat-card .label{font-size:0.7em;opacity:0.5;margin-top:4px}
+.stat-card .ideal{font-size:0.65em;color:var(--gold);opacity:0.6;margin-top:2px}
+
+/* Bar chart */
+.bar-chart-container{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;backdrop-filter:blur(10px);margin:16px 0}
+.bar-chart{display:flex;align-items:flex-end;gap:4px;height:80px;margin-top:8px}
+.bar-wrapper{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar{width:100%;border-radius:3px 3px 0 0;transition:height 0.4s ease;min-height:2px;position:relative}
+.bar-label{font-size:0.55em;opacity:0.4}
+.bar-value{font-size:0.55em;color:var(--cyan)}
+
+/* Byte diff */
+.byte-diff{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;backdrop-filter:blur(10px);margin:16px 0;overflow-x:auto}
+.byte-diff table{width:100%;border-collapse:collapse;font-size:0.7em}
+.byte-diff th{color:var(--accent);font-weight:normal;padding:4px 2px;font-size:0.85em;text-align:center}
+.byte-diff td{text-align:center;padding:4px 2px;border-radius:3px}
+.byte-diff .xor-cell{font-weight:bold}
+
+/* Binary diff */
+.binary-diff{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;backdrop-filter:blur(10px);margin:16px 0;overflow-x:auto}
+.binary-line{font-size:0.6em;line-height:1.8;word-break:break-all;letter-spacing:1px}
+.binary-line .bit-same{opacity:0.25}
+.binary-line .bit-flip{font-weight:bold;text-shadow:0 0 6px currentColor}
+.binary-label{font-size:0.7em;color:var(--accent);margin-bottom:2px}
+
+/* Auto-walk */
+.controls{display:flex;gap:12px;margin:16px 0;flex-wrap:wrap;align-items:center}
+button{background:rgba(124,108,240,0.2);border:1px solid var(--accent);border-radius:8px;padding:8px 18px;color:var(--accent);font-family:inherit;font-size:0.8em;cursor:pointer;transition:all 0.2s}
+button:hover{background:rgba(124,108,240,0.35);transform:translateY(-1px)}
+button:active{transform:translateY(0)}
+button.active{background:rgba(255,68,136,0.3);border-color:var(--pink);color:var(--pink)}
+.walk-info{font-size:0.7em;opacity:0.5}
+
+/* Histogram */
+.histogram-container{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;backdrop-filter:blur(10px);margin:16px 0;display:none}
+.histogram-container.visible{display:block}
+.histogram{display:flex;align-items:flex-end;gap:1px;height:100px;margin-top:8px}
+.histo-bar{flex:1;background:var(--accent);border-radius:2px 2px 0 0;min-width:2px;transition:height 0.2s;position:relative}
+.histo-bar:hover::after{content:attr(data-label);position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);font-size:0.55em;background:rgba(0,0,0,0.8);padding:2px 6px;border-radius:4px;white-space:nowrap;color:var(--cyan)}
+.histo-axis{display:flex;justify-content:space-between;font-size:0.55em;opacity:0.3;margin-top:4px}
+
+/* Longest run */
+.run-info{font-size:0.75em;opacity:0.6;margin:8px 0}
+
+/* Responsive */
+@media(max-width:700px){
+  .input-row{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:1fr}
+  .bit-grid{grid-template-columns:repeat(16,1fr)}
+  .bit-cell{font-size:0.35em}
+}
+
+/* Back link */
+.back-link{display:inline-block;margin:0 0 10px;font-size:0.75em;color:var(--accent);text-decoration:none;opacity:0.6;transition:opacity 0.2s}
+.back-link:hover{opacity:1}
+
+/* Sound toggle */
+.sound-toggle{font-size:0.7em;opacity:0.5;cursor:pointer;user-select:none}
+.sound-toggle:hover{opacity:0.8}
+</style>
+</head>
+<body>
+<header>
+  <h1>Avalanche Explorer</h1>
+  <div class="sub">fold(HASH) — Change one character, watch ~128 bits flip. The avalanche effect, visualized and sonified.</div>
+</header>
+<div class="container">
+<a href="index.html" class="back-link">← back to fold(HASH)</a>
+
+<!-- Inputs -->
+<div class="input-row">
+  <div class="input-group">
+    <label>Input A</label>
+    <input type="text" id="inputA" value="Hello, World" spellcheck="false" autocomplete="off">
+    <div class="hash-display" id="hashA"></div>
+  </div>
+  <div class="input-group">
+    <label>Input B</label>
+    <input type="text" id="inputB" value="Hello, World!" spellcheck="false" autocomplete="off">
+    <div class="hash-display" id="hashB"></div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button id="btnCascade">▶ Cascade</button>
+  <button id="btnAutoWalk">Auto-Walk a–z</button>
+  <span class="sound-toggle" id="soundToggle">🔊 Sound ON</span>
+  <span class="walk-info" id="walkInfo"></span>
+</div>
+
+<!-- Bit Grid -->
+<div class="section-title">256-Bit Avalanche Grid (32×8)</div>
+<div class="bit-grid" id="bitGrid"></div>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="value" id="hammingValue">0</div>
+    <div class="label">Hamming Distance</div>
+    <div class="ideal">bits flipped</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" id="percentValue">0%</div>
+    <div class="label">Percentage Flipped</div>
+    <div class="ideal">Ideal: 50% (128 bits)</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" id="runValue">0</div>
+    <div class="label">Longest Run</div>
+    <div class="ideal" id="runDetail">of same bits</div>
+  </div>
+</div>
+
+<!-- Per-byte bar chart -->
+<div class="bar-chart-container">
+  <div class="section-title">Per-Byte Flip Count (32 bytes → 8 groups of 4 bytes)</div>
+  <div class="bar-chart" id="barChart"></div>
+</div>
+
+<!-- Auto-walk histogram -->
+<div class="histogram-container" id="histoContainer">
+  <div class="section-title">Hamming Distance Histogram (Auto-Walk)</div>
+  <div class="histogram" id="histogram"></div>
+  <div class="histo-axis"><span>0</span><span>64</span><span>128</span><span>192</span><span>256</span></div>
+</div>
+
+<!-- Byte diff -->
+<div class="byte-diff">
+  <div class="section-title">Byte-Level Diff (32 bytes, hex)</div>
+  <table id="byteDiffTable"></table>
+</div>
+
+<!-- Binary diff -->
+<div class="binary-diff">
+  <div class="section-title">Binary Diff (256 bits)</div>
+  <div class="binary-label">Hash A:</div>
+  <div class="binary-line" id="binA"></div>
+  <div class="binary-label" style="margin-top:8px">Hash B:</div>
+  <div class="binary-line" id="binB"></div>
+  <div class="binary-label" style="margin-top:8px">XOR (flipped = 1):</div>
+  <div class="binary-line" id="binXor"></div>
+</div>
+
+</div>
+
+<script>
+// ============================================================
+// Pure JS SHA-256 implementation (synchronous, no dependencies)
+// ============================================================
+const SHA256 = (function() {
+  // SHA-256 constants: first 32 bits of fractional parts of cube roots of first 64 primes
+  const K = new Uint32Array([
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
+    0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+    0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+    0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+    0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
+    0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
+    0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+    0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  ]);
+
+  // Initial hash values: first 32 bits of fractional parts of square roots of first 8 primes
+  const H_INIT = new Uint32Array([
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  ]);
+
+  function rightRotate(v, n) {
+    return (v >>> n) | (v << (32 - n));
+  }
+
+  function sha256(message) {
+    // Convert string to UTF-8 byte array
+    const msgBytes = [];
+    for (let i = 0; i < message.length; i++) {
+      const code = message.charCodeAt(i);
+      if (code < 0x80) {
+        msgBytes.push(code);
+      } else if (code < 0x800) {
+        msgBytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+      } else if (code < 0xd800 || code >= 0xe000) {
+        msgBytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+      } else {
+        // Surrogate pair
+        i++;
+        const cp = 0x10000 + (((code & 0x3ff) << 10) | (message.charCodeAt(i) & 0x3ff));
+        msgBytes.push(
+          0xf0 | (cp >> 18),
+          0x80 | ((cp >> 12) & 0x3f),
+          0x80 | ((cp >> 6) & 0x3f),
+          0x80 | (cp & 0x3f)
+        );
+      }
+    }
+
+    // Pre-processing: adding padding bits
+    const bitLen = msgBytes.length * 8;
+    msgBytes.push(0x80);
+    while (msgBytes.length % 64 !== 56) {
+      msgBytes.push(0);
+    }
+
+    // Append original length in bits as 64-bit big-endian
+    // JavaScript bitwise ops are 32-bit, so handle high and low 32 bits
+    const lenHi = Math.floor(bitLen / 0x100000000);
+    const lenLo = bitLen >>> 0;
+    msgBytes.push(
+      (lenHi >>> 24) & 0xff, (lenHi >>> 16) & 0xff,
+      (lenHi >>> 8) & 0xff, lenHi & 0xff,
+      (lenLo >>> 24) & 0xff, (lenLo >>> 16) & 0xff,
+      (lenLo >>> 8) & 0xff, lenLo & 0xff
+    );
+
+    // Process each 512-bit (64-byte) block
+    const H = new Uint32Array(H_INIT);
+    const W = new Uint32Array(64);
+
+    for (let offset = 0; offset < msgBytes.length; offset += 64) {
+      // Prepare message schedule
+      for (let i = 0; i < 16; i++) {
+        const j = offset + i * 4;
+        W[i] = (msgBytes[j] << 24) | (msgBytes[j+1] << 16) |
+                (msgBytes[j+2] << 8) | msgBytes[j+3];
+      }
+      for (let i = 16; i < 64; i++) {
+        const s0 = rightRotate(W[i-15], 7) ^ rightRotate(W[i-15], 18) ^ (W[i-15] >>> 3);
+        const s1 = rightRotate(W[i-2], 17) ^ rightRotate(W[i-2], 19) ^ (W[i-2] >>> 10);
+        W[i] = (W[i-16] + s0 + W[i-7] + s1) | 0;
+      }
+
+      // Initialize working variables
+      let a = H[0], b = H[1], c = H[2], d = H[3];
+      let e = H[4], f = H[5], g = H[6], h = H[7];
+
+      // Compression function main loop
+      for (let i = 0; i < 64; i++) {
+        const S1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25);
+        const ch = (e & f) ^ (~e & g);
+        const temp1 = (h + S1 + ch + K[i] + W[i]) | 0;
+        const S0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22);
+        const maj = (a & b) ^ (a & c) ^ (b & c);
+        const temp2 = (S0 + maj) | 0;
+
+        h = g; g = f; f = e;
+        e = (d + temp1) | 0;
+        d = c; c = b; b = a;
+        a = (temp1 + temp2) | 0;
+      }
+
+      // Add compressed chunk to hash value
+      H[0] = (H[0] + a) | 0;
+      H[1] = (H[1] + b) | 0;
+      H[2] = (H[2] + c) | 0;
+      H[3] = (H[3] + d) | 0;
+      H[4] = (H[4] + e) | 0;
+      H[5] = (H[5] + f) | 0;
+      H[6] = (H[6] + g) | 0;
+      H[7] = (H[7] + h) | 0;
+    }
+
+    // Produce the final hash as bytes
+    const hashBytes = new Uint8Array(32);
+    for (let i = 0; i < 8; i++) {
+      hashBytes[i*4]   = (H[i] >>> 24) & 0xff;
+      hashBytes[i*4+1] = (H[i] >>> 16) & 0xff;
+      hashBytes[i*4+2] = (H[i] >>> 8) & 0xff;
+      hashBytes[i*4+3] = H[i] & 0xff;
+    }
+    return hashBytes;
+  }
+
+  function toHex(bytes) {
+    return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  function toBin(bytes) {
+    return Array.from(bytes).map(b => b.toString(2).padStart(8,'0')).join('');
+  }
+
+  return { hash: sha256, toHex, toBin };
+})();
+
+// ============================================================
+// Web Audio for sonification
+// ============================================================
+let audioCtx = null;
+let soundEnabled = true;
+
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playTick(position, time) {
+  if (!soundEnabled || !audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  // Pitch varies by position: low to high across 256 bits
+  const freq = 200 + (position / 256) * 1800;
+  osc.frequency.setValueAtTime(freq, time);
+  osc.type = 'sine';
+  gain.gain.setValueAtTime(0.03, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(time);
+  osc.stop(time + 0.06);
+}
+
+function playChord(isResolved, time) {
+  if (!soundEnabled || !audioCtx) return;
+  const base = 220;
+  // Resolved: major chord. Dissonant: tritone cluster
+  const ratios = isResolved
+    ? [1, 1.25, 1.5, 2]      // major chord
+    : [1, 1.06, 1.41, 1.89]; // dissonant cluster
+  ratios.forEach(r => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.setValueAtTime(base * r, time);
+    osc.type = 'triangle';
+    gain.gain.setValueAtTime(0.06, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.8);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(time);
+    osc.stop(time + 0.9);
+  });
+}
+
+// ============================================================
+// State
+// ============================================================
+const inputA = document.getElementById('inputA');
+const inputB = document.getElementById('inputB');
+const hashADisplay = document.getElementById('hashA');
+const hashBDisplay = document.getElementById('hashB');
+const bitGrid = document.getElementById('bitGrid');
+const hammingValue = document.getElementById('hammingValue');
+const percentValue = document.getElementById('percentValue');
+const runValue = document.getElementById('runValue');
+const runDetail = document.getElementById('runDetail');
+const barChart = document.getElementById('barChart');
+const byteDiffTable = document.getElementById('byteDiffTable');
+const binADisplay = document.getElementById('binA');
+const binBDisplay = document.getElementById('binB');
+const binXorDisplay = document.getElementById('binXor');
+const btnCascade = document.getElementById('btnCascade');
+const btnAutoWalk = document.getElementById('btnAutoWalk');
+const walkInfo = document.getElementById('walkInfo');
+const histoContainer = document.getElementById('histoContainer');
+const histogramEl = document.getElementById('histogram');
+const soundToggle = document.getElementById('soundToggle');
+
+let cells = [];
+let cascadeTimer = null;
+let autoWalkRunning = false;
+let autoWalkTimer = null;
+let histogramData = new Array(257).fill(0); // index = hamming distance, value = count
+
+// Build bit grid cells
+for (let i = 0; i < 256; i++) {
+  const cell = document.createElement('div');
+  cell.className = 'bit-cell same';
+  cell.textContent = '0';
+  bitGrid.appendChild(cell);
+  cells.push(cell);
+}
+
+// Build bar chart
+const barWrappers = [];
+for (let i = 0; i < 8; i++) {
+  const wrap = document.createElement('div');
+  wrap.className = 'bar-wrapper';
+  const bar = document.createElement('div');
+  bar.className = 'bar';
+  bar.style.background = `hsl(${i / 8 * 360}, 70%, 55%)`;
+  bar.style.height = '2px';
+  const val = document.createElement('div');
+  val.className = 'bar-value';
+  val.textContent = '0';
+  const label = document.createElement('div');
+  label.className = 'bar-label';
+  label.textContent = `B${i*4}-${i*4+3}`;
+  wrap.appendChild(val);
+  wrap.appendChild(bar);
+  wrap.appendChild(label);
+  barChart.appendChild(wrap);
+  barWrappers.push({ bar, val });
+}
+
+// Sound toggle
+soundToggle.addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  soundToggle.textContent = soundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF';
+});
+
+// ============================================================
+// Core computation & display
+// ============================================================
+function getXorBits(hashBytesA, hashBytesB) {
+  const xorBytes = new Uint8Array(32);
+  for (let i = 0; i < 32; i++) xorBytes[i] = hashBytesA[i] ^ hashBytesB[i];
+  const bits = [];
+  for (let i = 0; i < 32; i++) {
+    for (let b = 7; b >= 0; b--) {
+      bits.push((xorBytes[i] >> b) & 1);
+    }
+  }
+  return { xorBytes, bits };
+}
+
+function computeStats(xorBits) {
+  const hamming = xorBits.reduce((s, b) => s + b, 0);
+  const percent = (hamming / 256 * 100).toFixed(1);
+
+  // Per-byte-group flips (8 groups of 4 bytes = 32 bits each)
+  const groupFlips = [];
+  for (let g = 0; g < 8; g++) {
+    let count = 0;
+    for (let i = g * 32; i < (g + 1) * 32; i++) count += xorBits[i];
+    groupFlips.push(count);
+  }
+
+  // Longest run of same value
+  let maxRun = 0, maxRunVal = 0, curRun = 1;
+  for (let i = 1; i < 256; i++) {
+    if (xorBits[i] === xorBits[i-1]) {
+      curRun++;
+    } else {
+      if (curRun > maxRun) { maxRun = curRun; maxRunVal = xorBits[i-1]; }
+      curRun = 1;
+    }
+  }
+  if (curRun > maxRun) { maxRun = curRun; maxRunVal = xorBits[255]; }
+
+  return { hamming, percent, groupFlips, maxRun, maxRunVal };
+}
+
+function hslForBit(bitIndex) {
+  const byteIndex = Math.floor(bitIndex / 8);
+  const hue = (byteIndex / 32) * 360;
+  return `hsl(${hue}, 85%, 60%)`;
+}
+
+function updateInstant() {
+  const a = inputA.value;
+  const b = inputB.value;
+  const hashA = SHA256.hash(a);
+  const hashB = SHA256.hash(b);
+
+  hashADisplay.textContent = 'SHA-256: ' + SHA256.toHex(hashA);
+  hashBDisplay.textContent = 'SHA-256: ' + SHA256.toHex(hashB);
+
+  const { xorBytes, bits: xorBits } = getXorBits(hashA, hashB);
+  const stats = computeStats(xorBits);
+
+  const bitsA = SHA256.toBin(hashA);
+  const bitsB = SHA256.toBin(hashB);
+
+  // Update bit grid instantly
+  for (let i = 0; i < 256; i++) {
+    const flipped = xorBits[i] === 1;
+    cells[i].textContent = bitsB[i];
+    if (flipped) {
+      cells[i].className = 'bit-cell flipped';
+      cells[i].style.color = hslForBit(i);
+      cells[i].style.background = hslForBit(i).replace('60%', '15%');
+    } else {
+      cells[i].className = 'bit-cell same';
+      cells[i].style.color = '';
+      cells[i].style.background = '';
+    }
+  }
+
+  updateStats(stats);
+  updateBarChart(stats.groupFlips);
+  updateByteDiff(hashA, hashB, xorBytes);
+  updateBinaryDiff(bitsA, bitsB, xorBits);
+}
+
+function updateCascade() {
+  ensureAudio();
+  if (cascadeTimer) { clearTimeout(cascadeTimer); cascadeTimer = null; }
+
+  const a = inputA.value;
+  const b = inputB.value;
+  const hashA = SHA256.hash(a);
+  const hashB = SHA256.hash(b);
+
+  hashADisplay.textContent = 'SHA-256: ' + SHA256.toHex(hashA);
+  hashBDisplay.textContent = 'SHA-256: ' + SHA256.toHex(hashB);
+
+  const { xorBytes, bits: xorBits } = getXorBits(hashA, hashB);
+  const stats = computeStats(xorBits);
+  const bitsA = SHA256.toBin(hashA);
+  const bitsB = SHA256.toBin(hashB);
+
+  // Start all cells as hidden
+  for (let i = 0; i < 256; i++) {
+    const flipped = xorBits[i] === 1;
+    cells[i].textContent = bitsB[i];
+    if (flipped) {
+      cells[i].className = 'bit-cell flipped hidden';
+      cells[i].style.color = hslForBit(i);
+      cells[i].style.background = hslForBit(i).replace('60%', '15%');
+    } else {
+      cells[i].className = 'bit-cell same';
+      cells[i].style.color = '';
+      cells[i].style.background = '';
+    }
+  }
+
+  // Cascade: reveal flipped bits one by one
+  const flippedIndices = [];
+  for (let i = 0; i < 256; i++) {
+    if (xorBits[i] === 1) flippedIndices.push(i);
+  }
+
+  const startTime = audioCtx ? audioCtx.currentTime + 0.05 : 0;
+  const stagger = 0.005; // 5ms
+
+  flippedIndices.forEach((idx, step) => {
+    const delay = step * 5;
+    const t = startTime + step * stagger;
+    setTimeout(() => {
+      cells[idx].classList.remove('hidden');
+      // Re-trigger animation
+      cells[idx].style.animation = 'none';
+      cells[idx].offsetHeight; // force reflow
+      cells[idx].style.animation = '';
+    }, delay);
+    playTick(idx, t);
+  });
+
+  // After cascade completes, play chord
+  const totalDelay = flippedIndices.length * 5 + 50;
+  cascadeTimer = setTimeout(() => {
+    const closeTo50 = Math.abs(stats.hamming - 128) < 30;
+    if (audioCtx) playChord(closeTo50, audioCtx.currentTime);
+  }, totalDelay);
+
+  updateStats(stats);
+  updateBarChart(stats.groupFlips);
+  updateByteDiff(hashA, hashB, xorBytes);
+  updateBinaryDiff(bitsA, bitsB, xorBits);
+
+  return stats.hamming;
+}
+
+function updateStats(stats) {
+  hammingValue.textContent = stats.hamming;
+  hammingValue.style.color = Math.abs(stats.hamming - 128) < 20
+    ? 'var(--green)' : Math.abs(stats.hamming - 128) < 40
+    ? 'var(--cyan)' : 'var(--pink)';
+
+  percentValue.textContent = stats.percent + '%';
+  percentValue.style.color = hammingValue.style.color;
+
+  runValue.textContent = stats.maxRun;
+  runDetail.textContent = stats.maxRunVal === 1 ? 'consecutive flipped' : 'consecutive same';
+}
+
+function updateBarChart(groupFlips) {
+  const max = Math.max(...groupFlips, 1);
+  groupFlips.forEach((count, i) => {
+    const pct = (count / 32 * 100);
+    barWrappers[i].bar.style.height = Math.max(2, (count / 32) * 70) + 'px';
+    barWrappers[i].val.textContent = count + '/32';
+  });
+}
+
+function updateByteDiff(hashA, hashB, xorBytes) {
+  let html = '<tr><th></th>';
+  for (let i = 0; i < 32; i++) html += `<th>${i}</th>`;
+  html += '</tr>';
+
+  html += '<tr><td style="color:var(--cyan);font-size:0.8em">A</td>';
+  for (let i = 0; i < 32; i++) {
+    const diff = xorBytes[i] !== 0;
+    const bg = diff ? 'rgba(124,108,240,0.15)' : 'transparent';
+    html += `<td style="background:${bg}">${hashA[i].toString(16).padStart(2,'0')}</td>`;
+  }
+  html += '</tr>';
+
+  html += '<tr><td style="color:var(--pink);font-size:0.8em">B</td>';
+  for (let i = 0; i < 32; i++) {
+    const diff = xorBytes[i] !== 0;
+    const bg = diff ? 'rgba(255,68,136,0.15)' : 'transparent';
+    html += `<td style="background:${bg}">${hashB[i].toString(16).padStart(2,'0')}</td>`;
+  }
+  html += '</tr>';
+
+  html += '<tr><td style="color:var(--gold);font-size:0.8em">XOR</td>';
+  for (let i = 0; i < 32; i++) {
+    const v = xorBytes[i];
+    const hue = (i / 32) * 360;
+    const color = v !== 0 ? `hsl(${hue}, 80%, 60%)` : 'rgba(100,100,120,0.3)';
+    html += `<td class="xor-cell" style="color:${color}">${v.toString(16).padStart(2,'0')}</td>`;
+  }
+  html += '</tr>';
+
+  byteDiffTable.innerHTML = html;
+}
+
+function updateBinaryDiff(bitsA, bitsB, xorBits) {
+  let htmlA = '', htmlB = '', htmlX = '';
+  for (let i = 0; i < 256; i++) {
+    const flipped = xorBits[i] === 1;
+    const color = flipped ? hslForBit(i) : '';
+    const cls = flipped ? 'bit-flip' : 'bit-same';
+    const style = flipped ? ` style="color:${color}"` : '';
+    htmlA += `<span class="${cls}"${style}>${bitsA[i]}</span>`;
+    htmlB += `<span class="${cls}"${style}>${bitsB[i]}</span>`;
+    htmlX += `<span class="${cls}"${style}>${xorBits[i]}</span>`;
+    // Add thin space every 8 bits
+    if ((i + 1) % 8 === 0 && i < 255) {
+      htmlA += ' ';
+      htmlB += ' ';
+      htmlX += ' ';
+    }
+  }
+  binADisplay.innerHTML = htmlA;
+  binBDisplay.innerHTML = htmlB;
+  binXorDisplay.innerHTML = htmlX;
+}
+
+// ============================================================
+// Auto-walk
+// ============================================================
+function startAutoWalk() {
+  if (autoWalkRunning) { stopAutoWalk(); return; }
+  ensureAudio();
+  autoWalkRunning = true;
+  btnAutoWalk.classList.add('active');
+  btnAutoWalk.textContent = '■ Stop Walk';
+  histogramData = new Array(257).fill(0);
+  histoContainer.classList.add('visible');
+
+  const baseText = inputA.value;
+  const chars = 'abcdefghijklmnopqrstuvwxyz';
+  let step = 0;
+
+  function nextStep() {
+    if (!autoWalkRunning || step >= chars.length) {
+      stopAutoWalk();
+      return;
+    }
+    const newText = baseText + chars[step];
+    inputB.value = newText;
+    walkInfo.textContent = `Step ${step + 1}/26: appending '${chars[step]}'`;
+
+    const hamming = updateCascade();
+    histogramData[hamming]++;
+    updateHistogram();
+
+    step++;
+    const cascadeDuration = 256 * 5 + 200;
+    autoWalkTimer = setTimeout(nextStep, cascadeDuration);
+  }
+
+  nextStep();
+}
+
+function stopAutoWalk() {
+  autoWalkRunning = false;
+  btnAutoWalk.classList.remove('active');
+  btnAutoWalk.textContent = 'Auto-Walk a–z';
+  if (autoWalkTimer) { clearTimeout(autoWalkTimer); autoWalkTimer = null; }
+  walkInfo.textContent = '';
+}
+
+function updateHistogram() {
+  const maxCount = Math.max(...histogramData, 1);
+  // Show bins from 80 to 180 (relevant range around 128)
+  const lo = 80, hi = 180;
+  let html = '';
+  for (let i = lo; i <= hi; i++) {
+    const h = histogramData[i] > 0 ? Math.max(3, (histogramData[i] / maxCount) * 90) : 0;
+    const isCenter = i === 128;
+    const bg = isCenter ? 'var(--gold)' : histogramData[i] > 0 ? 'var(--accent)' : 'rgba(60,60,80,0.3)';
+    html += `<div class="histo-bar" style="height:${h}px;background:${bg}" data-label="${i}: ${histogramData[i]}"></div>`;
+  }
+  histogramEl.innerHTML = html;
+}
+
+// ============================================================
+// Event listeners
+// ============================================================
+let typingDebounce = null;
+function onInput() {
+  clearTimeout(typingDebounce);
+  typingDebounce = setTimeout(updateInstant, 30);
+}
+
+inputA.addEventListener('input', () => {
+  // Auto-set B to A + "!" if user hasn't manually edited B
+  if (!inputB.dataset.manual) {
+    inputB.value = inputA.value + '!';
+  }
+  onInput();
+});
+
+inputB.addEventListener('input', () => {
+  inputB.dataset.manual = '1';
+  onInput();
+});
+
+inputA.addEventListener('focus', () => { ensureAudio(); });
+inputB.addEventListener('focus', () => { ensureAudio(); });
+
+btnCascade.addEventListener('click', () => {
+  ensureAudio();
+  updateCascade();
+});
+
+btnAutoWalk.addEventListener('click', startAutoWalk);
+
+// Initialize
+updateInstant();
+</script>
+</body>
+</html>

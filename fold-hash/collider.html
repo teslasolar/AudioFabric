@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Birthday Collider — SHA-256</title>
+<style>
+  :root {
+    --bg: #030308;
+    --accent: #7c6cf0;
+    --cyan: #00f0ff;
+    --pink: #ff4488;
+    --gold: #ffd700;
+    --panel: rgba(12, 12, 30, 0.85);
+    --border: rgba(124, 108, 240, 0.25);
+    --text: #c8c4e0;
+    --dim: #5a567a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    height: 48px;
+  }
+  header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+  header h1 span { color: var(--cyan); }
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  button {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 4px 14px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+  button:hover { background: rgba(124, 108, 240, 0.15); }
+  button.active { background: var(--accent); color: var(--bg); }
+  button.reset { border-color: var(--pink); color: var(--pink); }
+  button.reset:hover { background: rgba(255, 68, 136, 0.15); }
+  .slider-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--dim);
+  }
+  .slider-group label { white-space: nowrap; }
+  .slider-group .val { color: var(--cyan); min-width: 28px; text-align: right; }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  #prefixSlider { width: 100px; }
+  #speedSlider { width: 70px; }
+
+  .main-area {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    min-width: 0;
+  }
+  canvas#hashSpace {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .canvas-overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 11px;
+    color: var(--dim);
+    pointer-events: none;
+  }
+
+  .sidebar {
+    width: 320px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+    flex-shrink: 0;
+  }
+  .panel h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    margin-bottom: 3px;
+  }
+  .stat-row .label { color: var(--dim); }
+  .stat-row .value { color: var(--cyan); }
+  .stat-row .value.gold { color: var(--gold); }
+  .stat-row .value.pink { color: var(--pink); }
+
+  .prefix-table {
+    font-size: 10px;
+    max-height: 100px;
+    overflow-y: auto;
+    margin-top: 4px;
+  }
+  .prefix-table::-webkit-scrollbar { width: 3px; }
+  .prefix-table::-webkit-scrollbar-thumb { background: var(--border); }
+  .prefix-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 1px 0;
+  }
+  .prefix-row .bits { color: var(--dim); }
+  .prefix-row .count { color: var(--gold); }
+  .prefix-row .expected { color: var(--dim); font-style: italic; }
+
+  .histogram-wrap {
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+  }
+  .histogram-wrap h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  canvas#histogram {
+    display: block;
+    width: 100%;
+    height: 80px;
+  }
+
+  .log-panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+  }
+  .log-panel h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 6px;
+    flex-shrink: 0;
+  }
+  .log-entries {
+    flex: 1;
+    overflow-y: auto;
+    font-size: 10px;
+    min-height: 0;
+  }
+  .log-entries::-webkit-scrollbar { width: 3px; }
+  .log-entries::-webkit-scrollbar-thumb { background: var(--border); }
+  .log-entry {
+    margin-bottom: 6px;
+    border-left: 2px solid var(--pink);
+    padding-left: 6px;
+    line-height: 1.4;
+  }
+  .log-entry .le-title { color: var(--gold); }
+  .log-entry .le-hash { color: var(--dim); word-break: break-all; }
+  .log-entry .le-match { color: var(--pink); }
+  .sound-toggle {
+    font-size: 11px;
+    color: var(--dim);
+    cursor: pointer;
+    user-select: none;
+  }
+  .sound-toggle:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>BIRTHDAY <span>COLLIDER</span> &mdash; SHA-256</h1>
+  <div class="controls">
+    <span class="sound-toggle" id="soundToggle" title="Toggle sound">[SND:OFF]</span>
+    <div class="slider-group">
+      <label>Prefix</label>
+      <input type="range" id="prefixSlider" min="1" max="32" value="16">
+      <span class="val" id="prefixVal">16</span>
+    </div>
+    <div class="slider-group">
+      <label>Speed</label>
+      <input type="range" id="speedSlider" min="1" max="100" value="10">
+      <span class="val" id="speedVal">10</span>
+    </div>
+    <button id="btnGenerate">Generate</button>
+    <button id="btnAuto">Auto</button>
+    <button class="reset" id="btnReset">Reset</button>
+  </div>
+</header>
+
+<div class="main-area">
+  <div class="canvas-wrap">
+    <canvas id="hashSpace"></canvas>
+    <div class="canvas-overlay" id="canvasOverlay">Hash Space — each dot = one SHA-256 hash</div>
+  </div>
+  <div class="sidebar">
+    <div class="panel" id="statsPanel">
+      <h2>Statistics</h2>
+      <div class="stat-row"><span class="label">Total hashes</span><span class="value" id="statTotal">0</span></div>
+      <div class="stat-row"><span class="label">Nearest collision</span><span class="value gold" id="statNearest">--</span></div>
+      <div class="stat-row"><span class="label">Min Hamming dist</span><span class="value pink" id="statHamming">256</span></div>
+      <div class="stat-row"><span class="label">Birthday bound</span><span class="value" id="statBound">--</span></div>
+      <div class="stat-row"><span class="label">vs. theory</span><span class="value" id="statTheory">--</span></div>
+      <h2 style="margin-top:8px">Prefix Matches</h2>
+      <div class="prefix-table" id="prefixTable"></div>
+    </div>
+    <div class="histogram-wrap">
+      <h2>Hamming Distance Distribution</h2>
+      <canvas id="histogram"></canvas>
+    </div>
+    <div class="log-panel">
+      <h2>Near-Collision Log</h2>
+      <div class="log-entries" id="logEntries"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// === SHA-256 (pure JS, sync) ===
+const SHA256 = (() => {
+  const K = new Uint32Array([
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ]);
+  function rotr(n,x){return(x>>>n)|(x<<(32-n))}
+  function ch(x,y,z){return(x&y)^(~x&z)}
+  function maj(x,y,z){return(x&y)^(x&z)^(y&z)}
+  function sigma0(x){return rotr(2,x)^rotr(13,x)^rotr(22,x)}
+  function sigma1(x){return rotr(6,x)^rotr(11,x)^rotr(25,x)}
+  function gamma0(x){return rotr(7,x)^rotr(18,x)^(x>>>3)}
+  function gamma1(x){return rotr(17,x)^rotr(19,x)^(x>>>10)}
+  return function sha256(msg) {
+    const utf8 = new TextEncoder().encode(msg);
+    const bitLen = utf8.length * 8;
+    const padLen = (((utf8.length + 8) >> 6) + 1) << 6;
+    const padded = new Uint8Array(padLen);
+    padded.set(utf8);
+    padded[utf8.length] = 0x80;
+    const view = new DataView(padded.buffer);
+    view.setUint32(padLen - 4, bitLen, false);
+    let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a;
+    let h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;
+    for (let offset = 0; offset < padLen; offset += 64) {
+      const W = new Uint32Array(64);
+      for (let i = 0; i < 16; i++) W[i] = view.getUint32(offset + i*4, false);
+      for (let i = 16; i < 64; i++) W[i] = (gamma1(W[i-2]) + W[i-7] + gamma0(W[i-15]) + W[i-16]) | 0;
+      let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;
+      for (let i = 0; i < 64; i++) {
+        const T1 = (h + sigma1(e) + ch(e,f,g) + K[i] + W[i]) | 0;
+        const T2 = (sigma0(a) + maj(a,b,c)) | 0;
+        h=g; g=f; f=e; e=(d+T1)|0; d=c; c=b; b=a; a=(T1+T2)|0;
+      }
+      h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;
+      h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+h)|0;
+    }
+    const out = new Uint8Array(32);
+    const dv = new DataView(out.buffer);
+    [h0,h1,h2,h3,h4,h5,h6,h7].forEach((v,i) => dv.setUint32(i*4, v, false));
+    return out;
+  };
+})();
+
+// === Utilities ===
+function hexOf(u8) {
+  let s = '';
+  for (let i = 0; i < u8.length; i++) s += u8[i].toString(16).padStart(2, '0');
+  return s;
+}
+
+function randomInput() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let s = '';
+  for (let i = 0; i < 16; i++) s += chars[Math.random() * chars.length | 0];
+  return s;
+}
+
+function hammingDistance(a, b) {
+  let dist = 0;
+  for (let i = 0; i < 32; i++) {
+    let xor = a[i] ^ b[i];
+    while (xor) { dist++; xor &= xor - 1; }
+  }
+  return dist;
+}
+
+function sharedPrefixBits(a, b) {
+  for (let i = 0; i < 32; i++) {
+    const xor = a[i] ^ b[i];
+    if (xor !== 0) {
+      return i * 8 + Math.clz32(xor) - 24;
+    }
+  }
+  return 256; // identical
+}
+
+// === State ===
+let hashes = [];       // array of {bytes: Uint8Array, hex: string, input: string, x: number, y: number, hue: number}
+let autoRunning = false;
+let autoTimer = null;
+let prefixBits = 16;
+let speed = 10;
+let minHamming = 256;
+let nearestPair = null;
+let prefixMatches = {}; // bits -> count
+let collisionLog = [];
+let soundEnabled = false;
+let hammingSamples = new Uint32Array(257); // index = distance, value = count
+
+// Prefix trie for efficient collision detection
+// Each node: { children: {0: node, 1: node}, indices: [hashIndex...] }
+function createTrieNode() { return { children: {}, indices: [] }; }
+let trieRoot = createTrieNode();
+
+function insertTrie(hashBytes, idx) {
+  let node = trieRoot;
+  node.indices.push(idx);
+  const maxBits = 32;
+  for (let bit = 0; bit < maxBits; bit++) {
+    const byteIdx = bit >> 3;
+    const bitIdx = 7 - (bit & 7);
+    const b = (hashBytes[byteIdx] >> bitIdx) & 1;
+    if (!node.children[b]) node.children[b] = createTrieNode();
+    node = node.children[b];
+    node.indices.push(idx);
+  }
+}
+
+function findPrefixMatches(hashBytes, idx, maxBits) {
+  let node = trieRoot;
+  const matches = [];
+  for (let bit = 0; bit < maxBits; bit++) {
+    const byteIdx = bit >> 3;
+    const bitIdx = 7 - (bit & 7);
+    const b = (hashBytes[byteIdx] >> bitIdx) & 1;
+    if (!node.children[b]) break;
+    node = node.children[b];
+    const level = bit + 1;
+    // All indices in this node at this depth share (bit+1) prefix bits
+    for (const otherIdx of node.indices) {
+      if (otherIdx !== idx) {
+        // Verify the prefix match is exact at this level
+        const actual = sharedPrefixBits(hashBytes, hashes[otherIdx].bytes);
+        if (actual >= level) {
+          matches.push({ otherIdx, bits: level });
+        }
+      }
+    }
+  }
+  return matches;
+}
+
+// === Canvas ===
+const canvas = document.getElementById('hashSpace');
+const ctx = canvas.getContext('2d');
+const histCanvas = document.getElementById('histogram');
+const histCtx = histCanvas.getContext('2d');
+
+function resizeCanvas() {
+  const wrap = canvas.parentElement;
+  canvas.width = wrap.clientWidth * devicePixelRatio;
+  canvas.height = wrap.clientHeight * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  histCanvas.width = histCanvas.parentElement.clientWidth * devicePixelRatio;
+  histCanvas.height = 80 * devicePixelRatio;
+  histCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+}
+window.addEventListener('resize', () => { resizeCanvas(); redraw(); });
+resizeCanvas();
+
+// === Audio ===
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playPing(firstByte) {
+  if (!soundEnabled || !audioCtx) return;
+  const freq = 200 + (firstByte / 255) * 600;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+  gain.gain.exponentialDecayToValueAtTime
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.15);
+}
+
+function playCollisionChord(prefixLen) {
+  if (!soundEnabled || !audioCtx) return;
+  const t = audioCtx.currentTime;
+  const baseFreq = 220;
+  const notes = [1, 5/4, 3/2, 15/8]; // major 7th chord
+  const volume = Math.min(0.12, 0.03 + prefixLen * 0.005);
+  const duration = 0.5 + prefixLen * 0.05;
+  notes.forEach((ratio, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = i === 0 ? 'triangle' : 'sine';
+    osc.frequency.value = baseFreq * ratio;
+    gain.gain.setValueAtTime(volume, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t + i * 0.03);
+    osc.stop(t + duration);
+  });
+}
+
+let droneOsc = null;
+let droneGain = null;
+function updateDrone() {
+  if (!soundEnabled || !audioCtx) {
+    stopDrone();
+    return;
+  }
+  const bound = Math.pow(2, prefixBits / 2);
+  const ratio = Math.min(hashes.length / bound, 1.5);
+  if (ratio < 0.1) { stopDrone(); return; }
+  if (!droneOsc) {
+    droneOsc = audioCtx.createOscillator();
+    droneGain = audioCtx.createGain();
+    droneOsc.type = 'sawtooth';
+    droneOsc.frequency.value = 55;
+    droneGain.gain.value = 0;
+    droneOsc.connect(droneGain).connect(audioCtx.destination);
+    droneOsc.start();
+  }
+  const targetVol = Math.min(ratio * 0.02, 0.035);
+  const targetFreq = 55 + ratio * 40;
+  droneGain.gain.linearRampToValueAtTime(targetVol, audioCtx.currentTime + 0.1);
+  droneOsc.frequency.linearRampToValueAtTime(targetFreq, audioCtx.currentTime + 0.1);
+}
+
+function stopDrone() {
+  if (droneOsc) {
+    try { droneOsc.stop(); } catch(e) {}
+    droneOsc = null;
+    droneGain = null;
+  }
+}
+
+// === Drawing ===
+let pendingLines = []; // lines to draw for near-collisions
+
+function redraw() {
+  const w = canvas.width / devicePixelRatio;
+  const h = canvas.height / devicePixelRatio;
+
+  ctx.fillStyle = '#030308';
+  ctx.fillRect(0, 0, w, h);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(124, 108, 240, 0.06)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 8; i++) {
+    const x = (i / 8) * w;
+    const y = (i / 8) * h;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  // Collision lines
+  for (const line of pendingLines) {
+    const h1 = hashes[line.i];
+    const h2 = hashes[line.j];
+    if (!h1 || !h2) continue;
+    const x1 = (h1.x / 65535) * w;
+    const y1 = (h1.y / 65535) * h;
+    const x2 = (h2.x / 65535) * w;
+    const y2 = (h2.y / 65535) * h;
+    const alpha = Math.min(1, 0.15 + (line.bits / 24) * 0.85);
+    const lw = 0.5 + (line.bits / 16) * 2.5;
+    ctx.strokeStyle = `rgba(255, 68, 136, ${alpha})`;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  // Dots
+  for (const entry of hashes) {
+    const x = (entry.x / 65535) * w;
+    const y = (entry.y / 65535) * h;
+    const r = 2;
+    ctx.fillStyle = `hsl(${entry.hue}, 80%, 60%)`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Nearest collision highlight
+  if (nearestPair) {
+    const a = hashes[nearestPair[0]];
+    const b = hashes[nearestPair[1]];
+    if (a && b) {
+      const ax = (a.x / 65535) * w, ay = (a.y / 65535) * h;
+      const bx = (b.x / 65535) * w, by = (b.y / 65535) * h;
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.setLineDash([]);
+      // Circles
+      [{ x: ax, y: ay }, { x: bx, y: by }].forEach(p => {
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2); ctx.stroke();
+      });
+    }
+  }
+}
+
+function drawHistogram() {
+  const w = histCanvas.width / devicePixelRatio;
+  const h = 80;
+  histCtx.fillStyle = '#030308';
+  histCtx.fillRect(0, 0, w, h);
+
+  let maxCount = 0;
+  const totalSamples = hammingSamples.reduce((a, b) => a + b, 0);
+  if (totalSamples === 0) {
+    histCtx.fillStyle = 'rgba(124, 108, 240, 0.3)';
+    histCtx.font = '10px Courier New';
+    histCtx.textAlign = 'center';
+    histCtx.fillText('No data yet', w / 2, h / 2);
+    return;
+  }
+
+  // Bucket into 64 bins
+  const bins = 64;
+  const buckets = new Float64Array(bins);
+  for (let i = 0; i <= 256; i++) {
+    const bin = Math.min(Math.floor(i / 256 * bins), bins - 1);
+    buckets[bin] += hammingSamples[i];
+  }
+  for (let i = 0; i < bins; i++) if (buckets[i] > maxCount) maxCount = buckets[i];
+  if (maxCount === 0) return;
+
+  const barW = w / bins;
+  for (let i = 0; i < bins; i++) {
+    const barH = (buckets[i] / maxCount) * (h - 16);
+    const x = i * barW;
+    const hue = 260 - (i / bins) * 200;
+    histCtx.fillStyle = `hsla(${hue}, 70%, 55%, 0.7)`;
+    histCtx.fillRect(x + 1, h - barH - 8, barW - 2, barH);
+  }
+
+  // Axis labels
+  histCtx.fillStyle = 'rgba(200, 196, 224, 0.4)';
+  histCtx.font = '8px Courier New';
+  histCtx.textAlign = 'left';
+  histCtx.fillText('0', 2, h - 1);
+  histCtx.textAlign = 'center';
+  histCtx.fillText('128', w / 2, h - 1);
+  histCtx.textAlign = 'right';
+  histCtx.fillText('256', w - 2, h - 1);
+}
+
+// === Statistics ===
+function updateStats() {
+  document.getElementById('statTotal').textContent = hashes.length;
+  if (nearestPair) {
+    const bits = sharedPrefixBits(hashes[nearestPair[0]].bytes, hashes[nearestPair[1]].bytes);
+    document.getElementById('statNearest').textContent = bits + '-bit prefix';
+  }
+  document.getElementById('statHamming').textContent = minHamming === 256 && hashes.length < 2 ? '--' : minHamming;
+
+  const bound = Math.pow(2, prefixBits / 2);
+  document.getElementById('statBound').textContent = `~${bound < 1000 ? bound.toFixed(0) : bound.toExponential(1)} (2^${prefixBits/2})`;
+
+  if (hashes.length > 0) {
+    const ratio = hashes.length / bound;
+    const pct = (ratio * 100).toFixed(1);
+    document.getElementById('statTheory').textContent = `${pct}% of bound`;
+    document.getElementById('statTheory').style.color =
+      ratio > 1 ? 'var(--pink)' : ratio > 0.5 ? 'var(--gold)' : 'var(--cyan)';
+  }
+
+  // Prefix table
+  const table = document.getElementById('prefixTable');
+  let html = '';
+  for (let b = 1; b <= Math.min(prefixBits, 24); b++) {
+    const count = prefixMatches[b] || 0;
+    if (count > 0 || b <= 8) {
+      const expectedAt = Math.pow(2, b / 2);
+      html += `<div class="prefix-row">
+        <span class="bits">${b}-bit:</span>
+        <span class="count">${count}</span>
+        <span class="expected">expect@${expectedAt < 100 ? expectedAt.toFixed(1) : expectedAt.toFixed(0)}</span>
+      </div>`;
+    }
+  }
+  table.innerHTML = html;
+}
+
+function addLog(bits, idx1, idx2) {
+  const h1 = hashes[idx1], h2 = hashes[idx2];
+  collisionLog.unshift({ bits, hex1: h1.hex, hex2: h2.hex, input1: h1.input, input2: h2.input, n: hashes.length });
+  if (collisionLog.length > 50) collisionLog.length = 50;
+  renderLog();
+}
+
+function renderLog() {
+  const container = document.getElementById('logEntries');
+  let html = '';
+  for (const entry of collisionLog.slice(0, 20)) {
+    const matchPart = entry.hex1.substring(0, Math.ceil(entry.bits / 4));
+    html += `<div class="log-entry">
+      <div class="le-title">${entry.bits}-bit match (hash #${entry.n})</div>
+      <div class="le-hash"><span class="le-match">${matchPart}</span>${entry.hex1.substring(matchPart.length)}</div>
+      <div class="le-hash"><span class="le-match">${matchPart}</span>${entry.hex2.substring(matchPart.length)}</div>
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
+// === Core logic ===
+function generateOne() {
+  const input = randomInput();
+  const bytes = SHA256(input);
+  const hex = hexOf(bytes);
+  const x = (bytes[0] << 8) | bytes[1];
+  const y = (bytes[2] << 8) | bytes[3];
+  const hue = (bytes[4] / 255) * 360;
+  const idx = hashes.length;
+  const entry = { bytes, hex, input, x, y, hue };
+  hashes.push(entry);
+
+  // Sound: ping
+  playPing(bytes[0]);
+
+  // Check against existing hashes via trie
+  let bestBitsThisRound = 0;
+  let bestOtherIdx = -1;
+
+  // For small counts, check all; for large, sample
+  const checkLimit = Math.min(idx, 500);
+  const step = idx <= 500 ? 1 : Math.ceil(idx / 500);
+
+  // Walk trie for prefix matches
+  let node = trieRoot;
+  for (let bit = 0; bit < prefixBits; bit++) {
+    const byteIdx = bit >> 3;
+    const bitIdx = 7 - (bit & 7);
+    const b = (bytes[byteIdx] >> bitIdx) & 1;
+    if (!node.children[b]) break;
+    node = node.children[b];
+    const level = bit + 1;
+    // Check if there are other hashes at this prefix depth
+    if (node.indices.length > 0) {
+      for (const otherIdx of node.indices) {
+        if (otherIdx === idx) continue;
+        const actualBits = sharedPrefixBits(bytes, hashes[otherIdx].bytes);
+        if (actualBits >= level && level > bestBitsThisRound) {
+          bestBitsThisRound = level;
+          bestOtherIdx = otherIdx;
+        }
+      }
+    }
+  }
+
+  // Insert into trie
+  insertTrie(bytes, idx);
+
+  // Record prefix matches
+  if (bestBitsThisRound > 0) {
+    for (let b = 1; b <= bestBitsThisRound; b++) {
+      prefixMatches[b] = (prefixMatches[b] || 0) + 1;
+    }
+    // Add line
+    pendingLines.push({ i: idx, j: bestOtherIdx, bits: bestBitsThisRound });
+
+    // Log if significant (at or above current slider threshold or notable)
+    if (bestBitsThisRound >= Math.min(prefixBits, 8)) {
+      addLog(bestBitsThisRound, idx, bestOtherIdx);
+      playCollisionChord(bestBitsThisRound);
+    }
+  }
+
+  // Hamming distance sampling
+  const sampleCount = Math.min(20, idx);
+  for (let s = 0; s < sampleCount; s++) {
+    const otherIdx = Math.random() * idx | 0;
+    const hd = hammingDistance(bytes, hashes[otherIdx].bytes);
+    hammingSamples[hd]++;
+    if (hd < minHamming) {
+      minHamming = hd;
+      nearestPair = [idx, otherIdx];
+    }
+  }
+
+  // Also check against the best prefix match for Hamming
+  if (bestOtherIdx >= 0) {
+    const hd = hammingDistance(bytes, hashes[bestOtherIdx].bytes);
+    hammingSamples[hd]++;
+    if (hd < minHamming) {
+      minHamming = hd;
+      nearestPair = [idx, bestOtherIdx];
+    }
+  }
+
+  updateDrone();
+}
+
+// === Rendering loop ===
+let needsRedraw = true;
+let lastStatsUpdate = 0;
+
+function renderLoop() {
+  if (needsRedraw) {
+    redraw();
+    needsRedraw = false;
+  }
+  const now = performance.now();
+  if (now - lastStatsUpdate > 200) {
+    updateStats();
+    drawHistogram();
+    lastStatsUpdate = now;
+  }
+  requestAnimationFrame(renderLoop);
+}
+requestAnimationFrame(renderLoop);
+
+// === Controls ===
+const btnGenerate = document.getElementById('btnGenerate');
+const btnAuto = document.getElementById('btnAuto');
+const btnReset = document.getElementById('btnReset');
+const prefixSliderEl = document.getElementById('prefixSlider');
+const speedSliderEl = document.getElementById('speedSlider');
+const soundToggle = document.getElementById('soundToggle');
+
+btnGenerate.addEventListener('click', () => {
+  if (soundEnabled) ensureAudio();
+  generateOne();
+  needsRedraw = true;
+  updateStats();
+  drawHistogram();
+});
+
+btnAuto.addEventListener('click', () => {
+  if (soundEnabled) ensureAudio();
+  autoRunning = !autoRunning;
+  btnAuto.classList.toggle('active', autoRunning);
+  btnAuto.textContent = autoRunning ? 'Stop' : 'Auto';
+  if (autoRunning) startAutoGen();
+  else stopAutoGen();
+});
+
+function startAutoGen() {
+  stopAutoGen();
+  const intervalMs = 1000 / speed;
+  if (speed >= 50) {
+    // Batch mode for high speeds
+    const batchFn = () => {
+      if (!autoRunning) return;
+      const batchSize = Math.ceil(speed / 30);
+      for (let i = 0; i < batchSize; i++) generateOne();
+      needsRedraw = true;
+      autoTimer = setTimeout(batchFn, 33); // ~30fps
+    };
+    batchFn();
+  } else {
+    const fn = () => {
+      if (!autoRunning) return;
+      generateOne();
+      needsRedraw = true;
+      autoTimer = setTimeout(fn, intervalMs);
+    };
+    fn();
+  }
+}
+
+function stopAutoGen() {
+  if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+}
+
+btnReset.addEventListener('click', () => {
+  autoRunning = false;
+  btnAuto.classList.remove('active');
+  btnAuto.textContent = 'Auto';
+  stopAutoGen();
+  stopDrone();
+  hashes = [];
+  pendingLines = [];
+  prefixMatches = {};
+  collisionLog = [];
+  minHamming = 256;
+  nearestPair = null;
+  hammingSamples = new Uint32Array(257);
+  trieRoot = createTrieNode();
+  document.getElementById('statNearest').textContent = '--';
+  document.getElementById('statHamming').textContent = '256';
+  document.getElementById('statTheory').textContent = '--';
+  document.getElementById('logEntries').innerHTML = '';
+  needsRedraw = true;
+  updateStats();
+  drawHistogram();
+  redraw();
+});
+
+prefixSliderEl.addEventListener('input', (e) => {
+  prefixBits = parseInt(e.target.value);
+  document.getElementById('prefixVal').textContent = prefixBits;
+  updateStats();
+});
+
+speedSliderEl.addEventListener('input', (e) => {
+  speed = parseInt(e.target.value);
+  document.getElementById('speedVal').textContent = speed;
+  if (autoRunning) startAutoGen();
+});
+
+soundToggle.addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  soundToggle.textContent = soundEnabled ? '[SND:ON]' : '[SND:OFF]';
+  soundToggle.style.color = soundEnabled ? 'var(--cyan)' : '';
+  if (soundEnabled) ensureAudio();
+  if (!soundEnabled) stopDrone();
+});
+
+// Initial draw
+redraw();
+updateStats();
+drawHistogram();
+</script>
+</body>
+</html>
