@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Puzzle Bounty Landscape</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; color: #e0d0b0; font-family: 'Courier New', monospace; overflow: hidden; }
+canvas { display: block; width: 100vw; height: 100vh; cursor: grab; }
+canvas:active { cursor: grabbing; }
+#ui-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 10;
+}
+#title-panel {
+  position: absolute; top: 20px; left: 20px;
+  background: rgba(10,10,15,0.85); border: 1px solid rgba(255,180,50,0.3);
+  border-radius: 8px; padding: 16px 22px; pointer-events: auto;
+  backdrop-filter: blur(6px);
+}
+#title-panel h1 { font-size: 18px; color: #ffc850; margin-bottom: 6px; letter-spacing: 1px; }
+#title-panel .subtitle { font-size: 11px; color: #a09070; margin-bottom: 10px; }
+#title-panel .stat { font-size: 13px; color: #e0c080; margin: 3px 0; }
+#title-panel .stat span { color: #ff9040; font-weight: bold; }
+#controls-panel {
+  position: absolute; top: 20px; right: 20px;
+  background: rgba(10,10,15,0.85); border: 1px solid rgba(255,180,50,0.3);
+  border-radius: 8px; padding: 14px 18px; pointer-events: auto;
+  backdrop-filter: blur(6px);
+}
+#controls-panel h3 { font-size: 13px; color: #ffc850; margin-bottom: 10px; }
+.ctrl-btn {
+  display: block; width: 100%; padding: 7px 12px; margin: 5px 0;
+  background: rgba(255,180,50,0.1); border: 1px solid rgba(255,180,50,0.3);
+  border-radius: 4px; color: #e0c080; font-family: inherit; font-size: 11px;
+  cursor: pointer; text-align: left; transition: all 0.2s;
+}
+.ctrl-btn:hover { background: rgba(255,180,50,0.25); border-color: rgba(255,180,50,0.6); }
+.ctrl-btn.active { background: rgba(255,180,50,0.3); border-color: #ffc850; color: #fff; }
+#info-panel {
+  position: absolute; bottom: 20px; left: 20px;
+  background: rgba(10,10,15,0.85); border: 1px solid rgba(255,180,50,0.3);
+  border-radius: 8px; padding: 14px 18px; pointer-events: auto;
+  backdrop-filter: blur(6px); min-width: 240px;
+  display: none;
+}
+#info-panel h3 { font-size: 14px; color: #ffc850; margin-bottom: 8px; }
+#info-panel .info-row { font-size: 12px; color: #c0b090; margin: 3px 0; }
+#info-panel .info-row span { color: #ff9040; }
+#legend {
+  position: absolute; bottom: 20px; right: 20px;
+  background: rgba(10,10,15,0.85); border: 1px solid rgba(255,180,50,0.3);
+  border-radius: 8px; padding: 12px 16px;
+  backdrop-filter: blur(6px);
+}
+#legend h4 { font-size: 11px; color: #ffc850; margin-bottom: 8px; }
+.legend-row { display: flex; align-items: center; margin: 4px 0; font-size: 10px; }
+.legend-swatch { width: 20px; height: 10px; border-radius: 2px; margin-right: 8px; }
+</style>
+</head>
+<body>
+<canvas id="glcanvas"></canvas>
+<div id="ui-overlay">
+  <div id="title-panel">
+    <h1>BOUNTY LANDSCAPE</h1>
+    <div class="subtitle">Unsolved Bitcoin Puzzle Terrain &#8226; #67 &#8211; #160</div>
+    <div class="stat">Total Remaining: <span>~1,067 BTC</span></div>
+    <div class="stat">Estimated Value: <span>~$106.75M</span></div>
+    <div class="stat" id="fps-display">FPS: <span>60</span></div>
+  </div>
+  <div id="controls-panel">
+    <h3>Camera Presets</h3>
+    <button class="ctrl-btn active" onclick="setCameraPreset(0)">Overview</button>
+    <button class="ctrl-btn" onclick="setCameraPreset(1)">Valley View</button>
+    <button class="ctrl-btn" onclick="setCameraPreset(2)">Summit View</button>
+    <h3 style="margin-top:12px">Display</h3>
+    <button class="ctrl-btn" id="wireframe-btn" onclick="toggleWireframe()">Wireframe: OFF</button>
+    <button class="ctrl-btn" id="orbit-btn" onclick="toggleOrbit()">Auto-Orbit: ON</button>
+  </div>
+  <div id="info-panel">
+    <h3 id="info-title">Puzzle #67</h3>
+    <div class="info-row">Bounty: <span id="info-bounty">6.7 BTC</span></div>
+    <div class="info-row">Key Bits: <span id="info-bits">67</span></div>
+    <div class="info-row">Difficulty: <span id="info-diff">Low</span></div>
+    <div class="info-row">Status: <span id="info-status">Unsolved</span></div>
+  </div>
+  <div id="legend">
+    <h4>Heat Legend</h4>
+    <div class="legend-row"><div class="legend-swatch" style="background:linear-gradient(90deg,#40ff60,#60ff80)"></div>Frontier (#67)</div>
+    <div class="legend-row"><div class="legend-swatch" style="background:linear-gradient(90deg,#d4a020,#e0a030)"></div>6-8 BTC (Amber)</div>
+    <div class="legend-row"><div class="legend-swatch" style="background:linear-gradient(90deg,#e07020,#d03010)"></div>8-12 BTC (Orange-Red)</div>
+    <div class="legend-row"><div class="legend-swatch" style="background:linear-gradient(90deg,#d02010,#ffe0c0)"></div>12-16 BTC (Red-White)</div>
+  </div>
+</div>
+
+<script>
+// ===== WEBGL SETUP =====
+var canvas = document.getElementById('glcanvas');
+var gl = canvas.getContext('webgl', { antialias: true, alpha: false });
+if (!gl) { alert('WebGL not supported'); }
+
+function resize() {
+  canvas.width = window.innerWidth * devicePixelRatio;
+  canvas.height = window.innerHeight * devicePixelRatio;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ===== SHADER SOURCES =====
+var terrainVS = [
+'attribute vec3 aPosition;',
+'attribute vec3 aNormal;',
+'attribute vec2 aUV;',
+'uniform mat4 uProjection;',
+'uniform mat4 uModelView;',
+'uniform float uTime;',
+'varying vec3 vWorldPos;',
+'varying vec3 vNormal;',
+'varying vec2 vUV;',
+'varying float vHeight;',
+'varying float vPuzzleX;',
+'varying float vFogDepth;',
+'void main() {',
+'  vWorldPos = aPosition;',
+'  vNormal = aNormal;',
+'  vUV = aUV;',
+'  vHeight = aPosition.y;',
+'  vPuzzleX = aUV.x;',
+'  vec4 mvPos = uModelView * vec4(aPosition, 1.0);',
+'  vFogDepth = -mvPos.z;',
+'  gl_Position = uProjection * mvPos;',
+'}'
+].join('\n');
+
+var terrainFS = [
+'precision mediump float;',
+'varying vec3 vWorldPos;',
+'varying vec3 vNormal;',
+'varying vec2 vUV;',
+'varying float vHeight;',
+'varying float vPuzzleX;',
+'varying float vFogDepth;',
+'uniform float uTime;',
+'uniform float uWireframe;',
+'uniform vec3 uLightDir;',
+'',
+'vec3 heatColor(float h, float px) {',
+'  float frontier = smoothstep(0.05, 0.0, px);',
+'  float pulse = 0.7 + 0.3 * sin(uTime * 3.0);',
+'  vec3 frontierCol = vec3(0.2, 1.0, 0.4) * pulse;',
+'  float t = clamp(h / 4.5, 0.0, 1.0);',
+'  vec3 col;',
+'  if (t < 0.2) {',
+'    float f = t / 0.2;',
+'    col = mix(vec3(0.7, 0.55, 0.1), vec3(0.85, 0.6, 0.12), f);',
+'  } else if (t < 0.55) {',
+'    float f = (t - 0.2) / 0.35;',
+'    col = mix(vec3(0.88, 0.5, 0.1), vec3(0.85, 0.15, 0.05), f);',
+'  } else if (t < 0.85) {',
+'    float f = (t - 0.55) / 0.3;',
+'    col = mix(vec3(0.85, 0.12, 0.05), vec3(0.95, 0.3, 0.15), f);',
+'  } else {',
+'    float f = (t - 0.85) / 0.15;',
+'    col = mix(vec3(0.95, 0.3, 0.15), vec3(1.0, 0.9, 0.75), f);',
+'  }',
+'  col = mix(col, frontierCol, frontier);',
+'  return col;',
+'}',
+'',
+'void main() {',
+'  vec3 N = normalize(vNormal);',
+'  vec3 L = normalize(uLightDir);',
+'  float diff = max(dot(N, L), 0.0) * 0.7 + 0.3;',
+'  vec3 baseCol = heatColor(vHeight, vPuzzleX);',
+'  vec3 lit = baseCol * diff;',
+'  vec3 viewDir = normalize(-vWorldPos);',
+'  float rim = pow(1.0 - max(dot(N, viewDir), 0.0), 3.0);',
+'  lit += baseCol * rim * 0.3;',
+'  float emissive = smoothstep(3.0, 4.5, vHeight) * 0.25;',
+'  lit += baseCol * emissive;',
+'  float fogDensity = 0.012 + vPuzzleX * 0.018;',
+'  float fogFactor = 1.0 - exp(-fogDensity * vFogDepth);',
+'  fogFactor = clamp(fogFactor, 0.0, 1.0);',
+'  vec3 fogColor = vec3(0.04, 0.03, 0.06);',
+'  lit = mix(lit, fogColor, fogFactor);',
+'  if (uWireframe > 0.5) {',
+'    lit = mix(lit, vec3(0.0, 1.0, 0.6), 0.5);',
+'  }',
+'  gl_FragColor = vec4(lit, 1.0);',
+'}'
+].join('\n');
+
+var particleVS = [
+'attribute vec3 aPosition;',
+'attribute float aPhase;',
+'uniform mat4 uProjection;',
+'uniform mat4 uModelView;',
+'uniform float uTime;',
+'varying float vAlpha;',
+'varying float vPhase;',
+'void main() {',
+'  float t = uTime * 0.5 + aPhase * 6.283;',
+'  vec3 pos = aPosition;',
+'  pos.y += sin(t) * 0.3 + 0.5;',
+'  pos.x += sin(t * 0.7 + aPhase * 3.0) * 0.15;',
+'  pos.z += cos(t * 0.5 + aPhase * 2.0) * 0.15;',
+'  vec4 mvPos = uModelView * vec4(pos, 1.0);',
+'  gl_Position = uProjection * mvPos;',
+'  float dist = -mvPos.z;',
+'  gl_PointSize = max(2.0, 120.0 / dist);',
+'  vAlpha = 0.4 + 0.4 * sin(t * 1.5);',
+'  vPhase = aPhase;',
+'}'
+].join('\n');
+
+var particleFS = [
+'precision mediump float;',
+'varying float vAlpha;',
+'varying float vPhase;',
+'void main() {',
+'  vec2 c = gl_PointCoord - 0.5;',
+'  float d = length(c);',
+'  if (d > 0.5) discard;',
+'  float glow = exp(-d * 4.0);',
+'  vec3 col = mix(vec3(1.0, 0.85, 0.3), vec3(1.0, 0.6, 0.1), vPhase);',
+'  gl_FragColor = vec4(col * glow, vAlpha * glow);',
+'}'
+].join('\n');
+
+var starVS = [
+'attribute vec3 aPosition;',
+'attribute float aSize;',
+'attribute float aPhase;',
+'uniform mat4 uProjection;',
+'uniform mat4 uModelView;',
+'uniform float uTime;',
+'varying float vAlpha;',
+'void main() {',
+'  gl_Position = uProjection * uModelView * vec4(aPosition, 1.0);',
+'  gl_PointSize = aSize;',
+'  vAlpha = 0.5 + 0.5 * sin(uTime * 0.8 + aPhase * 6.283);',
+'}'
+].join('\n');
+
+var starFS = [
+'precision mediump float;',
+'varying float vAlpha;',
+'void main() {',
+'  vec2 c = gl_PointCoord - 0.5;',
+'  float d = length(c);',
+'  if (d > 0.5) discard;',
+'  float glow = exp(-d * 5.0);',
+'  gl_FragColor = vec4(vec3(0.9, 0.85, 0.8) * glow, vAlpha * glow * 0.8);',
+'}'
+].join('\n');
+
+// ===== SHADER COMPILATION =====
+function compileShader(src, type) {
+  var s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error('Shader error:', gl.getShaderInfoLog(s));
+    return null;
+  }
+  return s;
+}
+
+function createProgram(vs, fs) {
+  var p = gl.createProgram();
+  gl.attachShader(p, compileShader(vs, gl.VERTEX_SHADER));
+  gl.attachShader(p, compileShader(fs, gl.FRAGMENT_SHADER));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    console.error('Program error:', gl.getProgramInfoLog(p));
+    return null;
+  }
+  return p;
+}
+
+var terrainProg = createProgram(terrainVS, terrainFS);
+var particleProg = createProgram(particleVS, particleFS);
+var starProg = createProgram(starVS, starFS);
+
+function getUniforms(prog, names) {
+  var u = {};
+  for (var i = 0; i < names.length; i++) {
+    u[names[i]] = gl.getUniformLocation(prog, names[i]);
+  }
+  return u;
+}
+
+var tUni = getUniforms(terrainProg, ['uProjection','uModelView','uTime','uWireframe','uLightDir']);
+var pUni = getUniforms(particleProg, ['uProjection','uModelView','uTime']);
+var sUni = getUniforms(starProg, ['uProjection','uModelView','uTime']);
+
+// ===== TERRAIN GENERATION =====
+var GRID_X = 94; // puzzles 67-160
+var GRID_Z = 40;
+var SCALE_X = 0.25;
+var SCALE_Z = 0.25;
+
+// Fractal noise
+function hash(x, y) {
+  var n = x * 374761393 + y * 668265263;
+  n = (n ^ (n >> 13)) * 1274126177;
+  n = n & 0x7fffffff;
+  return n / 0x7fffffff;
+}
+
+function smoothNoise(x, y) {
+  var ix = Math.floor(x), iy = Math.floor(y);
+  var fx = x - ix, fy = y - iy;
+  var sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  var v00 = hash(ix, iy), v10 = hash(ix+1, iy);
+  var v01 = hash(ix, iy+1), v11 = hash(ix+1, iy+1);
+  var a = v00 + (v10 - v00) * sx;
+  var b = v01 + (v11 - v01) * sx;
+  return a + (b - a) * sy;
+}
+
+function fractalNoise(x, y) {
+  var val = 0, amp = 1, freq = 1, total = 0;
+  for (var i = 0; i < 5; i++) {
+    val += smoothNoise(x * freq, y * freq) * amp;
+    total += amp;
+    amp *= 0.5;
+    freq *= 2.0;
+  }
+  return val / total;
+}
+
+function getHeight(gx, gz) {
+  var t = gx / (GRID_X - 1);
+  var baseHeight = 6.7 + t * 9.3;
+  var h = (baseHeight - 6.7) / 9.3 * 4.0;
+  var nx = gx * 0.15 + 3.7;
+  var nz = gz * 0.2 + 1.3;
+  var noise = fractalNoise(nx, nz) * 1.2 - 0.3;
+  var centerDist = Math.abs(gz - GRID_Z / 2) / (GRID_Z / 2);
+  var ridge = (1.0 - centerDist * centerDist) * 0.8;
+  var mountain = h + noise * (0.4 + t * 0.6) + ridge * (0.3 + t * 0.7);
+  return Math.max(0.05, mountain);
+}
+
+// Build mesh
+var positions = [];
+var normals = [];
+var uvs = [];
+var indices = [];
+var wireIndices = [];
+var heights = [];
+
+var gz, gx, row;
+for (gz = 0; gz <= GRID_Z; gz++) {
+  row = [];
+  for (gx = 0; gx <= GRID_X; gx++) {
+    row.push(getHeight(gx, gz));
+  }
+  heights.push(row);
+}
+
+for (gz = 0; gz <= GRID_Z; gz++) {
+  for (gx = 0; gx <= GRID_X; gx++) {
+    var x = (gx - GRID_X / 2) * SCALE_X;
+    var z = (gz - GRID_Z / 2) * SCALE_Z;
+    var y = heights[gz][gx];
+    positions.push(x, y, z);
+    uvs.push(gx / GRID_X, gz / GRID_Z);
+    var hL = gx > 0 ? heights[gz][gx-1] : y;
+    var hR = gx < GRID_X ? heights[gz][gx+1] : y;
+    var hD = gz > 0 ? heights[gz-1][gx] : y;
+    var hU = gz < GRID_Z ? heights[gz+1][gx] : y;
+    var nnx = (hL - hR) / (2 * SCALE_X);
+    var nnz = (hD - hU) / (2 * SCALE_Z);
+    var len = Math.sqrt(nnx*nnx + 1 + nnz*nnz);
+    normals.push(nnx/len, 1/len, nnz/len);
+  }
+}
+
+var stride = GRID_X + 1;
+for (gz = 0; gz < GRID_Z; gz++) {
+  for (gx = 0; gx < GRID_X; gx++) {
+    var idx = gz * stride + gx;
+    indices.push(idx, idx+stride, idx+1);
+    indices.push(idx+1, idx+stride, idx+stride+1);
+    wireIndices.push(idx, idx+1, idx, idx+stride);
+  }
+}
+
+// Buffers
+function createBuffer(data, type) {
+  var b = gl.createBuffer();
+  gl.bindBuffer(type || gl.ARRAY_BUFFER, b);
+  gl.bufferData(type || gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  return b;
+}
+
+var posBuf = createBuffer(new Float32Array(positions));
+var normBuf = createBuffer(new Float32Array(normals));
+var uvBuf = createBuffer(new Float32Array(uvs));
+var idxBuf = createBuffer(new Uint16Array(indices.length > 65535 ? [] : indices), gl.ELEMENT_ARRAY_BUFFER);
+var wireIdxBuf;
+
+// Use OES_element_index_uint for large meshes
+var extUint = gl.getExtension('OES_element_index_uint');
+var useUint32 = false;
+if (indices.length > 65535 || true) {
+  if (extUint) {
+    idxBuf = createBuffer(new Uint32Array(indices), gl.ELEMENT_ARRAY_BUFFER);
+    wireIdxBuf = createBuffer(new Uint32Array(wireIndices), gl.ELEMENT_ARRAY_BUFFER);
+    useUint32 = true;
+  }
+} else {
+  idxBuf = createBuffer(new Uint16Array(indices), gl.ELEMENT_ARRAY_BUFFER);
+  wireIdxBuf = createBuffer(new Uint16Array(wireIndices), gl.ELEMENT_ARRAY_BUFFER);
+}
+
+var idxType = useUint32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
+
+// ===== PARTICLES =====
+var NUM_PARTICLES = 100;
+var particlePos = [];
+var particlePhase = [];
+for (var pi = 0; pi < NUM_PARTICLES; pi++) {
+  var pgx = Math.random() * GRID_X;
+  var pgz = Math.random() * GRID_Z;
+  var igx = Math.min(Math.floor(pgx), GRID_X);
+  var igz = Math.min(Math.floor(pgz), GRID_Z);
+  var ph = heights[igz][igx];
+  particlePos.push(
+    (pgx - GRID_X/2) * SCALE_X,
+    ph + 0.3 + Math.random() * 1.5,
+    (pgz - GRID_Z/2) * SCALE_Z
+  );
+  particlePhase.push(Math.random());
+}
+var partPosBuf = createBuffer(new Float32Array(particlePos));
+var partPhaseBuf = createBuffer(new Float32Array(particlePhase));
+
+// ===== STARFIELD =====
+var NUM_STARS = 300;
+var starPositions = [];
+var starSizes = [];
+var starPhases = [];
+for (var si = 0; si < NUM_STARS; si++) {
+  var theta = Math.random() * Math.PI * 2;
+  var phi = Math.random() * Math.PI;
+  var r = 40 + Math.random() * 20;
+  starPositions.push(
+    r * Math.sin(phi) * Math.cos(theta),
+    r * Math.cos(phi) * 0.6 + 10,
+    r * Math.sin(phi) * Math.sin(theta)
+  );
+  starSizes.push(1.0 + Math.random() * 2.5);
+  starPhases.push(Math.random());
+}
+var starPosBuf = createBuffer(new Float32Array(starPositions));
+var starSizeBuf = createBuffer(new Float32Array(starSizes));
+var starPhaseBuf = createBuffer(new Float32Array(starPhases));
+
+// ===== CAMERA =====
+var camTheta = 0.5;
+var camPhi = 0.45;
+var camDist = 16;
+var camTarget = [0, 1.5, 0];
+var autoOrbit = true;
+var wireframe = false;
+
+var presets = [
+  { theta: 0.5, phi: 0.45, dist: 16, target: [0, 1.5, 0], name: 'Overview' },
+  { theta: -0.3, phi: 0.2, dist: 8, target: [-6, 0.5, 0], name: 'Valley View' },
+  { theta: 1.2, phi: 0.55, dist: 10, target: [8, 3.0, 0], name: 'Summit View' }
+];
+var currentPreset = 0;
+var camTransition = 0;
+var camFrom = {};
+var camTo = {};
+var transitioning = false;
+
+function setCameraPreset(pidx) {
+  currentPreset = pidx;
+  var btns = document.querySelectorAll('.ctrl-btn');
+  for (var bi = 0; bi < 3; bi++) {
+    if (btns[bi]) {
+      if (bi === pidx) btns[bi].classList.add('active');
+      else btns[bi].classList.remove('active');
+    }
+  }
+  var p = presets[pidx];
+  camFrom = { theta: camTheta, phi: camPhi, dist: camDist, target: [camTarget[0], camTarget[1], camTarget[2]] };
+  camTo = { theta: p.theta, phi: p.phi, dist: p.dist, target: [p.target[0], p.target[1], p.target[2]] };
+  camTransition = 0;
+  transitioning = true;
+}
+window.setCameraPreset = setCameraPreset;
+
+function toggleWireframe() {
+  wireframe = !wireframe;
+  document.getElementById('wireframe-btn').textContent = 'Wireframe: ' + (wireframe ? 'ON' : 'OFF');
+  if (wireframe) document.getElementById('wireframe-btn').classList.add('active');
+  else document.getElementById('wireframe-btn').classList.remove('active');
+}
+window.toggleWireframe = toggleWireframe;
+
+function toggleOrbit() {
+  autoOrbit = !autoOrbit;
+  document.getElementById('orbit-btn').textContent = 'Auto-Orbit: ' + (autoOrbit ? 'ON' : 'OFF');
+  if (autoOrbit) document.getElementById('orbit-btn').classList.add('active');
+  else document.getElementById('orbit-btn').classList.remove('active');
+}
+window.toggleOrbit = toggleOrbit;
+
+// ===== MOUSE / TOUCH CONTROLS =====
+var isDragging = false;
+var lastMX = 0, lastMY = 0;
+
+canvas.addEventListener('mousedown', function(e) {
+  isDragging = true; lastMX = e.clientX; lastMY = e.clientY;
+  autoOrbit = false;
+  document.getElementById('orbit-btn').textContent = 'Auto-Orbit: OFF';
+  document.getElementById('orbit-btn').classList.remove('active');
+});
+canvas.addEventListener('mousemove', function(e) {
+  if (!isDragging) return;
+  var dx = e.clientX - lastMX, dy = e.clientY - lastMY;
+  camTheta += dx * 0.005;
+  camPhi = Math.max(0.05, Math.min(Math.PI * 0.48, camPhi + dy * 0.005));
+  lastMX = e.clientX; lastMY = e.clientY;
+});
+canvas.addEventListener('mouseup', function() { isDragging = false; });
+canvas.addEventListener('mouseleave', function() { isDragging = false; });
+canvas.addEventListener('wheel', function(e) {
+  camDist = Math.max(4, Math.min(35, camDist + e.deltaY * 0.01));
+  e.preventDefault();
+}, { passive: false });
+
+// Touch support
+var lastTouchDist = 0;
+canvas.addEventListener('touchstart', function(e) {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    lastMX = e.touches[0].clientX;
+    lastMY = e.touches[0].clientY;
+    autoOrbit = false;
+    document.getElementById('orbit-btn').textContent = 'Auto-Orbit: OFF';
+    document.getElementById('orbit-btn').classList.remove('active');
+  } else if (e.touches.length === 2) {
+    var tdx = e.touches[0].clientX - e.touches[1].clientX;
+    var tdy = e.touches[0].clientY - e.touches[1].clientY;
+    lastTouchDist = Math.sqrt(tdx*tdx + tdy*tdy);
+  }
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchmove', function(e) {
+  if (e.touches.length === 1 && isDragging) {
+    var dx = e.touches[0].clientX - lastMX;
+    var dy = e.touches[0].clientY - lastMY;
+    camTheta += dx * 0.005;
+    camPhi = Math.max(0.05, Math.min(Math.PI * 0.48, camPhi + dy * 0.005));
+    lastMX = e.touches[0].clientX;
+    lastMY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    var tdx = e.touches[0].clientX - e.touches[1].clientX;
+    var tdy = e.touches[0].clientY - e.touches[1].clientY;
+    var dist = Math.sqrt(tdx*tdx + tdy*tdy);
+    camDist = Math.max(4, Math.min(35, camDist - (dist - lastTouchDist) * 0.05));
+    lastTouchDist = dist;
+  }
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchend', function() { isDragging = false; });
+
+// ===== PUZZLE INFO ON CLICK =====
+canvas.addEventListener('click', function(e) {
+  var rect = canvas.getBoundingClientRect();
+  var mx = (e.clientX - rect.left) / rect.width;
+  var puzzleIdx = Math.floor(mx * GRID_X);
+  if (puzzleIdx >= 0 && puzzleIdx <= GRID_X) {
+    var pNum = 67 + puzzleIdx;
+    var btc = (6.7 + (puzzleIdx / GRID_X) * 9.3).toFixed(1);
+    var panel = document.getElementById('info-panel');
+    panel.style.display = 'block';
+    document.getElementById('info-title').textContent = 'Puzzle #' + pNum;
+    document.getElementById('info-bounty').textContent = btc + ' BTC';
+    document.getElementById('info-bits').textContent = pNum + '-bit key';
+    var diffLevel = pNum < 80 ? 'Moderate' : pNum < 120 ? 'High' : 'Extreme';
+    document.getElementById('info-diff').textContent = diffLevel;
+    document.getElementById('info-status').textContent = pNum === 67 ? 'Active Frontier' : 'Unsolved';
+  }
+});
+
+// ===== MATRIX MATH =====
+function perspective(fov, aspect, near, far) {
+  var f = 1 / Math.tan(fov / 2);
+  var nf = 1 / (near - far);
+  return new Float32Array([
+    f/aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far+near)*nf, -1,
+    0, 0, 2*far*near*nf, 0
+  ]);
+}
+
+function lookAt(eye, center, up) {
+  var zx = eye[0]-center[0], zy = eye[1]-center[1], zz = eye[2]-center[2];
+  var zlen = Math.sqrt(zx*zx+zy*zy+zz*zz);
+  var fz0 = zx/zlen, fz1 = zy/zlen, fz2 = zz/zlen;
+  var sx = up[1]*fz2-up[2]*fz1, sy = up[2]*fz0-up[0]*fz2, sz = up[0]*fz1-up[1]*fz0;
+  var slen = Math.sqrt(sx*sx+sy*sy+sz*sz);
+  var fx0 = sx/slen, fx1 = sy/slen, fx2 = sz/slen;
+  var ux0 = fz1*fx2-fz2*fx1, ux1 = fz2*fx0-fz0*fx2, ux2 = fz0*fx1-fz1*fx0;
+  return new Float32Array([
+    fx0, ux0, fz0, 0,
+    fx1, ux1, fz1, 0,
+    fx2, ux2, fz2, 0,
+    -(fx0*eye[0]+fx1*eye[1]+fx2*eye[2]),
+    -(ux0*eye[0]+ux1*eye[1]+ux2*eye[2]),
+    -(fz0*eye[0]+fz1*eye[1]+fz2*eye[2]),
+    1
+  ]);
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function smoothstepFn(t) { return t * t * (3 - 2 * t); }
+
+// ===== ATTRIBUTE HELPERS =====
+function bindAttr(prog, name, buf, size) {
+  var loc = gl.getAttribLocation(prog, name);
+  if (loc < 0) return;
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
+}
+
+function disableAttr(prog, name) {
+  var loc = gl.getAttribLocation(prog, name);
+  if (loc >= 0) gl.disableVertexAttribArray(loc);
+}
+
+// ===== RENDER LOOP =====
+var startTime = performance.now();
+var lastFrameTime = startTime;
+var frameCount = 0;
+var fpsValue = 60;
+
+function render() {
+  var now = performance.now();
+  var time = (now - startTime) * 0.001;
+  frameCount++;
+  if (now - lastFrameTime > 1000) {
+    fpsValue = Math.round(frameCount * 1000 / (now - lastFrameTime));
+    frameCount = 0;
+    lastFrameTime = now;
+    document.querySelector('#fps-display span').textContent = fpsValue;
+  }
+
+  // Camera transition
+  if (transitioning) {
+    camTransition += 0.015;
+    if (camTransition >= 1) {
+      camTransition = 1;
+      transitioning = false;
+    }
+    var st = smoothstepFn(camTransition);
+    camTheta = lerp(camFrom.theta, camTo.theta, st);
+    camPhi = lerp(camFrom.phi, camTo.phi, st);
+    camDist = lerp(camFrom.dist, camTo.dist, st);
+    camTarget[0] = lerp(camFrom.target[0], camTo.target[0], st);
+    camTarget[1] = lerp(camFrom.target[1], camTo.target[1], st);
+    camTarget[2] = lerp(camFrom.target[2], camTo.target[2], st);
+  }
+
+  // Auto orbit
+  if (autoOrbit && !transitioning) {
+    camTheta += 0.003;
+  }
+
+  var aspect = canvas.width / canvas.height;
+  var proj = perspective(Math.PI / 3.5, aspect, 0.1, 100);
+  var eyeX = camTarget[0] + camDist * Math.sin(camPhi) * Math.cos(camTheta);
+  var eyeY = camTarget[1] + camDist * Math.cos(camPhi);
+  var eyeZ = camTarget[2] + camDist * Math.sin(camPhi) * Math.sin(camTheta);
+  var view = lookAt([eyeX, eyeY, eyeZ], camTarget, [0, 1, 0]);
+
+  gl.clearColor(0.035, 0.025, 0.05, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+
+  // === Stars ===
+  gl.depthMask(false);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  gl.useProgram(starProg);
+  gl.uniformMatrix4fv(sUni.uProjection, false, proj);
+  gl.uniformMatrix4fv(sUni.uModelView, false, view);
+  gl.uniform1f(sUni.uTime, time);
+  bindAttr(starProg, 'aPosition', starPosBuf, 3);
+  bindAttr(starProg, 'aSize', starSizeBuf, 1);
+  bindAttr(starProg, 'aPhase', starPhaseBuf, 1);
+  gl.drawArrays(gl.POINTS, 0, NUM_STARS);
+  disableAttr(starProg, 'aPosition');
+  disableAttr(starProg, 'aSize');
+  disableAttr(starProg, 'aPhase');
+  gl.depthMask(true);
+  gl.disable(gl.BLEND);
+
+  // === Terrain ===
+  gl.useProgram(terrainProg);
+  gl.uniformMatrix4fv(tUni.uProjection, false, proj);
+  gl.uniformMatrix4fv(tUni.uModelView, false, view);
+  gl.uniform1f(tUni.uTime, time);
+  gl.uniform1f(tUni.uWireframe, wireframe ? 1.0 : 0.0);
+  gl.uniform3f(tUni.uLightDir, 0.4, 0.8, 0.3);
+  bindAttr(terrainProg, 'aPosition', posBuf, 3);
+  bindAttr(terrainProg, 'aNormal', normBuf, 3);
+  bindAttr(terrainProg, 'aUV', uvBuf, 2);
+
+  if (wireframe) {
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wireIdxBuf);
+    gl.drawElements(gl.LINES, wireIndices.length, idxType, 0);
+  } else {
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+    gl.drawElements(gl.TRIANGLES, indices.length, idxType, 0);
+  }
+  disableAttr(terrainProg, 'aPosition');
+  disableAttr(terrainProg, 'aNormal');
+  disableAttr(terrainProg, 'aUV');
+
+  // === Particles ===
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  gl.depthMask(false);
+  gl.useProgram(particleProg);
+  gl.uniformMatrix4fv(pUni.uProjection, false, proj);
+  gl.uniformMatrix4fv(pUni.uModelView, false, view);
+  gl.uniform1f(pUni.uTime, time);
+  bindAttr(particleProg, 'aPosition', partPosBuf, 3);
+  bindAttr(particleProg, 'aPhase', partPhaseBuf, 1);
+  gl.drawArrays(gl.POINTS, 0, NUM_PARTICLES);
+  disableAttr(particleProg, 'aPosition');
+  disableAttr(particleProg, 'aPhase');
+  gl.depthMask(true);
+  gl.disable(gl.BLEND);
+
+  requestAnimationFrame(render);
+}
+
+render();
+</script>
+</body>
+</html>

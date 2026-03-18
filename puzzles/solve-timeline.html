@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Puzzle Transaction — Solve Timeline</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a12;
+    color: #c8d6e5;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+  #main-canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    cursor: crosshair;
+  }
+  #controls {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    z-index: 10;
+    align-items: center;
+  }
+  #controls button, #controls select {
+    background: rgba(15, 20, 40, 0.85);
+    border: 1px solid #1e90ff55;
+    color: #7ec8e3;
+    padding: 7px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  #controls button:hover, #controls select:hover {
+    background: rgba(30, 50, 90, 0.85);
+    border-color: #1e90ffaa;
+  }
+  #controls button.active {
+    background: rgba(30, 80, 160, 0.7);
+    border-color: #1e90ff;
+    color: #fff;
+  }
+  #info-panel {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(8, 12, 28, 0.92);
+    border: 1px solid #1e90ff44;
+    border-radius: 6px;
+    padding: 14px 18px;
+    font-size: 12px;
+    line-height: 1.7;
+    z-index: 10;
+    min-width: 260px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+  #info-panel.visible { opacity: 1; pointer-events: auto; }
+  #info-panel .title { color: #1e90ff; font-size: 14px; font-weight: bold; margin-bottom: 4px; }
+  #info-panel .row { display: flex; justify-content: space-between; gap: 20px; }
+  #info-panel .label { color: #556; }
+  #info-panel .val { color: #e8e8e8; text-align: right; }
+  #stats-panel {
+    position: fixed;
+    top: 56px;
+    right: 20px;
+    background: rgba(8, 12, 28, 0.88);
+    border: 1px solid #1e90ff33;
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 12px;
+    line-height: 1.8;
+    z-index: 10;
+    min-width: 230px;
+  }
+  #stats-panel .heading { color: #1e90ff; font-weight: bold; margin-bottom: 2px; }
+  #stats-panel .row { display: flex; justify-content: space-between; }
+  #stats-panel .label { color: #667; }
+  #stats-panel .val { color: #ddd; }
+  #gap-panel {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(8, 12, 28, 0.88);
+    border: 1px solid #ff444433;
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 11px;
+    line-height: 1.8;
+    z-index: 10;
+    min-width: 240px;
+  }
+  #gap-panel .heading { color: #ff6b6b; font-weight: bold; margin-bottom: 4px; }
+  #gap-panel .row { color: #999; }
+  #gap-panel .highlight { color: #ff6b6b; font-weight: bold; }
+</style>
+</head>
+<body>
+<canvas id="main-canvas"></canvas>
+
+<div id="controls">
+  <button id="btn-play">&#9654; Play</button>
+  <button id="btn-reset">&#8634; Reset</button>
+  <select id="speed-select">
+    <option value="1">1x</option>
+    <option value="5" selected>5x</option>
+    <option value="10">10x</option>
+  </select>
+  <span style="color:#445;font-size:11px;margin-left:8px;">Scroll to zoom &middot; Drag to pan</span>
+</div>
+
+<div id="stats-panel">
+  <div class="heading">PLAYBACK STATS</div>
+  <div class="row"><span class="label">Date:</span><span class="val" id="st-date">Jan 2015</span></div>
+  <div class="row"><span class="label">Solved:</span><span class="val" id="st-solved">0 / 160</span></div>
+  <div class="row"><span class="label">BTC claimed:</span><span class="val" id="st-btc">0.000</span></div>
+  <div class="row"><span class="label">Frontier:</span><span class="val" id="st-frontier">#1</span></div>
+  <div class="row"><span class="label">Est. hashrate:</span><span class="val" id="st-hash">—</span></div>
+  <div class="row"><span class="label">Time since last:</span><span class="val" id="st-gap">—</span></div>
+</div>
+
+<div id="gap-panel">
+  <div class="heading">GAP ANALYSIS</div>
+  <div class="row">#1 — #50: solved in ~3 years</div>
+  <div class="row">#51 — #65: solved in ~1.5 years</div>
+  <div class="row highlight">#66 alone: took 4 years after #65</div>
+  <div class="row highlight">#67: 3+ years and counting...</div>
+</div>
+
+<div id="info-panel">
+  <div class="title" id="ip-title">Puzzle #1</div>
+  <div class="row"><span class="label">Bits:</span><span class="val" id="ip-bits">1</span></div>
+  <div class="row"><span class="label">Solved:</span><span class="val" id="ip-date">Jan 2015</span></div>
+  <div class="row"><span class="label">Keyspace:</span><span class="val" id="ip-keyspace">2</span></div>
+  <div class="row"><span class="label">Difficulty:</span><span class="val" id="ip-diff">Trivial</span></div>
+  <div class="row"><span class="label">Prize (BTC):</span><span class="val" id="ip-btc">0.001</span></div>
+</div>
+
+<script>
+// ──────────────────────────────────────────────
+// DATA
+// ──────────────────────────────────────────────
+const SOLVE_EVENTS = [];
+
+function addBatch(puzzleStart, puzzleEnd, dateStr) {
+  for (let i = puzzleStart; i <= puzzleEnd; i++) {
+    SOLVE_EVENTS.push({ puzzle: i, date: dateStr });
+  }
+}
+
+addBatch(1, 20, "2015-01-15");
+addBatch(21, 25, "2015-02-15");
+addBatch(26, 30, "2015-04-01");
+addBatch(31, 35, "2015-06-01");
+addBatch(36, 38, "2015-10-01");
+addBatch(39, 41, "2016-03-01");
+addBatch(42, 45, "2016-09-01");
+addBatch(46, 47, "2017-03-01");
+addBatch(48, 49, "2017-09-01");
+SOLVE_EVENTS.push({ puzzle: 50, date: "2018-06-01" });
+SOLVE_EVENTS.push({ puzzle: 51, date: "2018-09-01" });
+SOLVE_EVENTS.push({ puzzle: 52, date: "2018-09-15" });
+addBatch(53, 56, "2019-01-05");
+addBatch(57, 60, "2019-01-20");
+SOLVE_EVENTS.push({ puzzle: 61, date: "2019-02-10" });
+SOLVE_EVENTS.push({ puzzle: 62, date: "2019-02-25" });
+SOLVE_EVENTS.push({ puzzle: 63, date: "2019-03-15" });
+SOLVE_EVENTS.push({ puzzle: 64, date: "2019-04-10" });
+SOLVE_EVENTS.push({ puzzle: 65, date: "2019-09-10" });
+SOLVE_EVENTS.push({ puzzle: 66, date: "2023-09-17" });
+
+SOLVE_EVENTS.sort((a, b) => new Date(a.date) - new Date(b.date) || a.puzzle - b.puzzle);
+
+function puzzleBTC(n) {
+  if (n <= 10) return 0.001;
+  if (n <= 20) return 0.001;
+  if (n <= 30) return 0.01;
+  if (n <= 40) return 0.01;
+  if (n <= 50) return 0.1;
+  if (n <= 60) return 1.0;
+  if (n <= 65) return 6.6;
+  if (n === 66) return 6.6;
+  return 6.6;
+}
+
+function puzzleDiffLabel(n) {
+  if (n <= 20) return "Trivial";
+  if (n <= 35) return "Easy";
+  if (n <= 45) return "Moderate";
+  if (n <= 52) return "Hard";
+  if (n <= 60) return "Very Hard";
+  if (n <= 64) return "Extreme";
+  if (n === 65) return "Massive";
+  if (n === 66) return "Colossal";
+  return "Unsolved";
+}
+
+function puzzleHashrate(n) {
+  if (n <= 20) return "CPU, trivial";
+  if (n <= 35) return "~kH/s CPU";
+  if (n <= 45) return "~MH/s CPU";
+  if (n <= 52) return "~GH/s GPU";
+  if (n <= 60) return "~100 GH/s GPU";
+  if (n <= 64) return "~TH/s GPU farm";
+  if (n === 65) return "~10 TH/s GPU";
+  if (n === 66) return "~PH/s massive GPU";
+  return "—";
+}
+
+function keyspaceStr(n) {
+  if (n <= 10) return "2^" + n + " = " + Math.pow(2, n).toLocaleString();
+  return "2^" + n + " (~" + (Math.pow(2, n)).toExponential(1) + ")";
+}
+
+// ──────────────────────────────────────────────
+// CANVAS SETUP
+// ──────────────────────────────────────────────
+const canvas = document.getElementById("main-canvas");
+const ctx = canvas.getContext("2d");
+let W, H, dpr;
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ──────────────────────────────────────────────
+// TIMELINE VIEW STATE
+// ──────────────────────────────────────────────
+const TIMELINE_START = new Date("2014-10-01").getTime();
+const TIMELINE_END = new Date("2026-06-01").getTime();
+const TIMELINE_SPAN = TIMELINE_END - TIMELINE_START;
+
+let viewStart = TIMELINE_START;
+let viewEnd = TIMELINE_END;
+let isDragging = false;
+let dragLastX = 0;
+
+const MARGIN = { top: 90, bottom: 120, left: 80, right: 260 };
+
+function dateToX(d) {
+  const t = (typeof d === "number") ? d : new Date(d).getTime();
+  return MARGIN.left + (t - viewStart) / (viewEnd - viewStart) * (W - MARGIN.left - MARGIN.right);
+}
+
+function puzzleToY(n) {
+  const usable = H - MARGIN.top - MARGIN.bottom;
+  return MARGIN.top + (1 - n / 80) * usable;
+}
+
+function xToDate(x) {
+  return viewStart + (x - MARGIN.left) / (W - MARGIN.left - MARGIN.right) * (viewEnd - viewStart);
+}
+
+// ──────────────────────────────────────────────
+// ZOOM / PAN
+// ──────────────────────────────────────────────
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const zoomFactor = e.deltaY > 0 ? 1.12 : 0.88;
+  const mouseX = e.clientX;
+  const pivot = xToDate(mouseX);
+  let newStart = pivot - (pivot - viewStart) * zoomFactor;
+  let newEnd = pivot + (viewEnd - pivot) * zoomFactor;
+  if (newEnd - newStart < 86400000 * 30) return;
+  if (newStart < TIMELINE_START - TIMELINE_SPAN * 0.1) newStart = TIMELINE_START - TIMELINE_SPAN * 0.1;
+  if (newEnd > TIMELINE_END + TIMELINE_SPAN * 0.1) newEnd = TIMELINE_END + TIMELINE_SPAN * 0.1;
+  viewStart = newStart;
+  viewEnd = newEnd;
+}, { passive: false });
+
+canvas.addEventListener("mousedown", (e) => {
+  isDragging = true;
+  dragLastX = e.clientX;
+  canvas.style.cursor = "grabbing";
+});
+canvas.addEventListener("mousemove", (e) => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+  if (isDragging) {
+    const dx = e.clientX - dragLastX;
+    const span = viewEnd - viewStart;
+    const shift = -dx / (W - MARGIN.left - MARGIN.right) * span;
+    viewStart += shift;
+    viewEnd += shift;
+    dragLastX = e.clientX;
+  }
+});
+canvas.addEventListener("mouseup", () => { isDragging = false; canvas.style.cursor = "crosshair"; });
+canvas.addEventListener("mouseleave", () => { isDragging = false; canvas.style.cursor = "crosshair"; });
+
+let mouseX = -1, mouseY = -1;
+let clickedEvent = null;
+
+canvas.addEventListener("click", (e) => {
+  const hov = getHoveredEvent(e.clientX, e.clientY);
+  clickedEvent = hov ? hov : null;
+});
+
+// ──────────────────────────────────────────────
+// PARTICLES
+// ──────────────────────────────────────────────
+const particles = [];
+
+function spawnBurst(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 4;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1.0,
+      decay: 0.01 + Math.random() * 0.025,
+      size: 1.5 + Math.random() * 3,
+      color
+    });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.97;
+    p.vy *= 0.97;
+    p.life -= p.decay;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = p.life * 0.8;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ──────────────────────────────────────────────
+// PLAYBACK STATE
+// ──────────────────────────────────────────────
+let playing = false;
+let playTime = TIMELINE_START;
+let playSpeed = 5;
+let solvedSet = new Set();
+let lastSolveTime = TIMELINE_START;
+let flashEvents = [];
+
+const btnPlay = document.getElementById("btn-play");
+const btnReset = document.getElementById("btn-reset");
+const speedSelect = document.getElementById("speed-select");
+
+btnPlay.addEventListener("click", () => {
+  playing = !playing;
+  btnPlay.textContent = playing ? "⏸ Pause" : "▶ Play";
+  btnPlay.classList.toggle("active", playing);
+});
+
+btnReset.addEventListener("click", () => {
+  playing = false;
+  playTime = TIMELINE_START;
+  solvedSet.clear();
+  lastSolveTime = TIMELINE_START;
+  flashEvents = [];
+  particles.length = 0;
+  btnPlay.textContent = "▶ Play";
+  btnPlay.classList.remove("active");
+  clickedEvent = null;
+});
+
+speedSelect.addEventListener("change", () => {
+  playSpeed = parseInt(speedSelect.value);
+});
+
+// ──────────────────────────────────────────────
+// COLORS
+// ──────────────────────────────────────────────
+function nodeColor(n) {
+  if (n <= 20) return "#22cc66";
+  if (n <= 35) return "#44dd88";
+  if (n <= 45) return "#bbcc33";
+  if (n <= 52) return "#eebb22";
+  if (n <= 60) return "#ff8833";
+  if (n <= 64) return "#ff5544";
+  if (n === 65) return "#ff3366";
+  if (n === 66) return "#ff1144";
+  return "#882244";
+}
+
+function nodeGlow(n) {
+  if (n <= 35) return "rgba(34,204,102,0.3)";
+  if (n <= 52) return "rgba(238,187,34,0.3)";
+  return "rgba(255,50,50,0.35)";
+}
+
+function nodeRadius(n) {
+  return 3 + (n / 66) * 8;
+}
+
+// ──────────────────────────────────────────────
+// HOVER DETECTION
+// ──────────────────────────────────────────────
+function getHoveredEvent(mx, my) {
+  let closest = null;
+  let closestDist = Infinity;
+  const evts = playing ? SOLVE_EVENTS.filter(e => solvedSet.has(e.puzzle)) : SOLVE_EVENTS;
+  for (const ev of evts) {
+    const ex = dateToX(ev.date);
+    const ey = puzzleToY(ev.puzzle);
+    const r = nodeRadius(ev.puzzle) + 4;
+    const d = Math.hypot(mx - ex, my - ey);
+    if (d < r && d < closestDist) {
+      closest = ev;
+      closestDist = d;
+    }
+  }
+  return closest;
+}
+
+// ──────────────────────────────────────────────
+// DRAW: GRID & AXES
+// ──────────────────────────────────────────────
+function drawGrid() {
+  ctx.strokeStyle = "#141830";
+  ctx.lineWidth = 1;
+
+  const spanMs = viewEnd - viewStart;
+  let step;
+  if (spanMs > 86400000 * 365 * 6) step = 86400000 * 365;
+  else if (spanMs > 86400000 * 365 * 2) step = 86400000 * 182;
+  else if (spanMs > 86400000 * 365) step = 86400000 * 91;
+  else step = 86400000 * 30;
+
+  const firstYear = new Date(viewStart).getFullYear();
+  let t = new Date(firstYear, 0, 1).getTime();
+
+  ctx.font = "10px 'Courier New'";
+  ctx.fillStyle = "#334";
+
+  while (t < viewEnd + step) {
+    const x = dateToX(t);
+    if (x >= MARGIN.left && x <= W - MARGIN.right) {
+      ctx.beginPath();
+      ctx.moveTo(x, MARGIN.top);
+      ctx.lineTo(x, H - MARGIN.bottom);
+      ctx.stroke();
+      const d = new Date(t);
+      const label = d.getFullYear() + (step < 86400000 * 365 ? "-" + String(d.getMonth() + 1).padStart(2, "0") : "");
+      ctx.fillText(label, x - 15, H - MARGIN.bottom + 16);
+    }
+    t += step;
+  }
+
+  for (let p = 0; p <= 80; p += 10) {
+    const y = puzzleToY(p);
+    ctx.beginPath();
+    ctx.moveTo(MARGIN.left, y);
+    ctx.lineTo(W - MARGIN.right, y);
+    ctx.stroke();
+    ctx.fillText("#" + p, MARGIN.left - 30, y + 4);
+  }
+
+  // axis labels
+  ctx.fillStyle = "#556";
+  ctx.font = "11px 'Courier New'";
+  ctx.save();
+  ctx.translate(16, H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText("Puzzle Number", -40, 0);
+  ctx.restore();
+  ctx.fillText("Year", W / 2 - 15, H - MARGIN.bottom + 34);
+}
+
+// ──────────────────────────────────────────────
+// DRAW: TIMELINE AXIS
+// ──────────────────────────────────────────────
+function drawTimelineAxis() {
+  const y = H - MARGIN.bottom + 48;
+  ctx.strokeStyle = "#1e90ff33";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(MARGIN.left, y);
+  ctx.lineTo(W - MARGIN.right, y);
+  ctx.stroke();
+
+  if (playing) {
+    const px = dateToX(playTime);
+    ctx.strokeStyle = "#1e90ff";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(px, MARGIN.top);
+    ctx.lineTo(px, H - MARGIN.bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = "#1e90ff";
+    ctx.beginPath();
+    ctx.moveTo(px, y - 5);
+    ctx.lineTo(px - 5, y + 5);
+    ctx.lineTo(px + 5, y + 5);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+// ──────────────────────────────────────────────
+// DRAW: CONNECTIONS
+// ──────────────────────────────────────────────
+function drawConnections() {
+  const evts = playing ? SOLVE_EVENTS.filter(e => solvedSet.has(e.puzzle)) : SOLVE_EVENTS;
+  if (evts.length < 2) return;
+  ctx.strokeStyle = "#1e90ff18";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 1; i < evts.length; i++) {
+    const x0 = dateToX(evts[i - 1].date);
+    const y0 = puzzleToY(evts[i - 1].puzzle);
+    const x1 = dateToX(evts[i].date);
+    const y1 = puzzleToY(evts[i].puzzle);
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+  }
+  ctx.stroke();
+}
+
+// ──────────────────────────────────────────────
+// DRAW: NODES
+// ──────────────────────────────────────────────
+function drawNodes() {
+  const evts = playing ? SOLVE_EVENTS.filter(e => solvedSet.has(e.puzzle)) : SOLVE_EVENTS;
+  for (const ev of evts) {
+    const x = dateToX(ev.date);
+    const y = puzzleToY(ev.puzzle);
+    const r = nodeRadius(ev.puzzle);
+    const col = nodeColor(ev.puzzle);
+
+    // glow
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+    g.addColorStop(0, nodeGlow(ev.puzzle));
+    g.addColorStop(1, "transparent");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // node
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // border
+    ctx.strokeStyle = "#fff3";
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+}
+
+// ──────────────────────────────────────────────
+// DRAW: FLASH EFFECTS
+// ──────────────────────────────────────────────
+function drawFlashes() {
+  for (let i = flashEvents.length - 1; i >= 0; i--) {
+    const f = flashEvents[i];
+    f.life -= 0.02;
+    if (f.life <= 0) { flashEvents.splice(i, 1); continue; }
+    const x = dateToX(f.date);
+    const y = puzzleToY(f.puzzle);
+    const r = 10 + (1 - f.life) * 50;
+    ctx.globalAlpha = f.life * 0.5;
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, nodeColor(f.puzzle));
+    grad.addColorStop(0.5, nodeColor(f.puzzle) + "44");
+    grad.addColorStop(1, "transparent");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ──────────────────────────────────────────────
+// DRAW: DIFFICULTY WALL (right side)
+// ──────────────────────────────────────────────
+function drawDifficultyWall() {
+  const wallX = W - MARGIN.right + 30;
+  const wallW = 180;
+  const topY = MARGIN.top;
+  const botY = H - MARGIN.bottom;
+  const wallH = botY - topY;
+
+  ctx.fillStyle = "#0c0e1a";
+  ctx.fillRect(wallX - 5, topY, wallW + 10, wallH);
+  ctx.strokeStyle = "#1e90ff22";
+  ctx.strokeRect(wallX - 5, topY, wallW + 10, wallH);
+
+  ctx.fillStyle = "#556";
+  ctx.font = "11px 'Courier New'";
+  ctx.fillText("DIFFICULTY WALL", wallX + 20, topY - 8);
+  ctx.font = "9px 'Courier New'";
+  ctx.fillText("log\u2082(keyspace)", wallX + 35, topY + 14);
+
+  // exponential bar heights
+  for (let p = 1; p <= 70; p++) {
+    const barH = Math.pow(p / 66, 4) * (wallH * 0.85);
+    const barY = botY - barH;
+    const barW = 2;
+    const bx = wallX + (p / 70) * wallW;
+
+    let col;
+    if (p <= 66) {
+      col = nodeColor(p);
+      const isSolved = !playing || solvedSet.has(p);
+      if (playing && !isSolved) col = "#222";
+    } else {
+      col = "#331122";
+    }
+
+    ctx.fillStyle = col;
+    ctx.fillRect(bx, barY, barW, barH);
+
+    if (p === 66 || p === 67) {
+      ctx.fillStyle = p === 66 ? "#ff4444" : "#661133";
+      ctx.font = "9px 'Courier New'";
+      ctx.fillText("#" + p, bx - 5, barY - 6);
+    }
+  }
+
+  // wall line between 66 and 67
+  const x66 = wallX + (66 / 70) * wallW;
+  const x67 = wallX + (67 / 70) * wallW;
+  ctx.strokeStyle = "#ff2244";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo((x66 + x67) / 2, topY + 20);
+  ctx.lineTo((x66 + x67) / 2, botY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = "#ff4455";
+  ctx.font = "10px 'Courier New'";
+  ctx.save();
+  ctx.translate((x66 + x67) / 2 + 4, topY + 60);
+  ctx.rotate(Math.PI / 2);
+  ctx.fillText("THE WALL", 0, 0);
+  ctx.restore();
+}
+
+// ──────────────────────────────────────────────
+// DRAW: UNSOLVED ZONE
+// ──────────────────────────────────────────────
+function drawUnsolvedZone() {
+  const y66 = puzzleToY(66);
+  const y80 = puzzleToY(80);
+  ctx.fillStyle = "rgba(80, 10, 20, 0.06)";
+  ctx.fillRect(MARGIN.left, y80, W - MARGIN.left - MARGIN.right, y66 - y80);
+  ctx.fillStyle = "#44222244";
+  ctx.font = "12px 'Courier New'";
+  ctx.fillText("UNSOLVED TERRITORY", W / 2 - 80, y80 + 18);
+}
+
+// ──────────────────────────────────────────────
+// DRAW: HOVER INFO
+// ──────────────────────────────────────────────
+function updateInfoPanel() {
+  const active = clickedEvent || getHoveredEvent(mouseX, mouseY);
+  const panel = document.getElementById("info-panel");
+  if (!active) {
+    panel.classList.remove("visible");
+    return;
+  }
+  panel.classList.add("visible");
+  document.getElementById("ip-title").textContent = "Puzzle #" + active.puzzle;
+  document.getElementById("ip-bits").textContent = active.puzzle + "-bit key";
+  const d = new Date(active.date);
+  document.getElementById("ip-date").textContent = d.toLocaleDateString("en-US", { year: "numeric", month: "short" });
+  document.getElementById("ip-keyspace").textContent = keyspaceStr(active.puzzle);
+  document.getElementById("ip-diff").textContent = puzzleDiffLabel(active.puzzle);
+  document.getElementById("ip-btc").textContent = puzzleBTC(active.puzzle).toFixed(3);
+}
+
+// ──────────────────────────────────────────────
+// PLAYBACK: UPDATE STATS
+// ──────────────────────────────────────────────
+function updateStatsPanel() {
+  const d = new Date(playTime);
+  document.getElementById("st-date").textContent = d.toLocaleDateString("en-US", { year: "numeric", month: "short" });
+  document.getElementById("st-solved").textContent = solvedSet.size + " / 160";
+
+  let btc = 0;
+  for (const p of solvedSet) btc += puzzleBTC(p);
+  document.getElementById("st-btc").textContent = btc.toFixed(3) + " BTC";
+
+  let frontier = 1;
+  for (let i = 1; i <= 160; i++) { if (!solvedSet.has(i)) { frontier = i; break; } }
+  document.getElementById("st-frontier").textContent = "#" + frontier;
+
+  const lastPuzzle = [...solvedSet].sort((a, b) => a - b).pop();
+  document.getElementById("st-hash").textContent = lastPuzzle ? puzzleHashrate(lastPuzzle) : "—";
+
+  if (solvedSet.size > 0 && lastSolveTime > TIMELINE_START) {
+    const gapMs = playTime - lastSolveTime;
+    const days = Math.floor(gapMs / 86400000);
+    if (days > 365) {
+      document.getElementById("st-gap").textContent = (days / 365).toFixed(1) + " years";
+    } else if (days > 30) {
+      document.getElementById("st-gap").textContent = Math.floor(days / 30) + " months";
+    } else {
+      document.getElementById("st-gap").textContent = days + " days";
+    }
+  } else {
+    document.getElementById("st-gap").textContent = "—";
+  }
+}
+
+// ──────────────────────────────────────────────
+// DRAW: BACKGROUND GRID DOTS
+// ──────────────────────────────────────────────
+function drawBgDots() {
+  ctx.fillStyle = "#0e1020";
+  const spacing = 40;
+  for (let x = MARGIN.left; x < W - MARGIN.right; x += spacing) {
+    for (let y = MARGIN.top; y < H - MARGIN.bottom; y += spacing) {
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+}
+
+// ──────────────────────────────────────────────
+// DRAW: TITLE
+// ──────────────────────────────────────────────
+function drawTitle() {
+  ctx.fillStyle = "#1e90ff";
+  ctx.font = "bold 15px 'Courier New'";
+  ctx.fillText("BITCOIN PUZZLE TRANSACTION — SOLVE TIMELINE", MARGIN.left, 30);
+  ctx.fillStyle = "#445";
+  ctx.font = "11px 'Courier New'";
+  ctx.fillText("160 puzzles created Jan 2015  |  66 solved  |  94 remain", MARGIN.left, 50);
+}
+
+// ──────────────────────────────────────────────
+// HIGHLIGHT HOVERED NODE
+// ──────────────────────────────────────────────
+function drawHoverHighlight() {
+  const active = clickedEvent || getHoveredEvent(mouseX, mouseY);
+  if (!active) return;
+  const x = dateToX(active.date);
+  const y = puzzleToY(active.puzzle);
+  const r = nodeRadius(active.puzzle);
+
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, r + 4, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = "#ccc";
+  ctx.font = "10px 'Courier New'";
+  ctx.fillText("#" + active.puzzle, x + r + 8, y + 4);
+}
+
+// ──────────────────────────────────────────────
+// BACKGROUND STARS
+// ──────────────────────────────────────────────
+const stars = [];
+for (let i = 0; i < 120; i++) {
+  stars.push({ x: Math.random(), y: Math.random(), s: 0.5 + Math.random() * 1.5, b: Math.random() });
+}
+
+function drawStars(time) {
+  for (const s of stars) {
+    const alpha = 0.15 + 0.1 * Math.sin(time * 0.001 + s.b * 10);
+    ctx.fillStyle = `rgba(100,140,200,${alpha})`;
+    ctx.fillRect(s.x * W, s.y * H, s.s, s.s);
+  }
+}
+
+// ──────────────────────────────────────────────
+// MAIN LOOP
+// ──────────────────────────────────────────────
+let lastFrame = 0;
+const MS_PER_DAY_BASE = 86400000;
+
+function frame(time) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(time - lastFrame, 50);
+  lastFrame = time;
+
+  // playback advance
+  if (playing) {
+    const daysPerFrame = playSpeed * 3;
+    playTime += daysPerFrame * MS_PER_DAY_BASE * (dt / 16.67);
+    if (playTime > TIMELINE_END) {
+      playTime = TIMELINE_END;
+      playing = false;
+      btnPlay.textContent = "▶ Play";
+      btnPlay.classList.remove("active");
+    }
+
+    // check newly solved
+    for (const ev of SOLVE_EVENTS) {
+      const et = new Date(ev.date).getTime();
+      if (et <= playTime && !solvedSet.has(ev.puzzle)) {
+        solvedSet.add(ev.puzzle);
+        lastSolveTime = et;
+        const x = dateToX(ev.date);
+        const y = puzzleToY(ev.puzzle);
+        flashEvents.push({ puzzle: ev.puzzle, date: ev.date, life: 1.0 });
+        const burstCount = 8 + Math.floor(ev.puzzle / 5);
+        spawnBurst(x, y, nodeColor(ev.puzzle), burstCount);
+      }
+    }
+  }
+
+  // clear
+  ctx.fillStyle = "#0a0a12";
+  ctx.fillRect(0, 0, W, H);
+
+  drawStars(time);
+  drawBgDots();
+  drawTitle();
+  drawGrid();
+  drawUnsolvedZone();
+  drawTimelineAxis();
+  drawConnections();
+  drawFlashes();
+  drawNodes();
+  drawHoverHighlight();
+  drawDifficultyWall();
+  updateParticles();
+  drawParticles();
+  updateInfoPanel();
+  if (playing) updateStatsPanel();
+}
+
+// init stats to default non-playing state
+(function initStats() {
+  // Show all solved initially
+  document.getElementById("st-date").textContent = "Mar 2026";
+  document.getElementById("st-solved").textContent = "66 / 160";
+  let btc = 0;
+  for (const ev of SOLVE_EVENTS) btc += puzzleBTC(ev.puzzle);
+  document.getElementById("st-btc").textContent = btc.toFixed(3) + " BTC";
+  document.getElementById("st-frontier").textContent = "#67";
+  document.getElementById("st-hash").textContent = "~PH/s massive GPU";
+  document.getElementById("st-gap").textContent = "3+ years (#67)";
+})();
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

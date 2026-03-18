@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitcoin Puzzle Transaction</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    color: #c8c8d0;
+    font-family: 'Courier New', Courier, monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  canvas#matrix {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(10, 10, 15, 0.88);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 3rem;
+  }
+
+  /* Hero */
+  .hero {
+    text-align: center;
+    padding: 3.5rem 0 2rem;
+  }
+
+  .hero h1 {
+    font-size: clamp(1.8rem, 5vw, 3.2rem);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #e0e0e8;
+    text-shadow: 0 0 30px rgba(0, 255, 100, 0.15);
+    margin-bottom: 0.75rem;
+  }
+
+  .hero h1 span.btc { color: #f7931a; }
+
+  .hero .subtitle {
+    font-size: clamp(0.75rem, 2vw, 1rem);
+    color: #7a7a90;
+    letter-spacing: 0.12em;
+  }
+
+  .hero .subtitle .green { color: #00e676; }
+  .hero .subtitle .amber { color: #ffab00; }
+  .hero .subtitle .red { color: #ff5252; }
+
+  /* Overview */
+  .overview {
+    background: rgba(18, 18, 28, 0.85);
+    border: 1px solid rgba(100, 100, 140, 0.15);
+    border-radius: 10px;
+    padding: 1.8rem 2rem;
+    margin: 2rem 0 2.5rem;
+    line-height: 1.75;
+    font-size: 0.92rem;
+    color: #9a9ab0;
+    backdrop-filter: blur(4px);
+  }
+
+  .overview strong { color: #c0c0d0; }
+  .overview .highlight-green { color: #00e676; font-weight: bold; }
+  .overview .highlight-amber { color: #ffab00; font-weight: bold; }
+
+  /* Visualization Cards Grid */
+  .cards-heading {
+    text-align: center;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #555568;
+    margin-bottom: 1.5rem;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .card {
+    background: rgba(18, 18, 28, 0.8);
+    border: 1px solid rgba(100, 100, 140, 0.18);
+    border-radius: 12px;
+    padding: 1.8rem 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(4px);
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.06), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .card:hover {
+    border-color: rgba(0, 230, 118, 0.35);
+    box-shadow: 0 0 25px rgba(0, 230, 118, 0.08), 0 8px 32px rgba(0, 0, 0, 0.3);
+    transform: translateY(-3px);
+  }
+
+  .card:hover::before { opacity: 1; }
+
+  .card-icon {
+    width: 56px; height: 56px;
+    margin-bottom: 1rem;
+    position: relative;
+  }
+
+  .card-icon canvas { width: 56px; height: 56px; }
+
+  .card-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #e0e0e8;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.03em;
+  }
+
+  .card-desc {
+    font-size: 0.82rem;
+    color: #7a7a90;
+    line-height: 1.6;
+  }
+
+  .card-arrow {
+    position: absolute;
+    bottom: 1.2rem; right: 1.4rem;
+    font-size: 1.2rem;
+    color: #444460;
+    transition: color 0.3s, transform 0.3s;
+  }
+
+  .card:hover .card-arrow {
+    color: #00e676;
+    transform: translateX(4px);
+  }
+
+  /* Stats Bar */
+  .stats-bar {
+    background: rgba(18, 18, 28, 0.85);
+    border: 1px solid rgba(100, 100, 140, 0.15);
+    border-radius: 10px;
+    padding: 1.5rem 2rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.2rem;
+    backdrop-filter: blur(4px);
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #555568;
+    margin-bottom: 0.35rem;
+  }
+
+  .stat-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #e0e0e8;
+  }
+
+  .stat-value.green { color: #00e676; }
+  .stat-value.amber { color: #ffab00; }
+  .stat-value.red { color: #ff5252; }
+  .stat-value.btc { color: #f7931a; }
+
+  .footer {
+    text-align: center;
+    margin-top: 2.5rem;
+    font-size: 0.7rem;
+    color: #333348;
+    letter-spacing: 0.1em;
+  }
+
+  /* Progress bar inside overview */
+  .progress-track {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 82, 82, 0.25);
+    border-radius: 3px;
+    margin-top: 1rem;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    width: 41.25%;
+    height: 100%;
+    background: linear-gradient(90deg, #00e676, #00c853);
+    border-radius: 3px;
+    box-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
+  }
+
+  @media (max-width: 600px) {
+    .content { padding: 1rem; }
+    .hero { padding: 2rem 0 1.5rem; }
+    .overview { padding: 1.2rem; }
+    .stats-bar { padding: 1rem; gap: 0.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+<div class="overlay"></div>
+
+<div class="content">
+
+  <section class="hero">
+    <h1><span class="btc">Bitcoin</span> Puzzle Transaction</h1>
+    <p class="subtitle">
+      160 Cryptographic Puzzles &middot;
+      <span class="green">66 Solved</span> &middot;
+      <span class="amber">94 Remaining</span> &middot;
+      <span class="red">~1,000+ BTC Unclaimed</span>
+    </p>
+  </section>
+
+  <section class="overview">
+    In <strong>January 2015</strong>, an anonymous user created <strong>160 Bitcoin addresses</strong> with
+    private keys of increasing bit-length (1 to 160 bits). Each address was funded with BTC, creating a
+    series of cryptographic puzzles. Finding the private key lets you claim the coins. As of 2026, puzzles
+    <span class="highlight-green">1&ndash;66 have been solved</span>, with <strong>#66</strong> (a 66-bit key)
+    cracked in September 2023 after years of effort. Puzzles
+    <span class="highlight-amber">#67&ndash;#160 remain</span>, holding an estimated
+    <strong>1,000+ BTC (~$100M+)</strong>.
+    <div class="progress-track"><div class="progress-fill"></div></div>
+  </section>
+
+  <p class="cards-heading">Visualizations</p>
+
+  <div class="cards">
+    <a href="puzzle-grid.html" class="card">
+      <div class="card-icon"><canvas id="icon-grid" width="112" height="112"></canvas></div>
+      <div class="card-title">Puzzle Grid</div>
+      <div class="card-desc">Interactive grid of all 160 puzzles. See which are solved, their private keys, and BTC amounts.</div>
+      <span class="card-arrow">&rarr;</span>
+    </a>
+    <a href="keyspace-explorer.html" class="card">
+      <div class="card-icon"><canvas id="icon-curve" width="112" height="112"></canvas></div>
+      <div class="card-title">Keyspace Explorer</div>
+      <div class="card-desc">Visualize the mind-boggling exponential growth of keyspace difficulty from 1 bit to 160 bits.</div>
+      <span class="card-arrow">&rarr;</span>
+    </a>
+    <a href="solve-timeline.html" class="card">
+      <div class="card-icon"><canvas id="icon-timeline" width="112" height="112"></canvas></div>
+      <div class="card-title">Solve Timeline</div>
+      <div class="card-desc">Watch the history of puzzle solves unfold from 2015 to present, with animated playback.</div>
+      <span class="card-arrow">&rarr;</span>
+    </a>
+    <a href="bounty-landscape.html" class="card">
+      <div class="card-icon"><canvas id="icon-mountain" width="112" height="112"></canvas></div>
+      <div class="card-title">Bounty Landscape</div>
+      <div class="card-desc">3D terrain of unclaimed bounties &mdash; a mountain range of cryptographic treasure.</div>
+      <span class="card-arrow">&rarr;</span>
+    </a>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat">
+      <div class="stat-label">Solved</div>
+      <div class="stat-value green">66 / 160 (41.25%)</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Total BTC Claimed</div>
+      <div class="stat-value btc">~31.3 BTC</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">BTC Remaining</div>
+      <div class="stat-value amber">~1,014 BTC</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Est. Value Remaining</div>
+      <div class="stat-value red">~$101.4M</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Highest Solved</div>
+      <div class="stat-value green">#66 (66-bit)</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Next Target</div>
+      <div class="stat-value amber">#67 &middot; 6.7 BTC</div>
+    </div>
+  </div>
+
+  <p class="footer">BITCOIN PUZZLE TRANSACTION &middot; VISUALIZATION SUITE</p>
+
+</div>
+
+<script>
+/* ── Matrix binary rain ── */
+(function() {
+  var c = document.getElementById('matrix');
+  var ctx = c.getContext('2d');
+  var cols, drops;
+  var fontSize = 14;
+
+  function resize() {
+    c.width = window.innerWidth;
+    c.height = window.innerHeight;
+    cols = Math.floor(c.width / fontSize);
+    drops = [];
+    for (var i = 0; i < cols; i++) {
+      drops[i] = Math.random() * -100;
+    }
+  }
+
+  resize();
+  window.addEventListener('resize', resize);
+
+  function draw() {
+    ctx.fillStyle = 'rgba(10, 10, 15, 0.06)';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = 'rgba(0, 180, 80, 0.18)';
+    ctx.font = fontSize + 'px monospace';
+
+    for (var i = 0; i < cols; i++) {
+      if (drops[i] > 0) {
+        var ch = Math.random() > 0.5 ? '1' : '0';
+        ctx.fillText(ch, i * fontSize, drops[i] * fontSize);
+      }
+      if (drops[i] * fontSize > c.height && Math.random() > 0.985) {
+        drops[i] = 0;
+      }
+      drops[i] += 0.33;
+    }
+  }
+
+  setInterval(draw, 60);
+})();
+
+/* ── Card icons drawn on canvas ── */
+(function() {
+  var s = 2; // retina scale
+
+  // Grid icon
+  (function() {
+    var cv = document.getElementById('icon-grid');
+    var ctx = cv.getContext('2d');
+    var size = 112;
+    var cell = 16;
+    var gap = 4;
+    var cols = 5, rows = 5;
+    var ox = (size - cols * (cell + gap) + gap) / 2;
+    var oy = (size - rows * (cell + gap) + gap) / 2;
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        var solved = (r * cols + c) < 13; // ~41% solved
+        ctx.fillStyle = solved ? 'rgba(0, 230, 118, 0.7)' : 'rgba(255, 82, 82, 0.35)';
+        ctx.fillRect(ox + c * (cell + gap), oy + r * (cell + gap), cell, cell);
+      }
+    }
+  })();
+
+  // Exponential curve icon
+  (function() {
+    var cv = document.getElementById('icon-curve');
+    var ctx = cv.getContext('2d');
+    ctx.strokeStyle = 'rgba(0, 230, 118, 0.7)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (var x = 0; x <= 100; x++) {
+      var t = x / 100;
+      var y = 95 - 80 * Math.pow(t, 4);
+      if (x === 0) ctx.moveTo(10 + t * 92, y);
+      else ctx.lineTo(10 + t * 92, y);
+    }
+    ctx.stroke();
+    // axis lines
+    ctx.strokeStyle = 'rgba(120, 120, 160, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(10, 95); ctx.lineTo(102, 95);
+    ctx.moveTo(10, 15); ctx.lineTo(10, 95);
+    ctx.stroke();
+  })();
+
+  // Timeline icon
+  (function() {
+    var cv = document.getElementById('icon-timeline');
+    var ctx = cv.getContext('2d');
+    // horizontal line
+    ctx.strokeStyle = 'rgba(120, 120, 160, 0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(10, 56); ctx.lineTo(102, 56);
+    ctx.stroke();
+    // nodes
+    var nodes = [20, 38, 52, 68, 86];
+    var colors = ['#00e676', '#00e676', '#00e676', '#ffab00', '#ff5252'];
+    for (var i = 0; i < nodes.length; i++) {
+      ctx.beginPath();
+      ctx.arc(nodes[i], 56, 6, 0, Math.PI * 2);
+      ctx.fillStyle = colors[i];
+      ctx.globalAlpha = 0.75;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  })();
+
+  // Mountain icon
+  (function() {
+    var cv = document.getElementById('icon-mountain');
+    var ctx = cv.getContext('2d');
+    var grad = ctx.createLinearGradient(0, 20, 0, 95);
+    grad.addColorStop(0, 'rgba(255, 171, 0, 0.6)');
+    grad.addColorStop(1, 'rgba(255, 82, 82, 0.15)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(5, 95);
+    ctx.lineTo(20, 60); ctx.lineTo(32, 75);
+    ctx.lineTo(48, 28); ctx.lineTo(62, 55);
+    ctx.lineTo(72, 22); ctx.lineTo(85, 50);
+    ctx.lineTo(95, 38); ctx.lineTo(107, 95);
+    ctx.closePath();
+    ctx.fill();
+    // ridge line
+    ctx.strokeStyle = 'rgba(255, 171, 0, 0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(5, 95);
+    ctx.lineTo(20, 60); ctx.lineTo(32, 75);
+    ctx.lineTo(48, 28); ctx.lineTo(62, 55);
+    ctx.lineTo(72, 22); ctx.lineTo(85, 50);
+    ctx.lineTo(95, 38); ctx.lineTo(107, 95);
+    ctx.stroke();
+  })();
+})();
+</script>
+</body>
+</html>
