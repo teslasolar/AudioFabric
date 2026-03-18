@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fold(HASH) = 510,510 — The Singing Hypercube</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#030308;--card:rgba(10,10,25,0.85);--border:rgba(100,80,200,0.3);
+  --text:#d0d0f0;--accent:#7c6cf0;--gold:#ffd700;--cyan:#00f0ff;
+  --pink:#ff4488;--green:#00ff88;
+}
+body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;overflow:hidden;height:100vh;width:100vw}
+
+/* Canvas fills everything */
+#gl-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+
+/* UI overlay */
+#ui{position:fixed;top:0;left:0;right:0;bottom:0;z-index:10;pointer-events:none;display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:320px 1fr 320px;gap:0}
+#ui > *{pointer-events:auto}
+
+/* Header */
+#header{grid-column:1/-1;text-align:center;padding:12px;background:linear-gradient(180deg,rgba(3,3,8,0.95),transparent)}
+#header h1{font-size:1.4em;background:linear-gradient(90deg,var(--cyan),var(--accent),var(--pink),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px}
+#header .sub{font-size:0.7em;opacity:0.5;margin-top:2px}
+
+/* Left panel — hash input & byte view */
+#left{background:var(--card);border-right:1px solid var(--border);padding:12px;overflow-y:auto;backdrop-filter:blur(8px);max-height:calc(100vh - 120px)}
+#left h2{font-size:0.85em;color:var(--accent);margin:12px 0 6px;text-transform:uppercase;letter-spacing:1px}
+
+/* Right panel — analysis */
+#right{background:var(--card);border-left:1px solid var(--border);padding:12px;overflow-y:auto;backdrop-filter:blur(8px);max-height:calc(100vh - 120px)}
+#right h2{font-size:0.85em;color:var(--pink);margin:12px 0 6px;text-transform:uppercase;letter-spacing:1px}
+
+/* Bottom bar */
+#bottom{grid-column:1/-1;background:linear-gradient(0deg,rgba(3,3,8,0.95),transparent);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+
+/* Input */
+#hash-input{width:100%;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--cyan);font-family:inherit;font-size:0.85em;padding:8px;border-radius:6px;resize:none}
+#hash-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 15px rgba(124,108,240,0.3)}
+
+/* Hash display */
+#hash-display{font-size:0.75em;word-break:break-all;padding:8px;background:rgba(0,0,0,0.4);border-radius:6px;line-height:1.8;min-height:3em}
+.hash-byte{display:inline-block;padding:1px 2px;border-radius:2px;cursor:pointer;transition:all 0.2s}
+.hash-byte:hover{transform:scale(1.3);z-index:5;position:relative}
+.hash-byte.active{box-shadow:0 0 8px currentColor;transform:scale(1.2)}
+
+/* Byte grid */
+#byte-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;margin:8px 0}
+.byte-cell{aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:0.65em;cursor:pointer;transition:all 0.3s;border:1px solid transparent}
+.byte-cell:hover{border-color:var(--cyan);transform:scale(1.1);z-index:2}
+.byte-cell.playing{animation:byte-pulse 0.5s ease-out;border-color:var(--gold)}
+@keyframes byte-pulse{0%{transform:scale(1.3);box-shadow:0 0 15px currentColor}100%{transform:scale(1);box-shadow:none}}
+
+/* Bit display */
+#bit-view{font-size:0.6em;line-height:1.1;word-break:break-all;padding:6px;background:rgba(0,0,0,0.3);border-radius:4px;max-height:100px;overflow-y:auto}
+.bit-0{color:rgba(100,100,150,0.4)}
+.bit-1{color:var(--cyan);text-shadow:0 0 4px var(--cyan)}
+
+/* Prime panels */
+.prime-panel{margin:8px 0;padding:8px;background:rgba(0,0,0,0.3);border-radius:6px;border-left:3px solid var(--accent);font-size:0.8em;line-height:1.5}
+.prime-panel .p-label{color:var(--gold);font-weight:bold}
+.prime-panel .p-val{color:var(--cyan)}
+
+/* Stats */
+.stat-row{display:flex;justify-content:space-between;padding:3px 0;font-size:0.8em;border-bottom:1px solid rgba(100,80,200,0.1)}
+.stat-row .k{opacity:0.6}.stat-row .v{color:var(--cyan)}
+
+/* Dimension slider */
+#dim-control{display:flex;align-items:center;gap:8px;font-size:0.8em}
+#dim-control input{flex:1;accent-color:var(--accent)}
+
+/* Transport controls */
+.transport{display:flex;gap:8px;align-items:center}
+.transport button{background:rgba(124,108,240,0.2);border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:0.85em;transition:all 0.2s}
+.transport button:hover{background:var(--accent);color:white}
+.transport button.active{background:var(--accent);color:white;box-shadow:0 0 10px rgba(124,108,240,0.5)}
+
+/* Comparison */
+#compare-section{margin-top:8px}
+#hash-display-2{font-size:0.75em;word-break:break-all;padding:8px;background:rgba(0,0,0,0.4);border-radius:6px;line-height:1.8;min-height:2em}
+#hamming-bar{height:10px;background:rgba(0,0,0,0.4);border-radius:5px;overflow:hidden;margin:6px 0}
+#hamming-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--gold),var(--pink));transition:width 0.5s;border-radius:5px}
+
+/* Mode selector */
+#mode-tabs{display:flex;gap:4px}
+#mode-tabs button{background:rgba(0,0,0,0.3);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.75em;font-family:inherit}
+#mode-tabs button.active{background:var(--accent);border-color:var(--accent);color:white}
+
+/* Subcube visualization */
+#subcube-view{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;margin:8px 0}
+.subcube{height:24px;border-radius:3px;position:relative;overflow:hidden;cursor:pointer}
+.subcube-inner{height:100%;transition:width 0.3s}
+.subcube-label{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:0.55em;opacity:0.8}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--accent);border-radius:2px}
+
+/* Responsive */
+@media(max-width:1100px){
+  #ui{grid-template-columns:1fr}
+  #left,#right{max-height:200px}
+}
+</style>
+</head>
+<body>
+<canvas id="gl-canvas"></canvas>
+
+<div id="ui">
+  <div id="header">
+    <h1>fold(HASH) = 2 &middot; 3 &middot; 5 &middot; 7 &middot; 11 &middot; 13 &middot; 17 = 510,510</h1>
+    <div class="sub">SHA-256 as hypercube geometry &mdash; in color, time, and sound</div>
+  </div>
+
+  <!-- LEFT: Input & Hash View -->
+  <div id="left">
+    <h2>Input</h2>
+    <textarea id="hash-input" rows="2" placeholder="Type anything — watch the cube sing...">AudioFabric</textarea>
+    <h2>SHA-256 Hash (32 bytes &times; 8 bits = 256 dimensions)</h2>
+    <div id="hash-display"></div>
+    <h2>Byte Grid (Q&#x2088; &times; 32)</h2>
+    <div id="byte-grid"></div>
+    <h2>256 Bits &mdash; 256 Dimensions</h2>
+    <div id="bit-view"></div>
+
+    <h2>Compare (Hamming Distance)</h2>
+    <div id="compare-section">
+      <textarea id="hash-input-2" rows="1" placeholder="Second input..." style="width:100%;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--pink);font-family:inherit;font-size:0.8em;padding:6px;border-radius:4px;resize:none">AudioFabric!</textarea>
+      <div id="hash-display-2"></div>
+      <div id="hamming-bar"><div id="hamming-fill" style="width:50%"></div></div>
+      <div class="stat-row"><span class="k">Hamming Distance</span><span class="v" id="hamming-val">--</span></div>
+      <div class="stat-row"><span class="k">Bits Flipped</span><span class="v" id="hamming-pct">--</span></div>
+      <div class="stat-row"><span class="k">Hops in Q&#x2082;&#x2085;&#x2086;</span><span class="v" id="hamming-hops">--</span></div>
+    </div>
+  </div>
+
+  <!-- CENTER is the WebGL canvas (behind) -->
+  <div style="pointer-events:none"></div>
+
+  <!-- RIGHT: Analysis & Primes -->
+  <div id="right">
+    <h2>Decomposition View</h2>
+    <div id="mode-tabs">
+      <button class="active" data-mode="cube">Hypercube</button>
+      <button data-mode="subcube">Subcubes</button>
+      <button data-mode="round">Rounds</button>
+      <button data-mode="wave">Waveform</button>
+    </div>
+
+    <h2>8 Subcubes (Q&#x2083;&#x2082; each)</h2>
+    <div id="subcube-view"></div>
+
+    <h2>The Fold &mdash; Prime Observations</h2>
+    <div class="prime-panel" id="p2-panel">
+      <span class="p-label">p=2 Binary Dimension:</span>
+      <span class="p-val" id="p2-val">--</span>
+    </div>
+    <div class="prime-panel" id="p3-panel">
+      <span class="p-label">p=3 Decomposition:</span>
+      <span class="p-val" id="p3-val">--</span>
+    </div>
+    <div class="prime-panel" id="p5-panel">
+      <span class="p-label">p=5 Collision Geometry:</span>
+      <span class="p-val" id="p5-val">--</span>
+    </div>
+    <div class="prime-panel" id="p7-panel">
+      <span class="p-label">p=7 Cube Shortcut:</span>
+      <span class="p-val" id="p7-val">--</span>
+    </div>
+    <div class="prime-panel" id="p11-panel">
+      <span class="p-label">p=11 The 8&times;32 Grid:</span>
+      <span class="p-val" id="p11-val">--</span>
+    </div>
+    <div class="prime-panel" id="p13-panel">
+      <span class="p-label">p=13 Recursive Depth:</span>
+      <span class="p-val" id="p13-val">--</span>
+    </div>
+    <div class="prime-panel" id="p17-panel">
+      <span class="p-label">p=17 Structure:</span>
+      <span class="p-val" id="p17-val">--</span>
+    </div>
+
+    <h2>Statistics</h2>
+    <div class="stat-row"><span class="k">Ones</span><span class="v" id="s-ones">--</span></div>
+    <div class="stat-row"><span class="k">Zeros</span><span class="v" id="s-zeros">--</span></div>
+    <div class="stat-row"><span class="k">Balance</span><span class="v" id="s-balance">--</span></div>
+    <div class="stat-row"><span class="k">Entropy (est)</span><span class="v" id="s-entropy">--</span></div>
+    <div class="stat-row"><span class="k">Max Run (1s)</span><span class="v" id="s-run1">--</span></div>
+    <div class="stat-row"><span class="k">Max Run (0s)</span><span class="v" id="s-run0">--</span></div>
+    <div class="stat-row"><span class="k">Byte Range</span><span class="v" id="s-range">--</span></div>
+    <div class="stat-row"><span class="k">Byte Std Dev</span><span class="v" id="s-stddev">--</span></div>
+  </div>
+
+  <!-- BOTTOM: Transport & Controls -->
+  <div id="bottom">
+    <div class="transport">
+      <button id="btn-sing">&#9654; Sing Hash</button>
+      <button id="btn-arp">Arpeggio</button>
+      <button id="btn-drone">Drone</button>
+      <button id="btn-walk">Random Walk</button>
+      <button id="btn-stop">&#9632; Stop</button>
+    </div>
+    <div id="dim-control">
+      <span>Projection</span>
+      <input type="range" id="dim-slider" min="2" max="8" value="4" step="1">
+      <span id="dim-val">4D</span>
+    </div>
+    <div class="transport">
+      <button id="btn-auto" title="Auto-rotate">Spin</button>
+      <button id="btn-explode" title="Explode subcubes">Explode</button>
+      <button id="btn-trail" title="Show hash trail">Trail</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// SHA-256 IMPLEMENTATION (pure JS — no crypto.subtle for sync)
+// ═══════════════════════════════════════════════════════
+const SHA256 = (() => {
+  const K = new Uint32Array([
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ]);
+  function rotr(n,x){return(x>>>n)|(x<<(32-n))}
+  function ch(x,y,z){return(x&y)^(~x&z)}
+  function maj(x,y,z){return(x&y)^(x&z)^(y&z)}
+  function sigma0(x){return rotr(2,x)^rotr(13,x)^rotr(22,x)}
+  function sigma1(x){return rotr(6,x)^rotr(11,x)^rotr(25,x)}
+  function gamma0(x){return rotr(7,x)^rotr(18,x)^(x>>>3)}
+  function gamma1(x){return rotr(17,x)^rotr(19,x)^(x>>>10)}
+
+  return function sha256(msg) {
+    const utf8 = new TextEncoder().encode(msg);
+    const bitLen = utf8.length * 8;
+    // Padding
+    const padLen = (((utf8.length + 8) >> 6) + 1) << 6;
+    const padded = new Uint8Array(padLen);
+    padded.set(utf8);
+    padded[utf8.length] = 0x80;
+    const view = new DataView(padded.buffer);
+    view.setUint32(padLen - 4, bitLen, false);
+
+    let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a;
+    let h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;
+
+    for (let offset = 0; offset < padLen; offset += 64) {
+      const W = new Uint32Array(64);
+      for (let i = 0; i < 16; i++) W[i] = view.getUint32(offset + i*4, false);
+      for (let i = 16; i < 64; i++) W[i] = (gamma1(W[i-2]) + W[i-7] + gamma0(W[i-15]) + W[i-16]) | 0;
+
+      let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;
+      for (let i = 0; i < 64; i++) {
+        const T1 = (h + sigma1(e) + ch(e,f,g) + K[i] + W[i]) | 0;
+        const T2 = (sigma0(a) + maj(a,b,c)) | 0;
+        h=g; g=f; f=e; e=(d+T1)|0; d=c; c=b; b=a; a=(T1+T2)|0;
+      }
+      h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;
+      h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+h)|0;
+    }
+
+    const out = new Uint8Array(32);
+    const dv = new DataView(out.buffer);
+    [h0,h1,h2,h3,h4,h5,h6,h7].forEach((v,i) => dv.setUint32(i*4, v, false));
+    return out;
+  };
+})();
+
+// ═══════════════════════════════════════════════════════
+// HASH STATE
+// ═══════════════════════════════════════════════════════
+let hashBytes = new Uint8Array(32);
+let hashBytes2 = new Uint8Array(32);
+let hashBits = [];
+let hashBits2 = [];
+let hashHex = '';
+let hashHex2 = '';
+
+function bytesToHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function bytesToBits(bytes) {
+  const bits = [];
+  for (const b of bytes) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  return bits;
+}
+function hammingDistance(b1, b2) {
+  let d = 0;
+  for (let i = 0; i < b1.length; i++) {
+    let xor = b1[i] ^ b2[i];
+    while (xor) { d += xor & 1; xor >>= 1; }
+  }
+  return d;
+}
+
+function computeHash(input) {
+  hashBytes = SHA256(input);
+  hashBits = bytesToBits(hashBytes);
+  hashHex = bytesToHex(hashBytes);
+  updateAllViews();
+}
+function computeHash2(input) {
+  hashBytes2 = SHA256(input);
+  hashBits2 = bytesToBits(hashBytes2);
+  hashHex2 = bytesToHex(hashBytes2);
+  updateCompare();
+}
+
+// ═══════════════════════════════════════════════════════
+// VIEWS
+// ═══════════════════════════════════════════════════════
+function byteToColor(b) {
+  const h = (b / 255) * 360;
+  return `hsl(${h}, 80%, ${40 + (b/255)*30}%)`;
+}
+
+function updateHashDisplay() {
+  const el = document.getElementById('hash-display');
+  let html = '';
+  for (let i = 0; i < 32; i++) {
+    const b = hashBytes[i];
+    const hex = b.toString(16).padStart(2, '0');
+    const color = byteToColor(b);
+    html += `<span class="hash-byte" style="color:${color}" data-byte="${i}" title="Byte ${i}: ${b} (0x${hex})\nBits: ${b.toString(2).padStart(8,'0')}">${hex}</span>`;
+    if (i % 4 === 3 && i < 31) html += ' ';
+  }
+  el.innerHTML = html;
+  el.querySelectorAll('.hash-byte').forEach(span => {
+    span.addEventListener('click', () => playByte(parseInt(span.dataset.byte)));
+    span.addEventListener('mouseenter', () => highlightByte(parseInt(span.dataset.byte)));
+  });
+}
+
+function updateByteGrid() {
+  const el = document.getElementById('byte-grid');
+  let html = '';
+  for (let i = 0; i < 32; i++) {
+    const b = hashBytes[i];
+    const color = byteToColor(b);
+    html += `<div class="byte-cell" style="background:${color}" data-byte="${i}" title="Byte ${i}: ${b}">${b}</div>`;
+  }
+  el.innerHTML = html;
+  el.querySelectorAll('.byte-cell').forEach(cell => {
+    cell.addEventListener('click', () => playByte(parseInt(cell.dataset.byte)));
+  });
+}
+
+function updateBitView() {
+  const el = document.getElementById('bit-view');
+  let html = '';
+  for (let i = 0; i < 256; i++) {
+    html += `<span class="bit-${hashBits[i]}">${hashBits[i]}</span>`;
+    if (i % 8 === 7) html += ' ';
+    if (i % 64 === 63) html += '\n';
+  }
+  el.innerHTML = html;
+}
+
+function updateSubcubeView() {
+  const el = document.getElementById('subcube-view');
+  let html = '';
+  // 8 subcubes of 4 bytes (32 bits) each
+  for (let sc = 0; sc < 8; sc++) {
+    const start = sc * 4;
+    let val = 0;
+    for (let j = 0; j < 4; j++) val += hashBytes[start + j];
+    const avg = val / 4;
+    const norm = avg / 255;
+    const hue = sc * 45;
+    const ones = hashBits.slice(sc*32, (sc+1)*32).filter(b=>b).length;
+    html += `<div class="subcube" style="background:rgba(0,0,0,0.4)" title="Q₃₂ #${sc}: bytes ${start}-${start+3}, ${ones}/32 ones">
+      <div class="subcube-inner" style="width:${norm*100}%;background:hsl(${hue},70%,50%)"></div>
+      <span class="subcube-label">Q${sc}</span>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function updateStats() {
+  const ones = hashBits.filter(b=>b).length;
+  const zeros = 256 - ones;
+  const balance = ((ones / 256) * 100).toFixed(1);
+
+  // Runs
+  let maxRun1 = 0, maxRun0 = 0, cur = 0, curBit = hashBits[0];
+  for (let i = 0; i < 256; i++) {
+    if (hashBits[i] === curBit) { cur++; }
+    else { if (curBit) maxRun1 = Math.max(maxRun1, cur); else maxRun0 = Math.max(maxRun0, cur); cur = 1; curBit = hashBits[i]; }
+  }
+  if (curBit) maxRun1 = Math.max(maxRun1, cur); else maxRun0 = Math.max(maxRun0, cur);
+
+  // Byte stats
+  const byteArr = Array.from(hashBytes);
+  const min = Math.min(...byteArr), max = Math.max(...byteArr);
+  const mean = byteArr.reduce((a,b)=>a+b,0) / 32;
+  const stddev = Math.sqrt(byteArr.reduce((s,b)=>s+(b-mean)**2, 0) / 32);
+
+  // Shannon entropy estimate (per byte)
+  const freq = new Array(256).fill(0);
+  byteArr.forEach(b => freq[b]++);
+  let entropy = 0;
+  freq.forEach(f => { if (f > 0) { const p = f/32; entropy -= p * Math.log2(p); } });
+
+  document.getElementById('s-ones').textContent = ones + '/256';
+  document.getElementById('s-zeros').textContent = zeros + '/256';
+  document.getElementById('s-balance').textContent = balance + '% ones';
+  document.getElementById('s-balance').style.color = Math.abs(ones - 128) < 20 ? 'var(--green)' : 'var(--pink)';
+  document.getElementById('s-entropy').textContent = entropy.toFixed(3) + ' bits/byte';
+  document.getElementById('s-run1').textContent = maxRun1;
+  document.getElementById('s-run0').textContent = maxRun0;
+  document.getElementById('s-range').textContent = min + ' — ' + max;
+  document.getElementById('s-stddev').textContent = stddev.toFixed(1);
+}
+
+function updatePrimes() {
+  const ones = hashBits.filter(b=>b).length;
+  // p=2: vertex position
+  document.getElementById('p2-val').textContent =
+    `Vertex at [${hashBytes.slice(0,4).join(',')},...] in Q₂₅₆. ${ones} dimensions are 1.`;
+  // p=3: decomposition
+  const subcubeSums = [];
+  for (let i = 0; i < 8; i++) {
+    const s = hashBits.slice(i*32,(i+1)*32).filter(b=>b).length;
+    subcubeSums.push(s);
+  }
+  document.getElementById('p3-val').textContent =
+    `Q₂₅₆ = Q₃₂⁸. Subcube densities: [${subcubeSums.join(',')}]/32`;
+  // p=5: collision
+  document.getElementById('p5-val').textContent =
+    `Birthday bound: 2¹²⁸ ≈ 3.4×10³⁸ samples for 39% collision. This hash occupies 1 of 2²⁵⁶ vertices.`;
+  // p=7: shortcut
+  const maxSC = Math.max(...subcubeSums), minSC = Math.min(...subcubeSums);
+  document.getElementById('p7-val').textContent =
+    `Subcube imbalance: ${maxSC - minSC}. Perfect diffusion → ~0. Current spread suggests ${maxSC-minSC < 5 ? 'good' : 'notable'} uniformity.`;
+  // p=11
+  document.getElementById('p11-val').textContent =
+    `32 rows × 8 bits. Byte mean: ${(Array.from(hashBytes).reduce((a,b)=>a+b,0)/32).toFixed(1)}/255 (ideal: 127.5)`;
+  // p=13
+  document.getElementById('p13-val').textContent =
+    `Recursive: Q₂₅₆ → Q₃₂⁸ → Q₄⁶⁴ → Q₁²⁵⁶. Each level reveals finer structure.`;
+  // p=17
+  const uniqueBytes = new Set(Array.from(hashBytes)).size;
+  document.getElementById('p17-val').textContent =
+    `${uniqueBytes}/32 unique byte values. Structure visible: ${uniqueBytes < 28 ? 'YES — repeated bytes reveal constraint' : 'minimal — appears near-random'}.`;
+}
+
+function updateCompare() {
+  const el = document.getElementById('hash-display-2');
+  let html = '';
+  for (let i = 0; i < 32; i++) {
+    const b = hashBytes2[i];
+    const hex = b.toString(16).padStart(2, '0');
+    const diff = hashBytes[i] !== hashBytes2[i];
+    const color = diff ? 'var(--pink)' : 'rgba(100,100,150,0.4)';
+    html += `<span style="color:${color}">${hex}</span>`;
+    if (i % 4 === 3 && i < 31) html += ' ';
+  }
+  el.innerHTML = html;
+
+  const hd = hammingDistance(hashBytes, hashBytes2);
+  const pct = (hd / 256 * 100).toFixed(1);
+  document.getElementById('hamming-val').textContent = hd + ' / 256 bits';
+  document.getElementById('hamming-pct').textContent = pct + '%';
+  document.getElementById('hamming-hops').textContent = hd + ' hops (bit-flips)';
+  document.getElementById('hamming-fill').style.width = pct + '%';
+}
+
+function updateAllViews() {
+  updateHashDisplay();
+  updateByteGrid();
+  updateBitView();
+  updateSubcubeView();
+  updateStats();
+  updatePrimes();
+  computeHash2(document.getElementById('hash-input-2').value);
+  updateCubeGeometry();
+}
+
+// ═══════════════════════════════════════════════════════
+// AUDIO — SONIFICATION ENGINE
+// ═══════════════════════════════════════════════════════
+let audioCtx, masterGain;
+let activeOscillators = [];
+
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.15;
+    masterGain.connect(audioCtx.destination);
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function stopAll() {
+  activeOscillators.forEach(o => { try { o.stop(); } catch(e){} });
+  activeOscillators = [];
+}
+
+// Map byte value to musical frequency (pentatonic scale across 4 octaves)
+function byteToFreq(b) {
+  // Pentatonic: C D E G A across octaves 3-6
+  const notes = [261.63, 293.66, 329.63, 392.00, 440.00,
+                 523.25, 587.33, 659.25, 783.99, 880.00,
+                 1046.50, 1174.66, 1318.51, 1567.98, 1760.00,
+                 2093.00];
+  const idx = Math.floor((b / 256) * notes.length);
+  return notes[Math.min(idx, notes.length - 1)];
+}
+
+// Map byte to detune for microtonal color
+function byteToDetune(b) {
+  return ((b % 16) - 8) * 5; // -40 to +35 cents
+}
+
+function playByte(idx) {
+  ensureAudio();
+  const b = hashBytes[idx];
+  const freq = byteToFreq(b);
+  const osc = audioCtx.createOscillator();
+  const env = audioCtx.createGain();
+  const wave = ['sine', 'triangle', 'sawtooth', 'square'][Math.floor(idx / 8)];
+  osc.type = wave;
+  osc.frequency.value = freq;
+  osc.detune.value = byteToDetune(b);
+  env.gain.setValueAtTime(0.2, audioCtx.currentTime);
+  env.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+  osc.connect(env); env.connect(masterGain);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.8);
+
+  // Visual feedback
+  const cells = document.querySelectorAll('.byte-cell');
+  if (cells[idx]) { cells[idx].classList.add('playing'); setTimeout(() => cells[idx].classList.remove('playing'), 500); }
+
+  highlightByte(idx);
+}
+
+function highlightByte(idx) {
+  document.querySelectorAll('.hash-byte').forEach(s => s.classList.remove('active'));
+  const spans = document.querySelectorAll('.hash-byte');
+  if (spans[idx]) spans[idx].classList.add('active');
+  // Highlight corresponding subcube
+  highlightedSubcube = Math.floor(idx / 4);
+}
+
+// Sing: play all 32 bytes as a melody
+function singHash() {
+  ensureAudio(); stopAll();
+  for (let i = 0; i < 32; i++) {
+    setTimeout(() => {
+      if (!audioCtx) return;
+      playByte(i);
+    }, i * 150);
+  }
+}
+
+// Arpeggio: play bytes as chords (4 bytes per chord, 8 chords)
+function arpeggioHash() {
+  ensureAudio(); stopAll();
+  for (let chord = 0; chord < 8; chord++) {
+    setTimeout(() => {
+      for (let j = 0; j < 4; j++) {
+        const idx = chord * 4 + j;
+        const b = hashBytes[idx];
+        const osc = audioCtx.createOscillator();
+        const env = audioCtx.createGain();
+        osc.type = ['sine','triangle','sawtooth','sine'][j];
+        osc.frequency.value = byteToFreq(b);
+        osc.detune.value = byteToDetune(b);
+        env.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        env.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
+        osc.connect(env); env.connect(masterGain);
+        osc.start(); osc.stop(audioCtx.currentTime + 1.2);
+        activeOscillators.push(osc);
+      }
+      highlightByte(chord * 4);
+    }, chord * 400);
+  }
+}
+
+// Drone: all 32 bytes as simultaneous frequencies
+function droneHash() {
+  ensureAudio(); stopAll();
+  const droneGain = audioCtx.createGain();
+  droneGain.gain.value = 0.02;
+  droneGain.connect(masterGain);
+
+  for (let i = 0; i < 32; i++) {
+    const b = hashBytes[i];
+    const osc = audioCtx.createOscillator();
+    osc.type = i < 8 ? 'sine' : i < 16 ? 'triangle' : i < 24 ? 'sawtooth' : 'sine';
+    osc.frequency.value = byteToFreq(b);
+    osc.detune.value = byteToDetune(b);
+    const env = audioCtx.createGain();
+    env.gain.setValueAtTime(0, audioCtx.currentTime);
+    env.gain.linearRampToValueAtTime(0.03, audioCtx.currentTime + 1);
+    env.gain.linearRampToValueAtTime(0.03, audioCtx.currentTime + 6);
+    env.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 8);
+    osc.connect(env); env.connect(droneGain);
+    osc.start(); osc.stop(audioCtx.currentTime + 8);
+    activeOscillators.push(osc);
+  }
+}
+
+// Random walk: flip random bits and play the changing tone
+let walkInterval;
+function randomWalk() {
+  ensureAudio(); stopAll();
+  clearInterval(walkInterval);
+  const walkBytes = new Uint8Array(hashBytes);
+  let step = 0;
+  walkInterval = setInterval(() => {
+    // Flip a random bit
+    const byteIdx = Math.floor(Math.random() * 32);
+    const bitIdx = Math.floor(Math.random() * 8);
+    walkBytes[byteIdx] ^= (1 << bitIdx);
+
+    const b = walkBytes[byteIdx];
+    const osc = audioCtx.createOscillator();
+    const env = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = byteToFreq(b);
+    env.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    env.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+    osc.connect(env); env.connect(masterGain);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+
+    // Update one byte in the visualization
+    const cells = document.querySelectorAll('.byte-cell');
+    if (cells[byteIdx]) {
+      cells[byteIdx].style.background = byteToColor(b);
+      cells[byteIdx].textContent = b;
+      cells[byteIdx].classList.add('playing');
+      setTimeout(() => cells[byteIdx].classList.remove('playing'), 300);
+    }
+    highlightByte(byteIdx);
+
+    step++;
+    if (step > 200) { clearInterval(walkInterval); walkInterval = null; }
+  }, 100);
+}
+
+// ═══════════════════════════════════════════════════════
+// WEBGL — HYPERCUBE PROJECTION
+// ═══════════════════════════════════════════════════════
+const canvas = document.getElementById('gl-canvas');
+const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+let projDim = 4;
+let autoRotate = true;
+let exploded = false;
+let showTrail = false;
+let trailVertices = [];
+let highlightedSubcube = -1;
+let currentMode = 'cube';
+let rotationAngles = [0, 0, 0, 0, 0, 0]; // rotation planes for higher dims
+
+// Resize
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Since WebGL shaders for arbitrary hypercube projections are complex,
+// we'll use a 2D canvas overlay for the cube rendering and keep the
+// WebGL for background effects.
+const canvas2d = document.createElement('canvas');
+canvas2d.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none';
+document.body.appendChild(canvas2d);
+const ctx = canvas2d.getContext('2d');
+
+function resize2d() {
+  canvas2d.width = window.innerWidth;
+  canvas2d.height = window.innerHeight;
+}
+window.addEventListener('resize', resize2d);
+resize2d();
+
+// Generate hypercube vertices for dimension n
+function hypercubeVertices(n) {
+  const count = 1 << n;
+  const verts = [];
+  for (let i = 0; i < count; i++) {
+    const v = [];
+    for (let d = 0; d < n; d++) v.push(((i >> d) & 1) * 2 - 1);
+    verts.push(v);
+  }
+  return verts;
+}
+
+// Generate edges (vertices differing by 1 bit)
+function hypercubeEdges(n) {
+  const count = 1 << n;
+  const edges = [];
+  for (let i = 0; i < count; i++) {
+    for (let d = 0; d < n; d++) {
+      const j = i ^ (1 << d);
+      if (j > i) edges.push([i, j, d]);
+    }
+  }
+  return edges;
+}
+
+// Rotate in a plane defined by two axes
+function rotate(point, a1, a2, angle) {
+  const p = point.slice();
+  const c = Math.cos(angle), s = Math.sin(angle);
+  const x = p[a1], y = p[a2];
+  p[a1] = x * c - y * s;
+  p[a2] = x * s + y * c;
+  return p;
+}
+
+// Project n-D point to 2D using perspective
+function projectTo2D(point, fov = 3) {
+  let p = point.slice();
+  // Apply rotations for each plane pair
+  const planes = [[0,1],[0,2],[1,2],[0,3],[1,3],[2,3]];
+  for (let i = 0; i < Math.min(planes.length, rotationAngles.length); i++) {
+    if (planes[i][0] < p.length && planes[i][1] < p.length) {
+      p = rotate(p, planes[i][0], planes[i][1], rotationAngles[i]);
+    }
+  }
+  // Perspective project from high-D down to 2D
+  let scale = 1;
+  for (let d = p.length - 1; d >= 2; d--) {
+    const dist = fov - p[d] * 0.3;
+    scale *= fov / Math.max(dist, 0.1);
+  }
+  return { x: p[0] * scale, y: p[1] * scale, depth: scale };
+}
+
+// Map hash bytes to vertex highlights
+function getHashVertex(dim) {
+  // Use the first `dim` bits of the hash to select a vertex
+  let idx = 0;
+  for (let i = 0; i < dim; i++) idx |= (hashBits[i] << i);
+  return idx;
+}
+
+// Get subcube colors from hash
+function getVertexColor(vertIdx, dim) {
+  // Color based on hash byte at modular position
+  const byteIdx = vertIdx % 32;
+  const b = hashBytes[byteIdx];
+  const h = (b / 255) * 360;
+  return `hsl(${h}, 85%, 60%)`;
+}
+
+let cubeVerts, cubeEdges;
+
+function updateCubeGeometry() {
+  cubeVerts = hypercubeVertices(projDim);
+  cubeEdges = hypercubeEdges(projDim);
+}
+
+function drawCube(t) {
+  ctx.clearRect(0, 0, canvas2d.width, canvas2d.height);
+  if (!cubeVerts) return;
+
+  const cx = canvas2d.width / 2;
+  const cy = canvas2d.height / 2;
+  const baseSize = Math.min(cx, cy) * 0.4;
+
+  // Auto-rotate
+  if (autoRotate) {
+    rotationAngles[0] += 0.003;
+    rotationAngles[1] += 0.005;
+    rotationAngles[2] += 0.002;
+    if (projDim >= 4) rotationAngles[3] += 0.004;
+    if (projDim >= 5) rotationAngles[4] += 0.003;
+    if (projDim >= 6) rotationAngles[5] += 0.002;
+  }
+
+  const hashVertex = getHashVertex(projDim);
+  const projected = cubeVerts.map(v => {
+    const p = projectTo2D(v);
+    return { x: cx + p.x * baseSize, y: cy + p.y * baseSize, depth: p.depth };
+  });
+
+  // Draw edges
+  ctx.lineWidth = 0.5;
+  for (const [i, j, dim] of cubeEdges) {
+    const a = projected[i], b = projected[j];
+    const alpha = Math.min(a.depth, b.depth) * 0.15;
+
+    // Color edges by dimension
+    const hue = (dim / projDim) * 360;
+    ctx.strokeStyle = `hsla(${hue}, 70%, 50%, ${alpha})`;
+
+    // Thicken edges connected to hash vertex
+    if (i === hashVertex || j === hashVertex) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = `hsla(${hue}, 100%, 70%, ${alpha * 3})`;
+    } else {
+      ctx.lineWidth = 0.5;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  // Draw vertices
+  for (let i = 0; i < projected.length; i++) {
+    const p = projected[i];
+    const isHash = i === hashVertex;
+    const radius = isHash ? 6 : 2 + p.depth * 0.5;
+
+    // Subcube coloring
+    const scIdx = i % 8;
+    const byteIdx = i % 32;
+    const b = hashBytes[byteIdx];
+    const hue = (b / 255) * 360;
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+
+    if (isHash) {
+      // Hash vertex — bright pulsing glow
+      const pulse = 0.7 + Math.sin(t * 0.005) * 0.3;
+      ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = 20;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Label
+      ctx.fillStyle = '#ffd700';
+      ctx.font = '10px monospace';
+      ctx.fillText('HASH', p.x + 10, p.y - 8);
+      ctx.fillText(hashHex.slice(0, 8) + '...', p.x + 10, p.y + 4);
+    } else {
+      ctx.fillStyle = `hsla(${hue}, 60%, 50%, ${0.3 + p.depth * 0.1})`;
+      ctx.fill();
+    }
+  }
+
+  // Draw trail if active
+  if (showTrail && trailVertices.length > 1) {
+    ctx.strokeStyle = 'rgba(255, 68, 136, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    for (let i = 0; i < trailVertices.length; i++) {
+      const idx = trailVertices[i] % projected.length;
+      const p = projected[idx];
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Mode-specific overlays
+  if (currentMode === 'wave') drawWaveform(t);
+  if (currentMode === 'round') drawRoundView(t);
+}
+
+function drawWaveform(t) {
+  const w = canvas2d.width;
+  const h = canvas2d.height;
+  const cy = h * 0.7;
+  const amp = 60;
+
+  // Draw byte values as waveform
+  ctx.strokeStyle = 'rgba(0, 240, 255, 0.6)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < 32; i++) {
+    const x = (i / 31) * w * 0.6 + w * 0.2;
+    const y = cy - (hashBytes[i] / 255 - 0.5) * amp * 2;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Second hash for comparison
+  if (hashBytes2.length) {
+    ctx.strokeStyle = 'rgba(255, 68, 136, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < 32; i++) {
+      const x = (i / 31) * w * 0.6 + w * 0.2;
+      const y = cy - (hashBytes2[i] / 255 - 0.5) * amp * 2;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // Bit frequency bars
+  ctx.font = '9px monospace';
+  ctx.fillStyle = 'rgba(200,200,255,0.3)';
+  ctx.fillText('Byte values as waveform', w * 0.2, cy - amp - 10);
+}
+
+function drawRoundView(t) {
+  // Simulate SHA-256 rounds visually — 64 round boxes
+  const w = canvas2d.width;
+  const h = canvas2d.height;
+  const cols = 16, rows = 4;
+  const bw = 20, bh = 14, gap = 4;
+  const startX = w * 0.35;
+  const startY = h * 0.65;
+
+  ctx.font = '8px monospace';
+  for (let r = 0; r < 64; r++) {
+    const col = r % cols, row = Math.floor(r / cols);
+    const x = startX + col * (bw + gap);
+    const y = startY + row * (bh + gap);
+    // Color by how much each round contributes to diffusion
+    const diffusion = Math.min(1, (r + 1) / 16); // full diffusion at round 16
+    const hue = diffusion * 120; // red → green
+    ctx.fillStyle = `hsla(${hue}, 70%, 40%, 0.7)`;
+    ctx.fillRect(x, y, bw, bh);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText(r, x + 3, y + 10);
+  }
+  ctx.fillStyle = 'rgba(200,200,255,0.4)';
+  ctx.fillText('SHA-256: 64 rounds (full diffusion at round ~16)', startX, startY - 8);
+  ctx.fillText('Red = partial diffusion. Green = full diffusion.', startX, startY - 20);
+}
+
+// Background GL — simple animated field
+function drawGLBackground(t) {
+  if (!gl) return;
+  // Just clear to near-black with subtle gradients done in CSS
+  gl.clearColor(0.012, 0.012, 0.03, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+}
+
+// ═══════════════════════════════════════════════════════
+// ANIMATION LOOP
+// ═══════════════════════════════════════════════════════
+function animate(t) {
+  drawGLBackground(t);
+  drawCube(t);
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+// ═══════════════════════════════════════════════════════
+// EVENT HANDLERS
+// ═══════════════════════════════════════════════════════
+document.getElementById('hash-input').addEventListener('input', (e) => {
+  computeHash(e.target.value);
+});
+document.getElementById('hash-input-2').addEventListener('input', (e) => {
+  computeHash2(e.target.value);
+});
+
+document.getElementById('btn-sing').addEventListener('click', singHash);
+document.getElementById('btn-arp').addEventListener('click', arpeggioHash);
+document.getElementById('btn-drone').addEventListener('click', droneHash);
+document.getElementById('btn-walk').addEventListener('click', randomWalk);
+document.getElementById('btn-stop').addEventListener('click', () => {
+  stopAll();
+  clearInterval(walkInterval);
+  walkInterval = null;
+});
+
+document.getElementById('dim-slider').addEventListener('input', (e) => {
+  projDim = parseInt(e.target.value);
+  document.getElementById('dim-val').textContent = projDim + 'D';
+  updateCubeGeometry();
+});
+
+document.getElementById('btn-auto').addEventListener('click', (e) => {
+  autoRotate = !autoRotate;
+  e.target.classList.toggle('active', autoRotate);
+});
+document.getElementById('btn-explode').addEventListener('click', (e) => {
+  exploded = !exploded;
+  e.target.classList.toggle('active', exploded);
+});
+document.getElementById('btn-trail').addEventListener('click', (e) => {
+  showTrail = !showTrail;
+  e.target.classList.toggle('active', showTrail);
+  if (showTrail) {
+    // Build trail from hash byte differences
+    trailVertices = [];
+    let v = getHashVertex(projDim);
+    trailVertices.push(v);
+    for (let i = 0; i < 32; i++) {
+      v ^= (1 << (hashBytes[i] % projDim));
+      trailVertices.push(v);
+    }
+  }
+});
+
+// Mode tabs
+document.querySelectorAll('#mode-tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#mode-tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+  });
+});
+
+// Mouse rotation (when not auto-rotating)
+let isDragging = false, lastMouse = {x:0, y:0};
+canvas2d.style.pointerEvents = 'auto';
+canvas2d.addEventListener('mousedown', (e) => {
+  if (e.target !== canvas2d) return;
+  isDragging = true;
+  lastMouse = {x: e.clientX, y: e.clientY};
+});
+window.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  const dx = e.clientX - lastMouse.x;
+  const dy = e.clientY - lastMouse.y;
+  rotationAngles[0] += dx * 0.005;
+  rotationAngles[2] += dy * 0.005;
+  lastMouse = {x: e.clientX, y: e.clientY};
+});
+window.addEventListener('mouseup', () => isDragging = false);
+
+// Init
+document.getElementById('btn-auto').classList.add('active');
+computeHash(document.getElementById('hash-input').value);
+updateCubeGeometry();
+</script>
+</body>
+</html>
