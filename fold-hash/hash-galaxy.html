@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hash Galaxy — fold(HASH)</title>
+<style>
+:root{--bg:#030308;--accent:#7c6cf0;--cyan:#00f0ff;--pink:#ff4488;--gold:#ffd700;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:#ccc;font-family:'Courier New',monospace;overflow:hidden;height:100vh;width:100vw;}
+canvas{display:block;position:absolute;top:0;left:0;width:100%;height:100%;cursor:grab;}
+canvas:active{cursor:grabbing;}
+#ui{position:absolute;top:0;left:0;width:280px;max-height:100vh;overflow-y:auto;padding:14px;background:rgba(3,3,8,0.85);border-right:1px solid rgba(124,108,240,0.2);z-index:10;display:flex;flex-direction:column;gap:10px;}
+#ui::-webkit-scrollbar{width:4px;}
+#ui::-webkit-scrollbar-thumb{background:var(--accent);border-radius:2px;}
+h1{font-size:14px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;}
+h1 span{color:var(--cyan);font-weight:400;}
+label{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:1px;}
+textarea{background:rgba(124,108,240,0.08);border:1px solid rgba(124,108,240,0.25);color:#eee;font-family:'Courier New',monospace;font-size:12px;padding:8px;border-radius:4px;resize:vertical;width:100%;min-height:100px;outline:none;}
+textarea:focus{border-color:var(--accent);}
+.stats{font-size:11px;color:#888;display:flex;gap:12px;}
+.stats span{color:var(--cyan);}
+.btn-row{display:flex;gap:6px;flex-wrap:wrap;}
+button{background:rgba(124,108,240,0.15);border:1px solid rgba(124,108,240,0.3);color:var(--accent);font-family:'Courier New',monospace;font-size:10px;padding:5px 10px;border-radius:3px;cursor:pointer;text-transform:uppercase;letter-spacing:1px;transition:all 0.2s;}
+button:hover{background:rgba(124,108,240,0.3);border-color:var(--accent);}
+button.active{background:rgba(124,108,240,0.35);color:#fff;border-color:var(--accent);}
+#legend{display:flex;flex-direction:column;gap:3px;max-height:160px;overflow-y:auto;}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:10px;color:#aaa;}
+.legend-swatch{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.legend-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#info{position:absolute;bottom:14px;right:14px;font-size:10px;color:#444;z-index:10;text-align:right;line-height:1.6;}
+#focusInfo{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--gold);z-index:10;opacity:0;transition:opacity 0.3s;pointer-events:none;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <h1>Hash Galaxy <span>— fold(HASH)</span></h1>
+  <label>Inputs (one per line)</label>
+  <textarea id="inputs">bitcoin
+ethereum
+SHA-256
+hello world</textarea>
+  <div class="stats">
+    Hashes: <span id="hashCount">0</span>&nbsp;&nbsp;Stars: <span id="starCount">0</span>
+  </div>
+  <div class="btn-row">
+    <button id="btnRandom">+ Random</button>
+    <button id="btnConst" class="active">Constellations</button>
+    <button id="btnLabels">Labels</button>
+    <button id="btnSound">Sound</button>
+  </div>
+  <label>Color Legend</label>
+  <div id="legend"></div>
+</div>
+<div id="info">Drag to orbit · Scroll to zoom · Click star to focus<br>ESC to reset camera</div>
+<div id="focusInfo"></div>
+
+<script>
+// === SHA-256 ===
+const SHA256=(()=>{const K=new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);function rotr(n,x){return(x>>>n)|(x<<(32-n))}return function(msg){const utf8=new TextEncoder().encode(msg);const bitLen=utf8.length*8;const padLen=(((utf8.length+8)>>6)+1)<<6;const padded=new Uint8Array(padLen);padded.set(utf8);padded[utf8.length]=0x80;const view=new DataView(padded.buffer);view.setUint32(padLen-4,bitLen,false);let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a,h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;for(let o=0;o<padLen;o+=64){const W=new Uint32Array(64);for(let i=0;i<16;i++)W[i]=view.getUint32(o+i*4,false);for(let i=16;i<64;i++)W[i]=((rotr(17,W[i-2])^rotr(19,W[i-2])^(W[i-2]>>>10))+W[i-7]+(rotr(7,W[i-15])^rotr(18,W[i-15])^(W[i-15]>>>3))+W[i-16])|0;let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;for(let i=0;i<64;i++){const T1=(h+(rotr(6,e)^rotr(11,e)^rotr(25,e))+((e&f)^(~e&g))+K[i]+W[i])|0;const T2=((rotr(2,a)^rotr(13,a)^rotr(22,a))+((a&b)^(a&c)^(b&c)))|0;h=g;g=f;f=e;e=(d+T1)|0;d=c;c=b;b=a;a=(T1+T2)|0;}h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+h)|0;}const out=new Uint8Array(32);const dv=new DataView(out.buffer);[h0,h1,h2,h3,h4,h5,h6,h7].forEach((v,i)=>dv.setUint32(i*4,v,false));return out;};})();
+
+function bytesToHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// === WebGL Setup ===
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl', { alpha: false, antialias: true });
+if (!gl) { document.body.innerHTML = '<h1 style="color:red;padding:40px">WebGL not supported</h1>'; }
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+resize();
+window.addEventListener('resize', resize);
+
+// === Shader compilation ===
+function createShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(s));
+    return null;
+  }
+  return s;
+}
+function createProgram(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, vs);
+  gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(p));
+    return null;
+  }
+  return p;
+}
+
+// === Star shader ===
+const starVS = `
+attribute vec3 aPos;
+attribute vec4 aColor;
+attribute float aSize;
+attribute float aPhase;
+uniform mat4 uMVP;
+uniform float uTime;
+uniform float uPixelRatio;
+varying vec4 vColor;
+varying float vGlow;
+void main() {
+  gl_Position = uMVP * vec4(aPos, 1.0);
+  float twinkle = 0.7 + 0.3 * sin(uTime * 2.0 + aPhase * 6.283);
+  gl_PointSize = aSize * uPixelRatio * twinkle * (300.0 / max(gl_Position.w, 1.0));
+  gl_PointSize = clamp(gl_PointSize, 1.0, 60.0);
+  vColor = aColor;
+  vGlow = twinkle;
+}`;
+
+const starFS = `
+precision mediump float;
+varying vec4 vColor;
+varying float vGlow;
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  float d = length(c);
+  float core = smoothstep(0.5, 0.05, d);
+  float glow = smoothstep(0.5, 0.0, d) * 0.4;
+  float alpha = (core + glow) * vColor.a * vGlow;
+  vec3 col = vColor.rgb * core + vColor.rgb * 0.6 * glow;
+  gl_FragColor = vec4(col, alpha);
+}`;
+
+// === Background star shader ===
+const bgVS = `
+attribute vec3 aPos;
+attribute float aBright;
+uniform mat4 uMVP;
+varying float vBright;
+void main() {
+  gl_Position = uMVP * vec4(aPos, 1.0);
+  gl_PointSize = aBright * 2.0 + 0.5;
+  vBright = aBright;
+}`;
+
+const bgFS = `
+precision mediump float;
+varying float vBright;
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  float d = length(c);
+  float a = smoothstep(0.5, 0.0, d) * vBright * 0.6;
+  gl_FragColor = vec4(0.8, 0.85, 1.0, a);
+}`;
+
+// === Line shader ===
+const lineVS = `
+attribute vec3 aPos;
+attribute vec4 aColor;
+uniform mat4 uMVP;
+varying vec4 vColor;
+void main() {
+  gl_Position = uMVP * vec4(aPos, 1.0);
+  vColor = aColor;
+}`;
+
+const lineFS = `
+precision mediump float;
+varying vec4 vColor;
+void main() {
+  gl_FragColor = vColor;
+}`;
+
+// === Label shader (billboard quads) ===
+const labelVS = `
+attribute vec3 aPos;
+attribute vec2 aUV;
+attribute vec4 aColor;
+uniform mat4 uMVP;
+uniform mat4 uView;
+uniform float uAspect;
+varying vec2 vUV;
+varying vec4 vColor;
+void main() {
+  vec4 viewPos = uView * vec4(aPos, 1.0);
+  vUV = aUV;
+  vColor = aColor;
+  gl_Position = uMVP * vec4(aPos, 1.0);
+}`;
+
+// Compile all programs
+const starProg = createProgram(
+  createShader(gl.VERTEX_SHADER, starVS),
+  createShader(gl.FRAGMENT_SHADER, starFS)
+);
+const bgProg = createProgram(
+  createShader(gl.VERTEX_SHADER, bgVS),
+  createShader(gl.FRAGMENT_SHADER, bgFS)
+);
+const lineProg = createProgram(
+  createShader(gl.VERTEX_SHADER, lineVS),
+  createShader(gl.FRAGMENT_SHADER, lineFS)
+);
+
+// === Attribute/uniform locations ===
+const starLoc = {
+  aPos: gl.getAttribLocation(starProg, 'aPos'),
+  aColor: gl.getAttribLocation(starProg, 'aColor'),
+  aSize: gl.getAttribLocation(starProg, 'aSize'),
+  aPhase: gl.getAttribLocation(starProg, 'aPhase'),
+  uMVP: gl.getUniformLocation(starProg, 'uMVP'),
+  uTime: gl.getUniformLocation(starProg, 'uTime'),
+  uPixelRatio: gl.getUniformLocation(starProg, 'uPixelRatio'),
+};
+const bgLoc = {
+  aPos: gl.getAttribLocation(bgProg, 'aPos'),
+  aBright: gl.getAttribLocation(bgProg, 'aBright'),
+  uMVP: gl.getUniformLocation(bgProg, 'uMVP'),
+};
+const lineLoc = {
+  aPos: gl.getAttribLocation(lineProg, 'aPos'),
+  aColor: gl.getAttribLocation(lineProg, 'aColor'),
+  uMVP: gl.getUniformLocation(lineProg, 'uMVP'),
+};
+
+// === Background stars ===
+const BG_COUNT = 1500;
+const bgData = new Float32Array(BG_COUNT * 4);
+for (let i = 0; i < BG_COUNT; i++) {
+  const theta = Math.random() * Math.PI * 2;
+  const phi = Math.acos(2 * Math.random() - 1);
+  const r = 40 + Math.random() * 60;
+  bgData[i*4]   = r * Math.sin(phi) * Math.cos(theta);
+  bgData[i*4+1] = r * Math.sin(phi) * Math.sin(theta);
+  bgData[i*4+2] = r * Math.cos(phi);
+  bgData[i*4+3] = Math.random() * 0.5 + 0.3;
+}
+const bgBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, bgBuf);
+gl.bufferData(gl.ARRAY_BUFFER, bgData, gl.STATIC_DRAW);
+
+// === Matrix math ===
+function mat4Perspective(fov, aspect, near, far) {
+  const f = 1 / Math.tan(fov / 2);
+  const nf = 1 / (near - far);
+  return new Float32Array([
+    f/aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far+near)*nf, -1,
+    0, 0, 2*far*near*nf, 0
+  ]);
+}
+function mat4LookAt(eye, center, up) {
+  const zx=eye[0]-center[0], zy=eye[1]-center[1], zz=eye[2]-center[2];
+  let len=Math.sqrt(zx*zx+zy*zy+zz*zz)||1;
+  const z=[zx/len,zy/len,zz/len];
+  const xx=up[1]*z[2]-up[2]*z[1], xy=up[2]*z[0]-up[0]*z[2], xz=up[0]*z[1]-up[1]*z[0];
+  len=Math.sqrt(xx*xx+xy*xy+xz*xz)||1;
+  const x=[xx/len,xy/len,xz/len];
+  const y=[z[1]*x[2]-z[2]*x[1], z[2]*x[0]-z[0]*x[2], z[0]*x[1]-z[1]*x[0]];
+  return new Float32Array([
+    x[0],y[0],z[0],0,
+    x[1],y[1],z[1],0,
+    x[2],y[2],z[2],0,
+    -(x[0]*eye[0]+x[1]*eye[1]+x[2]*eye[2]),
+    -(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]),
+    -(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]),
+    1
+  ]);
+}
+function mat4Mul(a, b) {
+  const r = new Float32Array(16);
+  for (let i = 0; i < 4; i++)
+    for (let j = 0; j < 4; j++) {
+      r[j*4+i] = a[i]*b[j*4] + a[4+i]*b[j*4+1] + a[8+i]*b[j*4+2] + a[12+i]*b[j*4+3];
+    }
+  return r;
+}
+
+// === HSL to RGB ===
+function hsl(h, s, l) {
+  h = ((h % 360) + 360) % 360;
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2*l - 1)) * s;
+  const x = c * (1 - Math.abs((h/60) % 2 - 1));
+  const m = l - c/2;
+  let r, g, b;
+  if (h < 60) { r=c; g=x; b=0; }
+  else if (h < 120) { r=x; g=c; b=0; }
+  else if (h < 180) { r=0; g=c; b=x; }
+  else if (h < 240) { r=0; g=x; b=c; }
+  else if (h < 300) { r=x; g=0; b=c; }
+  else { r=c; g=0; b=x; }
+  return [r+m, g+m, b+m];
+}
+
+// === Galaxy state ===
+const GALAXY_RADIUS = 8;
+let clusters = []; // {input, hash, bytes, hue, stars:[{x,y,z,r,g,b,size,freq,hexLabel}], color:[r,g,b]}
+let allStarData = null;  // Float32Array for positions, colors, sizes
+let allLineData = null;
+let starBuf = gl.createBuffer();
+let lineBuf = gl.createBuffer();
+let totalStars = 0;
+let totalLineVerts = 0;
+
+function hashToStars(bytes, hueOffset) {
+  const stars = [];
+  // 10 stars from byte triplets, wrapping
+  for (let i = 0; i < 10; i++) {
+    const bi = i * 3;
+    const bx = bytes[bi % 32];
+    const by = bytes[(bi+1) % 32];
+    const bz = bytes[(bi+2) % 32];
+    const colorByte = bytes[(bi+3) % 32];
+    const sizeByte = bytes[(bi+4) % 32];
+
+    const x = (bx / 255) * 2 - 1;
+    const y = (by / 255) * 2 - 1;
+    const z = (bz / 255) * 2 - 1;
+
+    const starHue = (hueOffset + (colorByte / 255) * 60 - 30) % 360;
+    const [r, g, b] = hsl(starHue, 70 + (sizeByte/255)*30, 55 + (colorByte/255)*25);
+    const size = 0.4 + (sizeByte / 255) * 1.2;
+    const freq = 80 + (bx + by) * 1.5; // frequency for sound
+
+    const hexLabel = bytesToHex(bytes).substring(i*6, i*6+6).padEnd(6, bytesToHex(bytes).substring(0,6));
+
+    stars.push({
+      x: x * GALAXY_RADIUS,
+      y: y * GALAXY_RADIUS,
+      z: z * GALAXY_RADIUS,
+      r, g, b, size, freq,
+      hexLabel: bytesToHex(bytes).substring(0, 8)
+    });
+  }
+  return stars;
+}
+
+function rebuildGalaxy() {
+  const inputEl = document.getElementById('inputs');
+  const lines = inputEl.value.split('\n').filter(l => l.trim().length > 0);
+
+  const oldCount = clusters.length;
+  clusters = [];
+
+  lines.forEach((line, idx) => {
+    const input = line.trim();
+    const bytes = SHA256(input);
+    const hue = (idx * 137.508) % 360; // golden angle for nice distribution
+    const [cr, cg, cb] = hsl(hue, 80, 60);
+    const stars = hashToStars(bytes, hue);
+    clusters.push({ input, hash: bytesToHex(bytes), bytes, hue, stars, color: [cr, cg, cb] });
+  });
+
+  // Build star buffer: position(3) + color(4) + size(1) + phase(1) = 9 floats per star
+  totalStars = clusters.reduce((s, c) => s + c.stars.length, 0);
+  allStarData = new Float32Array(totalStars * 9);
+  let si = 0;
+  clusters.forEach(c => {
+    c.stars.forEach(star => {
+      allStarData[si++] = star.x;
+      allStarData[si++] = star.y;
+      allStarData[si++] = star.z;
+      allStarData[si++] = star.r;
+      allStarData[si++] = star.g;
+      allStarData[si++] = star.b;
+      allStarData[si++] = 0.9; // alpha
+      allStarData[si++] = star.size;
+      allStarData[si++] = Math.random(); // phase for twinkle
+    });
+  });
+  gl.bindBuffer(gl.ARRAY_BUFFER, starBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, allStarData, gl.STATIC_DRAW);
+
+  // Build constellation lines
+  rebuildLines();
+
+  // Update UI
+  document.getElementById('hashCount').textContent = clusters.length;
+  document.getElementById('starCount').textContent = totalStars;
+  updateLegend();
+
+  // Trigger shimmer if new hash added
+  if (clusters.length > oldCount && soundEnabled) {
+    playShimmer();
+  }
+}
+
+function rebuildLines() {
+  const lineVerts = [];
+  clusters.forEach(c => {
+    for (let i = 0; i < c.stars.length - 1; i++) {
+      const a = c.stars[i], b = c.stars[i+1];
+      lineVerts.push(a.x, a.y, a.z, c.color[0], c.color[1], c.color[2], 0.15);
+      lineVerts.push(b.x, b.y, b.z, c.color[0], c.color[1], c.color[2], 0.15);
+    }
+    // Close the loop
+    if (c.stars.length > 2) {
+      const a = c.stars[c.stars.length-1], b = c.stars[0];
+      lineVerts.push(a.x, a.y, a.z, c.color[0], c.color[1], c.color[2], 0.08);
+      lineVerts.push(b.x, b.y, b.z, c.color[0], c.color[1], c.color[2], 0.08);
+    }
+  });
+  totalLineVerts = lineVerts.length / 7;
+  allLineData = new Float32Array(lineVerts);
+  gl.bindBuffer(gl.ARRAY_BUFFER, lineBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, allLineData, gl.STATIC_DRAW);
+}
+
+function updateLegend() {
+  const el = document.getElementById('legend');
+  el.innerHTML = '';
+  clusters.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'legend-item';
+    const swatch = document.createElement('div');
+    swatch.className = 'legend-swatch';
+    swatch.style.background = `rgb(${Math.round(c.color[0]*255)},${Math.round(c.color[1]*255)},${Math.round(c.color[2]*255)})`;
+    const text = document.createElement('span');
+    text.className = 'legend-text';
+    text.textContent = `${c.input} (${c.hash.substring(0,8)}...)`;
+    div.appendChild(swatch);
+    div.appendChild(text);
+    el.appendChild(div);
+  });
+}
+
+// === Camera ===
+let camTheta = 0.5;
+let camPhi = 0.8;
+let camDist = 22;
+let targetTheta = camTheta;
+let targetPhi = camPhi;
+let targetDist = camDist;
+let targetCenter = [0, 0, 0];
+let camCenter = [0, 0, 0];
+let autoOrbit = true;
+let dragging = false;
+let lastMX = 0, lastMY = 0;
+let focusedStar = null;
+
+function getCamPos() {
+  return [
+    camCenter[0] + camDist * Math.sin(camPhi) * Math.cos(camTheta),
+    camCenter[1] + camDist * Math.cos(camPhi),
+    camCenter[2] + camDist * Math.sin(camPhi) * Math.sin(camTheta),
+  ];
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (e.target !== canvas) return;
+  dragging = true;
+  lastMX = e.clientX;
+  lastMY = e.clientY;
+  autoOrbit = false;
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const dx = e.clientX - lastMX;
+  const dy = e.clientY - lastMY;
+  targetTheta -= dx * 0.005;
+  targetPhi = Math.max(0.1, Math.min(Math.PI - 0.1, targetPhi - dy * 0.005));
+  lastMX = e.clientX;
+  lastMY = e.clientY;
+});
+window.addEventListener('mouseup', () => { dragging = false; });
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  targetDist = Math.max(3, Math.min(80, targetDist + e.deltaY * 0.02));
+}, { passive: false });
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    dragging = true;
+    lastMX = e.touches[0].clientX;
+    lastMY = e.touches[0].clientY;
+    autoOrbit = false;
+  }
+}, { passive: true });
+canvas.addEventListener('touchmove', e => {
+  if (!dragging || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - lastMX;
+  const dy = e.touches[0].clientY - lastMY;
+  targetTheta -= dx * 0.005;
+  targetPhi = Math.max(0.1, Math.min(Math.PI - 0.1, targetPhi - dy * 0.005));
+  lastMX = e.touches[0].clientX;
+  lastMY = e.touches[0].clientY;
+}, { passive: true });
+canvas.addEventListener('touchend', () => { dragging = false; });
+
+// Star picking
+canvas.addEventListener('click', e => {
+  if (e.target !== canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) / rect.width * 2 - 1;
+  const my = -((e.clientY - rect.top) / rect.height * 2 - 1);
+
+  const aspect = canvas.width / canvas.height;
+  const proj = mat4Perspective(Math.PI / 4, aspect, 0.1, 200);
+  const eye = getCamPos();
+  const view = mat4LookAt(eye, camCenter, [0, 1, 0]);
+  const mvp = mat4Mul(proj, view);
+
+  let bestDist = 0.05;
+  let bestStar = null;
+  let bestCenter = null;
+
+  clusters.forEach(c => {
+    c.stars.forEach(star => {
+      // Project star to screen
+      const cx = mvp[0]*star.x + mvp[4]*star.y + mvp[8]*star.z + mvp[12];
+      const cy = mvp[1]*star.x + mvp[5]*star.y + mvp[9]*star.z + mvp[13];
+      const cw = mvp[3]*star.x + mvp[7]*star.y + mvp[11]*star.z + mvp[15];
+      if (cw <= 0) return;
+      const sx = cx / cw;
+      const sy = cy / cw;
+      const d = Math.sqrt((sx - mx) ** 2 + (sy - my) ** 2);
+      if (d < bestDist) {
+        bestDist = d;
+        bestStar = star;
+        bestCenter = [star.x, star.y, star.z];
+      }
+    });
+  });
+
+  if (bestStar) {
+    focusedStar = bestStar;
+    targetCenter = bestCenter;
+    targetDist = 6;
+    autoOrbit = false;
+    document.getElementById('focusInfo').textContent = `Focused: ${bestStar.hexLabel}...`;
+    document.getElementById('focusInfo').style.opacity = '1';
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    focusedStar = null;
+    targetCenter = [0, 0, 0];
+    targetDist = 22;
+    autoOrbit = true;
+    document.getElementById('focusInfo').style.opacity = '0';
+  }
+});
+
+// === Toggles ===
+let showConstellations = true;
+let showLabels = false;
+let soundEnabled = false;
+
+document.getElementById('btnConst').addEventListener('click', function() {
+  showConstellations = !showConstellations;
+  this.classList.toggle('active', showConstellations);
+});
+document.getElementById('btnLabels').addEventListener('click', function() {
+  showLabels = !showLabels;
+  this.classList.toggle('active', showLabels);
+});
+document.getElementById('btnSound').addEventListener('click', function() {
+  soundEnabled = !soundEnabled;
+  this.classList.toggle('active', soundEnabled);
+  if (soundEnabled) initAudio();
+});
+document.getElementById('btnRandom').addEventListener('click', () => {
+  const words = ['cosmos','nebula','quasar','pulsar','entropy','cipher','matrix','quantum','photon','gravity','singularity','wormhole','stardust','supernova','blackhole','neutron','fibonacci','merkle','nonce','genesis','block','chain','node','peer','hash','proof','stake','mint','oracle','token','protocol','layer','shard'];
+  const w = words[Math.floor(Math.random() * words.length)] + Math.floor(Math.random() * 1000);
+  const ta = document.getElementById('inputs');
+  ta.value = ta.value.trim() + '\n' + w;
+  rebuildGalaxy();
+});
+
+let inputTimeout;
+document.getElementById('inputs').addEventListener('input', () => {
+  clearTimeout(inputTimeout);
+  inputTimeout = setTimeout(rebuildGalaxy, 300);
+});
+
+// === Web Audio ===
+let audioCtx = null;
+let masterGain = null;
+let activeOscs = new Map();
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.08;
+  masterGain.connect(audioCtx.destination);
+}
+
+function playShimmer() {
+  if (!audioCtx) initAudio();
+  const now = audioCtx.currentTime;
+  for (let i = 0; i < 5; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 400 + Math.random() * 1200;
+    gain.gain.setValueAtTime(0, now + i * 0.06);
+    gain.gain.linearRampToValueAtTime(0.06, now + i * 0.06 + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.4);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(now + i * 0.06);
+    osc.stop(now + i * 0.06 + 0.5);
+  }
+}
+
+function updateAmbientSound(eye, forward) {
+  if (!audioCtx || !soundEnabled) {
+    if (activeOscs.size > 0) {
+      activeOscs.forEach((o) => {
+        o.gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+        setTimeout(() => { try { o.osc.stop(); } catch(e){} }, 200);
+      });
+      activeOscs.clear();
+    }
+    return;
+  }
+
+  const fLen = Math.sqrt(forward[0]**2 + forward[1]**2 + forward[2]**2) || 1;
+  const fn = [forward[0]/fLen, forward[1]/fLen, forward[2]/fLen];
+
+  const desiredStars = new Set();
+  let starIdx = 0;
+
+  clusters.forEach(c => {
+    c.stars.forEach(star => {
+      const dx = star.x - eye[0], dy = star.y - eye[1], dz = star.z - eye[2];
+      const dist = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1;
+      const dot = (dx*fn[0] + dy*fn[1] + dz*fn[2]) / dist;
+
+      if (dot > 0.3 && dist < 25) {
+        desiredStars.add(starIdx);
+      }
+      starIdx++;
+    });
+  });
+
+  // Remove oscs no longer desired
+  activeOscs.forEach((o, key) => {
+    if (!desiredStars.has(key)) {
+      o.gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+      setTimeout(() => { try { o.osc.stop(); } catch(e){} }, 400);
+      activeOscs.delete(key);
+    }
+  });
+
+  // Add new oscs (limit total)
+  const maxOscs = 8;
+  starIdx = 0;
+  if (activeOscs.size < maxOscs) {
+    clusters.forEach(c => {
+      c.stars.forEach(star => {
+        if (desiredStars.has(starIdx) && !activeOscs.has(starIdx) && activeOscs.size < maxOscs) {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          // Quantize to pentatonic scale for pleasant harmony
+          const noteFreqs = [130.81,146.83,164.81,196.00,220.00,261.63,293.66,329.63,392.00,440.00,523.25,587.33,659.25,783.99,880.00];
+          const fi = Math.floor((star.freq - 80) / (80 + 255*1.5 - 80) * noteFreqs.length);
+          osc.frequency.value = noteFreqs[Math.max(0, Math.min(fi, noteFreqs.length-1))];
+          gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.02, audioCtx.currentTime + 0.5);
+          osc.connect(gain);
+          gain.connect(masterGain);
+          osc.start();
+          activeOscs.set(starIdx, { osc, gain });
+        }
+        starIdx++;
+      });
+    });
+  }
+}
+
+// === Label rendering (2D overlay) ===
+const labelCanvas = document.createElement('canvas');
+labelCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;';
+document.body.appendChild(labelCanvas);
+const ctx2d = labelCanvas.getContext('2d');
+
+function resizeLabel() {
+  labelCanvas.width = window.innerWidth;
+  labelCanvas.height = window.innerHeight;
+}
+resizeLabel();
+window.addEventListener('resize', resizeLabel);
+
+function drawLabels(mvp) {
+  ctx2d.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
+  if (!showLabels) return;
+
+  ctx2d.font = '9px "Courier New", monospace';
+  ctx2d.textAlign = 'center';
+
+  clusters.forEach(c => {
+    const r = Math.round(c.color[0]*255), g = Math.round(c.color[1]*255), b = Math.round(c.color[2]*255);
+    ctx2d.fillStyle = `rgba(${r},${g},${b},0.7)`;
+
+    c.stars.forEach(star => {
+      const cx = mvp[0]*star.x + mvp[4]*star.y + mvp[8]*star.z + mvp[12];
+      const cy = mvp[1]*star.x + mvp[5]*star.y + mvp[9]*star.z + mvp[13];
+      const cw = mvp[3]*star.x + mvp[7]*star.y + mvp[11]*star.z + mvp[15];
+      if (cw <= 0) return;
+      const sx = (cx/cw * 0.5 + 0.5) * labelCanvas.width;
+      const sy = (-cy/cw * 0.5 + 0.5) * labelCanvas.height;
+
+      if (sx > -50 && sx < labelCanvas.width + 50 && sy > -50 && sy < labelCanvas.height + 50) {
+        ctx2d.fillText(star.hexLabel, sx, sy - 10);
+      }
+    });
+  });
+}
+
+// === Render loop ===
+let time = 0;
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function render(ts) {
+  requestAnimationFrame(render);
+  const dt = 1/60;
+  time = ts / 1000;
+
+  // Auto orbit
+  if (autoOrbit && !dragging) {
+    targetTheta += 0.003;
+  }
+
+  // Smooth camera
+  camTheta = lerp(camTheta, targetTheta, 0.06);
+  camPhi = lerp(camPhi, targetPhi, 0.06);
+  camDist = lerp(camDist, targetDist, 0.06);
+  camCenter[0] = lerp(camCenter[0], targetCenter[0], 0.04);
+  camCenter[1] = lerp(camCenter[1], targetCenter[1], 0.04);
+  camCenter[2] = lerp(camCenter[2], targetCenter[2], 0.04);
+
+  const aspect = canvas.width / canvas.height;
+  const proj = mat4Perspective(Math.PI / 4, aspect, 0.1, 200);
+  const eye = getCamPos();
+  const view = mat4LookAt(eye, camCenter, [0, 1, 0]);
+  const mvp = mat4Mul(proj, view);
+
+  // Sound update
+  const forward = [camCenter[0]-eye[0], camCenter[1]-eye[1], camCenter[2]-eye[2]];
+  updateAmbientSound(eye, forward);
+
+  gl.clearColor(0.012, 0.012, 0.031, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+  gl.depthMask(false);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+  // Draw background stars
+  gl.useProgram(bgProg);
+  gl.uniformMatrix4fv(bgLoc.uMVP, false, mvp);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bgBuf);
+  gl.enableVertexAttribArray(bgLoc.aPos);
+  gl.vertexAttribPointer(bgLoc.aPos, 3, gl.FLOAT, false, 16, 0);
+  gl.enableVertexAttribArray(bgLoc.aBright);
+  gl.vertexAttribPointer(bgLoc.aBright, 1, gl.FLOAT, false, 16, 12);
+  gl.drawArrays(gl.POINTS, 0, BG_COUNT);
+  gl.disableVertexAttribArray(bgLoc.aPos);
+  gl.disableVertexAttribArray(bgLoc.aBright);
+
+  // Draw constellation lines
+  if (showConstellations && totalLineVerts > 0) {
+    gl.useProgram(lineProg);
+    gl.uniformMatrix4fv(lineLoc.uMVP, false, mvp);
+    gl.bindBuffer(gl.ARRAY_BUFFER, lineBuf);
+    gl.enableVertexAttribArray(lineLoc.aPos);
+    gl.vertexAttribPointer(lineLoc.aPos, 3, gl.FLOAT, false, 28, 0);
+    gl.enableVertexAttribArray(lineLoc.aColor);
+    gl.vertexAttribPointer(lineLoc.aColor, 4, gl.FLOAT, false, 28, 12);
+    gl.drawArrays(gl.LINES, 0, totalLineVerts);
+    gl.disableVertexAttribArray(lineLoc.aPos);
+    gl.disableVertexAttribArray(lineLoc.aColor);
+  }
+
+  // Draw hash stars
+  if (totalStars > 0) {
+    gl.useProgram(starProg);
+    gl.uniformMatrix4fv(starLoc.uMVP, false, mvp);
+    gl.uniform1f(starLoc.uTime, time);
+    gl.uniform1f(starLoc.uPixelRatio, window.devicePixelRatio || 1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, starBuf);
+    const stride = 36; // 9 floats * 4 bytes
+    gl.enableVertexAttribArray(starLoc.aPos);
+    gl.vertexAttribPointer(starLoc.aPos, 3, gl.FLOAT, false, stride, 0);
+    gl.enableVertexAttribArray(starLoc.aColor);
+    gl.vertexAttribPointer(starLoc.aColor, 4, gl.FLOAT, false, stride, 12);
+    gl.enableVertexAttribArray(starLoc.aSize);
+    gl.vertexAttribPointer(starLoc.aSize, 1, gl.FLOAT, false, stride, 28);
+    gl.enableVertexAttribArray(starLoc.aPhase);
+    gl.vertexAttribPointer(starLoc.aPhase, 1, gl.FLOAT, false, stride, 32);
+    gl.drawArrays(gl.POINTS, 0, totalStars);
+    gl.disableVertexAttribArray(starLoc.aPos);
+    gl.disableVertexAttribArray(starLoc.aColor);
+    gl.disableVertexAttribArray(starLoc.aSize);
+    gl.disableVertexAttribArray(starLoc.aPhase);
+  }
+
+  gl.depthMask(true);
+
+  // 2D labels
+  drawLabels(mvp);
+}
+
+// === Init ===
+rebuildGalaxy();
+requestAnimationFrame(render);
+
+</script>
+</body>
+</html>

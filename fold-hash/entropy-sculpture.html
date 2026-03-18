@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entropy Sculpture — fold(HASH)</title>
+<style>
+:root{--bg:#030308;--accent:#7c6cf0;--cyan:#00f0ff;--pink:#ff4488;--gold:#ffd700}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:#e0e0e0;font-family:'Courier New',monospace;overflow:hidden;height:100vh;width:100vw}
+canvas{display:block;position:absolute;top:0;left:0;width:100%;height:100%;z-index:0}
+#ui{position:absolute;top:0;left:0;right:0;z-index:10;pointer-events:none}
+#ui>*{pointer-events:auto}
+#header{text-align:center;padding:12px 20px 8px}
+#title{font-size:14px;color:var(--accent);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px}
+#input-row{display:flex;justify-content:center;gap:8px;margin-bottom:8px}
+#hash-input{background:rgba(124,108,240,0.08);border:1px solid rgba(124,108,240,0.3);color:#e0e0e0;font-family:'Courier New',monospace;font-size:13px;padding:6px 14px;border-radius:4px;width:340px;outline:none;transition:border-color 0.3s}
+#hash-input:focus{border-color:var(--accent)}
+#hash-display{font-size:10px;letter-spacing:1px;line-height:1.6;max-width:520px;margin:0 auto 6px;word-break:break-all}
+.hash-byte{transition:color 0.3s}
+#controls{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.btn{background:rgba(124,108,240,0.1);border:1px solid rgba(124,108,240,0.25);color:var(--accent);font-family:'Courier New',monospace;font-size:10px;padding:4px 10px;border-radius:3px;cursor:pointer;transition:all 0.2s;text-transform:uppercase;letter-spacing:1px}
+.btn:hover{background:rgba(124,108,240,0.2);border-color:var(--accent)}
+.btn.active{background:rgba(124,108,240,0.25);border-color:var(--cyan);color:var(--cyan)}
+#info-panel{position:absolute;bottom:12px;left:12px;z-index:10;font-size:10px;line-height:1.7;opacity:0.7}
+#info-panel div{margin-bottom:2px}
+.label{color:var(--accent)}
+.val{color:var(--cyan)}
+.sym-val{color:var(--pink)}
+#dna-panel{position:absolute;bottom:12px;right:12px;z-index:10;font-size:10px;line-height:1.7;opacity:0.7;text-align:right}
+#dna-panel div{margin-bottom:2px}
+#copy-btn{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:10}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="ui">
+  <div id="header">
+    <div id="title">Entropy Sculpture &mdash; fold(HASH)</div>
+    <div id="input-row">
+      <input id="hash-input" type="text" placeholder="Type anything to sculpt..." value="entropy sculpture" spellcheck="false"/>
+    </div>
+    <div id="hash-display"></div>
+    <div id="controls">
+      <button class="btn active" id="btn-rotate">Rotate</button>
+      <button class="btn" id="btn-wire">Wireframe</button>
+      <button class="btn" id="btn-flat">Flat Shading</button>
+      <button class="btn" id="btn-normals">Normals</button>
+      <button class="btn" id="btn-sound">Sound</button>
+    </div>
+  </div>
+</div>
+<div id="info-panel">
+  <div><span class="label">Symmetry: </span><span class="sym-val" id="sym-display">—</span></div>
+  <div><span class="label">Faces: </span><span class="val" id="face-count">—</span></div>
+  <div><span class="label">Vertices: </span><span class="val" id="vert-count">—</span></div>
+</div>
+<div id="dna-panel">
+  <div><span class="label">Hue: </span><span class="val" id="dna-hue">—</span></div>
+  <div><span class="label">Freq: </span><span class="val" id="dna-freq">—</span></div>
+  <div><span class="label">Amp: </span><span class="val" id="dna-amp">—</span></div>
+  <div><span class="label">Shine: </span><span class="val" id="dna-shine">—</span></div>
+  <div><span class="label">Scheme: </span><span class="val" id="dna-scheme">—</span></div>
+</div>
+<button class="btn" id="copy-btn">Copy DNA</button>
+
+<script>
+// ─── SHA-256 ────────────────────────────────────────────────────────
+const SHA256=(()=>{const K=new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);function rotr(n,x){return(x>>>n)|(x<<(32-n))}return function(msg){const utf8=new TextEncoder().encode(msg);const bitLen=utf8.length*8;const padLen=(((utf8.length+8)>>6)+1)<<6;const padded=new Uint8Array(padLen);padded.set(utf8);padded[utf8.length]=0x80;const view=new DataView(padded.buffer);view.setUint32(padLen-4,bitLen,false);let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a,h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;for(let o=0;o<padLen;o+=64){const W=new Uint32Array(64);for(let i=0;i<16;i++)W[i]=view.getUint32(o+i*4,false);for(let i=16;i<64;i++)W[i]=((rotr(17,W[i-2])^rotr(19,W[i-2])^(W[i-2]>>>10))+W[i-7]+(rotr(7,W[i-15])^rotr(18,W[i-15])^(W[i-15]>>>3))+W[i-16])|0;let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;for(let i=0;i<64;i++){const T1=(h+(rotr(6,e)^rotr(11,e)^rotr(25,e))+((e&f)^(~e&g))+K[i]+W[i])|0;const T2=((rotr(2,a)^rotr(13,a)^rotr(22,a))+((a&b)^(a&c)^(b&c)))|0;h=g;g=f;f=e;e=(d+T1)|0;d=c;c=b;b=a;a=(T1+T2)|0;}h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+h)|0;}const out=new Uint8Array(32);const dv=new DataView(out.buffer);[h0,h1,h2,h3,h4,h5,h6,h7].forEach((v,i)=>dv.setUint32(i*4,v,false));return out;};})();
+
+// ─── WebGL Setup ────────────────────────────────────────────────────
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl', { antialias: true, alpha: false });
+if (!gl) document.body.innerHTML = '<h1 style="color:red;text-align:center;margin-top:40vh">WebGL not supported</h1>';
+
+// ─── Shaders ────────────────────────────────────────────────────────
+const VERT_PHONG = `
+precision highp float;
+attribute vec3 aPos;
+attribute vec3 aNorm;
+attribute vec3 aColor;
+attribute float aDisp;
+uniform mat4 uProj, uMV;
+uniform mat3 uNormMat;
+uniform int uFlatShade;
+varying vec3 vNorm, vPos, vColor;
+varying float vDisp;
+void main(){
+  vec4 mvPos = uMV * vec4(aPos, 1.0);
+  vPos = mvPos.xyz;
+  vNorm = normalize(uNormMat * aNorm);
+  vColor = aColor;
+  vDisp = aDisp;
+  gl_Position = uProj * mvPos;
+}`;
+
+const FRAG_PHONG = `
+precision highp float;
+varying vec3 vNorm, vPos, vColor;
+varying float vDisp;
+uniform vec3 uLight1Dir, uLight2Dir;
+uniform vec3 uLight1Col, uLight2Col;
+uniform float uShininess;
+uniform float uAmbient;
+uniform int uShowNormals;
+void main(){
+  if(uShowNormals == 1){
+    gl_FragColor = vec4(vNorm * 0.5 + 0.5, 1.0);
+    return;
+  }
+  vec3 N = normalize(vNorm);
+  vec3 V = normalize(-vPos);
+  vec3 ambient = uAmbient * vColor;
+  vec3 result = ambient;
+  // Light 1 (warm)
+  vec3 L1 = normalize(uLight1Dir - vPos);
+  float diff1 = max(dot(N, L1), 0.0);
+  vec3 R1 = reflect(-L1, N);
+  float spec1 = pow(max(dot(V, R1), 0.0), uShininess);
+  result += diff1 * vColor * uLight1Col + spec1 * uLight1Col * 0.5;
+  // Light 2 (cool)
+  vec3 L2 = normalize(uLight2Dir - vPos);
+  float diff2 = max(dot(N, L2), 0.0);
+  vec3 R2 = reflect(-L2, N);
+  float spec2 = pow(max(dot(V, R2), 0.0), uShininess);
+  result += diff2 * vColor * uLight2Col * 0.6 + spec2 * uLight2Col * 0.3;
+  // Rim light
+  float rim = 1.0 - max(dot(N, V), 0.0);
+  rim = pow(rim, 3.0) * 0.25;
+  result += rim * vec3(0.486, 0.424, 0.941);
+  gl_FragColor = vec4(result, 1.0);
+}`;
+
+const VERT_LINE = `
+precision highp float;
+attribute vec3 aPos;
+uniform mat4 uProj, uMV;
+void main(){
+  gl_Position = uProj * uMV * vec4(aPos, 1.0);
+}`;
+
+const FRAG_LINE = `
+precision highp float;
+uniform vec3 uLineColor;
+void main(){
+  gl_FragColor = vec4(uLineColor, 0.6);
+}`;
+
+function compileShader(src, type) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(s));
+    return null;
+  }
+  return s;
+}
+
+function linkProgram(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compileShader(vs, gl.VERTEX_SHADER));
+  gl.attachShader(p, compileShader(fs, gl.FRAGMENT_SHADER));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(p));
+  return p;
+}
+
+const progPhong = linkProgram(VERT_PHONG, FRAG_PHONG);
+const progLine = linkProgram(VERT_LINE, FRAG_LINE);
+
+function getUniforms(prog, names) {
+  const u = {};
+  names.forEach(n => u[n] = gl.getUniformLocation(prog, n));
+  return u;
+}
+
+const uPhong = getUniforms(progPhong, ['uProj','uMV','uNormMat','uLight1Dir','uLight2Dir','uLight1Col','uLight2Col','uShininess','uAmbient','uFlatShade','uShowNormals']);
+const uLine = getUniforms(progLine, ['uProj','uMV','uLineColor']);
+
+// ─── Icosphere Generation ───────────────────────────────────────────
+function createIcosphere(subdivisions) {
+  const t = (1 + Math.sqrt(5)) / 2;
+  let verts = [
+    [-1,t,0],[1,t,0],[-1,-t,0],[1,-t,0],
+    [0,-1,t],[0,1,t],[0,-1,-t],[0,1,-t],
+    [t,0,-1],[t,0,1],[-t,0,-1],[-t,0,1]
+  ];
+  // Normalize
+  verts = verts.map(v => {
+    const l = Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);
+    return [v[0]/l, v[1]/l, v[2]/l];
+  });
+  let faces = [
+    [0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],
+    [1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
+    [3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],
+    [4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]
+  ];
+
+  const midCache = {};
+  function getMid(i1, i2) {
+    const key = Math.min(i1,i2) + ':' + Math.max(i1,i2);
+    if (midCache[key] !== undefined) return midCache[key];
+    const v1 = verts[i1], v2 = verts[i2];
+    const m = [(v1[0]+v2[0])/2, (v1[1]+v2[1])/2, (v1[2]+v2[2])/2];
+    const l = Math.sqrt(m[0]*m[0]+m[1]*m[1]+m[2]*m[2]);
+    m[0]/=l; m[1]/=l; m[2]/=l;
+    verts.push(m);
+    midCache[key] = verts.length - 1;
+    return midCache[key];
+  }
+
+  for (let s = 0; s < subdivisions; s++) {
+    const newFaces = [];
+    for (const [a,b,c] of faces) {
+      const ab = getMid(a,b), bc = getMid(b,c), ca = getMid(c,a);
+      newFaces.push([a,ab,ca],[ab,b,bc],[ca,bc,c],[ab,bc,ca]);
+    }
+    faces = newFaces;
+    // Clear cache for next level
+    for (const k in midCache) delete midCache[k];
+  }
+
+  return { verts, faces };
+}
+
+// ─── Hash Parameter Extraction ──────────────────────────────────────
+const SYMMETRY_NAMES = ['None','Bilateral','Trilateral','4-Fold','6-Fold','8-Fold'];
+const SCHEME_NAMES = ['Complementary','Analogous','Triadic','Split-Comp','Tetradic','Monochrome'];
+
+function extractParams(hash) {
+  // Bytes 0-7: 4 attractor points (pairs of bytes = theta/phi)
+  const attractors = [];
+  for (let i = 0; i < 4; i++) {
+    const theta = (hash[i*2] / 255) * Math.PI;
+    const phi = (hash[i*2+1] / 255) * Math.PI * 2;
+    attractors.push({
+      x: Math.sin(theta) * Math.cos(phi),
+      y: Math.sin(theta) * Math.sin(phi),
+      z: Math.cos(theta),
+      strength: ((hash[i*2] + hash[i*2+1]) / 510) * 0.6 + 0.2
+    });
+  }
+
+  // Bytes 8-11: Symmetry
+  const symType = hash[8] % 6;
+  const symStrength = hash[9] / 255;
+  const symPhase = (hash[10] / 255) * Math.PI * 2;
+  const symBlend = hash[11] / 255;
+
+  // Bytes 12-15: Deformation amplitude
+  const ampBase = (hash[12] / 255) * 0.5 + 0.1;
+  const ampVar = (hash[13] / 255) * 0.3;
+  const ampDecay = (hash[14] / 255) * 0.5 + 0.5;
+  const ampBias = (hash[15] / 255 - 0.5) * 0.3;
+
+  // Bytes 16-19: Frequency
+  const freqBase = Math.floor(hash[16] / 32) + 1; // 1-8
+  const freqMod = (hash[17] / 255) * 4 + 1;
+  const freqPhase = (hash[18] / 255) * Math.PI * 2;
+  const freqMix = hash[19] / 255;
+
+  // Bytes 20-23: Color
+  const baseHue = hash[20] / 255;
+  const saturation = (hash[21] / 255) * 0.5 + 0.4;
+  const colorScheme = hash[22] % 6;
+  const colorShift = (hash[23] / 255) * 0.3;
+
+  // Bytes 24-27: Surface
+  const shininess = (hash[24] / 255) * 120 + 8;
+  const roughness = hash[25] / 255;
+  const metallic = hash[26] / 255;
+  const ambient = (hash[27] / 255) * 0.15 + 0.08;
+
+  // Bytes 28-31: Noise seed
+  const noiseSeed = [hash[28], hash[29], hash[30], hash[31]];
+  const noiseAmp = (hash[28] / 255) * 0.25;
+  const noiseFreq = (hash[29] / 255) * 6 + 2;
+  const noiseOct = Math.floor(hash[30] / 64) + 1; // 1-4
+  const noiseLacunarity = (hash[31] / 255) * 1.5 + 1.5;
+
+  return {
+    attractors, symType, symStrength, symPhase, symBlend,
+    ampBase, ampVar, ampDecay, ampBias,
+    freqBase, freqMod, freqPhase, freqMix,
+    baseHue, saturation, colorScheme, colorShift,
+    shininess, roughness, metallic, ambient,
+    noiseSeed, noiseAmp, noiseFreq, noiseOct, noiseLacunarity
+  };
+}
+
+// ─── Seeded Noise ───────────────────────────────────────────────────
+function seededNoise(seed) {
+  let s = seed[0]*16777259 + seed[1]*65537 + seed[2]*257 + seed[3];
+  return function(x, y, z) {
+    // Simple hash-based 3D noise
+    let n = Math.sin(x*127.1 + y*311.7 + z*74.7 + s) * 43758.5453;
+    n = n - Math.floor(n);
+    let n2 = Math.sin(x*269.5 + y*183.3 + z*246.1 + s*1.3) * 28461.2156;
+    n2 = n2 - Math.floor(n2);
+    return (n + n2) * 0.5 - 0.5; // -0.5 to 0.5
+  };
+}
+
+function fbmNoise(noiseFn, x, y, z, octaves, lacunarity) {
+  let val = 0, amp = 0.5, freq = 1;
+  for (let i = 0; i < octaves; i++) {
+    val += amp * noiseFn(x*freq, y*freq, z*freq);
+    amp *= 0.5;
+    freq *= lacunarity;
+  }
+  return val;
+}
+
+// ─── Sculpture Deformation ──────────────────────────────────────────
+function applySymmetry(x, y, z, symType) {
+  // Return an array of symmetry-mirrored points
+  const pts = [[x, y, z]];
+  if (symType === 0) return pts; // none
+  if (symType === 1) { pts.push([-x, y, z]); return pts; } // bilateral
+  const folds = [3, 4, 6, 8][symType - 2] || 3;
+  for (let i = 1; i < folds; i++) {
+    const angle = (Math.PI * 2 * i) / folds;
+    const nx = x * Math.cos(angle) - z * Math.sin(angle);
+    const nz = x * Math.sin(angle) + z * Math.cos(angle);
+    pts.push([nx, y, nz]);
+  }
+  return pts;
+}
+
+function deformIcosphere(baseVerts, params) {
+  const { attractors, symType, symStrength, ampBase, ampVar, ampDecay, ampBias,
+          freqBase, freqMod, freqPhase, freqMix,
+          noiseSeed, noiseAmp, noiseFreq, noiseOct, noiseLacunarity } = params;
+
+  const noise = seededNoise(noiseSeed);
+  const deformed = [];
+  const displacements = [];
+
+  for (let vi = 0; vi < baseVerts.length; vi++) {
+    const [vx, vy, vz] = baseVerts[vi];
+    const len = Math.sqrt(vx*vx + vy*vy + vz*vz);
+    const nx = vx/len, ny = vy/len, nz = vz/len;
+
+    // Spherical coords of vertex
+    const theta = Math.acos(Math.max(-1, Math.min(1, ny)));
+    const phi = Math.atan2(nz, nx);
+
+    // Attractor influence
+    let attractorDisp = 0;
+    for (const att of attractors) {
+      // Distance on unit sphere (angular)
+      const dot = nx*att.x + ny*att.y + nz*att.z;
+      const angDist = Math.acos(Math.max(-1, Math.min(1, dot)));
+      const influence = Math.exp(-angDist * angDist * (3 + ampDecay * 5));
+      attractorDisp += att.strength * influence;
+    }
+
+    // Apply symmetry to attractor pattern
+    let symDisp = attractorDisp;
+    if (symType > 0) {
+      const mirrorPts = applySymmetry(nx, ny, nz, symType);
+      let mirrorTotal = 0;
+      for (const [mx, my, mz] of mirrorPts) {
+        let md = 0;
+        for (const att of attractors) {
+          const dot = mx*att.x + my*att.y + mz*att.z;
+          const angDist = Math.acos(Math.max(-1, Math.min(1, dot)));
+          md += att.strength * Math.exp(-angDist * angDist * (3 + ampDecay * 5));
+        }
+        mirrorTotal += md;
+      }
+      mirrorTotal /= mirrorPts.length;
+      symDisp = attractorDisp * (1 - symStrength) + mirrorTotal * symStrength;
+    }
+
+    // Angular frequency modulation
+    const angFreq = Math.sin(theta * freqBase + freqPhase) *
+                    Math.cos(phi * freqMod + freqPhase * 0.7);
+    const freqDisp = angFreq * ampVar * freqMix;
+
+    // Noise displacement
+    const noiseDisp = fbmNoise(noise, nx * noiseFreq, ny * noiseFreq, nz * noiseFreq, noiseOct, noiseLacunarity) * noiseAmp;
+
+    // Total displacement
+    const totalDisp = (symDisp * ampBase + freqDisp + noiseDisp + ampBias) * 0.8;
+    const r = 1.0 + totalDisp;
+
+    deformed.push([nx * r, ny * r, nz * r]);
+    displacements.push(totalDisp);
+  }
+
+  return { verts: deformed, displacements };
+}
+
+// ─── Color Mapping ──────────────────────────────────────────────────
+function hsl2rgb(h, s, l) {
+  h = ((h % 1) + 1) % 1;
+  const c = (1 - Math.abs(2*l - 1)) * s;
+  const x = c * (1 - Math.abs((h*6) % 2 - 1));
+  const m = l - c/2;
+  let r, g, b;
+  if (h < 1/6) { r=c; g=x; b=0; }
+  else if (h < 2/6) { r=x; g=c; b=0; }
+  else if (h < 3/6) { r=0; g=c; b=x; }
+  else if (h < 4/6) { r=0; g=x; b=c; }
+  else if (h < 5/6) { r=x; g=0; b=c; }
+  else { r=c; g=0; b=x; }
+  return [r+m, g+m, b+m];
+}
+
+function getColorSchemeHues(baseHue, scheme, shift) {
+  switch(scheme) {
+    case 0: return [baseHue, baseHue + 0.5]; // complementary
+    case 1: return [baseHue, baseHue + 0.083, baseHue - 0.083]; // analogous
+    case 2: return [baseHue, baseHue + 0.333, baseHue + 0.667]; // triadic
+    case 3: return [baseHue, baseHue + 0.417, baseHue + 0.583]; // split-comp
+    case 4: return [baseHue, baseHue + 0.25, baseHue + 0.5, baseHue + 0.75]; // tetradic
+    case 5: return [baseHue]; // mono
+    default: return [baseHue];
+  }
+}
+
+function mapColor(disp, minD, maxD, params) {
+  const { baseHue, saturation, colorScheme, colorShift } = params;
+  const hues = getColorSchemeHues(baseHue, colorScheme, colorShift);
+  const t = maxD > minD ? (disp - minD) / (maxD - minD) : 0.5;
+
+  // Blend between scheme hues based on displacement
+  const hueIdx = t * (hues.length - 0.01);
+  const h0 = hues[Math.floor(hueIdx) % hues.length];
+  const h1 = hues[Math.ceil(hueIdx) % hues.length];
+  const hFrac = hueIdx - Math.floor(hueIdx);
+  const hue = h0 + (h1 - h0) * hFrac + colorShift * (t - 0.5);
+
+  const sat = saturation * (0.7 + t * 0.3);
+  const light = 0.35 + t * 0.3;
+
+  return hsl2rgb(hue, sat, light);
+}
+
+// ─── Build Mesh Buffers ─────────────────────────────────────────────
+let currentMesh = null;
+let previousMesh = null;
+let transitionStart = 0;
+let transitioning = false;
+const TRANSITION_MS = 700;
+
+function computeFaceNormal(v0, v1, v2) {
+  const ax = v1[0]-v0[0], ay = v1[1]-v0[1], az = v1[2]-v0[2];
+  const bx = v2[0]-v0[0], by = v2[1]-v0[1], bz = v2[2]-v0[2];
+  const nx = ay*bz - az*by, ny = az*bx - ax*bz, nz = ax*by - ay*bx;
+  const l = Math.sqrt(nx*nx+ny*ny+nz*nz) || 1;
+  return [nx/l, ny/l, nz/l];
+}
+
+function buildMeshData(faces, verts, displacements, params, flatShading) {
+  const minD = Math.min(...displacements);
+  const maxD = Math.max(...displacements);
+
+  // Compute smooth vertex normals
+  const vertNormals = verts.map(() => [0,0,0]);
+  for (const [a,b,c] of faces) {
+    const fn = computeFaceNormal(verts[a], verts[b], verts[c]);
+    for (const idx of [a,b,c]) {
+      vertNormals[idx][0] += fn[0];
+      vertNormals[idx][1] += fn[1];
+      vertNormals[idx][2] += fn[2];
+    }
+  }
+  vertNormals.forEach(n => {
+    const l = Math.sqrt(n[0]*n[0]+n[1]*n[1]+n[2]*n[2]) || 1;
+    n[0]/=l; n[1]/=l; n[2]/=l;
+  });
+
+  const positions = [];
+  const normals = [];
+  const colors = [];
+  const dispArr = [];
+
+  for (const [a,b,c] of faces) {
+    const fn = flatShading ? computeFaceNormal(verts[a], verts[b], verts[c]) : null;
+    for (const idx of [a,b,c]) {
+      const v = verts[idx];
+      positions.push(v[0], v[1], v[2]);
+      const n = flatShading ? fn : vertNormals[idx];
+      normals.push(n[0], n[1], n[2]);
+      const col = mapColor(displacements[idx], minD, maxD, params);
+      colors.push(col[0], col[1], col[2]);
+      dispArr.push(displacements[idx]);
+    }
+  }
+
+  // Wireframe indices (edges)
+  const edgeSet = new Set();
+  const wirePositions = [];
+  for (const [a,b,c] of faces) {
+    const edges = [[a,b],[b,c],[c,a]];
+    for (const [e0,e1] of edges) {
+      const key = Math.min(e0,e1) + ':' + Math.max(e0,e1);
+      if (!edgeSet.has(key)) {
+        edgeSet.add(key);
+        wirePositions.push(
+          verts[e0][0], verts[e0][1], verts[e0][2],
+          verts[e1][0], verts[e1][1], verts[e1][2]
+        );
+      }
+    }
+  }
+
+  return {
+    positions: new Float32Array(positions),
+    normals: new Float32Array(normals),
+    colors: new Float32Array(colors),
+    displacements: new Float32Array(dispArr),
+    wirePositions: new Float32Array(wirePositions),
+    triCount: faces.length * 3,
+    wireCount: wirePositions.length / 3
+  };
+}
+
+// ─── GL Buffers ─────────────────────────────────────────────────────
+let bufPos, bufNorm, bufColor, bufDisp, bufWire;
+function initBuffers() {
+  bufPos = gl.createBuffer();
+  bufNorm = gl.createBuffer();
+  bufColor = gl.createBuffer();
+  bufDisp = gl.createBuffer();
+  bufWire = gl.createBuffer();
+}
+initBuffers();
+
+function uploadMesh(mesh) {
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufPos);
+  gl.bufferData(gl.ARRAY_BUFFER, mesh.positions, gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufNorm);
+  gl.bufferData(gl.ARRAY_BUFFER, mesh.normals, gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufColor);
+  gl.bufferData(gl.ARRAY_BUFFER, mesh.colors, gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufDisp);
+  gl.bufferData(gl.ARRAY_BUFFER, mesh.displacements, gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufWire);
+  gl.bufferData(gl.ARRAY_BUFFER, mesh.wirePositions, gl.DYNAMIC_DRAW);
+}
+
+function interpolateMeshes(a, b, t) {
+  // Easing
+  t = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+  const len = Math.min(a.positions.length, b.positions.length);
+  const pos = new Float32Array(len);
+  const norm = new Float32Array(len);
+  const col = new Float32Array(len);
+  for (let i = 0; i < len; i++) {
+    pos[i] = a.positions[i] * (1-t) + b.positions[i] * t;
+    norm[i] = a.normals[i] * (1-t) + b.normals[i] * t;
+    col[i] = a.colors[i] * (1-t) + b.colors[i] * t;
+  }
+  const wLen = Math.min(a.wirePositions.length, b.wirePositions.length);
+  const wire = new Float32Array(wLen);
+  for (let i = 0; i < wLen; i++) {
+    wire[i] = a.wirePositions[i] * (1-t) + b.wirePositions[i] * t;
+  }
+  return {
+    positions: pos, normals: norm, colors: col,
+    displacements: b.displacements,
+    wirePositions: wire,
+    triCount: Math.min(a.triCount, b.triCount),
+    wireCount: Math.min(a.wireCount, b.wireCount)
+  };
+}
+
+// ─── Matrix Math ────────────────────────────────────────────────────
+function mat4Perspective(fov, aspect, near, far) {
+  const f = 1 / Math.tan(fov / 2);
+  const nf = 1 / (near - far);
+  return new Float32Array([
+    f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0
+  ]);
+}
+
+function mat4Identity() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
+
+function mat4Multiply(a, b) {
+  const r = new Float32Array(16);
+  for (let i = 0; i < 4; i++)
+    for (let j = 0; j < 4; j++) {
+      r[j*4+i] = 0;
+      for (let k = 0; k < 4; k++) r[j*4+i] += a[k*4+i] * b[j*4+k];
+    }
+  return r;
+}
+
+function mat4RotateX(m, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  const r = mat4Identity();
+  r[5]=c; r[6]=s; r[9]=-s; r[10]=c;
+  return mat4Multiply(m, r);
+}
+
+function mat4RotateY(m, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  const r = mat4Identity();
+  r[0]=c; r[2]=-s; r[8]=s; r[10]=c;
+  return mat4Multiply(m, r);
+}
+
+function mat4Translate(m, x, y, z) {
+  const r = mat4Identity();
+  r[12]=x; r[13]=y; r[14]=z;
+  return mat4Multiply(m, r);
+}
+
+function mat3NormalFromMat4(m) {
+  const a00=m[0],a01=m[1],a02=m[2],a10=m[4],a11=m[5],a12=m[6],a20=m[8],a21=m[9],a22=m[10];
+  const det = a00*(a11*a22-a12*a21) - a01*(a10*a22-a12*a20) + a02*(a10*a21-a11*a20);
+  const id = 1/det;
+  return new Float32Array([
+    (a11*a22-a12*a21)*id, (a02*a21-a01*a22)*id, (a01*a12-a02*a11)*id,
+    (a12*a20-a10*a22)*id, (a00*a22-a02*a20)*id, (a02*a10-a00*a12)*id,
+    (a10*a21-a11*a20)*id, (a01*a20-a00*a21)*id, (a00*a11-a01*a10)*id
+  ]);
+}
+
+// ─── Camera State ───────────────────────────────────────────────────
+let camRotX = 0.3, camRotY = 0, camDist = 3.5;
+let autoRotate = true;
+let mouseDown = false, lastMX = 0, lastMY = 0;
+
+canvas.addEventListener('mousedown', e => { mouseDown = true; lastMX = e.clientX; lastMY = e.clientY; });
+canvas.addEventListener('mousemove', e => {
+  if (!mouseDown) return;
+  camRotY += (e.clientX - lastMX) * 0.008;
+  camRotX += (e.clientY - lastMY) * 0.008;
+  camRotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, camRotX));
+  lastMX = e.clientX; lastMY = e.clientY;
+});
+canvas.addEventListener('mouseup', () => mouseDown = false);
+canvas.addEventListener('mouseleave', () => mouseDown = false);
+canvas.addEventListener('wheel', e => {
+  camDist += e.deltaY * 0.003;
+  camDist = Math.max(1.5, Math.min(8, camDist));
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('dblclick', () => { camRotX = 0.3; camRotY = 0; camDist = 3.5; });
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    mouseDown = true;
+    lastMX = e.touches[0].clientX;
+    lastMY = e.touches[0].clientY;
+  }
+}, { passive: true });
+canvas.addEventListener('touchmove', e => {
+  if (mouseDown && e.touches.length === 1) {
+    camRotY += (e.touches[0].clientX - lastMX) * 0.008;
+    camRotX += (e.touches[0].clientY - lastMY) * 0.008;
+    camRotX = Math.max(-Math.PI/2, Math.min(Math.PI/2, camRotX));
+    lastMX = e.touches[0].clientX;
+    lastMY = e.touches[0].clientY;
+  }
+}, { passive: true });
+canvas.addEventListener('touchend', () => mouseDown = false);
+
+// ─── Sound Engine ───────────────────────────────────────────────────
+let audioCtx = null;
+let soundEnabled = false;
+let sustainedOscs = [];
+let masterGain = null;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.15;
+  masterGain.connect(audioCtx.destination);
+}
+
+function playFormChord(params) {
+  if (!soundEnabled || !audioCtx) return;
+  // Stop previous sustained
+  stopSustained();
+
+  const { attractors, baseHue, freqBase, shininess } = params;
+  const baseFreq = 110 + baseHue * 220;
+  const now = audioCtx.currentTime;
+
+  // Chord from attractor positions
+  attractors.forEach((att, i) => {
+    const freq = baseFreq * (1 + Math.abs(att.x) * 0.5 + i * 0.25);
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = ['sine','triangle','sawtooth','square'][i % 4];
+    osc.frequency.value = freq;
+    osc.detune.value = att.y * 20;
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 1.5);
+  });
+
+  // Sustained ambient hum
+  for (let i = 0; i < 2; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filt = audioCtx.createBiquadFilter();
+    osc.type = 'sawtooth';
+    osc.frequency.value = baseFreq * (i === 0 ? 0.5 : 0.501);
+    filt.type = 'lowpass';
+    filt.frequency.value = 200 + shininess * 8;
+    filt.Q.value = 2 + freqBase * 0.5;
+    gain.gain.value = 0.02;
+    osc.connect(filt);
+    filt.connect(gain);
+    gain.connect(masterGain);
+    osc.start();
+    sustainedOscs.push({ osc, gain });
+  }
+}
+
+function stopSustained() {
+  const now = audioCtx ? audioCtx.currentTime : 0;
+  sustainedOscs.forEach(({ osc, gain }) => {
+    try {
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc.stop(now + 0.35);
+    } catch(e) {}
+  });
+  sustainedOscs = [];
+}
+
+function playTapSound(disp) {
+  if (!soundEnabled || !audioCtx) return;
+  const now = audioCtx.currentTime;
+  const freq = 220 + Math.abs(disp) * 1000;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.2, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+  osc.connect(gain);
+  gain.connect(masterGain);
+  osc.start(now);
+  osc.stop(now + 0.4);
+}
+
+// Click to tap
+canvas.addEventListener('click', () => {
+  if (!currentMeshData) return;
+  const avgDisp = currentMeshData.displacements.reduce((a,b) => a+b, 0) / currentMeshData.displacements.length;
+  playTapSound(avgDisp);
+});
+
+// ─── State ──────────────────────────────────────────────────────────
+let showWireframe = false;
+let flatShading = false;
+let showNormals = false;
+let currentHash = null;
+let currentParams = null;
+let currentMeshData = null;
+let baseIco = null;
+
+// ─── Sculpture Generation Pipeline ─────────────────────────────────
+function generateSculpture(text) {
+  const hash = SHA256(text);
+  currentHash = hash;
+  const params = extractParams(hash);
+  currentParams = params;
+
+  // Choose subdivision based on frequency
+  const subdiv = params.freqBase > 5 ? 3 : 2;
+  if (!baseIco || baseIco._subdiv !== subdiv) {
+    baseIco = createIcosphere(subdiv);
+    baseIco._subdiv = subdiv;
+  }
+
+  const { verts, displacements } = deformIcosphere(baseIco.verts, params);
+  const meshData = buildMeshData(baseIco.faces, verts, displacements, params, flatShading);
+
+  // Transition
+  if (currentMeshData) {
+    previousMesh = currentMeshData;
+    transitionStart = performance.now();
+    transitioning = true;
+  }
+
+  currentMeshData = meshData;
+  uploadMesh(meshData);
+
+  // Play sound
+  if (soundEnabled) {
+    initAudio();
+    playFormChord(params);
+  }
+
+  // Update UI
+  updateUI(hash, params, baseIco);
+}
+
+function rebuildWithShading() {
+  if (!currentParams || !baseIco) return;
+  const { verts, displacements } = deformIcosphere(baseIco.verts, currentParams);
+  const meshData = buildMeshData(baseIco.faces, verts, displacements, currentParams, flatShading);
+  currentMeshData = meshData;
+  uploadMesh(meshData);
+}
+
+// ─── UI Updates ─────────────────────────────────────────────────────
+function updateUI(hash, params, ico) {
+  // Hash display
+  const hexDiv = document.getElementById('hash-display');
+  let html = '';
+  for (let i = 0; i < 32; i++) {
+    const h = hash[i].toString(16).padStart(2, '0');
+    const hue = (i / 32 * 360 + params.baseHue * 360) % 360;
+    html += `<span class="hash-byte" style="color:hsl(${hue},70%,65%)">${h}</span>`;
+    if (i < 31) html += ' ';
+  }
+  hexDiv.innerHTML = html;
+
+  // Info panel
+  document.getElementById('sym-display').textContent = SYMMETRY_NAMES[params.symType];
+  document.getElementById('face-count').textContent = ico.faces.length;
+  document.getElementById('vert-count').textContent = ico.verts.length;
+
+  // DNA panel
+  document.getElementById('dna-hue').textContent = Math.round(params.baseHue * 360) + '\u00B0';
+  document.getElementById('dna-freq').textContent = params.freqBase.toFixed(0) + 'x';
+  document.getElementById('dna-amp').textContent = (params.ampBase * 100).toFixed(0) + '%';
+  document.getElementById('dna-shine').textContent = params.shininess.toFixed(0);
+  document.getElementById('dna-scheme').textContent = SCHEME_NAMES[params.colorScheme];
+}
+
+// ─── Button Handlers ────────────────────────────────────────────────
+document.getElementById('btn-rotate').addEventListener('click', function() {
+  autoRotate = !autoRotate;
+  this.classList.toggle('active');
+});
+
+document.getElementById('btn-wire').addEventListener('click', function() {
+  showWireframe = !showWireframe;
+  this.classList.toggle('active');
+});
+
+document.getElementById('btn-flat').addEventListener('click', function() {
+  flatShading = !flatShading;
+  this.classList.toggle('active');
+  rebuildWithShading();
+});
+
+document.getElementById('btn-normals').addEventListener('click', function() {
+  showNormals = !showNormals;
+  this.classList.toggle('active');
+});
+
+document.getElementById('btn-sound').addEventListener('click', function() {
+  soundEnabled = !soundEnabled;
+  this.classList.toggle('active');
+  if (soundEnabled) {
+    initAudio();
+    if (currentParams) playFormChord(currentParams);
+  } else {
+    stopSustained();
+  }
+});
+
+document.getElementById('copy-btn').addEventListener('click', () => {
+  if (!currentParams || !currentHash) return;
+  const hex = Array.from(currentHash).map(b => b.toString(16).padStart(2,'0')).join('');
+  const p = currentParams;
+  const dna = `Entropy Sculpture DNA\n` +
+    `Hash: ${hex}\n` +
+    `Symmetry: ${SYMMETRY_NAMES[p.symType]}\n` +
+    `Hue: ${Math.round(p.baseHue*360)}deg | Scheme: ${SCHEME_NAMES[p.colorScheme]}\n` +
+    `Freq: ${p.freqBase} | Amp: ${(p.ampBase*100).toFixed(0)}%\n` +
+    `Shininess: ${p.shininess.toFixed(0)} | Roughness: ${(p.roughness*100).toFixed(0)}%`;
+  navigator.clipboard.writeText(dna).catch(() => {});
+});
+
+// Input handler
+const input = document.getElementById('hash-input');
+let inputTimeout;
+input.addEventListener('input', () => {
+  clearTimeout(inputTimeout);
+  inputTimeout = setTimeout(() => generateSculpture(input.value), 100);
+});
+
+// ─── Render Loop ────────────────────────────────────────────────────
+function resize() {
+  canvas.width = canvas.clientWidth * devicePixelRatio;
+  canvas.height = canvas.clientHeight * devicePixelRatio;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+window.addEventListener('resize', resize);
+resize();
+
+gl.enable(gl.DEPTH_TEST);
+gl.enable(gl.CULL_FACE);
+gl.cullFace(gl.BACK);
+gl.clearColor(0.012, 0.012, 0.031, 1.0);
+
+function render(now) {
+  requestAnimationFrame(render);
+  if (!currentMeshData) return;
+
+  // Handle transition
+  let meshToRender = currentMeshData;
+  if (transitioning && previousMesh) {
+    const elapsed = now - transitionStart;
+    const t = Math.min(elapsed / TRANSITION_MS, 1);
+    if (t >= 1) {
+      transitioning = false;
+      previousMesh = null;
+    } else {
+      meshToRender = interpolateMeshes(previousMesh, currentMeshData, t);
+      uploadMesh(meshToRender);
+    }
+  }
+
+  if (autoRotate) camRotY += 0.005;
+
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  const aspect = canvas.width / canvas.height;
+  const proj = mat4Perspective(Math.PI / 4, aspect, 0.1, 50);
+
+  let mv = mat4Identity();
+  mv = mat4Translate(mv, 0, 0, -camDist);
+  mv = mat4RotateX(mv, camRotX);
+  mv = mat4RotateY(mv, camRotY);
+
+  const normMat = mat3NormalFromMat4(mv);
+
+  // ─── Draw solid mesh ───
+  gl.useProgram(progPhong);
+  gl.uniformMatrix4fv(uPhong.uProj, false, proj);
+  gl.uniformMatrix4fv(uPhong.uMV, false, mv);
+  gl.uniformMatrix3fv(uPhong.uNormMat, false, normMat);
+
+  // Lights
+  gl.uniform3f(uPhong.uLight1Dir, 3, 4, 3);   // warm light
+  gl.uniform3f(uPhong.uLight2Dir, -3, 2, -2);  // cool light
+  gl.uniform3f(uPhong.uLight1Col, 1.0, 0.9, 0.7);
+  gl.uniform3f(uPhong.uLight2Col, 0.4, 0.6, 1.0);
+  gl.uniform1f(uPhong.uShininess, currentParams ? currentParams.shininess : 32);
+  gl.uniform1f(uPhong.uAmbient, currentParams ? currentParams.ambient : 0.12);
+  gl.uniform1i(uPhong.uFlatShade, flatShading ? 1 : 0);
+  gl.uniform1i(uPhong.uShowNormals, showNormals ? 1 : 0);
+
+  // Position
+  const aPos = gl.getAttribLocation(progPhong, 'aPos');
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufPos);
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+
+  // Normal
+  const aNorm = gl.getAttribLocation(progPhong, 'aNorm');
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufNorm);
+  gl.enableVertexAttribArray(aNorm);
+  gl.vertexAttribPointer(aNorm, 3, gl.FLOAT, false, 0, 0);
+
+  // Color
+  const aColor = gl.getAttribLocation(progPhong, 'aColor');
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufColor);
+  gl.enableVertexAttribArray(aColor);
+  gl.vertexAttribPointer(aColor, 3, gl.FLOAT, false, 0, 0);
+
+  gl.drawArrays(gl.TRIANGLES, 0, meshToRender.triCount);
+
+  // ─── Draw wireframe ───
+  if (showWireframe) {
+    gl.useProgram(progLine);
+    gl.uniformMatrix4fv(uLine.uProj, false, proj);
+    gl.uniformMatrix4fv(uLine.uMV, false, mv);
+    gl.uniform3f(uLine.uLineColor, 0.486, 0.424, 0.941);
+
+    gl.disable(gl.CULL_FACE);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthFunc(gl.LEQUAL);
+
+    const aLinePos = gl.getAttribLocation(progLine, 'aPos');
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufWire);
+    gl.enableVertexAttribArray(aLinePos);
+    gl.vertexAttribPointer(aLinePos, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.LINES, 0, meshToRender.wireCount);
+
+    gl.disable(gl.BLEND);
+    gl.enable(gl.CULL_FACE);
+    gl.depthFunc(gl.LESS);
+  }
+}
+
+// ─── Initialize ─────────────────────────────────────────────────────
+generateSculpture(input.value);
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bit Ocean — fold(HASH)</title>
+<style>
+:root {
+  --bg: #030308;
+  --accent: #7c6cf0;
+  --cyan: #00f0ff;
+  --pink: #ff4488;
+  --gold: #ffd700;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: #ccc;
+  font-family: 'Courier New', monospace;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+canvas#gl {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+}
+#ui {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px;
+}
+#top-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+h1 {
+  font-size: 18px;
+  color: var(--cyan);
+  text-shadow: 0 0 20px rgba(0,240,255,0.3);
+  letter-spacing: 2px;
+}
+#input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  pointer-events: auto;
+}
+#textInput {
+  background: rgba(3,3,8,0.7);
+  border: 1px solid rgba(124,108,240,0.4);
+  color: var(--cyan);
+  padding: 8px 14px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  border-radius: 4px;
+  width: 320px;
+  outline: none;
+  backdrop-filter: blur(10px);
+}
+#textInput:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 15px rgba(0,240,255,0.2);
+}
+#textInput::placeholder { color: rgba(124,108,240,0.5); }
+#hash-display {
+  font-size: 11px;
+  letter-spacing: 1px;
+  line-height: 1.6;
+  word-break: break-all;
+  max-width: 500px;
+}
+#bit-count {
+  font-size: 13px;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(255,215,0,0.3);
+}
+#wave-stats {
+  font-size: 11px;
+  color: rgba(200,200,220,0.6);
+  line-height: 1.5;
+}
+#bottom-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+#controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: auto;
+}
+.ctrl-btn {
+  background: rgba(3,3,8,0.6);
+  border: 1px solid rgba(124,108,240,0.3);
+  color: rgba(200,200,220,0.7);
+  padding: 4px 10px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  border-radius: 3px;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  transition: all 0.2s;
+  text-align: left;
+}
+.ctrl-btn:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+.ctrl-btn.active {
+  border-color: var(--pink);
+  color: var(--pink);
+}
+#speed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+#speed-row label {
+  font-size: 11px;
+  color: rgba(200,200,220,0.5);
+}
+#speedSlider {
+  width: 100px;
+  accent-color: var(--accent);
+}
+#info-right {
+  text-align: right;
+  font-size: 10px;
+  color: rgba(200,200,220,0.3);
+  line-height: 1.6;
+}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="ui">
+  <div id="top-bar">
+    <h1>Bit Ocean — fold(HASH)</h1>
+    <div id="input-row">
+      <input type="text" id="textInput" placeholder="type to shape the ocean..." autofocus spellcheck="false">
+    </div>
+    <div id="hash-display"></div>
+    <div id="bit-count">0/256 wave sources active</div>
+    <div id="wave-stats"></div>
+  </div>
+  <div id="bottom-bar">
+    <div id="controls">
+      <button class="ctrl-btn" id="btnWireframe">[W] Wireframe</button>
+      <button class="ctrl-btn" id="btnFreeze">[F] Freeze Time</button>
+      <button class="ctrl-btn" id="btnSources">[S] Show Sources</button>
+      <div id="speed-row">
+        <label>Speed</label>
+        <input type="range" id="speedSlider" min="0.1" max="3.0" step="0.1" value="1.0">
+        <span id="speedVal" style="font-size:11px;color:rgba(200,200,220,0.5);">1.0x</span>
+      </div>
+    </div>
+    <div id="info-right">
+      drag to orbit / scroll to zoom<br>
+      256 bits = 256 potential wave sources<br>
+      interference creates the surface
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── SHA-256 ───
+const SHA256=(()=>{const K=new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);function rotr(n,x){return(x>>>n)|(x<<(32-n))}return function(msg){const utf8=new TextEncoder().encode(msg);const bitLen=utf8.length*8;const padLen=(((utf8.length+8)>>6)+1)<<6;const padded=new Uint8Array(padLen);padded.set(utf8);padded[utf8.length]=0x80;const view=new DataView(padded.buffer);view.setUint32(padLen-4,bitLen,false);let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a,h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;for(let o=0;o<padLen;o+=64){const W=new Uint32Array(64);for(let i=0;i<16;i++)W[i]=view.getUint32(o+i*4,false);for(let i=16;i<64;i++)W[i]=((rotr(17,W[i-2])^rotr(19,W[i-2])^(W[i-2]>>>10))+W[i-7]+(rotr(7,W[i-15])^rotr(18,W[i-15])^(W[i-15]>>>3))+W[i-16])|0;let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;for(let i=0;i<64;i++){const T1=(h+(rotr(6,e)^rotr(11,e)^rotr(25,e))+((e&f)^(~e&g))+K[i]+W[i])|0;const T2=((rotr(2,a)^rotr(13,a)^rotr(22,a))+((a&b)^(a&c)^(b&c)))|0;h=g;g=f;f=e;e=(d+T1)|0;d=c;c=b;b=a;a=(T1+T2)|0;}h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+h)|0;}const out=new Uint8Array(32);const dv=new DataView(out.buffer);[h0,h1,h2,h3,h4,h5,h6,h7].forEach((v,i)=>dv.setUint32(i*4,v,false));return out;};})();
+
+// ─── State ───
+let hashBytes = new Uint8Array(32);
+let targetHashBytes = new Uint8Array(32);
+let currentHashBytes = new Float32Array(32); // for smooth transitions
+let bitCount = 0;
+let wireframe = false;
+let frozen = false;
+let showSources = false;
+let animSpeed = 1.0;
+let animTime = 0;
+let peakHeight = 0, avgRoughness = 0, domFreq = 0;
+
+// Camera
+let camTheta = 0.5;
+let camPhi = 0.45;
+let camDist = 2.8;
+let autoOrbit = true;
+let dragging = false;
+let lastMX = 0, lastMY = 0;
+
+// ─── WebGL Setup ───
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl', { alpha: false, antialias: true, depth: true });
+if (!gl) document.body.innerHTML = '<h1 style="color:red;padding:40px;">WebGL not supported</h1>';
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio, 2);
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─── Shaders ───
+const VERT_SRC = `
+precision highp float;
+attribute vec2 aPos; // grid position 0..1
+
+uniform float uTime;
+uniform float uHashBytes[32]; // the 32 hash bytes as floats (0-255)
+uniform mat4 uMVP;
+uniform float uShowSources;
+
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+varying float vHeight;
+varying float vIsSource;
+
+// decode bit from hash bytes
+float getBit(int idx) {
+  int byteIdx = idx / 8;
+  int bitIdx = 7 - (idx - byteIdx * 8);
+  float byteVal = 0.0;
+  // unrolled byte lookup
+  for (int i = 0; i < 32; i++) {
+    if (i == byteIdx) { byteVal = uHashBytes[i]; break; }
+  }
+  float divisor = pow(2.0, float(bitIdx));
+  return mod(floor(byteVal / divisor), 2.0);
+}
+
+float getByteVal(int idx) {
+  for (int i = 0; i < 32; i++) {
+    if (i == idx) return uHashBytes[i];
+  }
+  return 0.0;
+}
+
+float waveHeight(vec2 pos) {
+  float h = 0.0;
+  float totalAmp = 0.0;
+  for (int bit = 0; bit < 256; bit++) {
+    float active = getBit(bit);
+    if (active < 0.5) continue;
+
+    int row = bit / 16;
+    int col = bit - row * 16;
+    vec2 srcPos = vec2(float(col) / 15.0, float(row) / 15.0);
+
+    float dist = length(pos - srcPos);
+
+    int byteIdx = bit / 8;
+    float byteVal = getByteVal(byteIdx);
+
+    float freq = 6.0 + byteVal / 255.0 * 14.0; // 6-20
+    float amp = 0.003 + (byteVal / 255.0) * 0.007; // 0.003-0.01
+    float speed = 1.5 + float(col) * 0.1;
+
+    h += amp * sin(freq * dist * 6.2832 - uTime * speed);
+    totalAmp += amp;
+  }
+  return h;
+}
+
+void main() {
+  vec2 pos = aPos;
+  float h = waveHeight(pos);
+
+  // finite differences for normal
+  float eps = 1.0 / 80.0;
+  float hx = waveHeight(pos + vec2(eps, 0.0));
+  float hz = waveHeight(pos + vec2(0.0, eps));
+  vec3 normal = normalize(vec3(h - hx, eps * 2.0, h - hz));
+
+  // Check if this vertex is near a wave source
+  float srcGlow = 0.0;
+  if (uShowSources > 0.5) {
+    for (int bit = 0; bit < 256; bit++) {
+      float active = getBit(bit);
+      if (active < 0.5) continue;
+      int row = bit / 16;
+      int col = bit - row * 16;
+      vec2 srcPos = vec2(float(col) / 15.0, float(row) / 15.0);
+      float d = length(pos - srcPos);
+      if (d < 0.015) srcGlow = 1.0;
+    }
+  }
+
+  vec3 worldPos = vec3(pos.x - 0.5, h, pos.y - 0.5);
+
+  vWorldPos = worldPos;
+  vNormal = normal;
+  vHeight = h;
+  vIsSource = srcGlow;
+
+  gl_Position = uMVP * vec4(worldPos, 1.0);
+  gl_PointSize = 4.0;
+}
+`;
+
+const FRAG_SRC = `
+precision highp float;
+
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+varying float vHeight;
+varying float vIsSource;
+
+uniform vec3 uCamPos;
+uniform float uTime;
+
+void main() {
+  if (vIsSource > 0.5) {
+    float pulse = 0.7 + 0.3 * sin(uTime * 4.0);
+    gl_FragColor = vec4(1.0, 0.27, 0.53, 1.0) * pulse; // pink glow
+    return;
+  }
+
+  vec3 normal = normalize(vNormal);
+  vec3 viewDir = normalize(uCamPos - vWorldPos);
+  vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3));
+
+  // Ocean color gradient by height
+  float hNorm = clamp((vHeight + 0.15) / 0.3, 0.0, 1.0);
+  vec3 deepColor = vec3(0.01, 0.03, 0.12);
+  vec3 midColor = vec3(0.0, 0.15, 0.25);
+  vec3 shallowColor = vec3(0.0, 0.6, 0.7);
+  vec3 foamColor = vec3(0.85, 0.92, 1.0);
+
+  vec3 baseColor;
+  if (hNorm < 0.33) {
+    baseColor = mix(deepColor, midColor, hNorm / 0.33);
+  } else if (hNorm < 0.66) {
+    baseColor = mix(midColor, shallowColor, (hNorm - 0.33) / 0.33);
+  } else {
+    baseColor = mix(shallowColor, foamColor, (hNorm - 0.66) / 0.34);
+  }
+
+  // Fresnel
+  float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
+  vec3 skyColor = vec3(0.02, 0.05, 0.15);
+  baseColor = mix(baseColor, skyColor + vec3(0.05, 0.1, 0.2), fresnel * 0.5);
+
+  // Diffuse
+  float diff = max(dot(normal, lightDir), 0.0);
+  baseColor *= 0.4 + 0.6 * diff;
+
+  // Specular (sun reflection)
+  vec3 halfVec = normalize(lightDir + viewDir);
+  float spec = pow(max(dot(normal, halfVec), 0.0), 128.0);
+  vec3 specColor = vec3(1.0, 0.95, 0.8) * spec * 1.5;
+
+  // Secondary specular (cyan highlight)
+  vec3 lightDir2 = normalize(vec3(-0.3, 0.6, -0.5));
+  vec3 halfVec2 = normalize(lightDir2 + viewDir);
+  float spec2 = pow(max(dot(normal, halfVec2), 0.0), 64.0);
+  specColor += vec3(0.0, 0.7, 1.0) * spec2 * 0.4;
+
+  // Foam at peaks
+  float foam = smoothstep(0.04, 0.1, vHeight);
+  baseColor = mix(baseColor, foamColor * 0.9, foam * 0.6);
+
+  // Depth darkening
+  float depth = smoothstep(-0.12, 0.0, vHeight);
+  baseColor *= 0.5 + 0.5 * depth;
+
+  gl_FragColor = vec4(baseColor + specColor, 1.0);
+}
+`;
+
+// ─── Compile Shaders ───
+function compileShader(src, type) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error('Shader error:', gl.getShaderInfoLog(s));
+    return null;
+  }
+  return s;
+}
+
+function createProgram(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, vs);
+  gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    console.error('Link error:', gl.getProgramInfoLog(p));
+    return null;
+  }
+  return p;
+}
+
+const vs = compileShader(VERT_SRC, gl.VERTEX_SHADER);
+const fs = compileShader(FRAG_SRC, gl.FRAGMENT_SHADER);
+const program = createProgram(vs, fs);
+gl.useProgram(program);
+
+// Locations
+const aPos = gl.getAttribLocation(program, 'aPos');
+const uTime = gl.getUniformLocation(program, 'uTime');
+const uMVP = gl.getUniformLocation(program, 'uMVP');
+const uCamPos = gl.getUniformLocation(program, 'uCamPos');
+const uShowSources = gl.getUniformLocation(program, 'uShowSources');
+const uHashBytesLocs = [];
+for (let i = 0; i < 32; i++) {
+  uHashBytesLocs.push(gl.getUniformLocation(program, `uHashBytes[${i}]`));
+}
+
+// ─── Grid Mesh ───
+const GRID = 64;
+const verts = [];
+for (let y = 0; y <= GRID; y++) {
+  for (let x = 0; x <= GRID; x++) {
+    verts.push(x / GRID, y / GRID);
+  }
+}
+const vertBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vertBuf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+
+// Indexed triangles
+const indices = [];
+for (let y = 0; y < GRID; y++) {
+  for (let x = 0; x < GRID; x++) {
+    const i = y * (GRID + 1) + x;
+    indices.push(i, i + 1, i + GRID + 1);
+    indices.push(i + 1, i + GRID + 2, i + GRID + 1);
+  }
+}
+const idxBuf = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+const numIndices = indices.length;
+
+// wireframe indices (lines)
+const wireIndices = [];
+for (let y = 0; y < GRID; y++) {
+  for (let x = 0; x < GRID; x++) {
+    const i = y * (GRID + 1) + x;
+    wireIndices.push(i, i + 1);
+    wireIndices.push(i, i + GRID + 1);
+  }
+}
+// right and bottom edges
+for (let y = 0; y < GRID; y++) wireIndices.push(y * (GRID+1) + GRID, (y+1) * (GRID+1) + GRID);
+for (let x = 0; x < GRID; x++) wireIndices.push(GRID * (GRID+1) + x, GRID * (GRID+1) + x + 1);
+const wireBuf = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wireBuf);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(wireIndices), gl.STATIC_DRAW);
+const numWireIndices = wireIndices.length;
+
+// ─── Matrix Math ───
+function mat4Perspective(fov, aspect, near, far) {
+  const f = 1 / Math.tan(fov / 2);
+  const nf = 1 / (near - far);
+  return new Float32Array([
+    f/aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far+near)*nf, -1,
+    0, 0, 2*far*near*nf, 0
+  ]);
+}
+
+function mat4LookAt(eye, center, up) {
+  const z = normalize3(sub3(eye, center));
+  const x = normalize3(cross3(up, z));
+  const y = cross3(z, x);
+  return new Float32Array([
+    x[0], y[0], z[0], 0,
+    x[1], y[1], z[1], 0,
+    x[2], y[2], z[2], 0,
+    -dot3(x,eye), -dot3(y,eye), -dot3(z,eye), 1
+  ]);
+}
+
+function mat4Mul(a, b) {
+  const r = new Float32Array(16);
+  for (let i = 0; i < 4; i++)
+    for (let j = 0; j < 4; j++) {
+      let s = 0;
+      for (let k = 0; k < 4; k++) s += a[i+k*4] * b[k+j*4]; // column-major fix below
+      r[i+j*4] = s;
+    }
+  return r;
+}
+
+function sub3(a,b){ return [a[0]-b[0],a[1]-b[1],a[2]-b[2]]; }
+function cross3(a,b){ return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]; }
+function dot3(a,b){ return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
+function normalize3(v){ const l=Math.sqrt(dot3(v,v))||1; return [v[0]/l,v[1]/l,v[2]/l]; }
+
+// ─── Audio ───
+let audioCtx = null;
+let noiseNode = null;
+let noiseGain = null;
+let noiseFilter = null;
+let droneOscs = [];
+let droneGains = [];
+let masterGain = null;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.3;
+  masterGain.connect(audioCtx.destination);
+
+  // Ocean noise
+  const bufSize = audioCtx.sampleRate * 2;
+  const noiseBuf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+  const data = noiseBuf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+
+  noiseNode = audioCtx.createBufferSource();
+  noiseNode.buffer = noiseBuf;
+  noiseNode.loop = true;
+
+  noiseFilter = audioCtx.createBiquadFilter();
+  noiseFilter.type = 'lowpass';
+  noiseFilter.frequency.value = 400;
+  noiseFilter.Q.value = 0.5;
+
+  noiseGain = audioCtx.createGain();
+  noiseGain.gain.value = 0.15;
+
+  noiseNode.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(masterGain);
+  noiseNode.start();
+
+  // Drone oscillators (use 16 to represent the 16 byte pairs)
+  for (let i = 0; i < 16; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 80 + i * 20;
+    gain.gain.value = 0;
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start();
+    droneOscs.push(osc);
+    droneGains.push(gain);
+  }
+}
+
+function updateAudio() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+
+  // Noise volume based on wave intensity
+  const intensity = bitCount / 256;
+  noiseGain.gain.linearRampToValueAtTime(0.05 + intensity * 0.2, t + 0.5);
+  noiseFilter.frequency.linearRampToValueAtTime(300 + intensity * 400, t + 0.5);
+
+  // Drone from hash bytes
+  for (let i = 0; i < 16; i++) {
+    const b1 = targetHashBytes[i * 2] || 0;
+    const b2 = targetHashBytes[i * 2 + 1] || 0;
+    const freq = 60 + b1 * 1.5;
+    const vol = (b2 / 255) * 0.008;
+    droneOscs[i].frequency.linearRampToValueAtTime(freq, t + 1.0);
+    droneGains[i].gain.linearRampToValueAtTime(vol, t + 1.0);
+  }
+}
+
+// ─── Hash Processing ───
+function updateHash(text) {
+  if (text.length === 0) {
+    targetHashBytes = new Uint8Array(32);
+  } else {
+    targetHashBytes = SHA256(text);
+  }
+
+  // Count bits
+  bitCount = 0;
+  for (let i = 0; i < 32; i++) {
+    let b = targetHashBytes[i];
+    while (b) { bitCount += b & 1; b >>= 1; }
+  }
+
+  updateUI();
+  updateAudio();
+}
+
+function updateUI() {
+  // Hash display
+  const hexEl = document.getElementById('hash-display');
+  let hexStr = '';
+  for (let i = 0; i < 32; i++) {
+    const b = targetHashBytes[i];
+    const hex = b.toString(16).padStart(2, '0');
+    const hue = (b / 255) * 280;
+    const sat = 70 + (b % 30);
+    hexStr += `<span style="color:hsl(${hue},${sat}%,65%)">${hex}</span>`;
+    if (i % 8 === 7 && i < 31) hexStr += ' ';
+  }
+  hexEl.innerHTML = hexStr;
+
+  document.getElementById('bit-count').textContent = `${bitCount}/256 wave sources active`;
+}
+
+function updateWaveStats() {
+  document.getElementById('wave-stats').textContent =
+    `peak: ${peakHeight.toFixed(4)} | roughness: ${avgRoughness.toFixed(4)} | active freq range: ${(6).toFixed(0)}-${(20).toFixed(0)}`;
+}
+
+// ─── Interaction ───
+const input = document.getElementById('textInput');
+input.addEventListener('input', () => {
+  initAudio();
+  updateHash(input.value);
+});
+
+// Camera controls
+canvas.addEventListener('mousedown', e => {
+  dragging = true;
+  autoOrbit = false;
+  lastMX = e.clientX;
+  lastMY = e.clientY;
+});
+window.addEventListener('mouseup', () => { dragging = false; });
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const dx = e.clientX - lastMX;
+  const dy = e.clientY - lastMY;
+  camTheta += dx * 0.005;
+  camPhi = Math.max(0.1, Math.min(1.4, camPhi + dy * 0.005));
+  lastMX = e.clientX;
+  lastMY = e.clientY;
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  camDist = Math.max(0.8, Math.min(6, camDist + e.deltaY * 0.003));
+}, { passive: false });
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    dragging = true;
+    autoOrbit = false;
+    lastMX = e.touches[0].clientX;
+    lastMY = e.touches[0].clientY;
+  }
+}, { passive: true });
+window.addEventListener('touchend', () => { dragging = false; });
+window.addEventListener('touchmove', e => {
+  if (!dragging || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - lastMX;
+  const dy = e.touches[0].clientY - lastMY;
+  camTheta += dx * 0.005;
+  camPhi = Math.max(0.1, Math.min(1.4, camPhi + dy * 0.005));
+  lastMX = e.touches[0].clientX;
+  lastMY = e.touches[0].clientY;
+}, { passive: true });
+
+// Buttons
+document.getElementById('btnWireframe').addEventListener('click', function() {
+  wireframe = !wireframe;
+  this.classList.toggle('active', wireframe);
+});
+document.getElementById('btnFreeze').addEventListener('click', function() {
+  frozen = !frozen;
+  this.classList.toggle('active', frozen);
+});
+document.getElementById('btnSources').addEventListener('click', function() {
+  showSources = !showSources;
+  this.classList.toggle('active', showSources);
+});
+document.getElementById('speedSlider').addEventListener('input', function() {
+  animSpeed = parseFloat(this.value);
+  document.getElementById('speedVal').textContent = animSpeed.toFixed(1) + 'x';
+});
+
+// Keyboard shortcuts
+window.addEventListener('keydown', e => {
+  if (document.activeElement === input) return;
+  if (e.key === 'w') document.getElementById('btnWireframe').click();
+  if (e.key === 'f') document.getElementById('btnFreeze').click();
+  if (e.key === 's') document.getElementById('btnSources').click();
+});
+
+// Click on canvas starts audio
+canvas.addEventListener('click', () => initAudio());
+
+// ─── Render Loop ───
+let lastTime = 0;
+let statsTimer = 0;
+
+function render(now) {
+  requestAnimationFrame(render);
+
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  if (!frozen) animTime += dt * animSpeed;
+
+  // Smooth hash byte transitions
+  for (let i = 0; i < 32; i++) {
+    currentHashBytes[i] += (targetHashBytes[i] - currentHashBytes[i]) * Math.min(1, dt * 4);
+  }
+
+  // Auto orbit
+  if (autoOrbit) camTheta += dt * 0.15;
+
+  // Camera
+  const cx = camDist * Math.sin(camPhi) * Math.cos(camTheta);
+  const cy = camDist * Math.cos(camPhi);
+  const cz = camDist * Math.sin(camPhi) * Math.sin(camTheta);
+  const eye = [cx, cy, cz];
+  const center = [0, -0.05, 0];
+  const up = [0, 1, 0];
+
+  const aspect = canvas.width / canvas.height;
+  const proj = mat4Perspective(Math.PI / 4, aspect, 0.01, 50);
+  const view = mat4LookAt(eye, center, up);
+  const mvp = mat4Mul(view, proj); // proj * view (column major)
+
+  // Clear
+  gl.clearColor(0.012, 0.012, 0.031, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+
+  gl.useProgram(program);
+
+  // Uniforms
+  gl.uniform1f(uTime, animTime);
+  gl.uniformMatrix4fv(uMVP, false, mvp);
+  gl.uniform3fv(uCamPos, eye);
+  gl.uniform1f(uShowSources, showSources ? 1.0 : 0.0);
+
+  for (let i = 0; i < 32; i++) {
+    gl.uniform1f(uHashBytesLocs[i], currentHashBytes[i]);
+  }
+
+  // Draw
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertBuf);
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  if (wireframe) {
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wireBuf);
+    gl.drawElements(gl.LINES, numWireIndices, gl.UNSIGNED_SHORT, 0);
+  } else {
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+    gl.drawElements(gl.TRIANGLES, numIndices, gl.UNSIGNED_SHORT, 0);
+  }
+
+  // Compute approximate stats (every ~0.5s)
+  statsTimer += dt;
+  if (statsTimer > 0.5) {
+    statsTimer = 0;
+    // Estimate peak and roughness from hash
+    let pk = 0, rough = 0;
+    let activeBits = 0;
+    for (let i = 0; i < 32; i++) {
+      let b = Math.round(currentHashBytes[i]);
+      for (let bit = 7; bit >= 0; bit--) {
+        if ((b >> bit) & 1) {
+          activeBits++;
+          let amp = 0.003 + (b / 255) * 0.007;
+          pk += amp;
+          rough += amp * amp;
+        }
+      }
+    }
+    peakHeight = pk;
+    avgRoughness = Math.sqrt(rough);
+    updateWaveStats();
+  }
+}
+
+// Init
+updateHash('');
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

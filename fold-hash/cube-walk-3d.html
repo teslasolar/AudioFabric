@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cube Walk 3D — fold(HASH)</title>
+<style>
+:root {
+  --bg: #030308;
+  --accent: #7c6cf0;
+  --cyan: #00f0ff;
+  --pink: #ff4488;
+  --gold: #ffd700;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: #ccc;
+  font-family: 'Courier New', monospace;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+canvas#gl {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  z-index: 0;
+}
+
+#ui {
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 10;
+  padding: 16px;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+}
+
+#panel {
+  pointer-events: all;
+  background: rgba(3,3,8,0.85);
+  border: 1px solid rgba(124,108,240,0.3);
+  border-radius: 8px;
+  padding: 16px;
+  max-width: 340px;
+  backdrop-filter: blur(8px);
+}
+
+#panel h1 {
+  font-size: 14px;
+  color: var(--accent);
+  margin-bottom: 10px;
+  letter-spacing: 2px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.row label {
+  font-size: 11px;
+  color: #888;
+  min-width: 60px;
+}
+
+input[type="text"] {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(124,108,240,0.3);
+  color: var(--cyan);
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  flex: 1;
+  outline: none;
+}
+input[type="text"]:focus { border-color: var(--accent); }
+
+select, button {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(124,108,240,0.3);
+  color: #ccc;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+}
+button:hover { background: rgba(124,108,240,0.2); }
+button.active { background: rgba(124,108,240,0.4); border-color: var(--accent); }
+
+.stats {
+  font-size: 10px;
+  color: #666;
+  margin-top: 8px;
+  line-height: 1.6;
+}
+.stats span { color: var(--cyan); }
+.stats .gold { color: var(--gold); }
+
+#hashHex {
+  font-size: 9px;
+  color: #555;
+  word-break: break-all;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+#controls-help {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 10;
+  font-size: 10px;
+  color: #444;
+  line-height: 1.6;
+  pointer-events: none;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.slider-row label { font-size: 10px; color: #666; min-width: 50px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  background: rgba(124,108,240,0.15);
+  height: 3px;
+  border-radius: 2px;
+  flex: 1;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px; height: 10px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="ui">
+  <div id="panel">
+    <h1>CUBE WALK 3D — fold(HASH)</h1>
+    <div class="row">
+      <label>Input</label>
+      <input type="text" id="hashInput" value="hello world" placeholder="Type to hash...">
+    </div>
+    <div class="row">
+      <label>Dim</label>
+      <select id="dimSelect">
+        <option value="3">3D Cube (8v)</option>
+        <option value="4" selected>4D Tesseract (16v)</option>
+        <option value="5">5D Penteract (32v)</option>
+        <option value="6">6D Hexeract (64v)</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Speed</label>
+      <input type="range" id="speedSlider" min="0" max="200" value="50">
+      <button id="explodeBtn">Explode</button>
+    </div>
+    <div class="stats">
+      Vertices: <span id="statVerts">16</span> &nbsp;
+      Edges: <span id="statEdges">32</span><br>
+      Hash vertex: <span class="gold" id="statHashVtx">0</span><br>
+      Camera: <span id="statCam">0,0,0</span>
+    </div>
+    <div id="hashHex"></div>
+  </div>
+</div>
+
+<div id="controls-help">
+  DRAG: orbit &nbsp; SCROLL: zoom &nbsp; WASD: fly<br>
+  Q/E: rotate XW &nbsp; R/F: rotate YW &nbsp; T/G: rotate ZW
+</div>
+
+<script>
+// ===== SHA-256 =====
+const SHA256=(()=>{const K=new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);function rotr(n,x){return(x>>>n)|(x<<(32-n))}return function(msg){const utf8=new TextEncoder().encode(msg);const bitLen=utf8.length*8;const padLen=(((utf8.length+8)>>6)+1)<<6;const padded=new Uint8Array(padLen);padded.set(utf8);padded[utf8.length]=0x80;const view=new DataView(padded.buffer);view.setUint32(padLen-4,bitLen,false);let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a,h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;for(let o=0;o<padLen;o+=64){const W=new Uint32Array(64);for(let i=0;i<16;i++)W[i]=view.getUint32(o+i*4,false);for(let i=16;i<64;i++)W[i]=((rotr(17,W[i-2])^rotr(19,W[i-2])^(W[i-2]>>>10))+W[i-7]+(rotr(7,W[i-15])^rotr(18,W[i-15])^(W[i-15]>>>3))+W[i-16])|0;let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;for(let i=0;i<64;i++){const T1=(h+(rotr(6,e)^rotr(11,e)^rotr(25,e))+((e&f)^(~e&g))+K[i]+W[i])|0;const T2=((rotr(2,a)^rotr(13,a)^rotr(22,a))+((a&b)^(a&c)^(b&c)))|0;h=g;g=f;f=e;e=(d+T1)|0;d=c;c=b;b=a;a=(T1+T2)|0;}h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+h)|0;}const out=new Uint8Array(32);const dv=new DataView(out.buffer);[h0,h1,h2,h3,h4,h5,h6,h7].forEach((v,i)=>dv.setUint32(i*4,v,false));return out;};})();
+
+function hashHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function getHashVertex(hashBytes, dim) {
+  // Use first N bits of hash to determine vertex index
+  let idx = 0;
+  for (let i = 0; i < dim; i++) {
+    const byteIdx = Math.floor(i / 8);
+    const bitIdx = 7 - (i % 8);
+    if (hashBytes[byteIdx] & (1 << bitIdx)) idx |= (1 << i);
+  }
+  return idx;
+}
+
+// ===== Hypercube generation =====
+function generateHypercube(dim) {
+  const numVerts = 1 << dim;
+  const vertices = [];
+  const edges = [];
+
+  // Vertices: each is an N-dimensional coordinate of -1 or +1
+  for (let i = 0; i < numVerts; i++) {
+    const coords = [];
+    for (let d = 0; d < dim; d++) {
+      coords.push((i & (1 << d)) ? 1.0 : -1.0);
+    }
+    vertices.push(coords);
+  }
+
+  // Edges: connect vertices differing by exactly 1 bit
+  for (let i = 0; i < numVerts; i++) {
+    for (let d = 0; d < dim; d++) {
+      const j = i ^ (1 << d);
+      if (j > i) {
+        edges.push([i, j, d]); // [from, to, dimension]
+      }
+    }
+  }
+
+  return { vertices, edges, numVerts };
+}
+
+// ===== N-D rotation =====
+function makeNDRotation(dim, planeA, planeB, angle) {
+  // Returns rotation matrix for rotating in planeA-planeB
+  const mat = [];
+  for (let i = 0; i < dim; i++) {
+    const row = new Float32Array(dim);
+    row[i] = 1.0;
+    mat.push(row);
+  }
+  const c = Math.cos(angle), s = Math.sin(angle);
+  mat[planeA][planeA] = c;
+  mat[planeA][planeB] = -s;
+  mat[planeB][planeA] = s;
+  mat[planeB][planeB] = c;
+  return mat;
+}
+
+function applyNDRotation(mat, vec, dim) {
+  const out = new Float32Array(dim);
+  for (let i = 0; i < dim; i++) {
+    let sum = 0;
+    for (let j = 0; j < dim; j++) sum += mat[i][j] * vec[j];
+    out[i] = sum;
+  }
+  return out;
+}
+
+function multiplyNDMats(A, B, dim) {
+  const out = [];
+  for (let i = 0; i < dim; i++) {
+    out.push(new Float32Array(dim));
+    for (let j = 0; j < dim; j++) {
+      let s = 0;
+      for (let k = 0; k < dim; k++) s += A[i][k] * B[k][j];
+      out[i][j] = s;
+    }
+  }
+  return out;
+}
+
+function identityND(dim) {
+  const m = [];
+  for (let i = 0; i < dim; i++) {
+    m.push(new Float32Array(dim));
+    m[i][i] = 1.0;
+  }
+  return m;
+}
+
+// Project N-D point to 3D using perspective through higher dims
+function projectNDto3D(coords, dim, viewDist) {
+  let x = coords[0], y = coords[1], z = coords[2];
+  // Perspective project from each higher dimension down
+  for (let d = dim - 1; d >= 3; d--) {
+    const w = coords[d];
+    const scale = viewDist / (viewDist - w);
+    x *= scale;
+    y *= scale;
+    z *= scale;
+  }
+  return [x, y, z];
+}
+
+// ===== WebGL setup =====
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl', { antialias: true, alpha: false });
+if (!gl) { alert('WebGL not supported'); }
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth * devicePixelRatio;
+  canvas.height = window.innerHeight * devicePixelRatio;
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Compile shaders
+function compileShader(src, type) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error('Shader error:', gl.getShaderInfoLog(s));
+    return null;
+  }
+  return s;
+}
+
+function createProgram(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, vs);
+  gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    console.error('Program error:', gl.getProgramInfoLog(p));
+    return null;
+  }
+  return p;
+}
+
+// ----- Point shader (vertices) -----
+const pointVS = `
+attribute vec3 aPos;
+attribute vec4 aColor;
+attribute float aSize;
+uniform mat4 uMVP;
+uniform float uScale;
+varying vec4 vColor;
+void main() {
+  gl_Position = uMVP * vec4(aPos, 1.0);
+  gl_PointSize = aSize * uScale / gl_Position.w;
+  vColor = aColor;
+}
+`;
+
+const pointFS = `
+precision mediump float;
+varying vec4 vColor;
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  float d = length(c);
+  if (d > 0.5) discard;
+  float glow = exp(-d * 4.0);
+  float core = smoothstep(0.15, 0.0, d);
+  vec3 col = vColor.rgb * glow + vec3(1.0) * core * 0.5;
+  float alpha = vColor.a * smoothstep(0.5, 0.2, d);
+  gl_FragColor = vec4(col, alpha);
+}
+`;
+
+// ----- Line shader (edges) -----
+const lineVS = `
+attribute vec3 aPos;
+attribute vec4 aColor;
+uniform mat4 uMVP;
+varying vec4 vColor;
+void main() {
+  gl_Position = uMVP * vec4(aPos, 1.0);
+  vColor = aColor;
+}
+`;
+
+const lineFS = `
+precision mediump float;
+varying vec4 vColor;
+void main() {
+  gl_FragColor = vColor;
+}
+`;
+
+// ----- Star shader -----
+const starVS = `
+attribute vec3 aPos;
+attribute float aBright;
+uniform mat4 uMVP;
+varying float vBright;
+void main() {
+  gl_Position = uMVP * vec4(aPos, 1.0);
+  gl_PointSize = aBright * 2.5;
+  vBright = aBright;
+}
+`;
+
+const starFS = `
+precision mediump float;
+varying float vBright;
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  float d = length(c);
+  if (d > 0.5) discard;
+  float a = exp(-d * 6.0) * vBright * 0.5;
+  gl_FragColor = vec4(0.7, 0.75, 0.9, a);
+}
+`;
+
+// Build programs
+const pPointProg = createProgram(
+  compileShader(pointVS, gl.VERTEX_SHADER),
+  compileShader(pointFS, gl.FRAGMENT_SHADER)
+);
+const pLineProg = createProgram(
+  compileShader(lineVS, gl.VERTEX_SHADER),
+  compileShader(lineFS, gl.FRAGMENT_SHADER)
+);
+const pStarProg = createProgram(
+  compileShader(starVS, gl.VERTEX_SHADER),
+  compileShader(starFS, gl.FRAGMENT_SHADER)
+);
+
+// Get locations
+const loc = {
+  point: {
+    aPos: gl.getAttribLocation(pPointProg, 'aPos'),
+    aColor: gl.getAttribLocation(pPointProg, 'aColor'),
+    aSize: gl.getAttribLocation(pPointProg, 'aSize'),
+    uMVP: gl.getUniformLocation(pPointProg, 'uMVP'),
+    uScale: gl.getUniformLocation(pPointProg, 'uScale'),
+  },
+  line: {
+    aPos: gl.getAttribLocation(pLineProg, 'aPos'),
+    aColor: gl.getAttribLocation(pLineProg, 'aColor'),
+    uMVP: gl.getUniformLocation(pLineProg, 'uMVP'),
+  },
+  star: {
+    aPos: gl.getAttribLocation(pStarProg, 'aPos'),
+    aBright: gl.getAttribLocation(pStarProg, 'aBright'),
+    uMVP: gl.getUniformLocation(pStarProg, 'uMVP'),
+  }
+};
+
+// Buffers
+const pointPosBuf = gl.createBuffer();
+const pointColBuf = gl.createBuffer();
+const pointSizeBuf = gl.createBuffer();
+const linePosBuf = gl.createBuffer();
+const lineColBuf = gl.createBuffer();
+const starPosBuf = gl.createBuffer();
+const starBrightBuf = gl.createBuffer();
+
+// Generate starfield
+const NUM_STARS = 800;
+const starPosData = new Float32Array(NUM_STARS * 3);
+const starBrightData = new Float32Array(NUM_STARS);
+for (let i = 0; i < NUM_STARS; i++) {
+  const theta = Math.random() * Math.PI * 2;
+  const phi = Math.acos(2 * Math.random() - 1);
+  const r = 40 + Math.random() * 60;
+  starPosData[i*3] = r * Math.sin(phi) * Math.cos(theta);
+  starPosData[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+  starPosData[i*3+2] = r * Math.cos(phi);
+  starBrightData[i] = 0.3 + Math.random() * 0.7;
+}
+gl.bindBuffer(gl.ARRAY_BUFFER, starPosBuf);
+gl.bufferData(gl.ARRAY_BUFFER, starPosData, gl.STATIC_DRAW);
+gl.bindBuffer(gl.ARRAY_BUFFER, starBrightBuf);
+gl.bufferData(gl.ARRAY_BUFFER, starBrightData, gl.STATIC_DRAW);
+
+// ===== Matrix helpers =====
+function mat4Perspective(fov, aspect, near, far) {
+  const f = 1.0 / Math.tan(fov / 2);
+  const nf = 1 / (near - far);
+  return new Float32Array([
+    f/aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far+near)*nf, -1,
+    0, 0, 2*far*near*nf, 0
+  ]);
+}
+
+function mat4LookAt(eye, center, up) {
+  const zx = eye[0]-center[0], zy = eye[1]-center[1], zz = eye[2]-center[2];
+  let len = Math.sqrt(zx*zx+zy*zy+zz*zz);
+  const fz = [zx/len, zy/len, zz/len];
+  const sx = up[1]*fz[2]-up[2]*fz[1], sy = up[2]*fz[0]-up[0]*fz[2], sz = up[0]*fz[1]-up[1]*fz[0];
+  len = Math.sqrt(sx*sx+sy*sy+sz*sz);
+  const fs = [sx/len, sy/len, sz/len];
+  const ux = fz[1]*fs[2]-fz[2]*fs[1], uy = fz[2]*fs[0]-fz[0]*fs[2], uz = fz[0]*fs[1]-fz[1]*fs[0];
+  return new Float32Array([
+    fs[0], ux, fz[0], 0,
+    fs[1], uy, fz[1], 0,
+    fs[2], uz, fz[2], 0,
+    -(fs[0]*eye[0]+fs[1]*eye[1]+fs[2]*eye[2]),
+    -(ux*eye[0]+uy*eye[1]+uz*eye[2]),
+    -(fz[0]*eye[0]+fz[1]*eye[1]+fz[2]*eye[2]),
+    1
+  ]);
+}
+
+function mat4Multiply(a, b) {
+  const out = new Float32Array(16);
+  for (let i = 0; i < 4; i++)
+    for (let j = 0; j < 4; j++) {
+      let s = 0;
+      for (let k = 0; k < 4; k++) s += a[k*4+j] * b[i*4+k];
+      out[i*4+j] = s;
+    }
+  return out;
+}
+
+// ===== State =====
+let dim = 4;
+let cube = generateHypercube(dim);
+let hashBytes = SHA256('hello world');
+let hashVertex = getHashVertex(hashBytes, dim);
+let ndRotation = identityND(dim);
+let explodeMode = false;
+let explodeFactor = 0;
+
+// Camera
+let orbitTheta = 0.3;
+let orbitPhi = 0.5;
+let orbitDist = 7.0;
+let camTarget = [0, 0, 0];
+let camOffset = [0, 0, 0]; // WASD fly offset
+let autoRotate = true;
+let rotSpeed = 0.5;
+
+// Higher-D rotation angles (user-controlled)
+let ndAngles = {}; // key: "planeA_planeB" -> angle
+
+// Dimension edge colors
+const dimColors = [
+  [1.0, 0.2, 0.2], // 0: red
+  [0.2, 1.0, 0.2], // 1: green
+  [0.3, 0.4, 1.0], // 2: blue
+  [0.0, 0.94, 1.0], // 3: cyan
+  [1.0, 0.27, 0.53], // 4: pink
+  [1.0, 0.84, 0.0], // 5: gold
+];
+
+// ===== Audio =====
+let audioCtx = null;
+let oscillators = [];
+let gainNodes = [];
+let hashOsc = null;
+let hashGain = null;
+let masterGain = null;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.15;
+  masterGain.connect(audioCtx.destination);
+}
+
+function setupOscillators() {
+  if (!audioCtx) return;
+  // Cleanup old
+  oscillators.forEach(o => { try { o.stop(); } catch(e) {} });
+  gainNodes = [];
+  oscillators = [];
+
+  const numV = cube.numVerts;
+  for (let i = 0; i < numV; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    // Frequency: map index to a nice range
+    const baseFreq = 110;
+    const freq = baseFreq + (i / numV) * 330;
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.value = 0.0;
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start();
+    oscillators.push(osc);
+    gainNodes.push(gain);
+  }
+
+  // Hash vertex gets a special tone
+  if (hashOsc) { try { hashOsc.stop(); } catch(e) {} }
+  hashOsc = audioCtx.createOscillator();
+  hashGain = audioCtx.createGain();
+  hashOsc.type = 'triangle';
+  hashOsc.frequency.value = 261.63; // Middle C
+  hashGain.gain.value = 0.0;
+  hashOsc.connect(hashGain);
+  hashGain.connect(masterGain);
+  hashOsc.start();
+}
+
+function playTransitionChord() {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const freqs = [261.63, 329.63, 392.0, 523.25];
+  freqs.forEach(f => {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = f;
+    g.gain.setValueAtTime(0.08, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    osc.connect(g);
+    g.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 1.2);
+  });
+}
+
+function updateAudioProximity(projected3D, camPos) {
+  if (!audioCtx || gainNodes.length === 0) return;
+  const now = audioCtx.currentTime;
+  for (let i = 0; i < projected3D.length; i++) {
+    const p = projected3D[i];
+    const dx = p[0] - camPos[0], dy = p[1] - camPos[1], dz = p[2] - camPos[2];
+    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    const vol = Math.min(0.12, 0.5 / (1 + dist * dist));
+    if (gainNodes[i]) {
+      gainNodes[i].gain.setTargetAtTime(vol, now, 0.1);
+    }
+  }
+  // Hash vertex louder
+  if (hashGain && hashVertex < projected3D.length) {
+    const p = projected3D[hashVertex];
+    const dx = p[0]-camPos[0], dy = p[1]-camPos[1], dz = p[2]-camPos[2];
+    const dist = Math.sqrt(dx*dx+dy*dy+dz*dz);
+    const vol = Math.min(0.2, 1.0 / (1 + dist * dist));
+    hashGain.gain.setTargetAtTime(vol, now, 0.1);
+  }
+}
+
+// ===== Input handling =====
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  // Start audio on first key press
+  if (!audioCtx) { initAudio(); setupOscillators(); }
+});
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+let isDragging = false;
+let lastMouse = [0, 0];
+canvas.addEventListener('mousedown', e => {
+  isDragging = true;
+  lastMouse = [e.clientX, e.clientY];
+  autoRotate = false;
+  if (!audioCtx) { initAudio(); setupOscillators(); }
+});
+window.addEventListener('mouseup', () => { isDragging = false; });
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - lastMouse[0];
+  const dy = e.clientY - lastMouse[1];
+  orbitTheta -= dx * 0.005;
+  orbitPhi = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, orbitPhi - dy * 0.005));
+  lastMouse = [e.clientX, e.clientY];
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  orbitDist = Math.max(1.5, Math.min(30, orbitDist + e.deltaY * 0.01));
+}, { passive: false });
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    lastMouse = [e.touches[0].clientX, e.touches[0].clientY];
+    autoRotate = false;
+  }
+  if (!audioCtx) { initAudio(); setupOscillators(); }
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (isDragging && e.touches.length === 1) {
+    const dx = e.touches[0].clientX - lastMouse[0];
+    const dy = e.touches[0].clientY - lastMouse[1];
+    orbitTheta -= dx * 0.005;
+    orbitPhi = Math.max(-Math.PI/2+0.1, Math.min(Math.PI/2-0.1, orbitPhi - dy*0.005));
+    lastMouse = [e.touches[0].clientX, e.touches[0].clientY];
+  }
+}, { passive: false });
+canvas.addEventListener('touchend', () => { isDragging = false; });
+
+// UI
+const hashInput = document.getElementById('hashInput');
+const dimSelect = document.getElementById('dimSelect');
+const speedSlider = document.getElementById('speedSlider');
+const explodeBtn = document.getElementById('explodeBtn');
+
+hashInput.addEventListener('input', () => {
+  hashBytes = SHA256(hashInput.value);
+  hashVertex = getHashVertex(hashBytes, dim);
+  document.getElementById('hashHex').textContent = hashHex(hashBytes);
+  updateStats();
+  playTransitionChord();
+  if (audioCtx) setupOscillators();
+});
+
+dimSelect.addEventListener('change', () => {
+  dim = parseInt(dimSelect.value);
+  cube = generateHypercube(dim);
+  ndRotation = identityND(dim);
+  hashVertex = getHashVertex(hashBytes, dim);
+  updateStats();
+  if (audioCtx) setupOscillators();
+});
+
+speedSlider.addEventListener('input', () => {
+  rotSpeed = speedSlider.value / 100;
+});
+
+explodeBtn.addEventListener('click', () => {
+  explodeMode = !explodeMode;
+  explodeBtn.classList.toggle('active', explodeMode);
+});
+
+function updateStats() {
+  document.getElementById('statVerts').textContent = cube.numVerts;
+  document.getElementById('statEdges').textContent = cube.edges.length;
+  document.getElementById('statHashVtx').textContent = hashVertex;
+  document.getElementById('hashHex').textContent = hashHex(hashBytes);
+}
+updateStats();
+
+// ===== Main render loop =====
+let lastTime = 0;
+let totalRotAngle1 = 0;
+let totalRotAngle2 = 0;
+
+function hamming(a, b) {
+  let x = a ^ b, c = 0;
+  while (x) { c += x & 1; x >>= 1; }
+  return c;
+}
+
+function frame(time) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((time - lastTime) / 1000, 0.05);
+  lastTime = time;
+
+  // Auto rotate orbit
+  if (autoRotate) {
+    orbitTheta += dt * 0.3 * rotSpeed;
+  }
+
+  // WASD flying
+  const flySpeed = 4.0 * dt;
+  const fwd = [
+    -Math.sin(orbitTheta) * Math.cos(orbitPhi),
+    Math.sin(orbitPhi),
+    -Math.cos(orbitTheta) * Math.cos(orbitPhi)
+  ];
+  const right = [Math.cos(orbitTheta), 0, -Math.sin(orbitTheta)];
+
+  if (keys['w']) { camOffset[0] += fwd[0]*flySpeed; camOffset[1] += fwd[1]*flySpeed; camOffset[2] += fwd[2]*flySpeed; }
+  if (keys['s']) { camOffset[0] -= fwd[0]*flySpeed; camOffset[1] -= fwd[1]*flySpeed; camOffset[2] -= fwd[2]*flySpeed; }
+  if (keys['a']) { camOffset[0] -= right[0]*flySpeed; camOffset[1] -= right[1]*flySpeed; camOffset[2] -= right[2]*flySpeed; }
+  if (keys['d']) { camOffset[0] += right[0]*flySpeed; camOffset[1] += right[1]*flySpeed; camOffset[2] += right[2]*flySpeed; }
+
+  // N-D plane rotations via keyboard
+  const ndRotSpeed = dt * 1.5;
+  if (dim >= 4) {
+    if (keys['q']) totalRotAngle1 -= ndRotSpeed;
+    if (keys['e']) totalRotAngle1 += ndRotSpeed;
+    if (keys['r']) totalRotAngle2 -= ndRotSpeed;
+    if (keys['f']) totalRotAngle2 += ndRotSpeed;
+  }
+
+  // Build N-D rotation
+  const autoSpeed = rotSpeed * dt;
+  totalRotAngle1 += autoSpeed * 0.7;
+  totalRotAngle2 += autoSpeed * 0.5;
+
+  let rot = identityND(dim);
+  // Auto tumble: rotate in plane 0-1 and, if dim>=4, plane 2-3
+  rot = multiplyNDMats(rot, makeNDRotation(dim, 0, 1, totalRotAngle1 * 0.3), dim);
+  if (dim >= 4) {
+    rot = multiplyNDMats(rot, makeNDRotation(dim, 2, 3, totalRotAngle2 * 0.4), dim);
+  }
+  if (dim >= 4) {
+    // XW plane rotation (Q/E)
+    rot = multiplyNDMats(rot, makeNDRotation(dim, 0, 3, totalRotAngle1 * 0.2), dim);
+  }
+  if (dim >= 5) {
+    rot = multiplyNDMats(rot, makeNDRotation(dim, 1, 4, totalRotAngle2 * 0.15), dim);
+  }
+  if (dim >= 6) {
+    rot = multiplyNDMats(rot, makeNDRotation(dim, 3, 5, time * 0.0001), dim);
+  }
+
+  // Explode
+  const targetExplode = explodeMode ? 1.0 : 0.0;
+  explodeFactor += (targetExplode - explodeFactor) * dt * 3;
+
+  // Project all vertices
+  const viewDist = 3.0;
+  const projected = [];
+  for (let i = 0; i < cube.numVerts; i++) {
+    let coords = new Float32Array(cube.vertices[i]);
+
+    // Apply explode: push vertices outward based on distance from center
+    if (explodeFactor > 0.01) {
+      let mag = 0;
+      for (let d = 0; d < dim; d++) mag += coords[d] * coords[d];
+      mag = Math.sqrt(mag);
+      if (mag > 0) {
+        for (let d = 0; d < dim; d++) coords[d] += coords[d] / mag * explodeFactor * 1.5;
+      }
+    }
+
+    // Apply N-D rotation
+    coords = applyNDRotation(rot, coords, dim);
+
+    // Project to 3D
+    const p3 = projectNDto3D(coords, dim, viewDist);
+    projected.push(p3);
+  }
+
+  // Camera position
+  const camPos = [
+    camTarget[0] + camOffset[0] + orbitDist * Math.sin(orbitTheta) * Math.cos(orbitPhi),
+    camTarget[1] + camOffset[1] + orbitDist * Math.sin(orbitPhi),
+    camTarget[2] + camOffset[2] + orbitDist * Math.cos(orbitTheta) * Math.cos(orbitPhi)
+  ];
+  const lookAt = [camTarget[0] + camOffset[0], camTarget[1] + camOffset[1], camTarget[2] + camOffset[2]];
+
+  document.getElementById('statCam').textContent =
+    camPos.map(v => v.toFixed(1)).join(', ');
+
+  // Build MVP
+  const aspect = canvas.width / canvas.height;
+  const proj = mat4Perspective(Math.PI / 4, aspect, 0.1, 200);
+  const view = mat4LookAt(camPos, lookAt, [0, 1, 0]);
+  const mvp = mat4Multiply(proj, view);
+
+  // ===== Draw =====
+  gl.clearColor(0.012, 0.012, 0.03, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+  // Draw stars
+  gl.useProgram(pStarProg);
+  gl.uniformMatrix4fv(loc.star.uMVP, false, mvp);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, starPosBuf);
+  gl.enableVertexAttribArray(loc.star.aPos);
+  gl.vertexAttribPointer(loc.star.aPos, 3, gl.FLOAT, false, 0, 0);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, starBrightBuf);
+  gl.enableVertexAttribArray(loc.star.aBright);
+  gl.vertexAttribPointer(loc.star.aBright, 1, gl.FLOAT, false, 0, 0);
+
+  gl.drawArrays(gl.POINTS, 0, NUM_STARS);
+  gl.disableVertexAttribArray(loc.star.aPos);
+  gl.disableVertexAttribArray(loc.star.aBright);
+
+  // Build edge data
+  const edgePosArr = [];
+  const edgeColArr = [];
+  for (const [a, b, d] of cube.edges) {
+    const pa = projected[a], pb = projected[b];
+    edgePosArr.push(pa[0], pa[1], pa[2], pb[0], pb[1], pb[2]);
+
+    const dc = dimColors[d % dimColors.length];
+    const isHashEdge = (a === hashVertex || b === hashVertex);
+    const alpha = isHashEdge ? 0.9 : 0.35;
+    const bright = isHashEdge ? 1.5 : 0.7;
+    edgeColArr.push(
+      dc[0]*bright, dc[1]*bright, dc[2]*bright, alpha,
+      dc[0]*bright, dc[1]*bright, dc[2]*bright, alpha
+    );
+  }
+
+  // Draw edges
+  gl.useProgram(pLineProg);
+  gl.uniformMatrix4fv(loc.line.uMVP, false, mvp);
+
+  const edgePosData = new Float32Array(edgePosArr);
+  const edgeColData = new Float32Array(edgeColArr);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, linePosBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, edgePosData, gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(loc.line.aPos);
+  gl.vertexAttribPointer(loc.line.aPos, 3, gl.FLOAT, false, 0, 0);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, lineColBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, edgeColData, gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(loc.line.aColor);
+  gl.vertexAttribPointer(loc.line.aColor, 4, gl.FLOAT, false, 0, 0);
+
+  gl.drawArrays(gl.LINES, 0, cube.edges.length * 2);
+  gl.disableVertexAttribArray(loc.line.aPos);
+  gl.disableVertexAttribArray(loc.line.aColor);
+
+  // Build vertex data
+  const vtxPosArr = [];
+  const vtxColArr = [];
+  const vtxSizeArr = [];
+
+  for (let i = 0; i < cube.numVerts; i++) {
+    const p = projected[i];
+    vtxPosArr.push(p[0], p[1], p[2]);
+
+    const isHash = (i === hashVertex);
+    const hammDist = hamming(i, hashVertex);
+    const proximity = 1.0 - hammDist / dim;
+
+    if (isHash) {
+      // Gold glow
+      vtxColArr.push(1.0, 0.84, 0.0, 1.0);
+      vtxSizeArr.push(40.0);
+    } else {
+      // Color by proximity to hash vertex
+      const r = 0.1 + proximity * 0.4;
+      const g = 0.15 + proximity * 0.6;
+      const b = 0.5 + proximity * 0.5;
+      const a = 0.4 + proximity * 0.5;
+      vtxColArr.push(r, g, b, a);
+      vtxSizeArr.push(8.0 + proximity * 16.0);
+    }
+  }
+
+  // Draw vertices
+  gl.useProgram(pPointProg);
+  gl.uniformMatrix4fv(loc.point.uMVP, false, mvp);
+  gl.uniform1f(loc.point.uScale, canvas.height * 0.5);
+
+  const vtxPosData = new Float32Array(vtxPosArr);
+  const vtxColData = new Float32Array(vtxColArr);
+  const vtxSizeData = new Float32Array(vtxSizeArr);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, pointPosBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, vtxPosData, gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(loc.point.aPos);
+  gl.vertexAttribPointer(loc.point.aPos, 3, gl.FLOAT, false, 0, 0);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, pointColBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, vtxColData, gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(loc.point.aColor);
+  gl.vertexAttribPointer(loc.point.aColor, 4, gl.FLOAT, false, 0, 0);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, pointSizeBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, vtxSizeData, gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(loc.point.aSize);
+  gl.vertexAttribPointer(loc.point.aSize, 1, gl.FLOAT, false, 0, 0);
+
+  gl.drawArrays(gl.POINTS, 0, cube.numVerts);
+  gl.disableVertexAttribArray(loc.point.aPos);
+  gl.disableVertexAttribArray(loc.point.aColor);
+  gl.disableVertexAttribArray(loc.point.aSize);
+
+  // Update audio proximity
+  updateAudioProximity(projected, camPos);
+}
+
+requestAnimationFrame(frame);
+
+// Initialize hash display
+document.getElementById('hashHex').textContent = hashHex(hashBytes);
+</script>
+</body>
+</html>

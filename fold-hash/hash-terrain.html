@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hash Terrain — fold(HASH)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#030308;--card:rgba(12,12,28,0.9);--border:rgba(100,80,200,0.25);--text:#d0d0f0;--accent:#7c6cf0;--cyan:#00f0ff;--pink:#ff4488;--gold:#ffd700;--green:#00ff88}
+body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:
+  radial-gradient(ellipse at 20% 50%,rgba(124,108,240,0.08),transparent 60%),
+  radial-gradient(ellipse at 80% 30%,rgba(0,240,255,0.06),transparent 50%),
+  radial-gradient(ellipse at 50% 80%,rgba(255,68,136,0.05),transparent 50%);
+  z-index:-1;pointer-events:none}
+
+header{text-align:center;padding:20px 20px 6px}
+header h1{font-size:1.8em;background:linear-gradient(90deg,var(--cyan),var(--accent),var(--pink),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:3px}
+header .sub{font-size:0.7em;opacity:0.4;margin:4px 0;line-height:1.4}
+
+.container{max-width:1400px;margin:0 auto;padding:6px 20px 30px}
+
+.input-section{display:flex;gap:12px;margin:10px 0;align-items:flex-start;flex-wrap:wrap}
+.input-group{flex:1;min-width:250px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;backdrop-filter:blur(10px)}
+.input-group label{display:block;font-size:0.75em;color:var(--accent);margin-bottom:4px;font-weight:bold}
+.input-group input{width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:inherit;font-size:0.85em;outline:none;transition:border-color 0.3s}
+.input-group input:focus{border-color:var(--accent)}
+.hash-display{font-size:0.6em;margin-top:5px;word-break:break-all;opacity:0.45;min-height:1.2em;line-height:1.2}
+
+.compare-toggle{background:rgba(124,108,240,0.2);border:1px solid var(--accent);border-radius:8px;padding:8px 16px;color:var(--accent);font-family:inherit;font-size:0.75em;cursor:pointer;transition:all 0.2s;margin-top:22px;white-space:nowrap}
+.compare-toggle:hover{background:rgba(124,108,240,0.35);transform:translateY(-1px)}
+.compare-toggle.active{background:rgba(124,108,240,0.4);border-color:var(--cyan);color:var(--cyan)}
+
+.main-area{display:grid;grid-template-columns:1fr 220px;gap:12px;margin:10px 0}
+.canvas-wrap{position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;min-height:500px}
+#terrainCanvas{width:100%;height:100%;display:block;cursor:grab}
+#terrainCanvas:active{cursor:grabbing}
+
+.minimap-wrap{position:absolute;bottom:12px;left:12px;background:rgba(3,3,8,0.85);border:1px solid var(--border);border-radius:8px;padding:6px;z-index:5}
+.minimap-wrap .label{font-size:0.55em;opacity:0.4;margin-bottom:3px;text-align:center}
+#minimapCanvas{display:block;border-radius:4px;image-rendering:pixelated}
+
+.sidebar{display:flex;flex-direction:column;gap:10px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;backdrop-filter:blur(10px);text-align:center}
+.stat-card .value{font-size:1.6em;font-weight:bold;color:var(--cyan)}
+.stat-card .label{font-size:0.65em;opacity:0.5;margin-top:2px}
+.stat-card.peak .value{color:var(--gold)}
+.stat-card.valley .value{color:var(--cyan)}
+.stat-card.avg .value{color:var(--green)}
+.stat-card.rough .value{color:var(--pink)}
+
+.controls-bar{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;backdrop-filter:blur(10px)}
+.controls-bar label{font-size:0.65em;opacity:0.5;display:block;margin-bottom:4px}
+.controls-bar input[type=range]{width:100%;accent-color:var(--accent)}
+.controls-bar .row{display:flex;align-items:center;gap:8px;margin:4px 0}
+.controls-bar .val{font-size:0.7em;color:var(--accent);min-width:30px;text-align:right}
+
+.sound-toggle{background:rgba(124,108,240,0.2);border:1px solid var(--accent);border-radius:8px;padding:8px 16px;color:var(--accent);font-family:inherit;font-size:0.7em;cursor:pointer;transition:all 0.2s;width:100%}
+.sound-toggle:hover{background:rgba(124,108,240,0.35)}
+.sound-toggle.active{background:rgba(0,240,255,0.15);border-color:var(--cyan);color:var(--cyan)}
+
+.info-bar{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;align-items:center}
+.info-chip{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:0.65em;opacity:0.6}
+
+@media(max-width:900px){
+  .main-area{grid-template-columns:1fr}
+  .sidebar{flex-direction:row;flex-wrap:wrap}
+  .stat-card{flex:1;min-width:100px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hash Terrain</h1>
+  <div class="sub">SHA-256 bytes become mountains — type anything and explore the geography of data</div>
+</header>
+
+<div class="container">
+  <div class="input-section">
+    <div class="input-group">
+      <label>Input A</label>
+      <input type="text" id="inputA" placeholder="Type anything..." value="hello world" spellcheck="false">
+      <div class="hash-display" id="hashA"></div>
+    </div>
+    <div class="input-group" id="inputBGroup" style="display:none">
+      <label>Input B (wireframe overlay)</label>
+      <input type="text" id="inputB" placeholder="Compare with..." value="hello world!" spellcheck="false">
+      <div class="hash-display" id="hashB"></div>
+    </div>
+    <button class="compare-toggle" id="compareBtn">Compare</button>
+  </div>
+
+  <div class="main-area">
+    <div class="canvas-wrap">
+      <canvas id="terrainCanvas"></canvas>
+      <div class="minimap-wrap">
+        <div class="label">8x4 byte grid</div>
+        <canvas id="minimapCanvas" width="80" height="40"></canvas>
+      </div>
+    </div>
+    <div class="sidebar">
+      <div class="stat-card peak">
+        <div class="value" id="statPeak">0</div>
+        <div class="label">Highest Peak</div>
+      </div>
+      <div class="stat-card valley">
+        <div class="value" id="statValley">0</div>
+        <div class="label">Deepest Valley</div>
+      </div>
+      <div class="stat-card avg">
+        <div class="value" id="statAvg">0</div>
+        <div class="label">Avg Elevation</div>
+      </div>
+      <div class="stat-card rough">
+        <div class="value" id="statRough">0</div>
+        <div class="label">Roughness</div>
+      </div>
+      <div class="controls-bar">
+        <label>Water Level</label>
+        <div class="row">
+          <input type="range" id="waterLevel" min="0" max="255" value="80">
+          <span class="val" id="waterVal">80</span>
+        </div>
+        <label>Vertical Scale</label>
+        <div class="row">
+          <input type="range" id="vertScale" min="10" max="200" value="80">
+          <span class="val" id="scaleVal">80</span>
+        </div>
+      </div>
+      <button class="sound-toggle" id="soundBtn">Sound: OFF</button>
+    </div>
+  </div>
+
+  <div class="info-bar">
+    <div class="info-chip">Drag to orbit</div>
+    <div class="info-chip">Scroll to zoom</div>
+    <div class="info-chip">Click terrain to ping</div>
+    <div class="info-chip" id="fpsChip">FPS: --</div>
+  </div>
+</div>
+
+<script>
+// ─── SHA-256 ────────────────────────────────────────────────────
+const SHA256 = (() => {
+  const K = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+  function rotr(n,x){return(x>>>n)|(x<<(32-n))}
+  function ch(x,y,z){return(x&y)^(~x&z)}
+  function maj(x,y,z){return(x&y)^(x&z)^(y&z)}
+  function sigma0(x){return rotr(2,x)^rotr(13,x)^rotr(22,x)}
+  function sigma1(x){return rotr(6,x)^rotr(11,x)^rotr(25,x)}
+  function gamma0(x){return rotr(7,x)^rotr(18,x)^(x>>>3)}
+  function gamma1(x){return rotr(17,x)^rotr(19,x)^(x>>>10)}
+  return function sha256(msg){const utf8=new TextEncoder().encode(msg);const bitLen=utf8.length*8;const padLen=(((utf8.length+8)>>6)+1)<<6;const padded=new Uint8Array(padLen);padded.set(utf8);padded[utf8.length]=0x80;const view=new DataView(padded.buffer);view.setUint32(padLen-4,bitLen,false);let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a,h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;for(let offset=0;offset<padLen;offset+=64){const W=new Uint32Array(64);for(let i=0;i<16;i++)W[i]=view.getUint32(offset+i*4,false);for(let i=16;i<64;i++)W[i]=(gamma1(W[i-2])+W[i-7]+gamma0(W[i-15])+W[i-16])|0;let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;for(let i=0;i<64;i++){const T1=(h+sigma1(e)+ch(e,f,g)+K[i]+W[i])|0;const T2=(sigma0(a)+maj(a,b,c))|0;h=g;g=f;f=e;e=(d+T1)|0;d=c;c=b;b=a;a=(T1+T2)|0;}h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+h)|0;}const out=new Uint8Array(32);const dv=new DataView(out.buffer);[h0,h1,h2,h3,h4,h5,h6,h7].forEach((v,i)=>dv.setUint32(i*4,v,false));return out;};
+})();
+
+function hashHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// ─── Terrain from hash ─────────────────────────────────────────
+const GRID = 32;
+
+function bytesToGrid8x4(bytes) {
+  // Arrange 32 bytes as 4 rows x 8 cols
+  const grid = [];
+  for (let r = 0; r < 4; r++) {
+    grid[r] = [];
+    for (let c = 0; c < 8; c++) {
+      grid[r][c] = bytes[r * 8 + c];
+    }
+  }
+  return grid;
+}
+
+function bicubicWeight(t) {
+  // Catmull-Rom spline weights
+  const abs_t = Math.abs(t);
+  if (abs_t <= 1) return 1.5 * abs_t * abs_t * abs_t - 2.5 * abs_t * abs_t + 1;
+  if (abs_t <= 2) return -0.5 * abs_t * abs_t * abs_t + 2.5 * abs_t * abs_t - 4 * abs_t + 2;
+  return 0;
+}
+
+function sampleGrid(grid, rows, cols, r, c) {
+  const cr = Math.max(0, Math.min(rows - 1, Math.round(r)));
+  const cc = Math.max(0, Math.min(cols - 1, Math.round(c)));
+  return grid[cr][cc];
+}
+
+function interpolateHeightmap(bytes) {
+  const src = bytesToGrid8x4(bytes);
+  const srcRows = 4, srcCols = 8;
+  const out = new Float32Array(GRID * GRID);
+
+  for (let y = 0; y < GRID; y++) {
+    for (let x = 0; x < GRID; x++) {
+      const srcR = (y / (GRID - 1)) * (srcRows - 1);
+      const srcC = (x / (GRID - 1)) * (srcCols - 1);
+      const ir = Math.floor(srcR);
+      const ic = Math.floor(srcC);
+      const fr = srcR - ir;
+      const fc = srcC - ic;
+
+      let val = 0;
+      for (let dr = -1; dr <= 2; dr++) {
+        for (let dc = -1; dc <= 2; dc++) {
+          const wr = bicubicWeight(fr - dr);
+          const wc = bicubicWeight(fc - dc);
+          val += wr * wc * sampleGrid(src, srcRows, srcCols, ir + dr, ic + dc);
+        }
+      }
+      out[y * GRID + x] = Math.max(0, Math.min(255, val));
+    }
+  }
+  return out;
+}
+
+// ─── WebGL Setup ───────────────────────────────────────────────
+const canvas = document.getElementById('terrainCanvas');
+const gl = canvas.getContext('webgl', { antialias: true, alpha: false });
+
+if (!gl) {
+  document.querySelector('.canvas-wrap').innerHTML = '<p style="padding:40px;color:var(--pink)">WebGL not supported in this browser.</p>';
+}
+
+// Terrain vertex shader
+const terrainVS = `
+  attribute vec3 aPosition;
+  attribute float aHeight;
+  attribute float aTargetHeight;
+  uniform float uMorph; // 0..1 animation progress
+  uniform mat4 uProj;
+  uniform mat4 uView;
+  uniform float uScale;
+  varying float vHeight;
+  varying vec3 vWorldPos;
+  varying vec3 vNormal;
+
+  void main() {
+    float h = mix(aHeight, aTargetHeight, uMorph);
+    vHeight = h;
+    vec3 pos = aPosition;
+    pos.y = h * uScale / 255.0;
+    vWorldPos = pos;
+
+    // Approximate normal from neighbors encoded via height
+    // We'll compute normals in JS and pass them, but for simplicity
+    // use a flat normal adjusted by height gradient
+    vNormal = vec3(0.0, 1.0, 0.0);
+
+    gl_Position = uProj * uView * vec4(pos, 1.0);
+  }
+`;
+
+// Terrain fragment shader with height-based coloring + lighting
+const terrainFS = `
+  precision mediump float;
+  varying float vHeight;
+  varying vec3 vWorldPos;
+  varying vec3 vNormal;
+  uniform vec3 uLightDir;
+  uniform float uWaterLevel;
+
+  vec3 terrainColor(float h) {
+    float t = h / 255.0;
+    // Deep water blue -> shore -> green -> brown -> snow
+    if (t < 0.2) return mix(vec3(0.05, 0.1, 0.4), vec3(0.1, 0.3, 0.6), t / 0.2);
+    if (t < 0.35) return mix(vec3(0.1, 0.3, 0.6), vec3(0.15, 0.6, 0.25), (t - 0.2) / 0.15);
+    if (t < 0.55) return mix(vec3(0.15, 0.6, 0.25), vec3(0.4, 0.55, 0.15), (t - 0.35) / 0.2);
+    if (t < 0.75) return mix(vec3(0.4, 0.55, 0.15), vec3(0.5, 0.35, 0.2), (t - 0.55) / 0.2);
+    if (t < 0.9) return mix(vec3(0.5, 0.35, 0.2), vec3(0.7, 0.7, 0.7), (t - 0.75) / 0.15);
+    return mix(vec3(0.7, 0.7, 0.7), vec3(1.0, 1.0, 1.0), (t - 0.9) / 0.1);
+  }
+
+  void main() {
+    vec3 col = terrainColor(vHeight);
+
+    // Compute normal from derivatives
+    vec3 dx = dFdx(vWorldPos);
+    vec3 dz = dFdy(vWorldPos);
+    vec3 N = normalize(cross(dx, dz));
+    // Flip if needed
+    if (N.y < 0.0) N = -N;
+
+    // Directional light
+    float diff = max(dot(N, uLightDir), 0.0);
+    float ambient = 0.3;
+    col *= (ambient + 0.7 * diff);
+
+    // Slight fog for depth
+    float dist = length(vWorldPos);
+    float fog = 1.0 - smoothstep(3.0, 8.0, dist);
+    col = mix(vec3(0.012, 0.012, 0.03), col, fog);
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+// Water vertex shader
+const waterVS = `
+  attribute vec3 aPosition;
+  uniform mat4 uProj;
+  uniform mat4 uView;
+  uniform float uWaterY;
+  varying vec3 vPos;
+  void main() {
+    vec3 pos = aPosition;
+    pos.y = uWaterY;
+    vPos = pos;
+    gl_Position = uProj * uView * vec4(pos, 1.0);
+  }
+`;
+
+const waterFS = `
+  precision mediump float;
+  varying vec3 vPos;
+  uniform float uTime;
+  void main() {
+    float wave = sin(vPos.x * 8.0 + uTime * 1.5) * cos(vPos.z * 6.0 + uTime * 1.2) * 0.02;
+    vec3 col = vec3(0.05, 0.25, 0.55) + wave;
+    float alpha = 0.55 + wave * 2.0;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+// Wireframe vertex shader (for compare mode)
+const wireVS = `
+  attribute vec3 aPosition;
+  attribute float aHeight;
+  uniform mat4 uProj;
+  uniform mat4 uView;
+  uniform float uScale;
+  varying float vHeight;
+  void main() {
+    vec3 pos = aPosition;
+    pos.y = aHeight * uScale / 255.0;
+    vHeight = aHeight;
+    gl_Position = uProj * uView * vec4(pos, 1.0);
+  }
+`;
+
+const wireFS = `
+  precision mediump float;
+  varying float vHeight;
+  void main() {
+    float t = vHeight / 255.0;
+    vec3 col = mix(vec3(1.0, 0.27, 0.53), vec3(1.0, 0.84, 0.0), t);
+    gl_FragColor = vec4(col, 0.7);
+  }
+`;
+
+function compileShader(src, type) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(s));
+    return null;
+  }
+  return s;
+}
+
+function createProgram(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compileShader(vs, gl.VERTEX_SHADER));
+  gl.attachShader(p, compileShader(fs, gl.FRAGMENT_SHADER));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(p));
+    return null;
+  }
+  return p;
+}
+
+// Enable OES_standard_derivatives for dFdx/dFdy
+gl.getExtension('OES_standard_derivatives');
+
+const terrainProg = createProgram(terrainVS, terrainFS);
+const waterProg = createProgram(waterVS, waterFS);
+const wireProg = createProgram(wireVS, wireFS);
+
+// ─── Terrain Mesh ──────────────────────────────────────────────
+function buildTerrainGeometry() {
+  const positions = [];
+  const indices = [];
+  const size = 2.0; // terrain spans -1 to 1
+
+  for (let z = 0; z < GRID; z++) {
+    for (let x = 0; x < GRID; x++) {
+      const px = (x / (GRID - 1)) * size - size / 2;
+      const pz = (z / (GRID - 1)) * size - size / 2;
+      positions.push(px, 0, pz);
+    }
+  }
+
+  for (let z = 0; z < GRID - 1; z++) {
+    for (let x = 0; x < GRID - 1; x++) {
+      const i = z * GRID + x;
+      indices.push(i, i + 1, i + GRID);
+      indices.push(i + 1, i + GRID + 1, i + GRID);
+    }
+  }
+
+  return { positions: new Float32Array(positions), indices: new Uint16Array(indices) };
+}
+
+function buildWireframeIndices() {
+  const indices = [];
+  for (let z = 0; z < GRID; z++) {
+    for (let x = 0; x < GRID - 1; x++) {
+      indices.push(z * GRID + x, z * GRID + x + 1);
+    }
+  }
+  for (let x = 0; x < GRID; x++) {
+    for (let z = 0; z < GRID - 1; z++) {
+      indices.push(z * GRID + x, (z + 1) * GRID + x);
+    }
+  }
+  return new Uint16Array(indices);
+}
+
+const geo = buildTerrainGeometry();
+const wireIndices = buildWireframeIndices();
+
+// Buffers
+const posBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+gl.bufferData(gl.ARRAY_BUFFER, geo.positions, gl.STATIC_DRAW);
+
+const idxBuf = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geo.indices, gl.STATIC_DRAW);
+
+const wireIdxBuf = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wireIdxBuf);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, wireIndices, gl.STATIC_DRAW);
+
+const heightBuf = gl.createBuffer();
+const targetHeightBuf = gl.createBuffer();
+const wireHeightBuf = gl.createBuffer();
+
+// Water quad
+const waterVerts = new Float32Array([
+  -1, 0, -1,  1, 0, -1,  -1, 0, 1,
+  1, 0, -1,   1, 0, 1,   -1, 0, 1
+]);
+const waterBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, waterBuf);
+gl.bufferData(gl.ARRAY_BUFFER, waterVerts, gl.STATIC_DRAW);
+
+// ─── Matrix math ───────────────────────────────────────────────
+function mat4Perspective(fov, aspect, near, far) {
+  const f = 1 / Math.tan(fov / 2);
+  const nf = 1 / (near - far);
+  return new Float32Array([
+    f/aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far+near)*nf, -1,
+    0, 0, 2*far*near*nf, 0
+  ]);
+}
+
+function mat4LookAt(eye, center, up) {
+  const zx = eye[0]-center[0], zy = eye[1]-center[1], zz = eye[2]-center[2];
+  let len = 1/Math.sqrt(zx*zx+zy*zy+zz*zz);
+  const fz = [zx*len, zy*len, zz*len];
+  const sx = up[1]*fz[2]-up[2]*fz[1], sy = up[2]*fz[0]-up[0]*fz[2], sz = up[0]*fz[1]-up[1]*fz[0];
+  len = 1/Math.sqrt(sx*sx+sy*sy+sz*sz);
+  const s = [sx*len, sy*len, sz*len];
+  const u = [s[1]*fz[2]-s[2]*fz[1], s[2]*fz[0]-s[0]*fz[2], s[0]*fz[1]-s[1]*fz[0]];
+  return new Float32Array([
+    s[0], u[0], fz[0], 0,
+    s[1], u[1], fz[1], 0,
+    s[2], u[2], fz[2], 0,
+    -(s[0]*eye[0]+s[1]*eye[1]+s[2]*eye[2]),
+    -(u[0]*eye[0]+u[1]*eye[1]+u[2]*eye[2]),
+    -(fz[0]*eye[0]+fz[1]*eye[1]+fz[2]*eye[2]),
+    1
+  ]);
+}
+
+function normalize3(v) {
+  const l = Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);
+  return [v[0]/l, v[1]/l, v[2]/l];
+}
+
+// ─── Camera ────────────────────────────────────────────────────
+let camTheta = 0.5;
+let camPhi = 0.6;
+let camDist = 3.0;
+let autoRotate = true;
+let isDragging = false;
+let lastMX = 0, lastMY = 0;
+
+canvas.addEventListener('mousedown', e => {
+  isDragging = true;
+  autoRotate = false;
+  lastMX = e.clientX;
+  lastMY = e.clientY;
+});
+window.addEventListener('mouseup', () => { isDragging = false; });
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - lastMX;
+  const dy = e.clientY - lastMY;
+  camTheta -= dx * 0.005;
+  camPhi = Math.max(0.1, Math.min(Math.PI / 2 - 0.01, camPhi + dy * 0.005));
+  lastMX = e.clientX;
+  lastMY = e.clientY;
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  camDist = Math.max(1.2, Math.min(8, camDist + e.deltaY * 0.003));
+}, { passive: false });
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    autoRotate = false;
+    lastMX = e.touches[0].clientX;
+    lastMY = e.touches[0].clientY;
+  }
+});
+canvas.addEventListener('touchmove', e => {
+  if (!isDragging || e.touches.length !== 1) return;
+  e.preventDefault();
+  const dx = e.touches[0].clientX - lastMX;
+  const dy = e.touches[0].clientY - lastMY;
+  camTheta -= dx * 0.005;
+  camPhi = Math.max(0.1, Math.min(Math.PI / 2 - 0.01, camPhi + dy * 0.005));
+  lastMX = e.touches[0].clientX;
+  lastMY = e.touches[0].clientY;
+}, { passive: false });
+canvas.addEventListener('touchend', () => { isDragging = false; });
+
+// ─── State ─────────────────────────────────────────────────────
+let currentHeights = new Float32Array(GRID * GRID);
+let targetHeights = new Float32Array(GRID * GRID);
+let compareHeights = new Float32Array(GRID * GRID);
+let morphT = 1.0;
+let morphStart = 0;
+const MORPH_DURATION = 500;
+let compareMode = false;
+let hashBytesA = new Uint8Array(32);
+let hashBytesB = new Uint8Array(32);
+let waterLevelVal = 80;
+let vertScaleVal = 80;
+
+// ─── Audio ─────────────────────────────────────────────────────
+let audioCtx = null;
+let windOsc = null;
+let windGain = null;
+let soundOn = false;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // Wind drone: layered oscillators
+  windGain = audioCtx.createGain();
+  windGain.gain.value = 0;
+  windGain.connect(audioCtx.destination);
+
+  windOsc = audioCtx.createOscillator();
+  windOsc.type = 'sawtooth';
+  windOsc.frequency.value = 80;
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 200;
+  filter.Q.value = 5;
+
+  windOsc.connect(filter);
+  filter.connect(windGain);
+  windOsc.start();
+
+  // Second layer
+  const osc2 = audioCtx.createOscillator();
+  osc2.type = 'sine';
+  osc2.frequency.value = 120;
+  const g2 = audioCtx.createGain();
+  g2.gain.value = 0.3;
+  osc2.connect(g2);
+  g2.connect(windGain);
+  osc2.start();
+}
+
+function updateWind(avgHeight) {
+  if (!soundOn || !windGain) return;
+  const freq = 60 + (avgHeight / 255) * 140;
+  windOsc.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.3);
+  windGain.gain.setTargetAtTime(0.06, audioCtx.currentTime, 0.3);
+}
+
+function pingVertex(height) {
+  if (!audioCtx) initAudio();
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = 200 + (height / 255) * 800;
+  g.gain.value = 0.15;
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+  osc.connect(g);
+  g.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.8);
+}
+
+// ─── Click-on-terrain ──────────────────────────────────────────
+canvas.addEventListener('click', e => {
+  if (isDragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) / rect.width;
+  const mz = (e.clientY - rect.top) / rect.height;
+  // Approximate: pick based on screen position mapped to grid
+  const gx = Math.floor(mx * GRID);
+  const gz = Math.floor(mz * GRID);
+  if (gx >= 0 && gx < GRID && gz >= 0 && gz < GRID) {
+    const h = targetHeights[gz * GRID + gx];
+    pingVertex(h);
+  }
+});
+
+// ─── Update hash ───────────────────────────────────────────────
+function updateTerrain(text, isB) {
+  const bytes = SHA256(text);
+  const hex = hashHex(bytes);
+
+  if (isB) {
+    hashBytesB = bytes;
+    document.getElementById('hashB').textContent = hex;
+    compareHeights = interpolateHeightmap(bytes);
+    gl.bindBuffer(gl.ARRAY_BUFFER, wireHeightBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, compareHeights, gl.DYNAMIC_DRAW);
+  } else {
+    hashBytesA = bytes;
+    document.getElementById('hashA').textContent = hex;
+    // Start morph
+    currentHeights = new Float32Array(targetHeights);
+    targetHeights = interpolateHeightmap(bytes);
+    morphT = 0;
+    morphStart = performance.now();
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, heightBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, currentHeights, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, targetHeightBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, targetHeights, gl.DYNAMIC_DRAW);
+
+    updateStats(bytes);
+    updateMinimap(bytes);
+    updateWind(bytes.reduce((a, b) => a + b, 0) / 32);
+  }
+}
+
+function updateStats(bytes) {
+  let max = 0, min = 255, sum = 0, roughness = 0;
+  for (let i = 0; i < 32; i++) {
+    if (bytes[i] > max) max = bytes[i];
+    if (bytes[i] < min) min = bytes[i];
+    sum += bytes[i];
+    if (i > 0) roughness += Math.abs(bytes[i] - bytes[i - 1]);
+  }
+  const avg = (sum / 32).toFixed(1);
+  const rough = (roughness / 31).toFixed(1);
+  document.getElementById('statPeak').textContent = max;
+  document.getElementById('statValley').textContent = min;
+  document.getElementById('statAvg').textContent = avg;
+  document.getElementById('statRough').textContent = rough;
+}
+
+function updateMinimap(bytes) {
+  const mc = document.getElementById('minimapCanvas');
+  const ctx = mc.getContext('2d');
+  const cw = mc.width, ch = mc.height;
+  ctx.clearRect(0, 0, cw, ch);
+  const cellW = cw / 8, cellH = ch / 4;
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 8; c++) {
+      const v = bytes[r * 8 + c];
+      const t = v / 255;
+      // Color matching terrain
+      let cr, cg, cb;
+      if (t < 0.2) { cr = 13 + t/0.2*13; cg = 25 + t/0.2*51; cb = 102 + t/0.2*51; }
+      else if (t < 0.35) { const u=(t-0.2)/0.15; cr=26+u*13; cg=77+u*77; cb=153-u*89; }
+      else if (t < 0.55) { const u=(t-0.35)/0.2; cr=38+u*64; cg=153-u*13; cb=64-u*26; }
+      else if (t < 0.75) { const u=(t-0.55)/0.2; cr=102+u*26; cg=140-u*51; cb=38+u*13; }
+      else if (t < 0.9) { const u=(t-0.75)/0.15; cr=128+u*51; cg=89+u*89; cb=51+u*128; }
+      else { const u=(t-0.9)/0.1; cr=179+u*76; cg=179+u*76; cb=179+u*76; }
+      ctx.fillStyle = `rgb(${cr|0},${cg|0},${cb|0})`;
+      ctx.fillRect(c * cellW, r * cellH, cellW, cellH);
+      // Value label
+      ctx.fillStyle = t > 0.6 ? '#000' : '#fff';
+      ctx.font = '7px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.globalAlpha = 0.7;
+      ctx.fillText(v.toString(16).padStart(2, '0'), c * cellW + cellW/2, r * cellH + cellH/2);
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+// ─── Render ────────────────────────────────────────────────────
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+window.addEventListener('resize', resize);
+resize();
+
+let lastTime = 0;
+let frameCount = 0;
+let fpsTime = 0;
+
+function render(now) {
+  requestAnimationFrame(render);
+
+  // FPS
+  frameCount++;
+  if (now - fpsTime > 1000) {
+    document.getElementById('fpsChip').textContent = `FPS: ${frameCount}`;
+    frameCount = 0;
+    fpsTime = now;
+  }
+
+  const dt = (now - lastTime) / 1000;
+  lastTime = now;
+
+  // Morph
+  if (morphT < 1) {
+    morphT = Math.min(1, (now - morphStart) / MORPH_DURATION);
+  }
+
+  // Auto-rotate
+  if (autoRotate) camTheta += dt * 0.15;
+
+  // Camera
+  const ex = Math.cos(camTheta) * Math.cos(camPhi) * camDist;
+  const ey = Math.sin(camPhi) * camDist;
+  const ez = Math.sin(camTheta) * Math.cos(camPhi) * camDist;
+  const eye = [ex, ey, ez];
+  const center = [0, 0.15, 0];
+
+  const aspect = canvas.width / canvas.height;
+  const proj = mat4Perspective(Math.PI / 4, aspect, 0.1, 50);
+  const view = mat4LookAt(eye, center, [0, 1, 0]);
+
+  const lightDir = normalize3([0.4, 0.8, 0.3]);
+  const scale = vertScaleVal / 100;
+  const waterY = (waterLevelVal / 255) * scale;
+
+  gl.clearColor(0.012, 0.012, 0.03, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+
+  // ── Draw terrain triangles ──
+  gl.useProgram(terrainProg);
+
+  const tpLocs = {
+    aPosition: gl.getAttribLocation(terrainProg, 'aPosition'),
+    aHeight: gl.getAttribLocation(terrainProg, 'aHeight'),
+    aTargetHeight: gl.getAttribLocation(terrainProg, 'aTargetHeight'),
+    uMorph: gl.getUniformLocation(terrainProg, 'uMorph'),
+    uProj: gl.getUniformLocation(terrainProg, 'uProj'),
+    uView: gl.getUniformLocation(terrainProg, 'uView'),
+    uScale: gl.getUniformLocation(terrainProg, 'uScale'),
+    uLightDir: gl.getUniformLocation(terrainProg, 'uLightDir'),
+    uWaterLevel: gl.getUniformLocation(terrainProg, 'uWaterLevel'),
+  };
+
+  gl.uniformMatrix4fv(tpLocs.uProj, false, proj);
+  gl.uniformMatrix4fv(tpLocs.uView, false, view);
+  gl.uniform1f(tpLocs.uMorph, smoothstep(morphT));
+  gl.uniform1f(tpLocs.uScale, scale);
+  gl.uniform3fv(tpLocs.uLightDir, lightDir);
+  gl.uniform1f(tpLocs.uWaterLevel, waterLevelVal);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+  gl.enableVertexAttribArray(tpLocs.aPosition);
+  gl.vertexAttribPointer(tpLocs.aPosition, 3, gl.FLOAT, false, 0, 0);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, heightBuf);
+  gl.enableVertexAttribArray(tpLocs.aHeight);
+  gl.vertexAttribPointer(tpLocs.aHeight, 1, gl.FLOAT, false, 0, 0);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, targetHeightBuf);
+  gl.enableVertexAttribArray(tpLocs.aTargetHeight);
+  gl.vertexAttribPointer(tpLocs.aTargetHeight, 1, gl.FLOAT, false, 0, 0);
+
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+  gl.drawElements(gl.TRIANGLES, geo.indices.length, gl.UNSIGNED_SHORT, 0);
+
+  gl.disableVertexAttribArray(tpLocs.aHeight);
+  gl.disableVertexAttribArray(tpLocs.aTargetHeight);
+
+  // ── Draw water ──
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.useProgram(waterProg);
+
+  const wpLocs = {
+    aPosition: gl.getAttribLocation(waterProg, 'aPosition'),
+    uProj: gl.getUniformLocation(waterProg, 'uProj'),
+    uView: gl.getUniformLocation(waterProg, 'uView'),
+    uWaterY: gl.getUniformLocation(waterProg, 'uWaterY'),
+    uTime: gl.getUniformLocation(waterProg, 'uTime'),
+  };
+
+  gl.uniformMatrix4fv(wpLocs.uProj, false, proj);
+  gl.uniformMatrix4fv(wpLocs.uView, false, view);
+  gl.uniform1f(wpLocs.uWaterY, waterY);
+  gl.uniform1f(wpLocs.uTime, now / 1000);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, waterBuf);
+  gl.enableVertexAttribArray(wpLocs.aPosition);
+  gl.vertexAttribPointer(wpLocs.aPosition, 3, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  gl.disableVertexAttribArray(wpLocs.aPosition);
+  gl.disable(gl.BLEND);
+
+  // ── Draw wireframe (compare mode) ──
+  if (compareMode) {
+    gl.useProgram(wireProg);
+    const wlLocs = {
+      aPosition: gl.getAttribLocation(wireProg, 'aPosition'),
+      aHeight: gl.getAttribLocation(wireProg, 'aHeight'),
+      uProj: gl.getUniformLocation(wireProg, 'uProj'),
+      uView: gl.getUniformLocation(wireProg, 'uView'),
+      uScale: gl.getUniformLocation(wireProg, 'uScale'),
+    };
+
+    gl.uniformMatrix4fv(wlLocs.uProj, false, proj);
+    gl.uniformMatrix4fv(wlLocs.uView, false, view);
+    gl.uniform1f(wlLocs.uScale, scale);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+    gl.enableVertexAttribArray(wlLocs.aPosition);
+    gl.vertexAttribPointer(wlLocs.aPosition, 3, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, wireHeightBuf);
+    gl.enableVertexAttribArray(wlLocs.aHeight);
+    gl.vertexAttribPointer(wlLocs.aHeight, 1, gl.FLOAT, false, 0, 0);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wireIdxBuf);
+    gl.drawElements(gl.LINES, wireIndices.length, gl.UNSIGNED_SHORT, 0);
+    gl.disable(gl.BLEND);
+
+    gl.disableVertexAttribArray(wlLocs.aHeight);
+  }
+}
+
+function smoothstep(t) {
+  return t * t * (3 - 2 * t);
+}
+
+// ─── Event wiring ──────────────────────────────────────────────
+document.getElementById('inputA').addEventListener('input', e => {
+  updateTerrain(e.target.value, false);
+});
+
+document.getElementById('inputB').addEventListener('input', e => {
+  updateTerrain(e.target.value, true);
+});
+
+document.getElementById('compareBtn').addEventListener('click', () => {
+  compareMode = !compareMode;
+  const btn = document.getElementById('compareBtn');
+  btn.classList.toggle('active', compareMode);
+  btn.textContent = compareMode ? 'Compare: ON' : 'Compare';
+  document.getElementById('inputBGroup').style.display = compareMode ? '' : 'none';
+  if (compareMode) {
+    updateTerrain(document.getElementById('inputB').value, true);
+  }
+});
+
+document.getElementById('waterLevel').addEventListener('input', e => {
+  waterLevelVal = +e.target.value;
+  document.getElementById('waterVal').textContent = waterLevelVal;
+});
+
+document.getElementById('vertScale').addEventListener('input', e => {
+  vertScaleVal = +e.target.value;
+  document.getElementById('scaleVal').textContent = vertScaleVal;
+});
+
+document.getElementById('soundBtn').addEventListener('click', () => {
+  soundOn = !soundOn;
+  const btn = document.getElementById('soundBtn');
+  btn.textContent = soundOn ? 'Sound: ON' : 'Sound: OFF';
+  btn.classList.toggle('active', soundOn);
+  if (soundOn) {
+    initAudio();
+    const avg = hashBytesA.reduce((a, b) => a + b, 0) / 32;
+    updateWind(avg);
+  } else if (windGain) {
+    windGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.3);
+  }
+});
+
+// Double-click to reset camera
+canvas.addEventListener('dblclick', () => {
+  autoRotate = true;
+  camDist = 3.0;
+  camPhi = 0.6;
+});
+
+// ─── Init ──────────────────────────────────────────────────────
+// Initialize buffers with zeros first
+gl.bindBuffer(gl.ARRAY_BUFFER, heightBuf);
+gl.bufferData(gl.ARRAY_BUFFER, currentHeights, gl.DYNAMIC_DRAW);
+gl.bindBuffer(gl.ARRAY_BUFFER, targetHeightBuf);
+gl.bufferData(gl.ARRAY_BUFFER, targetHeights, gl.DYNAMIC_DRAW);
+gl.bindBuffer(gl.ARRAY_BUFFER, wireHeightBuf);
+gl.bufferData(gl.ARRAY_BUFFER, compareHeights, gl.DYNAMIC_DRAW);
+
+// Compute initial terrain
+updateTerrain(document.getElementById('inputA').value, false);
+
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
