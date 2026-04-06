@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AudioFabric — Voice Room</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a14;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+
+/* Top bar */
+#topBar{position:fixed;top:0;left:0;right:0;z-index:60;display:flex;align-items:center;
+  justify-content:space-between;padding:8px 16px;background:rgba(0,0,0,0.7);
+  border-bottom:1px solid #0ff2}
+#roomName{font-size:14px;color:#0ff;letter-spacing:2px}
+#userCount{font-size:11px;color:#088}
+#topControls{display:flex;gap:8px}
+.ctrl-btn{background:#0002;border:1px solid #0ff3;color:#0ff;padding:5px 12px;
+  cursor:pointer;font-size:10px;font-family:monospace;border-radius:4px;letter-spacing:1px}
+.ctrl-btn:hover{background:#0ff1}
+.ctrl-btn.active{color:#0f0;border-color:#0f04;background:#0f01}
+.ctrl-btn.danger{color:#f44;border-color:#f442}
+
+/* Participant grid overlay */
+#participantGrid{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:55;
+  display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:90%;pointer-events:none}
+.participant-card{background:#000a;border:1px solid #0ff2;border-radius:8px;padding:6px;
+  width:120px;text-align:center;pointer-events:auto;transition:border-color 0.3s,box-shadow 0.3s}
+.participant-card.speaking{border-color:#0f0;box-shadow:0 0 12px #0f04}
+.participant-card .p-name{font-size:10px;color:#0ff;margin-bottom:4px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.participant-card .p-vowel{font-size:24px;line-height:1;margin:4px 0;transition:color 0.2s}
+.participant-card .p-layer{font-size:8px;color:#ff08;letter-spacing:1px}
+.participant-card .p-energy{height:3px;background:#111;border-radius:2px;margin-top:4px;overflow:hidden}
+.participant-card .p-energy-fill{height:100%;background:#0ff;border-radius:2px;transition:width 0.1s}
+
+/* Bottom bar */
+#bottomBar{position:fixed;bottom:0;left:0;right:0;z-index:60;display:flex;align-items:center;
+  justify-content:center;gap:12px;padding:10px;background:rgba(0,0,0,0.8);border-top:1px solid #0ff1}
+.bottom-btn{background:#111;border:1px solid #fff2;color:#fff;padding:8px 18px;
+  cursor:pointer;font-size:11px;font-family:monospace;border-radius:20px;
+  display:flex;align-items:center;gap:6px;transition:all 0.2s}
+.bottom-btn:hover{background:#222}
+.bottom-btn.active{background:#0f02;border-color:#0f04;color:#0f0}
+.bottom-btn.muted{background:#f002;border-color:#f004;color:#f44}
+.bottom-btn .icon{font-size:16px}
+
+/* Voice visualizer ring */
+#voiceRing{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:50;
+  width:200px;height:200px;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#voiceRing.on{opacity:1}
+#voiceRingCanvas{width:100%;height:100%}
+
+/* Resonance depth HUD — left side */
+#resHUD{position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:55;
+  pointer-events:none;opacity:0;transition:opacity 0.4s}
+#resHUD.on{opacity:1}
+#resKanji{font-size:64px;line-height:1;text-shadow:0 0 30px currentColor,0 0 60px currentColor;
+  text-align:center;transition:color 0.3s}
+#resLabel{font-size:9px;color:#fff5;text-align:center;margin-top:4px;letter-spacing:2px}
+#resDepth{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.depth-layer{display:flex;align-items:center;gap:8px;opacity:0.15;
+  transition:opacity 0.3s,transform 0.3s}
+.depth-layer.active{opacity:1;transform:translateX(4px)}
+.depth-layer.peak{opacity:1;transform:translateX(8px)}
+.depth-dot{width:10px;height:10px;border-radius:50%;border:1px solid;transition:background 0.3s,box-shadow 0.3s}
+.depth-layer.active .depth-dot{box-shadow:0 0 8px currentColor}
+.depth-layer.peak .depth-dot{background:currentColor;box-shadow:0 0 12px currentColor,0 0 24px currentColor}
+.depth-name{font-size:10px;letter-spacing:1px}
+.depth-mult{font-size:9px;color:#ff08;margin-left:auto}
+#resProgress{width:100%;height:2px;background:#111;border-radius:1px;margin-top:6px;overflow:hidden}
+#resProgressFill{height:100%;width:0%;background:#fff;transition:width 0.08s,background 0.3s;border-radius:1px}
+#resSustain{font-size:9px;color:#fff3;text-align:center;margin-top:4px;font-variant-numeric:tabular-nums}
+#resMultiplier{font-size:22px;color:#ff0;text-align:center;margin-top:6px;text-shadow:0 0 10px #f80;
+  opacity:0;transition:opacity 0.3s}
+#resMultiplier.on{opacity:1}
+
+/* Kanji element HUD — right side */
+#kanjiHUD{position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:55;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#kanjiHUD.on{opacity:1}
+#kanjiChar{font-size:56px;line-height:1;text-shadow:0 0 25px currentColor,0 0 50px currentColor}
+#kanjiName{font-size:10px;color:#fff8;margin-top:4px}
+#kanjiReading{font-size:8px;color:#fff3}
+
+/* Score display */
+#scoreHUD{position:fixed;top:40px;left:50%;transform:translateX(-50%);z-index:55;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#scoreHUD.on{opacity:1}
+#scoreVal{font-size:24px;color:#ff0;text-shadow:0 0 8px #f80}
+#comboVal{font-size:12px;color:#f80;letter-spacing:2px}
+
+/* Damage text layer */
+#dmgLayer{position:fixed;inset:0;z-index:60;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 10px currentColor,0 0 20px currentColor;
+  animation:dmgUp 1.4s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-140px) scale(2)}}
+
+#version{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:45;
+  font-size:8px;color:#222;letter-spacing:3px;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="topBar">
+  <div>
+    <span id="roomName">VOICE ROOM</span>
+    <span id="userCount" style="margin-left:12px">connecting...</span>
+  </div>
+  <div id="topControls">
+    <button class="ctrl-btn" onclick="copyInvite()">COPY INVITE</button>
+    <button class="ctrl-btn" id="cameraToggle" onclick="toggleCamera()">CAM OFF</button>
+    <button class="ctrl-btn" id="screenToggle" onclick="toggleScreen()">SHARE</button>
+  </div>
+</div>
+
+<div id="participantGrid"></div>
+
+<div id="bottomBar">
+  <button class="bottom-btn active" id="micBtn" onclick="toggleMic()">
+    <span class="icon">&#9899;</span> MIC ON
+  </button>
+  <button class="bottom-btn" id="shareAudioBtn" onclick="toggleShareAudio()">
+    <span class="icon">&#9836;</span> SHARE AUDIO
+  </button>
+  <button class="bottom-btn" id="camBtn" onclick="toggleCamera()">
+    <span class="icon">&#9673;</span> CAM
+  </button>
+  <button class="bottom-btn" id="shareBtn2" onclick="toggleScreen()">
+    <span class="icon">&#9707;</span> SCREEN
+  </button>
+  <button class="bottom-btn" id="reactionBtn" onclick="sendReaction()">
+    <span class="icon">&#9733;</span> REACT
+  </button>
+  <button class="bottom-btn danger" onclick="leaveRoom()">
+    <span class="icon">&#10005;</span> LEAVE
+  </button>
+</div>
+<!-- Hidden audio container for remote streams -->
+<div id="remoteAudio" style="display:none"></div>
+
+<div id="resHUD">
+  <div id="resKanji" style="color:#4488ff">気</div>
+  <div id="resLabel">RESONANCE</div>
+  <div id="resDepth"></div>
+  <div id="resProgress"><div id="resProgressFill"></div></div>
+  <div id="resSustain">0.0s</div>
+  <div id="resMultiplier">1x</div>
+</div>
+<div id="kanjiHUD">
+  <div id="kanjiChar" style="color:#4488ff">気</div>
+  <div id="kanjiName">Spirit</div>
+  <div id="kanjiReading">KI</div>
+</div>
+<div id="scoreHUD">
+  <div id="scoreVal">0</div>
+  <div id="comboVal"></div>
+</div>
+<div id="dmgLayer"></div>
+
+<div id="voiceRing"><canvas id="voiceRingCanvas" width="200" height="200"></canvas></div>
+<div id="version">AUDIOFABRIC VOICE ROOM</div>
+<!-- hidden peers element for MQTT module -->
+<div id="peers" style="display:none"></div>
+<div id="lbRows" style="display:none"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+// ============================================================
+// AUDIOFABRIC — VOICE ROOM
+// P2P video/voice chat where everyone's voice creates
+// 3D reactive particle avatars in shared space
+// ============================================================
+
+import { KI } from '../modules/core.js';
+import * as Scene from '../modules/hd-scene.js';
+import * as VoiceEngine from '../modules/voice-engine.js';
+import * as Kanji from '../modules/kanji.js';
+import * as Vortex from '../modules/hd-vortex.js';
+import * as Resonance from '../modules/resonance.js';
+import * as ResonanceSynths from '../modules/resonance-synths.js';
+import * as KiBlasts from '../modules/ki-blasts.js';
+import * as FX from '../modules/hd-fx.js';
+import * as MqttNet from '../modules/mqtt-net.js';
+import * as WebRTCNet from '../modules/webrtc-net.js';
+import * as Camera from '../modules/camera.js';
+import * as ScreenShare from '../modules/screen-share.js';
+import * as Chat from '../modules/chat.js';
+
+// === ROOM SETUP ===
+const urlParams = new URLSearchParams(location.search);
+const ROOM = urlParams.get('room') || 'ROOM-' + Math.random().toString(36).slice(2,6).toUpperCase();
+if (!urlParams.has('room')) history.replaceState(null, '', '?room=' + ROOM);
+
+KI.player.name = localStorage.getItem('vr_nick') || KI.genHash();
+
+window.copyInvite = () => {
+  navigator.clipboard.writeText(location.href).then(() => {
+    document.querySelector('#topControls .ctrl-btn').textContent = 'COPIED!';
+    setTimeout(() => document.querySelector('#topControls .ctrl-btn').textContent = 'COPY INVITE', 2000);
+  });
+};
+
+let micActive = true, camActive = false, sharingAudio = false;
+let tabAudioStream = null;
+
+window.toggleMic = () => {
+  micActive = !micActive;
+  const btn = document.getElementById('micBtn');
+  if (micActive) { btn.className = 'bottom-btn active'; btn.innerHTML = '<span class="icon">&#9899;</span> MIC ON'; }
+  else { btn.className = 'bottom-btn muted'; btn.innerHTML = '<span class="icon">&#9898;</span> MUTED'; }
+  if (KI.stream) KI.stream.getAudioTracks().forEach(t => t.enabled = micActive);
+};
+
+// === SHARE TAB AUDIO (YouTube etc) ===
+window.toggleShareAudio = async () => {
+  const btn = document.getElementById('shareAudioBtn');
+  if (sharingAudio) {
+    // Stop sharing
+    if (tabAudioStream) {
+      tabAudioStream.getTracks().forEach(t => t.stop());
+      tabAudioStream = null;
+    }
+    sharingAudio = false;
+    btn.className = 'bottom-btn';
+    btn.innerHTML = '<span class="icon">&#9836;</span> SHARE AUDIO';
+    return;
+  }
+
+  try {
+    // Capture tab audio via getDisplayMedia
+    tabAudioStream = await navigator.mediaDevices.getDisplayMedia({
+      video: false,
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+
+    // Add audio tracks to all peer connections
+    const rtc = KI.get('webrtc-net');
+    if (rtc && rtc.pcs) {
+      rtc.pcs.forEach((pc) => {
+        tabAudioStream.getAudioTracks().forEach(track => {
+          pc.addTrack(track, tabAudioStream);
+        });
+      });
+    }
+
+    sharingAudio = true;
+    btn.className = 'bottom-btn active';
+    btn.innerHTML = '<span class="icon">&#9836;</span> SHARING';
+
+    // Auto-stop when user stops sharing
+    tabAudioStream.getAudioTracks()[0].onended = () => {
+      sharingAudio = false;
+      tabAudioStream = null;
+      btn.className = 'bottom-btn';
+      btn.innerHTML = '<span class="icon">&#9836;</span> SHARE AUDIO';
+    };
+  } catch(e) {
+    console.warn('Tab audio share failed:', e);
+  }
+};
+
+// === REACTIONS ===
+const REACTIONS = ['&#9733;', '&#10084;', '&#9996;', '&#128293;', '&#127881;', '&#128640;'];
+let reactionIdx = 0;
+window.sendReaction = () => {
+  const emoji = REACTIONS[reactionIdx++ % REACTIONS.length];
+  KI.emit('broadcast', { type: 'reaction', name: KI.player.name, emoji });
+  showReaction(emoji);
+};
+
+function showReaction(emoji) {
+  const el = document.createElement('div');
+  el.className = 'dmg';
+  el.innerHTML = emoji;
+  el.style.fontSize = '36px';
+  el.style.left = (30 + Math.random() * 40) + '%';
+  el.style.top = (20 + Math.random() * 30) + '%';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1400);
+}
+
+window.toggleCamera = async () => {
+  const cam = KI.get('camera');
+  if (!cam) return;
+  if (camActive) { cam.stopLocal(); camActive = false; }
+  else { await cam.startLocal(); camActive = true; }
+  document.getElementById('cameraToggle').classList.toggle('active', camActive);
+  document.getElementById('camBtn').classList.toggle('active', camActive);
+};
+
+window.toggleScreen = () => {
+  const ss = KI.get('screen-share');
+  if (ss) ss.toggleShare();
+};
+
+window.leaveRoom = () => { cleanup(); location.href = 'about:blank'; };
+
+// === CLEANUP — prevent stale connections and echo on refresh ===
+function cleanup() {
+  KI.running = false;
+  // Stop all streams
+  if (KI.stream) KI.stream.getTracks().forEach(t => t.stop());
+  if (tabAudioStream) tabAudioStream.getTracks().forEach(t => t.stop());
+  // Close all peer connections
+  const rtc = KI.get('webrtc-net');
+  if (rtc) {
+    if (rtc.pcs) rtc.pcs.forEach(pc => pc.close());
+    if (rtc.dcs) rtc.dcs.forEach(dc => dc.close());
+  }
+  // Remove all audio elements
+  document.querySelectorAll('#remoteAudio audio').forEach(el => {
+    el.srcObject = null; el.remove();
+  });
+}
+window.addEventListener('beforeunload', cleanup);
+window.addEventListener('pagehide', cleanup);
+
+// === PARTICIPANT TRACKING ===
+const participants = new Map();
+
+function updateParticipantCard(name, data) {
+  let card = document.getElementById('p-' + name);
+  if (!card) {
+    card = document.createElement('div');
+    card.className = 'participant-card';
+    card.id = 'p-' + name;
+    card.innerHTML = `<div class="p-name">${escHtml(name)}</div>` +
+      `<div class="p-vowel">&#9898;</div>` +
+      `<div class="p-layer"></div>` +
+      `<div class="p-energy"><div class="p-energy-fill" style="width:0%"></div></div>`;
+    document.getElementById('participantGrid').appendChild(card);
+  }
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const kj = KANJI[data.vowel];
+  card.classList.toggle('speaking', data.energy > 0.02);
+  card.querySelector('.p-vowel').textContent = kj ? kj.char : '\u26AA';
+  card.querySelector('.p-vowel').style.color = kj ? kj.color : '#555';
+  card.querySelector('.p-layer').textContent = data.layer >= 0 ?
+    Resonance.LAYERS[data.layer].name.toUpperCase() + ' ' + Resonance.LAYERS[data.layer].mult + 'x' : '';
+  card.querySelector('.p-energy-fill').style.width = Math.min(100, data.energy * 500) + '%';
+}
+
+function removeParticipantCard(name) {
+  const el = document.getElementById('p-' + name);
+  if (el) el.remove();
+}
+
+// Remote avatar spheres in 3D — HD particle avatars
+const remoteAvatars = {};
+const AVATAR_POSITIONS = [
+  [-4,2.5,3],[4,2.5,3],[-6,2.5,0],[6,2.5,0],
+  [-3,2.5,6],[3,2.5,6],[-7,2.5,-2],[7,2.5,-2],
+  [-5,3.5,5],[5,3.5,5],[-2,2.5,-3],[2,2.5,-3]
+];
+
+// ambient floating particles around room
+const ambientParticles = [];
+function initAmbientParticles() {
+  const scene = KI.scene;
+  if (!scene) return;
+  const count = 300;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  const cols = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    pos[i*3] = (Math.random()-0.5) * 30;
+    pos[i*3+1] = Math.random() * 8;
+    pos[i*3+2] = (Math.random()-0.5) * 30;
+    cols[i*3] = 0.1; cols[i*3+1] = 0.3 + Math.random()*0.2; cols[i*3+2] = 0.6 + Math.random()*0.3;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 0.08, vertexColors: true, transparent: true, opacity: 0.4,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const pts = new THREE.Points(geo, mat);
+  scene.add(pts);
+  ambientParticles.push({ points: pts, positions: pos, colors: cols, count });
+}
+
+function updateAmbientParticles(t) {
+  ambientParticles.forEach(ap => {
+    for (let i = 0; i < ap.count; i++) {
+      ap.positions[i*3] += Math.sin(t * 0.1 + i * 0.5) * 0.003;
+      ap.positions[i*3+1] += Math.cos(t * 0.15 + i * 0.3) * 0.002;
+      ap.positions[i*3+2] += Math.sin(t * 0.12 + i * 0.7) * 0.003;
+      // react to any active voice in room
+      const energy = KI.voice.energy;
+      if (energy > 0.02) {
+        const r = KI.hslToRgb((KI.voice.pn + i * 0.002) % 1, 0.7, 0.4 + energy * 0.3);
+        ap.colors[i*3] += (r[0] - ap.colors[i*3]) * 0.05;
+        ap.colors[i*3+1] += (r[1] - ap.colors[i*3+1]) * 0.05;
+        ap.colors[i*3+2] += (r[2] - ap.colors[i*3+2]) * 0.05;
+      }
+    }
+    ap.points.geometry.attributes.position.needsUpdate = true;
+    ap.points.geometry.attributes.color.needsUpdate = true;
+    ap.points.material.opacity = 0.3 + KI.voice.energy * 0.5;
+  });
+}
+
+function getOrCreateAvatar(name) {
+  if (remoteAvatars[name]) return remoteAvatars[name];
+  const scene = KI.scene;
+  if (!scene) return null;
+  const idx = Object.keys(remoteAvatars).length;
+  const pos = AVATAR_POSITIONS[idx % AVATAR_POSITIONS.length];
+
+  const group = new THREE.Group();
+  group.position.set(pos[0], pos[1], pos[2]);
+
+  // core sphere — higher poly
+  const cg = new THREE.IcosahedronGeometry(0.5, 3);
+  const cm = new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.3,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  const core = new THREE.Mesh(cg, cm);
+  group.add(core);
+
+  // outer glow shell
+  const og = new THREE.IcosahedronGeometry(0.8, 2);
+  const om = new THREE.MeshBasicMaterial({ color: 0x2244aa, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const outer = new THREE.Mesh(og, om);
+  group.add(outer);
+
+  // wireframe ring
+  const wrg = new THREE.TorusGeometry(0.7, 0.02, 8, 48);
+  const wrm = new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0.15,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  const wireRing = new THREE.Mesh(wrg, wrm);
+  wireRing.rotation.x = Math.PI / 2;
+  group.add(wireRing);
+
+  // orbiting particle ring per avatar
+  const orbitCount = 40;
+  const orbitGeo = new THREE.BufferGeometry();
+  const orbitPos = new Float32Array(orbitCount * 3);
+  for (let i = 0; i < orbitCount; i++) {
+    const a = (i / orbitCount) * Math.PI * 2;
+    orbitPos[i*3] = Math.cos(a) * 1.0;
+    orbitPos[i*3+1] = (Math.random()-0.5) * 0.3;
+    orbitPos[i*3+2] = Math.sin(a) * 1.0;
+  }
+  orbitGeo.setAttribute('position', new THREE.BufferAttribute(orbitPos, 3));
+  const orbitMat = new THREE.PointsMaterial({
+    size: 0.06, color: 0x44aaff, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const orbitPts = new THREE.Points(orbitGeo, orbitMat);
+  group.add(orbitPts);
+
+  // name label — sharper
+  const lc = document.createElement('canvas'); lc.width = 512; lc.height = 64;
+  const lx = lc.getContext('2d');
+  lx.fillStyle = 'rgba(0,0,0,0.5)'; lx.fillRect(0,0,512,64);
+  lx.strokeStyle = '#0ff'; lx.lineWidth = 1;
+  lx.strokeRect(2,2,508,60);
+  lx.fillStyle = '#0ff'; lx.font = 'bold 22px monospace'; lx.textAlign = 'center';
+  lx.shadowColor = '#0ff'; lx.shadowBlur = 10;
+  lx.fillText(name, 256, 40);
+  const lm = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(lc), transparent: true });
+  const ls = new THREE.Sprite(lm);
+  ls.scale.set(2, 0.4, 1);
+  ls.position.y = 1.4;
+  group.add(ls);
+
+  scene.add(group);
+  remoteAvatars[name] = {
+    group, core, outer, wireRing, orbitPts, orbitPos, orbitMat,
+    energy: 0, vowel: '', layer: -1, orbitAngle: Math.random() * Math.PI * 2
+  };
+  return remoteAvatars[name];
+}
+
+// === VOICE RING VISUALIZER — HD ===
+const ringCanvas = document.getElementById('voiceRingCanvas');
+const ringCtx = ringCanvas.getContext('2d');
+ringCanvas.width = 400; ringCanvas.height = 400;
+function drawVoiceRing() {
+  const v = KI.voice;
+  ringCtx.clearRect(0, 0, 400, 400);
+  if (!v.sounding && v.energy < 0.01) { document.getElementById('voiceRing').classList.remove('on'); return; }
+  document.getElementById('voiceRing').classList.add('on');
+
+  const res = KI.get('resonance');
+  const layer = res ? res.state.activeLayer : -1;
+  const cx = 200, cy = 200;
+  const now = performance.now() * 0.001;
+
+  // waveform circle
+  if (KI.analyser) {
+    const td = new Float32Array(128);
+    KI.analyser.getFloatTimeDomainData(td);
+    ringCtx.beginPath();
+    ringCtx.strokeStyle = 'rgba(0,255,255,0.3)';
+    ringCtx.lineWidth = 1.5;
+    for (let i = 0; i < 128; i++) {
+      const a = (i / 128) * Math.PI * 2;
+      const r = 60 + td[i] * 120;
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      i === 0 ? ringCtx.moveTo(x, y) : ringCtx.lineTo(x, y);
+    }
+    ringCtx.closePath();
+    ringCtx.stroke();
+  }
+
+  // layer rings with gradient glow
+  for (let i = 0; i <= Math.max(0, layer); i++) {
+    const ld = Resonance.LAYERS[i];
+    const col = '#' + ld.color.toString(16).padStart(6,'0');
+    const r = 55 + i * 25;
+    const pulse = 1 + Math.sin(now * (2 + i * 0.5)) * 0.06;
+
+    // outer glow
+    ringCtx.beginPath();
+    ringCtx.arc(cx, cy, r * pulse, 0, Math.PI * 2);
+    ringCtx.strokeStyle = col + '22';
+    ringCtx.lineWidth = 8;
+    ringCtx.stroke();
+
+    // main ring
+    ringCtx.beginPath();
+    ringCtx.arc(cx, cy, r * pulse, 0, Math.PI * 2);
+    ringCtx.strokeStyle = col + (i === layer ? 'cc' : '66');
+    ringCtx.lineWidth = 2 + (i === layer ? 2 : 0);
+    ringCtx.stroke();
+
+    // tick marks
+    const ticks = 12 + i * 4;
+    for (let t = 0; t < ticks; t++) {
+      const a = (t / ticks) * Math.PI * 2 + now * (0.2 + i * 0.1);
+      ringCtx.beginPath();
+      ringCtx.moveTo(cx + Math.cos(a) * r * pulse * 0.92, cy + Math.sin(a) * r * pulse * 0.92);
+      ringCtx.lineTo(cx + Math.cos(a) * r * pulse * 1.08, cy + Math.sin(a) * r * pulse * 1.08);
+      ringCtx.strokeStyle = col + '44';
+      ringCtx.lineWidth = 1;
+      ringCtx.stroke();
+    }
+  }
+
+  // center kanji with glow
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const kj = KANJI[v.vowel];
+  if (kj) {
+    ringCtx.font = 'bold 48px serif';
+    ringCtx.textAlign = 'center';
+    ringCtx.textBaseline = 'middle';
+    ringCtx.shadowColor = kj.color;
+    ringCtx.shadowBlur = 25;
+    ringCtx.fillStyle = kj.color;
+    ringCtx.fillText(kj.char, cx, cy);
+    ringCtx.shadowBlur = 0;
+    // reading below
+    ringCtx.font = '10px monospace';
+    ringCtx.fillStyle = 'rgba(255,255,255,0.4)';
+    ringCtx.fillText(kj.reading, cx, cy + 32);
+  }
+
+  // layer name
+  if (layer >= 0) {
+    ringCtx.font = '9px monospace';
+    ringCtx.fillStyle = '#' + Resonance.LAYERS[layer].color.toString(16).padStart(6,'0') + 'aa';
+    ringCtx.textAlign = 'center';
+    ringCtx.fillText(Resonance.LAYERS[layer].name.toUpperCase() + ' ' + Resonance.LAYERS[layer].mult + 'x', cx, cy + 44);
+  }
+}
+
+// === BROADCAST STATE ===
+let broadcastTimer = 0;
+function broadcastState(dt) {
+  broadcastTimer += dt;
+  if (broadcastTimer < 0.1) return;
+  broadcastTimer = 0;
+  const v = KI.voice;
+  const res = KI.get('resonance');
+  KI.emit('broadcast', {
+    type: 'state',
+    name: KI.player.name,
+    energy: v.energy,
+    vowel: v.vowel,
+    pn: v.pn,
+    layer: res ? res.state.activeLayer : -1,
+    sounding: v.sounding
+  });
+}
+
+// === HANDLE REMOTE STATE ===
+KI.on('rtc:data', data => {
+  if (data.type === 'state' && data.name && data.name !== KI.player.name) {
+    const av = getOrCreateAvatar(data.name);
+    if (av) {
+      av.energy = data.energy || 0;
+      av.vowel = data.vowel || '';
+      av.layer = data.layer ?? -1;
+    }
+    updateParticipantCard(data.name, data);
+  }
+});
+
+KI.on('remote:state', data => {
+  const av = getOrCreateAvatar(data.name);
+  if (av) {
+    av.energy = data.energy || 0;
+    av.vowel = data.vowel || '';
+    av.layer = data.layer ?? -1;
+  }
+  updateParticipantCard(data.name, data);
+});
+
+KI.on('rtc:peerDisconnect', ({ peerId }) => {
+  Object.keys(remoteAvatars).forEach(name => {
+    // fade out, will be cleaned eventually
+  });
+});
+
+// === UPDATE AVATARS ===
+function updateAvatars(dt, t) {
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  Object.keys(remoteAvatars).forEach(name => {
+    const av = remoteAvatars[name];
+    const kj = KANJI[av.vowel];
+    const color = kj ? kj.hex : 0x4488ff;
+    av.core.material.color.setHex(color);
+    av.core.material.opacity = 0.15 + av.energy * 2.5;
+    av.outer.material.color.setHex(color);
+    av.outer.material.opacity = av.energy * 0.4;
+    const scale = 1 + av.energy * 3 + (av.layer >= 0 ? av.layer * 0.25 : 0);
+    av.core.scale.setScalar(scale);
+    av.outer.scale.setScalar(scale * 1.4);
+    av.group.position.y = 2.5 + Math.sin(t + av.group.id * 0.3) * 0.2;
+    av.core.rotation.y = t * 0.3;
+    av.core.rotation.x = Math.sin(t * 0.5) * 0.1;
+
+    // wireframe ring pulses with energy
+    av.wireRing.material.opacity = av.energy > 0.02 ? 0.15 + av.energy * 0.4 : 0.05;
+    av.wireRing.material.color.setHex(color);
+    av.wireRing.rotation.z = t * 0.5;
+    av.wireRing.scale.setScalar(scale * 1.2 + Math.sin(t * 2) * 0.05);
+
+    // orbiting particles
+    av.orbitAngle += dt * (0.3 + av.energy * 2);
+    av.orbitMat.opacity = av.energy > 0.01 ? 0.2 + av.energy * 0.6 : 0;
+    av.orbitMat.color.setHex(color);
+    for (let i = 0; i < 40; i++) {
+      const a = (i / 40) * Math.PI * 2 + av.orbitAngle;
+      const r = 0.8 + av.energy * 0.5 + Math.sin(t * 2 + i * 0.3) * 0.1;
+      av.orbitPos[i*3] = Math.cos(a) * r;
+      av.orbitPos[i*3+1] = Math.sin(t * 1.5 + i * 0.2) * 0.2;
+      av.orbitPos[i*3+2] = Math.sin(a) * r;
+    }
+    av.orbitPts.geometry.attributes.position.needsUpdate = true;
+  });
+
+  updateAmbientParticles(t);
+
+  // own participant card
+  const v = KI.voice;
+  const res = KI.get('resonance');
+  updateParticipantCard(KI.player.name, {
+    energy: v.energy, vowel: v.vowel,
+    layer: res ? res.state.activeLayer : -1
+  });
+  const ownCard = document.getElementById('p-' + KI.player.name);
+  if (ownCard) ownCard.querySelector('.p-name').textContent = KI.player.name + ' (you)';
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// === RESONANCE HUD — ki-arena style bars ===
+function buildResHUD() {
+  const cont = document.getElementById('resDepth');
+  Resonance.LAYERS.forEach((layer, i) => {
+    const d = document.createElement('div');
+    d.className = 'depth-layer';
+    d.id = 'dL-' + i;
+    d.innerHTML =
+      '<div class="depth-dot" style="color:#' + layer.color.toString(16).padStart(6,'0') +
+      ';border-color:#' + layer.color.toString(16).padStart(6,'0') + '"></div>' +
+      '<span class="depth-name" style="color:#' + layer.color.toString(16).padStart(6,'0') + '">' +
+      layer.name.toUpperCase() + '</span>' +
+      '<span class="depth-mult">' + layer.mult + 'x</span>';
+    cont.appendChild(d);
+  });
+}
+
+function updateResHUD() {
+  const res = KI.get('resonance');
+  if (!res) return;
+  const st = res.state;
+  const hud = document.getElementById('resHUD');
+  const kanjiHud = document.getElementById('kanjiHUD');
+  const scoreHud = document.getElementById('scoreHUD');
+
+  if (st.activeLayer >= 0 || KI.voice.sounding) {
+    hud.classList.add('on');
+    kanjiHud.classList.add('on');
+    scoreHud.classList.add('on');
+  } else {
+    hud.classList.remove('on');
+    kanjiHud.classList.remove('on');
+    if (KI.player.score > 0) scoreHud.classList.add('on');
+    else scoreHud.classList.remove('on');
+  }
+
+  // layer indicators
+  Resonance.LAYERS.forEach((layer, i) => {
+    const el = document.getElementById('dL-' + i);
+    if (!el) return;
+    el.classList.toggle('active', i <= st.activeLayer);
+    el.classList.toggle('peak', i <= st.peakLayer && i > st.activeLayer);
+  });
+
+  // progress bar
+  const fill = document.getElementById('resProgressFill');
+  fill.style.width = (st.layerProgress * 100) + '%';
+  if (st.activeLayer >= 0)
+    fill.style.background = '#' + Resonance.LAYERS[st.activeLayer].color.toString(16).padStart(6,'0');
+
+  // sustain timer
+  document.getElementById('resSustain').textContent = st.sustainTime.toFixed(1) + 's';
+
+  // multiplier
+  const mult = document.getElementById('resMultiplier');
+  const m = Resonance.getMultiplier();
+  if (m > 1) { mult.textContent = Math.round(m) + 'x'; mult.classList.add('on'); }
+  else mult.classList.remove('on');
+
+  // resonance kanji
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const kj = KANJI[KI.voice.vowel];
+  const resK = document.getElementById('resKanji');
+  if (kj) {
+    resK.textContent = kj.char;
+    resK.style.color = kj.color;
+  } else {
+    resK.textContent = '気';
+    resK.style.color = '#4488ff';
+  }
+
+  // right-side kanji HUD
+  if (kj) {
+    document.getElementById('kanjiChar').textContent = kj.char;
+    document.getElementById('kanjiChar').style.color = kj.color;
+    document.getElementById('kanjiName').textContent = kj.name;
+    document.getElementById('kanjiReading').textContent = kj.reading;
+  }
+
+  // score
+  document.getElementById('scoreVal').textContent = KI.player.score.toLocaleString();
+  const combo = KI.player.combo || 0;
+  document.getElementById('comboVal').textContent = combo > 1 ? combo + 'x COMBO' : '';
+}
+
+// === DAMAGE POPUPS ===
+function spawnDmgText(text, color) {
+  const el = document.createElement('div');
+  el.className = 'dmg';
+  el.textContent = text;
+  el.style.color = color || '#ff0';
+  el.style.left = (35 + Math.random()*30) + '%';
+  el.style.top = (30 + Math.random()*20) + '%';
+  el.style.fontSize = (18 + Math.random()*14) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1500);
+}
+
+KI.on('hit', data => {
+  spawnDmgText('+' + Math.round(data.dmg), '#ff0');
+  if (data.combo > 1) spawnDmgText(data.combo + 'x', '#f80');
+});
+
+// === BOOT ===
+async function boot() {
+  document.getElementById('roomName').textContent = 'ROOM: ' + ROOM;
+
+  // prompt for name
+  const savedName = localStorage.getItem('vr_nick');
+  if (!savedName) {
+    const n = prompt('Enter your name:', KI.player.name);
+    if (n && n.trim()) { KI.player.name = n.trim().slice(0, 16); localStorage.setItem('vr_nick', KI.player.name); }
+  }
+
+  Scene.init({ stars: 6000, fogDensity: 0.005 });
+  Kanji.init();
+  Resonance.init();
+  Vortex.init({ count: 2500 });
+  KiBlasts.init();
+  FX.init({ aurora: true });
+  initAmbientParticles();
+  ResonanceSynths.init();
+  buildResHUD();
+
+  // floor glow ring
+  const floorGeo = new THREE.RingGeometry(3, 12, 64);
+  const floorMat = new THREE.MeshBasicMaterial({
+    color: 0x0044aa, transparent: true, opacity: 0.08,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+  });
+  const floorGlow = new THREE.Mesh(floorGeo, floorMat);
+  floorGlow.rotation.x = -Math.PI / 2;
+  floorGlow.position.y = -0.3;
+  KI.scene.add(floorGlow);
+
+  // Voice engine with echo cancellation
+  try { await VoiceEngine.init(); } catch(e) { console.warn('Mic failed:', e); }
+
+  // Re-request mic with echo cancellation for voice chat (separate from analysis)
+  let voiceChatStream = null;
+  try {
+    voiceChatStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+  } catch(e) {
+    console.warn('Voice chat mic failed, using analysis mic:', e);
+    voiceChatStream = KI.stream; // fallback
+  }
+
+  MqttNet.init({ room: 'VR-' + ROOM });
+  WebRTCNet.init({ room: 'VR-' + ROOM });
+  Camera.init();
+  ScreenShare.init();
+  Chat.init();
+
+  // === SEND VOICE CHAT AUDIO TO PEERS ===
+  // After WebRTC connects, add our mic audio track to peer connections
+  const addMicToPeers = () => {
+    if (!voiceChatStream) return;
+    const rtc = KI.get('webrtc-net');
+    if (rtc && rtc.pcs) {
+      rtc.pcs.forEach((pc) => {
+        // Check if we already added audio to this connection
+        const senders = pc.getSenders();
+        const hasAudio = senders.some(s => s.track && s.track.kind === 'audio');
+        if (!hasAudio) {
+          voiceChatStream.getAudioTracks().forEach(track => {
+            pc.addTrack(track, voiceChatStream);
+          });
+        }
+      });
+    }
+  };
+
+  // === PLAY REMOTE AUDIO ===
+  const playedStreams = new Set(); // prevent duplicate audio elements
+  KI.on('rtc:remoteStream', ({ peerId, stream }) => {
+    const streamId = stream.id;
+    if (playedStreams.has(streamId)) return; // deduplicate
+    playedStreams.add(streamId);
+
+    // Create audio element to play remote audio
+    const audio = document.createElement('audio');
+    audio.id = 'audio-' + peerId;
+    audio.srcObject = stream;
+    audio.autoplay = true;
+    audio.playsInline = true;
+    audio.volume = 1.0;
+    // Remove old audio element for this peer (prevent echo stacking on refresh)
+    const old = document.getElementById('audio-' + peerId);
+    if (old) old.remove();
+    document.getElementById('remoteAudio').appendChild(audio);
+
+    // Some browsers require user gesture to play
+    audio.play().catch(() => {
+      document.addEventListener('click', () => audio.play(), { once: true });
+    });
+  });
+
+  document.getElementById('userCount').textContent = '1 in room';
+
+  // count peers + send mic audio when they connect
+  KI.on('rtc:peerConnect', () => {
+    const ct = (KI.get('webrtc-net')?.getPeerCount?.() || 0) + 1;
+    document.getElementById('userCount').textContent = ct + ' in room';
+    addMicToPeers();
+  });
+  KI.on('rtc:peerDisconnect', ({ peerId }) => {
+    const ct = Math.max(1, (KI.get('webrtc-net')?.getPeerCount?.() || 0) + 1);
+    document.getElementById('userCount').textContent = ct + ' in room';
+    // Clean up audio element
+    const audio = document.getElementById('audio-' + peerId);
+    if (audio) { audio.srcObject = null; audio.remove(); }
+  });
+
+  // Handle reactions from others
+  KI.on('rtc:data', data => {
+    if (data.type === 'reaction' && data.name !== KI.player.name) {
+      showReaction(data.emoji);
+    }
+  });
+
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    broadcastState(dt);
+    updateAvatars(dt, t);
+    updateResHUD();
+    drawVoiceRing();
+    // floor glow reacts to room activity
+    if (floorGlow) {
+      floorGlow.material.opacity = 0.06 + KI.voice.energy * 0.15;
+      const res = KI.get('resonance');
+      const layer = res ? res.state.activeLayer : -1;
+      if (layer >= 0) floorGlow.material.color.setHex(Resonance.LAYERS[layer].color);
+      else floorGlow.material.color.setHex(0x0044aa);
+      floorGlow.rotation.z = t * 0.05;
+    }
+    KI.renderer.render(KI.scene, KI.camera);
+  })();
+
+  console.log('%c AUDIOFABRIC VOICE ROOM ', 'background:#0a0a14;color:#0ff;font-size:18px;padding:8px');
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

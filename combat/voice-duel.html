@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AudioFabric — Voice Duel</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0000;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+
+#topBar{position:fixed;top:0;left:0;right:0;z-index:60;display:flex;align-items:center;
+  justify-content:center;padding:8px 16px;background:rgba(0,0,0,0.7);border-bottom:1px solid #f002}
+#duelTitle{font-size:16px;color:#f44;letter-spacing:4px;text-shadow:0 0 10px #f004}
+
+/* VS display */
+#vsDisplay{position:fixed;top:50px;left:0;right:0;z-index:55;display:flex;
+  justify-content:space-between;align-items:flex-start;padding:0 30px;pointer-events:none}
+.fighter{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:140px}
+.fighter.right{align-items:center}
+.f-name{font-size:14px;letter-spacing:2px}
+.f-name.p1{color:#44aaff}
+.f-name.p2{color:#ff4444}
+.f-hp-bar{width:140px;height:8px;background:#111;border-radius:4px;overflow:hidden;border:1px solid #fff1}
+.f-hp-fill{height:100%;border-radius:3px;transition:width 0.3s}
+.f-hp-fill.p1{background:linear-gradient(90deg,#44aaff,#2266dd)}
+.f-hp-fill.p2{background:linear-gradient(90deg,#dd2222,#ff4444)}
+.f-kanji{font-size:48px;line-height:1;text-shadow:0 0 20px currentColor;transition:color 0.3s}
+.f-layer{font-size:10px;letter-spacing:2px;opacity:0.7}
+.f-score{font-size:20px;color:#ff0;text-shadow:0 0 8px #f80}
+
+#vsText{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:56;
+  font-size:48px;color:#f44;text-shadow:0 0 30px #f00,0 0 60px #f004;
+  letter-spacing:8px;pointer-events:none;opacity:0;transition:opacity 0.5s}
+#vsText.on{opacity:1}
+
+/* Clash zone — center of screen */
+#clashZone{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:50;
+  pointer-events:none}
+#clashCanvas{width:600px;height:600px}
+
+/* Winner banner */
+#winner{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);z-index:70;
+  font-size:36px;color:#ff0;text-shadow:0 0 30px #f80,0 0 60px #f804;
+  letter-spacing:6px;opacity:0;transition:opacity 0.5s;pointer-events:none;text-align:center}
+#winner.on{opacity:1}
+#winSub{font-size:14px;color:#fff8;margin-top:8px}
+
+#bottomBar{position:fixed;bottom:0;left:0;right:0;z-index:60;display:flex;align-items:center;
+  justify-content:center;gap:12px;padding:10px;background:rgba(0,0,0,0.8);border-top:1px solid #f001}
+.duel-btn{background:#111;border:1px solid #f443;color:#f44;padding:8px 18px;
+  cursor:pointer;font-size:11px;font-family:monospace;border-radius:20px;letter-spacing:1px}
+.duel-btn:hover{background:#f001}
+.duel-btn.active{background:#f002;border-color:#f446}
+
+#waitMsg{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:65;
+  font-size:18px;color:#f44;letter-spacing:4px;text-align:center}
+#waitSub{font-size:11px;color:#f448;margin-top:8px}
+
+/* Resonance depth bars — P1 left, P2 right */
+.res-bars{position:fixed;top:50%;transform:translateY(-50%);z-index:55;
+  pointer-events:none;display:flex;flex-direction:column;gap:3px}
+.res-bars.p1{left:12px}
+.res-bars.p2{right:12px}
+.res-bar{display:flex;align-items:center;gap:6px;opacity:0.15;transition:opacity 0.3s,transform 0.3s}
+.res-bar.active{opacity:1;transform:translateX(4px)}
+.res-bars.p2 .res-bar.active{transform:translateX(-4px)}
+.res-bar.peak{opacity:1}
+.rb-dot{width:8px;height:8px;border-radius:50%;border:1px solid;transition:background 0.3s,box-shadow 0.3s}
+.res-bar.active .rb-dot{box-shadow:0 0 8px currentColor}
+.res-bar.peak .rb-dot{background:currentColor;box-shadow:0 0 12px currentColor}
+.rb-name{font-size:9px;letter-spacing:1px}
+.rb-mult{font-size:8px;color:#ff08;margin-left:auto}
+.res-progress{width:100%;height:2px;background:#111;border-radius:1px;margin-top:4px;overflow:hidden}
+.res-fill{height:100%;width:0%;border-radius:1px;transition:width 0.08s}
+.res-sustain{font-size:8px;color:#fff3;text-align:center;margin-top:3px;font-variant-numeric:tabular-nums}
+.res-mult{font-size:18px;color:#ff0;text-align:center;margin-top:4px;text-shadow:0 0 8px #f80;
+  opacity:0;transition:opacity 0.3s}
+.res-mult.on{opacity:1}
+
+/* Damage popup layer */
+#dmgLayer{position:fixed;inset:0;z-index:62;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 10px currentColor,0 0 20px currentColor;
+  animation:dmgUp 1.4s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-140px) scale(2)}}
+
+/* Morphing ball indicator */
+#morphBall{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:52;
+  pointer-events:none}
+#morphCanvas{width:200px;height:200px}
+
+#version{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:45;
+  font-size:8px;color:#220000;letter-spacing:3px;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="topBar"><span id="duelTitle">VOICE DUEL</span></div>
+
+<div id="vsDisplay">
+  <div class="fighter left">
+    <div class="f-name p1" id="p1Name">—</div>
+    <div class="f-hp-bar"><div class="f-hp-fill p1" id="p1HP" style="width:100%"></div></div>
+    <div class="f-kanji" id="p1Kanji" style="color:#44aaff">気</div>
+    <div class="f-layer" id="p1Layer"></div>
+    <div class="f-score" id="p1Score">0</div>
+  </div>
+  <div class="fighter right">
+    <div class="f-name p2" id="p2Name">waiting...</div>
+    <div class="f-hp-bar"><div class="f-hp-fill p2" id="p2HP" style="width:100%"></div></div>
+    <div class="f-kanji" id="p2Kanji" style="color:#ff4444">気</div>
+    <div class="f-layer" id="p2Layer"></div>
+    <div class="f-score" id="p2Score">0</div>
+  </div>
+</div>
+
+<div id="vsText">VS</div>
+<div id="clashZone"><canvas id="clashCanvas" width="600" height="600"></canvas></div>
+<div id="winner"><span id="winnerText"></span><div id="winSub"></div></div>
+
+<div class="res-bars p1" id="p1Bars"></div>
+<div class="res-bars p2" id="p2Bars"></div>
+<div id="dmgLayer"></div>
+<div id="morphBall"><canvas id="morphCanvas" width="200" height="200"></canvas></div>
+
+<div id="waitMsg">WAITING FOR OPPONENT<div id="waitSub">Share link to invite</div></div>
+
+<div id="bottomBar">
+  <button class="duel-btn" onclick="copyLink()">INVITE OPPONENT</button>
+  <button class="duel-btn" onclick="rematch()">REMATCH</button>
+</div>
+<div id="peers" style="display:none"></div>
+<div id="lbRows" style="display:none"></div>
+<div id="version">AUDIOFABRIC VOICE DUEL</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+// ============================================================
+// AUDIOFABRIC — VOICE DUEL
+// 1v1 voice combat. Both players charge resonance layers
+// simultaneously. Deeper layer = stronger blast.
+// Blasts clash in the center — higher multiplier wins the clash.
+// First to drain opponent's HP wins.
+// ============================================================
+
+import { KI } from '../modules/core.js';
+import * as Scene from '../modules/hd-scene.js';
+import * as VoiceEngine from '../modules/voice-engine.js';
+import * as Kanji from '../modules/kanji.js';
+import * as Vortex from '../modules/hd-vortex.js';
+import * as Resonance from '../modules/resonance.js';
+import * as ResonanceSynths from '../modules/resonance-synths.js';
+import * as FX from '../modules/hd-fx.js';
+import * as KiBlasts from '../modules/ki-blasts.js';
+import * as MqttNet from '../modules/mqtt-net.js';
+import * as WebRTCNet from '../modules/webrtc-net.js';
+import * as Chat from '../modules/chat.js';
+
+const urlParams = new URLSearchParams(location.search);
+const ROOM = urlParams.get('room') || 'DUEL-' + Math.random().toString(36).slice(2,6).toUpperCase();
+if (!urlParams.has('room')) history.replaceState(null, '', '?room=' + ROOM);
+
+KI.player.name = localStorage.getItem('duel_nick') || KI.genHash();
+const savedNick = localStorage.getItem('duel_nick');
+if (!savedNick) {
+  const n = prompt('Fighter name:', KI.player.name);
+  if (n?.trim()) { KI.player.name = n.trim().slice(0,16); localStorage.setItem('duel_nick', KI.player.name); }
+}
+
+window.copyLink = () => {
+  navigator.clipboard.writeText(location.href);
+  document.querySelector('.duel-btn').textContent = 'COPIED!';
+  setTimeout(() => document.querySelector('.duel-btn').textContent = 'INVITE OPPONENT', 2000);
+};
+
+// === DUEL STATE ===
+const duel = {
+  phase: 'waiting',   // waiting, countdown, fight, ko
+  opponent: null,      // { name, hp, maxHP, score, layer, vowel, energy, charge, sounding }
+  myHP: 1000,
+  myMaxHP: 1000,
+  opHP: 1000,
+  opMaxHP: 1000,
+  roundTimer: 60,
+  countdownTimer: 3,
+  koTimer: 0,
+  clashEffects: []     // { x, y, size, color, life }
+};
+
+// === OPPONENT HANDLING ===
+function handleRemoteState(data) {
+  if (!data.name || data.name === KI.player.name) return;
+  if (!duel.opponent) {
+    duel.opponent = { name: data.name };
+    document.getElementById('waitMsg').style.display = 'none';
+    document.getElementById('p2Name').textContent = data.name;
+    startCountdown();
+  }
+  if (duel.opponent.name === data.name) {
+    Object.assign(duel.opponent, data);
+  }
+}
+
+function handleRemoteBlast(data) {
+  if (!data.name || data.name === KI.player.name || duel.phase !== 'fight') return;
+  // opponent fired — their blast hits us
+  const mult = data.multiplier || 1;
+  const dmg = Math.round(30 * mult * (1 + (data.power || 0.5)));
+
+  // check if we also have an active blast for CLASH
+  const myRes = KI.get('resonance');
+  const myLayer = myRes ? myRes.state.activeLayer : -1;
+  if (myLayer >= 0 && KI.voice.sounding) {
+    // CLASH! compare layers
+    const myMult = Resonance.LAYERS[myLayer]?.mult || 1;
+    if (myMult >= mult) {
+      // we win the clash — reduced damage
+      const reducedDmg = Math.max(5, Math.round(dmg * 0.2));
+      duel.myHP = Math.max(0, duel.myHP - reducedDmg);
+      spawnClashEffect(200, 200, '#0ff', 'BLOCKED!');
+    } else {
+      // we lose the clash
+      duel.myHP = Math.max(0, duel.myHP - dmg);
+      spawnClashEffect(200, 200, '#f44', '-' + dmg);
+    }
+  } else {
+    // no defense — full damage
+    duel.myHP = Math.max(0, duel.myHP - dmg);
+    spawnClashEffect(200, 200, '#f44', '-' + dmg);
+  }
+
+  if (KI._scene) KI._scene.screenShake = Math.max(KI._scene.screenShake, dmg * 0.015);
+  checkKO();
+}
+
+KI.on('rtc:data', d => {
+  if (d.type === 'state') handleRemoteState(d);
+  if (d.type === 'duel-blast') handleRemoteBlast(d);
+  if (d.type === 'duel-rematch') rematch();
+});
+KI.on('remote:state', handleRemoteState);
+
+// === RESONANCE RELEASE -> DUEL BLAST ===
+KI.on('resonance:release', data => {
+  if (duel.phase !== 'fight') return;
+  const mult = data.multiplier || 1;
+  const dmg = Math.round(30 * mult * (1 + KI.voice.energy * 2));
+
+  // deal damage to opponent
+  duel.opHP = Math.max(0, duel.opHP - dmg);
+  spawnClashEffect(200, 200, '#4af', '+' + dmg + ' HIT');
+
+  // broadcast to opponent
+  KI.emit('broadcast', {
+    type: 'duel-blast',
+    name: KI.player.name,
+    multiplier: mult,
+    power: data.sustainTime || 0.5,
+    layer: data.layer,
+    vowel: data.vowel
+  });
+
+  KI.player.score += Math.round(dmg);
+  document.getElementById('p1Score').textContent = KI.player.score.toLocaleString();
+
+  // also fire visual blast
+  const auraPos = KI._scene?.aura?.position || new THREE.Vector3(0, 2.5, 5);
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const kj = KANJI[data.vowel];
+  const blastMod = KI.get('ki-blasts');
+  if (blastMod) blastMod.fireBlast(kj?.blast || 'kiball', Math.min(1, mult / 4), auraPos);
+
+  checkKO();
+});
+
+function checkKO() {
+  if (duel.myHP <= 0) {
+    duel.phase = 'ko';
+    document.getElementById('winnerText').textContent = (duel.opponent?.name || 'OPPONENT') + ' WINS!';
+    document.getElementById('winSub').textContent = 'You were overwhelmed';
+    document.getElementById('winner').classList.add('on');
+  } else if (duel.opHP <= 0) {
+    duel.phase = 'ko';
+    document.getElementById('winnerText').textContent = 'YOU WIN!';
+    document.getElementById('winSub').textContent = 'Score: ' + KI.player.score.toLocaleString();
+    document.getElementById('winner').classList.add('on');
+  }
+}
+
+// === COUNTDOWN ===
+function startCountdown() {
+  duel.phase = 'countdown';
+  duel.countdownTimer = 3;
+  const vsEl = document.getElementById('vsText');
+  vsEl.classList.add('on');
+  vsEl.textContent = 'VS';
+
+  const interval = setInterval(() => {
+    duel.countdownTimer--;
+    if (duel.countdownTimer > 0) {
+      vsEl.textContent = duel.countdownTimer.toString();
+    } else {
+      vsEl.textContent = 'FIGHT!';
+      duel.phase = 'fight';
+      setTimeout(() => vsEl.classList.remove('on'), 1500);
+      clearInterval(interval);
+    }
+  }, 1000);
+}
+
+window.rematch = () => {
+  duel.myHP = duel.myMaxHP;
+  duel.opHP = duel.opMaxHP;
+  duel.phase = duel.opponent ? 'countdown' : 'waiting';
+  KI.player.score = 0;
+  document.getElementById('winner').classList.remove('on');
+  document.getElementById('p1Score').textContent = '0';
+  document.getElementById('p2Score').textContent = '0';
+  if (duel.opponent) startCountdown();
+  KI.emit('broadcast', { type: 'duel-rematch', name: KI.player.name });
+};
+
+// === CLASH EFFECTS ===
+function spawnClashEffect(x, y, color, text) {
+  duel.clashEffects.push({ x: 300, y: 300, color, text, life: 1.5, vy: -1.5 });
+  spawnClashParticles(300, 300, color, 15);
+}
+
+const clashCanvas = document.getElementById('clashCanvas');
+const clashCtx = clashCanvas.getContext('2d');
+
+// clash particle system
+const clashParticles = [];
+
+function spawnClashParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 4;
+    clashParticles.push({
+      x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+      life: 0.5 + Math.random() * 0.5, size: 1 + Math.random() * 3, color
+    });
+  }
+}
+
+function drawClash() {
+  clashCtx.clearRect(0, 0, 600, 600);
+  const cx = 300, cy = 300;
+  const now = performance.now() * 0.001;
+
+  if (duel.phase === 'fight') {
+    const myRes = KI.get('resonance');
+    const myLayer = myRes ? myRes.state.activeLayer : -1;
+    const opLayer = duel.opponent?.layer ?? -1;
+
+    // P1 beam (left) — multi-layer with wave distortion
+    if (myLayer >= 0 && KI.voice.sounding) {
+      const ld = Resonance.LAYERS[myLayer];
+      const col = '#' + ld.color.toString(16).padStart(6, '0');
+      const w = 6 + myLayer * 5;
+
+      // outer glow
+      clashCtx.globalAlpha = 0.06;
+      for (let g = 3; g >= 1; g--) {
+        clashCtx.beginPath();
+        for (let x = 0; x <= cx; x += 3) {
+          const wave = Math.sin(now * 8 + x * 0.05) * (w * 0.3 * g);
+          x === 0 ? clashCtx.moveTo(x, cy + wave) : clashCtx.lineTo(x, cy + wave);
+        }
+        clashCtx.strokeStyle = col;
+        clashCtx.lineWidth = w * g;
+        clashCtx.stroke();
+      }
+
+      // core beam with wave
+      clashCtx.globalAlpha = 0.7;
+      clashCtx.beginPath();
+      for (let x = 0; x <= cx; x += 2) {
+        const wave = Math.sin(now * 10 + x * 0.08) * (2 + myLayer);
+        x === 0 ? clashCtx.moveTo(x, cy + wave) : clashCtx.lineTo(x, cy + wave);
+      }
+      clashCtx.strokeStyle = col;
+      clashCtx.lineWidth = w * 0.4;
+      clashCtx.stroke();
+
+      // beam edge particles
+      if (Math.random() < 0.3) {
+        const px = Math.random() * cx;
+        spawnClashParticles(px, cy + (Math.random()-0.5) * w, col, 2);
+      }
+      clashCtx.globalAlpha = 1;
+    }
+
+    // P2 beam (right) — same treatment
+    if (opLayer >= 0 && duel.opponent?.sounding) {
+      const ld = Resonance.LAYERS[Math.min(4, opLayer)];
+      const col = '#' + ld.color.toString(16).padStart(6, '0');
+      const w = 6 + opLayer * 5;
+
+      clashCtx.globalAlpha = 0.06;
+      for (let g = 3; g >= 1; g--) {
+        clashCtx.beginPath();
+        for (let x = 600; x >= cx; x -= 3) {
+          const wave = Math.sin(now * 8 + x * 0.05 + 2) * (w * 0.3 * g);
+          x === 600 ? clashCtx.moveTo(x, cy + wave) : clashCtx.lineTo(x, cy + wave);
+        }
+        clashCtx.strokeStyle = col;
+        clashCtx.lineWidth = w * g;
+        clashCtx.stroke();
+      }
+
+      clashCtx.globalAlpha = 0.7;
+      clashCtx.beginPath();
+      for (let x = 600; x >= cx; x -= 2) {
+        const wave = Math.sin(now * 10 + x * 0.08 + 2) * (2 + opLayer);
+        x === 600 ? clashCtx.moveTo(x, cy + wave) : clashCtx.lineTo(x, cy + wave);
+      }
+      clashCtx.strokeStyle = col;
+      clashCtx.lineWidth = w * 0.4;
+      clashCtx.stroke();
+
+      if (Math.random() < 0.3) {
+        const px = cx + Math.random() * cx;
+        spawnClashParticles(px, cy + (Math.random()-0.5) * w, col, 2);
+      }
+      clashCtx.globalAlpha = 1;
+    }
+
+    // center clash — HD sparks + shockwave rings
+    if (myLayer >= 0 && opLayer >= 0 && KI.voice.sounding && duel.opponent?.sounding) {
+      // shockwave ring
+      const ringR = 15 + Math.sin(now * 6) * 10;
+      clashCtx.beginPath();
+      clashCtx.arc(cx, cy, ringR, 0, Math.PI * 2);
+      clashCtx.strokeStyle = 'rgba(255,255,255,0.4)';
+      clashCtx.lineWidth = 2;
+      clashCtx.stroke();
+
+      // inner sparks
+      const sparkCount = 12 + Math.max(myLayer, opLayer) * 4;
+      for (let i = 0; i < sparkCount; i++) {
+        const a = now * 3 + i * Math.PI * 2 / sparkCount;
+        const r = 5 + Math.sin(now * 8 + i * 1.5) * 15;
+        const sx = 1 + Math.random() * 2;
+        clashCtx.beginPath();
+        clashCtx.arc(cx + Math.cos(a)*r, cy + Math.sin(a)*r, sx, 0, Math.PI*2);
+        clashCtx.fillStyle = i % 2 === 0 ? '#fff' : '#ff0';
+        clashCtx.fill();
+      }
+
+      // energy cross pattern
+      clashCtx.globalAlpha = 0.15;
+      for (let i = 0; i < 4; i++) {
+        const a = now * 0.5 + i * Math.PI / 2;
+        clashCtx.beginPath();
+        clashCtx.moveTo(cx, cy);
+        clashCtx.lineTo(cx + Math.cos(a)*40, cy + Math.sin(a)*40);
+        clashCtx.strokeStyle = '#fff';
+        clashCtx.lineWidth = 3;
+        clashCtx.stroke();
+      }
+      clashCtx.globalAlpha = 1;
+
+      spawnClashParticles(cx, cy, '#fff', 1);
+    }
+  }
+
+  // update particles
+  for (let i = clashParticles.length - 1; i >= 0; i--) {
+    const p = clashParticles[i];
+    p.x += p.vx; p.y += p.vy; p.life -= 0.02; p.vx *= 0.97; p.vy *= 0.97;
+    clashCtx.globalAlpha = Math.max(0, p.life);
+    clashCtx.beginPath();
+    clashCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    clashCtx.fillStyle = p.color;
+    clashCtx.fill();
+    if (p.life <= 0) clashParticles.splice(i, 1);
+  }
+  clashCtx.globalAlpha = 1;
+
+  // fighter charge auras — left and right edges
+  if (duel.phase === 'fight') {
+    const myRes = KI.get('resonance');
+    const myL = myRes ? myRes.state.activeLayer : -1;
+    const opL = duel.opponent?.layer ?? -1;
+    // P1 left aura
+    if (myL >= 0 && KI.voice.sounding) {
+      const ld = Resonance.LAYERS[myL];
+      const col = '#' + ld.color.toString(16).padStart(6,'0');
+      const grad = clashCtx.createRadialGradient(40, cy, 5, 40, cy, 60 + myL * 15);
+      grad.addColorStop(0, col + '66');
+      grad.addColorStop(0.5, col + '18');
+      grad.addColorStop(1, col + '00');
+      clashCtx.fillStyle = grad;
+      clashCtx.fillRect(0, cy - 80, 120, 160);
+    }
+    // P2 right aura
+    if (opL >= 0 && duel.opponent?.sounding) {
+      const ld = Resonance.LAYERS[Math.min(4, opL)];
+      const col = '#' + ld.color.toString(16).padStart(6,'0');
+      const grad = clashCtx.createRadialGradient(560, cy, 5, 560, cy, 60 + opL * 15);
+      grad.addColorStop(0, col + '66');
+      grad.addColorStop(0.5, col + '18');
+      grad.addColorStop(1, col + '00');
+      clashCtx.fillStyle = grad;
+      clashCtx.fillRect(480, cy - 80, 120, 160);
+    }
+  }
+
+  // damage text effects — bigger font, with shadow
+  for (let i = duel.clashEffects.length - 1; i >= 0; i--) {
+    const e = duel.clashEffects[i];
+    e.life -= 0.012;
+    e.y += e.vy;
+    const scale = 1 + (1 - e.life) * 0.5;
+    clashCtx.globalAlpha = Math.max(0, e.life);
+    clashCtx.save();
+    clashCtx.translate(e.x, e.y);
+    clashCtx.scale(scale, scale);
+    clashCtx.shadowColor = e.color;
+    clashCtx.shadowBlur = 12;
+    clashCtx.fillStyle = e.color;
+    clashCtx.font = 'bold 22px monospace';
+    clashCtx.textAlign = 'center';
+    clashCtx.fillText(e.text, 0, 0);
+    clashCtx.restore();
+    clashCtx.shadowBlur = 0;
+    clashCtx.globalAlpha = 1;
+    if (e.life <= 0) duel.clashEffects.splice(i, 1);
+  }
+}
+
+// === HUD UPDATE ===
+function updateDuelHUD() {
+  document.getElementById('p1HP').style.width = (duel.myHP / duel.myMaxHP * 100) + '%';
+  document.getElementById('p2HP').style.width = (duel.opHP / duel.opMaxHP * 100) + '%';
+
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+
+  // P1
+  const myRes = KI.get('resonance');
+  const myLayer = myRes ? myRes.state.activeLayer : -1;
+  const myKj = KANJI[KI.voice.vowel];
+  document.getElementById('p1Kanji').textContent = myKj?.char || '気';
+  document.getElementById('p1Kanji').style.color = myLayer >= 0 ?
+    '#' + Resonance.LAYERS[myLayer].color.toString(16).padStart(6, '0') : '#44aaff';
+  document.getElementById('p1Layer').textContent = myLayer >= 0 ?
+    Resonance.LAYERS[myLayer].name.toUpperCase() + ' ' + Resonance.LAYERS[myLayer].mult + 'x' : '';
+
+  // P2
+  if (duel.opponent) {
+    const opKj = KANJI[duel.opponent.vowel];
+    const opLayer = Math.min(4, Math.max(-1, duel.opponent.layer ?? -1));
+    document.getElementById('p2Kanji').textContent = opKj?.char || '気';
+    document.getElementById('p2Kanji').style.color = opLayer >= 0 ?
+      '#' + Resonance.LAYERS[opLayer].color.toString(16).padStart(6, '0') : '#ff4444';
+    document.getElementById('p2Layer').textContent = opLayer >= 0 ?
+      Resonance.LAYERS[opLayer].name.toUpperCase() + ' ' + Resonance.LAYERS[opLayer].mult + 'x' : '';
+    document.getElementById('p2Score').textContent = (duel.opponent.score || 0).toLocaleString();
+  }
+}
+
+// === RESONANCE DEPTH BARS ===
+function buildResBars() {
+  ['p1Bars','p2Bars'].forEach(id => {
+    const cont = document.getElementById(id);
+    Resonance.LAYERS.forEach((layer, i) => {
+      const d = document.createElement('div');
+      d.className = 'res-bar';
+      d.id = id + '-' + i;
+      d.innerHTML =
+        '<div class="rb-dot" style="color:#' + layer.color.toString(16).padStart(6,'0') +
+        ';border-color:#' + layer.color.toString(16).padStart(6,'0') + '"></div>' +
+        '<span class="rb-name" style="color:#' + layer.color.toString(16).padStart(6,'0') + '">' +
+        layer.name.toUpperCase() + '</span>' +
+        '<span class="rb-mult">' + layer.mult + 'x</span>';
+      cont.appendChild(d);
+    });
+    const prog = document.createElement('div');
+    prog.className = 'res-progress';
+    prog.innerHTML = '<div class="res-fill" id="' + id + '-fill"></div>';
+    cont.appendChild(prog);
+    const sus = document.createElement('div');
+    sus.className = 'res-sustain';
+    sus.id = id + '-sus';
+    cont.appendChild(sus);
+    const mul = document.createElement('div');
+    mul.className = 'res-mult';
+    mul.id = id + '-mult';
+    cont.appendChild(mul);
+  });
+}
+
+function updateResBars() {
+  const res = KI.get('resonance');
+  const myLayer = res ? res.state.activeLayer : -1;
+  const myPeak = res ? res.state.peakLayer : -1;
+  const opLayer = Math.min(4, Math.max(-1, duel.opponent?.layer ?? -1));
+
+  // P1 bars
+  Resonance.LAYERS.forEach((_, i) => {
+    const el = document.getElementById('p1Bars-' + i);
+    if (el) {
+      el.classList.toggle('active', i <= myLayer);
+      el.classList.toggle('peak', i <= myPeak && i > myLayer);
+    }
+  });
+  const p1fill = document.getElementById('p1Bars-fill');
+  if (p1fill && res) {
+    p1fill.style.width = (res.state.layerProgress * 100) + '%';
+    p1fill.style.background = myLayer >= 0 ? '#' + Resonance.LAYERS[myLayer].color.toString(16).padStart(6,'0') : '#fff';
+  }
+  const p1sus = document.getElementById('p1Bars-sus');
+  if (p1sus && res) p1sus.textContent = res.state.sustainTime.toFixed(1) + 's';
+  const p1m = document.getElementById('p1Bars-mult');
+  if (p1m) {
+    const m = Resonance.getMultiplier();
+    if (m > 1) { p1m.textContent = Math.round(m) + 'x'; p1m.classList.add('on'); }
+    else p1m.classList.remove('on');
+  }
+
+  // P2 bars
+  Resonance.LAYERS.forEach((_, i) => {
+    const el = document.getElementById('p2Bars-' + i);
+    if (el) el.classList.toggle('active', i <= opLayer);
+  });
+}
+
+// === MORPH BALL CANVAS — shows a morphing ki-ball preview ===
+const morphCanvas = document.getElementById('morphCanvas');
+const morphCtx = morphCanvas.getContext('2d');
+
+function drawMorphBall(t) {
+  morphCtx.clearRect(0, 0, 200, 200);
+  const res = KI.get('resonance');
+  const layer = res ? res.state.activeLayer : -1;
+  if (layer < 0 || !KI.voice.sounding) return;
+
+  const cx = 100, cy = 100;
+  const ld = Resonance.LAYERS[layer];
+  const col = '#' + ld.color.toString(16).padStart(6,'0');
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const kj = KANJI[KI.voice.vowel];
+  const energy = KI.voice.energy;
+  const charge = res.state.layerProgress;
+
+  // outer morphing glow — shape changes per layer
+  const baseR = 20 + layer * 8 + energy * 15;
+  const sides = [0, 60, 5, 4, 3][layer]; // circle, hex, penta, square, triangle
+  morphCtx.globalAlpha = 0.12;
+  for (let g = 3; g >= 1; g--) {
+    morphCtx.beginPath();
+    if (sides === 0) {
+      morphCtx.arc(cx, cy, baseR * g * 0.8, 0, Math.PI * 2);
+    } else {
+      for (let i = 0; i <= sides; i++) {
+        const a = (i / sides) * Math.PI * 2 + t * 0.5;
+        const r = baseR * g * 0.8 + Math.sin(t * 3 + i) * 4;
+        const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+        i === 0 ? morphCtx.moveTo(x, y) : morphCtx.lineTo(x, y);
+      }
+      morphCtx.closePath();
+    }
+    morphCtx.fillStyle = col;
+    morphCtx.fill();
+  }
+
+  // core ball — morphs shape based on layer
+  morphCtx.globalAlpha = 0.7;
+  morphCtx.beginPath();
+  const coreR = 12 + layer * 5 + charge * 10;
+  const wobble = 1 + Math.sin(t * 6) * 0.15 * (layer + 1);
+  if (sides === 0) {
+    morphCtx.arc(cx, cy, coreR * wobble, 0, Math.PI * 2);
+  } else {
+    for (let i = 0; i <= sides; i++) {
+      const a = (i / sides) * Math.PI * 2 + t * 1.5;
+      const r = coreR * wobble + Math.sin(t * 8 + i * 2) * 3;
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      i === 0 ? morphCtx.moveTo(x, y) : morphCtx.lineTo(x, y);
+    }
+    morphCtx.closePath();
+  }
+  morphCtx.fillStyle = col;
+  morphCtx.fill();
+
+  // white-hot inner
+  morphCtx.globalAlpha = 0.4;
+  morphCtx.beginPath();
+  morphCtx.arc(cx, cy, coreR * 0.4, 0, Math.PI * 2);
+  morphCtx.fillStyle = '#fff';
+  morphCtx.fill();
+
+  // orbiting sparks
+  const sparkCount = 6 + layer * 3;
+  morphCtx.globalAlpha = 0.6;
+  for (let i = 0; i < sparkCount; i++) {
+    const a = (i / sparkCount) * Math.PI * 2 + t * (2 + layer);
+    const r = coreR * 1.4 + Math.sin(t * 4 + i) * 5;
+    const sz = 1.5 + Math.sin(t * 6 + i * 3) * 1;
+    morphCtx.beginPath();
+    morphCtx.arc(cx + Math.cos(a)*r, cy + Math.sin(a)*r, sz, 0, Math.PI*2);
+    morphCtx.fillStyle = col;
+    morphCtx.fill();
+  }
+
+  // kanji overlay
+  if (kj) {
+    morphCtx.globalAlpha = 0.5 + charge * 0.3;
+    morphCtx.font = 'bold ' + (18 + layer * 4) + 'px serif';
+    morphCtx.textAlign = 'center';
+    morphCtx.textBaseline = 'middle';
+    morphCtx.shadowColor = col;
+    morphCtx.shadowBlur = 15;
+    morphCtx.fillStyle = '#fff';
+    morphCtx.fillText(kj.char, cx, cy);
+    morphCtx.shadowBlur = 0;
+  }
+
+  // layer name
+  morphCtx.globalAlpha = 0.6;
+  morphCtx.font = '9px monospace';
+  morphCtx.fillStyle = col;
+  morphCtx.textAlign = 'center';
+  morphCtx.fillText(ld.name.toUpperCase() + ' ' + ld.mult + 'x', cx, cy + coreR + 16);
+
+  morphCtx.globalAlpha = 1;
+}
+
+// === DAMAGE POPUPS ===
+function spawnDmgPopup(text, color, side) {
+  const el = document.createElement('div');
+  el.className = 'dmg';
+  el.textContent = text;
+  el.style.color = color || '#ff0';
+  el.style.left = side === 'left' ? (10 + Math.random()*20) + '%' : (70 + Math.random()*20) + '%';
+  el.style.top = (25 + Math.random()*15) + '%';
+  el.style.fontSize = (16 + Math.random()*12) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1500);
+}
+
+KI.on('resonance:release', () => {
+  if (duel.phase === 'fight') spawnDmgPopup('FIRE!', '#ff0', 'left');
+});
+
+// === BROADCAST ===
+let bTimer = 0;
+function broadcastDuel(dt) {
+  bTimer += dt;
+  if (bTimer < 0.08) return;
+  bTimer = 0;
+  const res = KI.get('resonance');
+  KI.emit('broadcast', {
+    type: 'state',
+    name: KI.player.name,
+    energy: KI.voice.energy,
+    vowel: KI.voice.vowel,
+    pn: KI.voice.pn,
+    layer: res ? res.state.activeLayer : -1,
+    sounding: KI.voice.sounding,
+    score: KI.player.score,
+    hp: duel.myHP
+  });
+}
+
+// === BOOT ===
+async function boot() {
+  document.getElementById('duelTitle').textContent = 'DUEL: ' + ROOM;
+  document.getElementById('p1Name').textContent = KI.player.name;
+
+  Scene.init({ stars: 5000, fogColor: 0x0a0000, fogDensity: 0.008 });
+  Kanji.init();
+  Resonance.init();
+  Vortex.init({ count: 3000 });
+  KiBlasts.init();
+  ResonanceSynths.init();
+  FX.init({ aurora: true });
+  buildResBars();
+
+  try { await VoiceEngine.init(); } catch(e) { console.warn('Mic:', e); }
+
+  MqttNet.init({ room: 'DUEL-' + ROOM });
+  WebRTCNet.init({ room: 'DUEL-' + ROOM });
+  Chat.init();
+
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    broadcastDuel(dt);
+    updateDuelHUD();
+    updateResBars();
+    drawClash();
+    drawMorphBall(t);
+    KI.renderer.render(KI.scene, KI.camera);
+  })();
+
+  console.log('%c AUDIOFABRIC VOICE DUEL ', 'background:#0a0000;color:#f44;font-size:18px;padding:8px');
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

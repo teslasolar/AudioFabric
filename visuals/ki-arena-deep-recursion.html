@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena — Deep Recursion</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.7),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#score{font-size:28px;color:#ff0;text-shadow:0 0 10px #f80}
+#combo{font-size:16px;color:#f80}
+#blastType{font-size:14px;color:#4af}
+#charge{font-size:12px;color:#0f0}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#room{font-size:11px;color:#0ff}
+#peers{font-size:11px;color:#088}
+
+/* Deep recursion panels */
+#fractalPanel{position:fixed;left:16px;bottom:80px;z-index:55;pointer-events:none;opacity:0.9}
+#fractalMode{font-size:14px;color:#f4a;text-shadow:0 0 8px #f4a}
+#fractalDepth{font-size:11px;color:#a8f}
+#fractalLevel{font-size:10px;color:#666}
+
+#primePanel{position:fixed;right:16px;bottom:80px;z-index:55;pointer-events:none;opacity:0.9;text-align:right}
+#primeMode{font-size:14px;color:#4fa;text-shadow:0 0 8px #4fa}
+#primeActive{font-size:11px;color:#8fa;letter-spacing:1px}
+
+#tierHUD{position:fixed;right:16px;bottom:16px;z-index:55;text-align:right;pointer-events:none;opacity:0.8}
+#tierName{font-size:14px;color:#4af;text-shadow:0 0 8px #4af}
+#tierShape{font-size:10px;color:#888}
+
+#bandViz{position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:55;
+  display:flex;gap:3px;pointer-events:none;align-items:flex-end;height:50px}
+.band-bar{width:14px;background:#111;border:1px solid #fff1;border-radius:3px 3px 0 0;
+  position:relative;overflow:hidden;height:50px}
+.band-fill{position:absolute;bottom:0;left:0;right:0;border-radius:2px;transition:height 0.08s}
+.band-label{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);font-size:7px;color:#666;white-space:nowrap}
+
+#controls{position:fixed;top:50px;left:50%;transform:translateX(-50%);z-index:60;
+  display:flex;gap:8px;pointer-events:auto;opacity:0.6;transition:opacity 0.3s}
+#controls:hover{opacity:1}
+#controls button{background:#111;border:1px solid #fff3;color:#fff;padding:4px 12px;
+  border-radius:4px;font-family:inherit;font-size:10px;cursor:pointer;transition:all 0.2s}
+#controls button:hover{border-color:#0ff;color:#0ff}
+#controls button.active{border-color:#0f0;color:#0f0;background:#0f01}
+
+#dmgLayer{position:fixed;inset:0;z-index:60;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 8px currentColor;
+  animation:dmgUp 1.2s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-120px) scale(1.8)}}
+#cmt{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:70;
+  background:rgba(0,0,0,0.8);border:1px solid #ff0;border-radius:12px;padding:8px 20px;
+  font-size:16px;color:#ff0;text-shadow:0 0 10px #f80;text-align:center;
+  max-width:500px;opacity:0;transition:opacity 0.3s;pointer-events:none}
+#cmt.show{opacity:1}
+#modBadges{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:55;
+  display:flex;gap:6px;pointer-events:none;flex-wrap:wrap;justify-content:center;max-width:90%}
+.mod-badge{background:#0002;border:1px solid #0ff3;border-radius:4px;padding:2px 8px;
+  font-size:9px;color:#0ff8}
+.mod-badge.active{color:#0f0;border-color:#0f04}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l"><div id="score">0</div><div id="combo"></div><div id="blastType">&mdash;</div><div id="charge"></div></div>
+  <div class="hud-r"><div id="nick" onclick="changeNick()" title="Click to change name"></div>
+    <div id="room"></div><div id="peers"></div></div>
+</div>
+<div id="fractalPanel"><div id="fractalMode">MENGER SPONGE</div><div id="fractalDepth">Depth: 0</div><div id="fractalLevel"></div></div>
+<div id="primePanel"><div id="primeMode">ULAM SPIRAL</div><div id="primeActive"></div></div>
+<div id="tierHUD"><div id="tierName"></div><div id="tierShape"></div></div>
+<div id="bandViz"></div>
+<div id="controls">
+  <button onclick="cycleFractal()" title="Q">Fractal</button>
+  <button onclick="cyclePrime()" title="W">Primes</button>
+  <button onclick="toggleLandscape()" title="E" id="btnLandscape" class="active">Terrain</button>
+</div>
+<div id="dmgLayer"></div>
+<div id="cmt"></div>
+<div id="modBadges"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+import { KI } from '../modules/core.js';
+import * as Scene from '../modules/scene.js';
+import * as VoiceEngine from '../modules/voice-engine.js';
+import * as Kanji from '../modules/kanji.js';
+import * as KiBlasts from '../modules/ki-blasts.js';
+import * as Vortex from '../modules/vortex.js';
+import * as FX from '../modules/fx.js';
+import * as Synths from '../modules/synths.js';
+import * as Resonance from '../modules/resonance.js';
+import * as FreqBands from '../modules/freq-bands-12.js';
+import * as GeoFolder from '../modules/geo-folder.js';
+import * as PrimeRecursion from '../modules/prime-recursion.js';
+import * as DeepFractal from '../modules/deep-fractal.js';
+import * as SoundLandscape from '../modules/sound-landscape.js';
+import * as MqttNet from '../modules/mqtt-net.js';
+import * as WebRTCNet from '../modules/webrtc-net.js';
+import * as Presence from '../modules/presence.js';
+import * as Chat from '../modules/chat.js';
+
+const ROOM = 'DEEP-RECURSE-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+
+// === HUD WIRING ===
+KI.player.name = KI.genHash();
+document.getElementById('nick').textContent = KI.player.name;
+document.getElementById('room').textContent = ROOM;
+
+window.changeNick = function() {
+  const n = prompt('Nickname (max 16):', KI.player.name);
+  if (n && n.trim()) {
+    KI.player.name = n.trim().slice(0, 16);
+    document.getElementById('nick').textContent = KI.player.name;
+    KI.emit('broadcast', { type: 'nick', name: KI.player.name, score: KI.player.score });
+  }
+};
+
+KI.on('hit', data => {
+  document.getElementById('score').textContent = KI.player.score.toLocaleString();
+  document.getElementById('combo').textContent = KI.player.combo > 1 ? KI.player.combo + 'x COMBO' : '';
+  if (data.dmg > 200) showDmg(data.dmg);
+});
+KI.on('charge:update', data => {
+  document.getElementById('blastType').textContent = data.blastType?.name || '';
+  document.getElementById('charge').textContent = data.chargeLevel > 0.05 ? 'CHARGE: ' + Math.round(data.chargeLevel * 100) + '%' : '';
+});
+KI.on('ko', () => showCmt('TARGET DESTROYED!'));
+
+// === DEEP FRACTAL HUD ===
+KI.on('deep-fractal:mode', data => {
+  document.getElementById('fractalMode').textContent = data.name.toUpperCase();
+});
+KI.on('deep-fractal:update', data => {
+  document.getElementById('fractalDepth').textContent = 'Depth: ' + data.depth.toFixed(2);
+  document.getElementById('fractalLevel').textContent = 'Level ' + data.level + ' recursion';
+});
+
+// === PRIME RECURSION HUD ===
+KI.on('prime-recursion:mode', data => {
+  document.getElementById('primeMode').textContent = data.name.toUpperCase();
+});
+KI.on('prime-recursion:update', data => {
+  const primes = data.activePrimes;
+  document.getElementById('primeActive').textContent = primes.length > 0
+    ? 'Active: ' + primes.join(' ')
+    : '';
+});
+
+// === GEO FOLDER HUD ===
+KI.on('geo-folder:tier-change', data => {
+  document.getElementById('tierName').textContent = data.name;
+  document.getElementById('tierShape').textContent = 'Tier ' + data.tier;
+});
+
+// === 12-BAND VISUALIZER ===
+function buildBandViz() {
+  const cont = document.getElementById('bandViz');
+  if (!cont) return;
+  const fb = KI.get('freq-bands-12');
+  if (!fb) return;
+  fb.BANDS.forEach((band, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'band-bar';
+    bar.id = 'band-' + i;
+    bar.innerHTML = '<div class="band-fill" style="background:' + band.color + ';height:0%"></div>' +
+      '<div class="band-label">' + band.label + '</div>';
+    cont.appendChild(bar);
+  });
+}
+KI.on('freq-bands-12:ready', buildBandViz);
+KI.on('freq-bands-12:update', data => {
+  for (let i = 0; i < 12; i++) {
+    const fill = document.querySelector('#band-' + i + ' .band-fill');
+    if (fill) fill.style.height = (data.energy[i] * 100) + '%';
+  }
+});
+
+// === CONTROLS ===
+window.cycleFractal = function() {
+  const df = KI.get('deep-fractal');
+  if (df) df.cycleMode();
+};
+window.cyclePrime = function() {
+  const pr = KI.get('prime-recursion');
+  if (pr) pr.cycleMode();
+};
+let landscapeVisible = true;
+window.toggleLandscape = function() {
+  const sl = KI.get('sound-landscape');
+  if (!sl) return;
+  landscapeVisible = !landscapeVisible;
+  sl.state.group.visible = landscapeVisible;
+  document.getElementById('btnLandscape').classList.toggle('active', landscapeVisible);
+};
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key === 'q' || e.key === 'Q') window.cycleFractal();
+  if (e.key === 'w' || e.key === 'W') window.cyclePrime();
+  if (e.key === 'e' || e.key === 'E') window.toggleLandscape();
+});
+
+// === UTILS ===
+function showBadge(name) {
+  const b = document.createElement('div');
+  b.className = 'mod-badge active';
+  b.textContent = name.toUpperCase();
+  document.getElementById('modBadges').appendChild(b);
+}
+
+function showDmg(amount) {
+  const el = document.createElement('div'); el.className = 'dmg';
+  el.textContent = Math.round(amount);
+  el.style.color = '#ff0';
+  el.style.fontSize = (18 + Math.min(amount / 10, 30)) + 'px';
+  el.style.left = (window.innerWidth / 2 + (Math.random() - 0.5) * 120) + 'px';
+  el.style.top = (window.innerHeight / 2 - 60 + (Math.random() - 0.5) * 40) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+
+let cmtTimeout = null;
+function showCmt(text) {
+  if (cmtTimeout) return;
+  const el = document.getElementById('cmt');
+  el.textContent = text.slice(0, 80);
+  el.classList.add('show');
+  cmtTimeout = setTimeout(() => { el.classList.remove('show'); cmtTimeout = null; }, 3000);
+}
+
+// === BOOT ===
+async function boot() {
+  document.getElementById('hud').classList.add('on');
+
+  Scene.init({ stars: 5000 }); showBadge('scene');
+  try { await VoiceEngine.init(); showBadge('voice'); } catch(e) { console.warn('voice:', e); }
+  Kanji.init(); showBadge('kanji');
+  KiBlasts.init(); showBadge('ki-blasts');
+  Vortex.init({ count: 1200, particleSize: 0.1 }); showBadge('vortex');
+  FX.init({ aurora: true }); showBadge('fx');
+  Synths.init(); showBadge('synths');
+  Resonance.init(); showBadge('resonance');
+  FreqBands.init(); showBadge('freq-bands-12');
+  GeoFolder.init({ position: [0, 3.5, -2], scale: 1.2 }); showBadge('geo-folder');
+  PrimeRecursion.init({ position: [4, 5, -1], scale: 1.0 }); showBadge('prime-recursion');
+  DeepFractal.init({ position: [-4, 4, -2], scale: 1.0 }); showBadge('deep-fractal');
+  SoundLandscape.init({ position: [0, 0.5, 5], scale: 0.9 }); showBadge('sound-landscape');
+  MqttNet.init({ room: ROOM }); showBadge('mqtt');
+  WebRTCNet.init({ room: ROOM }); showBadge('webrtc');
+  Presence.init(); showBadge('presence');
+  Chat.init(); showBadge('chat');
+
+  // Main loop
+  KI.running = true;
+  const clock = KI.clock;
+  function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    KI.renderer.render(KI.scene, KI.camera);
+  }
+  animate();
+  console.log('%c DEEP RECURSION BOOTED ', 'background:#000;color:#f4a;font-size:20px;padding:10px');
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

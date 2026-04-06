@@ -1,7 +1,7 @@
 # AudioFabric Architecture
 
 > Auto-generated architecture document with timestamped changelog.
-> Last updated: 2026-03-14T10:00:00Z
+> Last updated: 2026-04-06T00:00:00Z
 
 ---
 
@@ -17,7 +17,21 @@ AudioFabric is a voice-driven, real-time audio-visual platform built on composab
 
 ```
 AudioFabric/
-├── *.html                    # 65 arena/experience entry points
+├── index.html                # Hub + CLI router (autoloading manifest)
+├── hub.html                  # Legacy hub (card-based launcher)
+├── arena/                    # Ki Arena combat variants (7)
+├── combat/                   # Kamehameha, PvP, Duels (5)
+├── boss/                     # Boss fights (4)
+├── music/                    # Singing, composing, audio gen (8)
+├── orbs/                     # Voice-reactive orb visualizations (10)
+├── visuals/                  # Fractal, geometry, shader visuals (14)
+├── worlds/                   # Voxel, Genesis, Zen Garden (3)
+├── social/                   # Voice chat, rooms (6)
+├── knowledge/                # Periodic table, D2R, Risk (3)
+├── ai/                       # Web LLM, Code Sandbox (3)
+├── shields/                  # Energy shield visualizations (3)
+├── ass-os/                   # AGI Soul System OS (1)
+├── vagal/                    # Vagal phoneme engine (1)
 ├── shared/styles.css         # Global styles
 ├── ARCHITECTURE.md           # This file
 ├── dev-agent/                # Web LLM dev agent (Express backend)

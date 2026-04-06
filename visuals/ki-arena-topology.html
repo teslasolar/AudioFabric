@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena — Topology Morpher</title>
+<link rel="stylesheet" href="../shared/styles.css">
+<style>
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.7),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#surfaceName{font-size:22px;color:#0ff;text-shadow:0 0 15px #0ff;transition:all 0.3s}
+#morphBar{width:120px;height:4px;background:#111;border-radius:2px;overflow:hidden}
+#morphFill{height:100%;width:0%;background:linear-gradient(90deg,#f0f,#0ff);border-radius:2px;transition:width 0.1s}
+#morphLabel{font-size:9px;color:#666}
+#vertexCount{font-size:10px;color:#888}
+/* Surface selector */
+#surfaceList{position:fixed;right:12px;top:50%;transform:translateY(-50%);z-index:55;
+  display:flex;flex-direction:column;gap:4px;pointer-events:none}
+.surf-item{padding:4px 10px;font-size:10px;color:#446;border:1px solid #fff1;
+  border-radius:4px;background:rgba(0,0,0,0.5);transition:all 0.3s}
+.surf-item.active{color:#0ff;border-color:#0ff4;background:rgba(0,50,80,0.4);text-shadow:0 0 8px #0ff}
+/* Morph flash */
+#morphFlash{position:fixed;inset:0;z-index:45;pointer-events:none;
+  background:radial-gradient(circle,rgba(0,255,255,0.08),transparent 60%);opacity:0;transition:opacity 0.4s}
+#morphFlash.show{opacity:1}
+/* Announce */
+#announce{position:fixed;top:30%;left:50%;transform:translate(-50%,-50%);z-index:60;
+  font-size:32px;color:#f0f;text-shadow:0 0 25px #f0f;opacity:0;transition:opacity 0.3s;
+  pointer-events:none;text-align:center;text-transform:uppercase;letter-spacing:4px}
+#announce.show{opacity:1}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l">
+    <div id="surfaceName">Klein Bottle</div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div id="morphBar"><div id="morphFill"></div></div>
+      <div id="morphLabel">morph</div>
+    </div>
+  </div>
+  <div class="hud-r">
+    <div id="nick" onclick="changeNick()"></div>
+    <div id="vertexCount"></div>
+  </div>
+</div>
+<div id="surfaceList">
+  <div class="surf-item active" data-s="klein">Klein Bottle</div>
+  <div class="surf-item" data-s="mobius">Möbius Strip</div>
+  <div class="surf-item" data-s="trefoil">Trefoil Knot</div>
+  <div class="surf-item" data-s="boy">Boy's Surface</div>
+  <div class="surf-item" data-s="crosscap">Cross-Cap</div>
+</div>
+<div id="morphFlash"></div>
+<div id="announce"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+import { KI } from '../modules/core.js';
+import * as Scene from '../modules/scene.js';
+import * as VoiceEngine from '../modules/voice-engine.js';
+import * as FreqBands from '../modules/freq-bands-12.js';
+import * as Synths from '../modules/synths.js';
+import * as Resonance from '../modules/resonance.js';
+import * as TopologyMorpher from '../modules/topology-morpher.js';
+import * as MqttNet from '../modules/mqtt-net.js';
+import * as WebRTCNet from '../modules/webrtc-net.js';
+import * as Presence from '../modules/presence.js';
+import * as Chat from '../modules/chat.js';
+import * as PlayerProfile from '../modules/player-profile.js';
+import * as NavOverlay from '../modules/nav-overlay.js';
+
+const ROOM = 'TOPO-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+KI.player.name = KI.genHash();
+document.getElementById('nick').textContent = KI.player.name;
+window.changeNick = function() {
+  const n = prompt('Nickname:', KI.player.name);
+  if (n && n.trim()) { KI.player.name = n.trim().slice(0,16); document.getElementById('nick').textContent = KI.player.name; }
+};
+
+const SURFACE_LABELS = { klein:'Klein Bottle', mobius:'Möbius Strip', trefoil:'Trefoil Knot', boy:"Boy's Surface", crosscap:'Cross-Cap' };
+let announceTimer = null;
+
+KI.on('topology-morpher:morph-start', data => {
+  document.getElementById('morphFlash').classList.add('show');
+  setTimeout(() => document.getElementById('morphFlash').classList.remove('show'), 600);
+  const el = document.getElementById('announce');
+  el.textContent = SURFACE_LABELS[data.to] || data.to;
+  el.classList.add('show');
+  clearTimeout(announceTimer);
+  announceTimer = setTimeout(() => el.classList.remove('show'), 2000);
+});
+
+KI.on('topology-morpher:update', data => {
+  document.getElementById('surfaceName').textContent = SURFACE_LABELS[data.surface] || data.surface;
+  document.getElementById('morphFill').style.width = (parseFloat(data.morphProgress) * 100) + '%';
+  document.getElementById('vertexCount').textContent = data.vertexCount + ' vertices';
+  document.querySelectorAll('.surf-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.s === data.surface || el.dataset.s === data.target);
+  });
+});
+
+async function boot() {
+  document.getElementById('hud').classList.add('on');
+  Scene.init({ stars: 2000 });
+  try { await VoiceEngine.init(); } catch(e) { console.warn('voice:', e); }
+  FreqBands.init(); Synths.init(); Resonance.init();
+  TopologyMorpher.init({ position: [0, 2.5, -4] });
+  MqttNet.init({ room: ROOM }); WebRTCNet.init({ room: ROOM });
+  Presence.init(); Chat.init(); PlayerProfile.init(); NavOverlay.init();
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return; requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t); KI.renderer.render(KI.scene, KI.camera);
+  })();
+  console.log('%c TOPOLOGY MORPHER BOOTED ', 'background:#000;color:#f0f;font-size:22px;padding:12px');
+}
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

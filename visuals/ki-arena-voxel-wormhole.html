@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena — Voxel Wormhole</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.7),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#score{font-size:28px;color:#ff0;text-shadow:0 0 10px #f80}
+#combo{font-size:16px;color:#f80}
+#blastType{font-size:14px;color:#4af}
+#charge{font-size:12px;color:#0f0}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#room{font-size:11px;color:#0ff}
+#peers{font-size:11px;color:#088}
+
+/* Wormhole strength meter */
+#wormholePanel{position:fixed;left:50%;bottom:65px;transform:translateX(-50%);z-index:55;
+  text-align:center;pointer-events:none}
+#wormholeLabel{font-size:10px;color:#a855f7;letter-spacing:2px;text-transform:uppercase}
+#wormholeMeter{width:200px;height:6px;background:#1a0a2e;border:1px solid #4c1d9544;
+  border-radius:3px;margin:4px auto 0;overflow:hidden}
+#wormholeFill{height:100%;width:0%;background:linear-gradient(90deg,#6b21a8,#a855f7,#06b6d4);
+  border-radius:2px;transition:width 0.1s}
+#wormholePct{font-size:18px;color:#a855f7;text-shadow:0 0 15px #7c3aed;margin-top:2px}
+
+#bandViz{position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:55;
+  display:flex;gap:3px;pointer-events:none;align-items:flex-end;height:40px}
+.band-bar{width:12px;background:#111;border:1px solid #fff1;border-radius:3px 3px 0 0;
+  position:relative;overflow:hidden;height:40px}
+.band-fill{position:absolute;bottom:0;left:0;right:0;border-radius:2px;transition:height 0.08s}
+
+#dmgLayer{position:fixed;inset:0;z-index:60;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 8px currentColor;
+  animation:dmgUp 1.2s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-120px) scale(1.8)}}
+
+/* Wormhole open flash */
+#portalFlash{position:fixed;inset:0;z-index:45;pointer-events:none;
+  background:radial-gradient(circle,rgba(139,92,246,0.15),transparent 70%);opacity:0;transition:opacity 0.3s}
+#portalFlash.on{opacity:1}
+
+#cmt{position:fixed;top:35%;left:50%;transform:translate(-50%,-50%);z-index:70;
+  font-size:20px;color:#a855f7;text-shadow:0 0 20px #7c3aed;text-align:center;
+  opacity:0;transition:opacity 0.4s;pointer-events:none}
+#cmt.show{opacity:1}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l"><div id="score">0</div><div id="combo"></div><div id="blastType">&mdash;</div><div id="charge"></div></div>
+  <div class="hud-r"><div id="nick" onclick="changeNick()" title="Click to change name"></div>
+    <div id="room"></div><div id="peers"></div></div>
+</div>
+<div id="wormholePanel">
+  <div id="wormholeLabel">WORMHOLE</div>
+  <div id="wormholeMeter"><div id="wormholeFill"></div></div>
+  <div id="wormholePct"></div>
+</div>
+<div id="bandViz"></div>
+<div id="dmgLayer"></div>
+<div id="portalFlash"></div>
+<div id="cmt"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+import { KI } from '../modules/core.js';
+import * as Scene from '../modules/scene.js';
+import * as VoiceEngine from '../modules/voice-engine.js';
+import * as Kanji from '../modules/kanji.js';
+import * as KiBlasts from '../modules/ki-blasts.js';
+import * as Vortex from '../modules/vortex.js';
+import * as FX from '../modules/fx.js';
+import * as Synths from '../modules/synths.js';
+import * as Resonance from '../modules/resonance.js';
+import * as FreqBands from '../modules/freq-bands-12.js';
+import * as VoxelWormhole from '../modules/voxel-wormhole.js';
+import * as MqttNet from '../modules/mqtt-net.js';
+import * as WebRTCNet from '../modules/webrtc-net.js';
+import * as Presence from '../modules/presence.js';
+import * as Chat from '../modules/chat.js';
+
+const ROOM = 'VOXEL-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+
+KI.player.name = KI.genHash();
+document.getElementById('nick').textContent = KI.player.name;
+document.getElementById('room').textContent = ROOM;
+
+window.changeNick = function() {
+  const n = prompt('Nickname:', KI.player.name);
+  if (n && n.trim()) {
+    KI.player.name = n.trim().slice(0, 16);
+    document.getElementById('nick').textContent = KI.player.name;
+    KI.emit('broadcast', { type: 'nick', name: KI.player.name });
+  }
+};
+
+// HUD
+KI.on('hit', data => {
+  document.getElementById('score').textContent = KI.player.score.toLocaleString();
+  document.getElementById('combo').textContent = KI.player.combo > 1 ? KI.player.combo + 'x COMBO' : '';
+  if (data.dmg > 200) showDmg(data.dmg);
+});
+KI.on('charge:update', data => {
+  document.getElementById('blastType').textContent = data.blastType?.name || '';
+  document.getElementById('charge').textContent = data.chargeLevel > 0.05 ? 'CHARGE ' + Math.round(data.chargeLevel * 100) + '%' : '';
+});
+
+// Wormhole strength meter
+let prevStrength = 0;
+let flashTimer = null;
+KI.on('voxel-wormhole:update', data => {
+  const pct = Math.round(data.strength * 100);
+  document.getElementById('wormholeFill').style.width = pct + '%';
+  document.getElementById('wormholePct').textContent = pct > 5 ? pct + '%' : '';
+
+  // Flash when wormhole first opens significantly
+  if (data.strength > 0.5 && prevStrength <= 0.5) {
+    const flash = document.getElementById('portalFlash');
+    flash.classList.add('on');
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => flash.classList.remove('on'), 800);
+  }
+  prevStrength = data.strength;
+});
+
+// 12-band viz
+KI.on('freq-bands-12:ready', () => {
+  const cont = document.getElementById('bandViz');
+  const fb = KI.get('freq-bands-12');
+  if (!fb) return;
+  fb.BANDS.forEach((band, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'band-bar'; bar.id = 'band-' + i;
+    bar.innerHTML = '<div class="band-fill" style="background:' + band.color + ';height:0%"></div>';
+    cont.appendChild(bar);
+  });
+});
+KI.on('freq-bands-12:update', data => {
+  for (let i = 0; i < 12; i++) {
+    const fill = document.querySelector('#band-' + i + ' .band-fill');
+    if (fill) fill.style.height = (data.energy[i] * 100) + '%';
+  }
+});
+
+function showDmg(amount) {
+  const el = document.createElement('div'); el.className = 'dmg';
+  el.textContent = Math.round(amount); el.style.color = '#a855f7';
+  el.style.fontSize = (18 + Math.min(amount / 10, 30)) + 'px';
+  el.style.left = (window.innerWidth / 2 + (Math.random() - 0.5) * 200) + 'px';
+  el.style.top = (window.innerHeight / 2 - 80 + (Math.random() - 0.5) * 60) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+
+// Boot
+async function boot() {
+  document.getElementById('hud').classList.add('on');
+
+  Scene.init({ stars: 4000 });
+  try { await VoiceEngine.init(); } catch(e) { console.warn('voice:', e); }
+  Kanji.init();
+  KiBlasts.init();
+  Vortex.init({ count: 600, particleSize: 0.06 });
+  FX.init({ aurora: true });
+  Synths.init();
+  Resonance.init();
+  FreqBands.init();
+  VoxelWormhole.init({ position: [0, 0.5, -3], scale: 1.2 });
+  MqttNet.init({ room: ROOM });
+  WebRTCNet.init({ room: ROOM });
+  Presence.init();
+  Chat.init();
+
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    KI.renderer.render(KI.scene, KI.camera);
+  })();
+  console.log('%c VOXEL WORMHOLE BOOTED ', 'background:#1a0a2e;color:#a855f7;font-size:20px;padding:10px');
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

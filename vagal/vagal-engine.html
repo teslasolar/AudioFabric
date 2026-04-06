@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audio Fabric · Vagal Phoneme Engine</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;color:#e0e0e0;font-family:'Courier New',monospace}
+#boot-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;transition:opacity 1.5s}
+#boot-screen.hidden{opacity:0;pointer-events:none}
+#boot-log{font-size:14px;line-height:2;text-align:left;max-width:600px}
+.boot-line{opacity:0;transition:opacity 0.3s}
+.boot-line.visible{opacity:1}
+.boot-line .status{color:#0f0;margin-left:8px}
+.boot-line .status.fail{color:#f00}
+.boot-line .prime{color:#ffaa00}
+#start-btn{margin-top:32px;padding:12px 32px;background:none;border:1px solid #ffaa00;color:#ffaa00;font-family:inherit;font-size:16px;cursor:pointer;opacity:0;transition:opacity 0.5s}
+#start-btn.visible{opacity:1}
+#start-btn:hover{background:#ffaa0020}
+canvas{display:block}
+#hud{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+#metrics-panel{position:fixed;top:16px;right:16px;font-size:11px;line-height:1.8;text-align:right;pointer-events:none;z-index:20;opacity:0.85}
+#metrics-panel .label{color:#888}
+#metrics-panel .value{color:#ffaa00;font-weight:bold}
+#metrics-panel .mode-sustained{color:#00ccff}
+#metrics-panel .mode-pulsed{color:#ff6600}
+#metrics-panel .mode-silent{color:#aa88ff}
+#ring-panel{position:fixed;bottom:16px;left:16px;font-size:10px;line-height:1.6;pointer-events:none;z-index:20;opacity:0.8}
+.ring-indicator{display:flex;align-items:center;gap:6px;margin:2px 0}
+.ring-bar{width:80px;height:6px;background:#111;border-radius:3px;overflow:hidden}
+.ring-bar-fill{height:100%;border-radius:3px;transition:width 0.1s}
+#fold-display{position:fixed;bottom:16px;right:16px;font-size:10px;color:#555;pointer-events:none;z-index:20;text-align:right}
+#breath-meter{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);width:200px;height:4px;background:#111;border-radius:2px;overflow:hidden;pointer-events:none;z-index:20}
+#breath-meter-fill{height:100%;background:linear-gradient(90deg,#00ccff,#00ff88);border-radius:2px;width:50%;transition:width 0.15s}
+#title-bar{position:fixed;top:16px;left:16px;font-size:10px;pointer-events:none;z-index:20;opacity:0.6}
+#title-bar .title{font-size:12px;color:#ffaa00;letter-spacing:2px}
+</style>
+</head>
+<body>
+
+<!-- BOOT SCREEN -->
+<div id="boot-screen">
+  <div id="boot-log">
+    <div class="boot-line" id="b0"><span class="prime">p= 2</span>  diaphragm engine &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[request mic permission]<span class="status" id="s0"></span></div>
+    <div class="boot-line" id="b1"><span class="prime">p= 3</span>  laryngeal sensor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[init FFT analyser]<span class="status" id="s1"></span></div>
+    <div class="boot-line" id="b2"><span class="prime">p= 5</span>  breath gate &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[calibrate noise floor]<span class="status" id="s2"></span></div>
+    <div class="boot-line" id="b3"><span class="prime">p= 7</span>  thoracic resonator &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[init formant tracker]<span class="status" id="s3"></span></div>
+    <div class="boot-line" id="b4"><span class="prime">p=11</span>  nasopharyngeal ERP &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[init back-pressure detector]<span class="status" id="s4"></span></div>
+    <div class="boot-line" id="b5"><span class="prime">p=13</span>  oral shaper &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[init vowel space mapper]<span class="status" id="s5"></span></div>
+    <div class="boot-line" id="b6"><span class="prime">p=17</span>  intent observer &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[init silence tracker]<span class="status" id="s6"></span></div>
+  </div>
+  <button id="start-btn">ACTIVATE GARDEN</button>
+</div>
+
+<!-- HUD -->
+<div id="title-bar">
+  <div class="title">AUDIO FABRIC</div>
+  <div>vagal phoneme engine</div>
+</div>
+
+<div id="metrics-panel">
+  <div><span class="label">VAGAL TONE </span><span class="value" id="m-tone">0.00</span></div>
+  <div><span class="label">MODE </span><span class="value" id="m-mode">SILENT</span></div>
+  <div><span class="label">COHERENCE </span><span class="value" id="m-coherence">0.00</span></div>
+  <div><span class="label">EXHALE RATIO </span><span class="value" id="m-exhale">0.00</span></div>
+  <div><span class="label">PULSE RATE </span><span class="value" id="m-pulse">0.0</span></div>
+  <div><span class="label">BREATH RATE </span><span class="value" id="m-breath">0.0</span></div>
+  <div><span class="label">SWEEP </span><span class="value" id="m-sweep">0%</span></div>
+  <div><span class="label">&psi; LEVEL </span><span class="value" id="m-psi">0.00</span></div>
+</div>
+
+<div id="ring-panel">
+  <div class="ring-indicator"><span style="color:#ff4444">R0</span> <div class="ring-bar"><div class="ring-bar-fill" id="rb0" style="background:#ff4444;width:0%"></div></div> <span style="color:#888;font-size:9px">DIAPHRAGM</span></div>
+  <div class="ring-indicator"><span style="color:#ff8800">R1</span> <div class="ring-bar"><div class="ring-bar-fill" id="rb1" style="background:#ff8800;width:0%"></div></div> <span style="color:#888;font-size:9px">LARYNGEAL</span></div>
+  <div class="ring-indicator"><span style="color:#ffcc00">R2</span> <div class="ring-bar"><div class="ring-bar-fill" id="rb2" style="background:#ffcc00;width:0%"></div></div> <span style="color:#888;font-size:9px">BREATH GATE</span></div>
+  <div class="ring-indicator"><span style="color:#44ff44">R3</span> <div class="ring-bar"><div class="ring-bar-fill" id="rb3" style="background:#44ff44;width:0%"></div></div> <span style="color:#888;font-size:9px">THORACIC</span></div>
+  <div class="ring-indicator"><span style="color:#00ccff">R4</span> <div class="ring-bar"><div class="ring-bar-fill" id="rb4" style="background:#00ccff;width:0%"></div></div> <span style="color:#888;font-size:9px">NASOPHARYNX</span></div>
+  <div class="ring-indicator"><span style="color:#8844ff">R5</span> <div class="ring-bar"><div class="ring-bar-fill" id="rb5" style="background:#8844ff;width:0%"></div></div> <span style="color:#888;font-size:9px">ORAL SHAPER</span></div>
+  <div class="ring-indicator"><span style="color:#cc44ff">R6</span> <div class="ring-bar"><div class="ring-bar-fill" id="rb6" style="background:#cc44ff;width:0%"></div></div> <span style="color:#888;font-size:9px">INTENT</span></div>
+</div>
+
+<div id="fold-display">
+  fold(voice) = 2 &times; 3 &times; 5 &times; 7 &times; 11 &times; 13 &times; 17 = 510,510
+</div>
+
+<div id="breath-meter"><div id="breath-meter-fill"></div></div>
+
+<!-- THREE.JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// ============================================================
+// AUDIO FABRIC — VAGAL PHONEME ENGINE
+// Single-file therapeutic live audio performance system
+// fold(voice) = 2 × 3 × 5 × 7 × 11 × 13 × 17 = 510,510
+// ============================================================
+
+(function(){
+'use strict';
+
+// ----- CONSTANTS -----
+const PRIMES = [2, 3, 5, 7, 11, 13, 17];
+const BASE_FREQ = 55; // Hz
+const RING_FREQS = PRIMES.map(p => p * BASE_FREQ); // [110, 165, 275, 385, 605, 715, 935]
+const FFT_SIZE = 2048;
+const SAMPLE_RATE = 44100;
+const PHI = (1 + Math.sqrt(5)) / 2; // golden ratio
+
+const RING_COLORS = [
+  new THREE.Color(0xff4444), // R0 red
+  new THREE.Color(0xff8800), // R1 orange
+  new THREE.Color(0xffcc00), // R2 yellow
+  new THREE.Color(0x44ff44), // R3 green
+  new THREE.Color(0x00ccff), // R4 cyan
+  new THREE.Color(0x8844ff), // R5 indigo
+  new THREE.Color(0xcc44ff), // R6 violet
+];
+
+// Vowel colors for R5
+const VOWEL_COLORS = {
+  ee: new THREE.Color(0x4488ff),
+  eh: new THREE.Color(0x00cccc),
+  ah: new THREE.Color(0xffaa00),
+  oh: new THREE.Color(0xff8800),
+  oo: new THREE.Color(0xff4444),
+  mm: new THREE.Color(0x9944ff),
+};
+
+// ----- STATE -----
+const state = {
+  running: false,
+  ringActivity: new Float32Array(7),     // [R0..R6] current
+  ringSmoothed: new Float32Array(7),     // smoothed for visuals
+  mode: 'SILENT',                        // SUSTAINED, PULSED, SILENT
+  f0: 0,                                // fundamental frequency
+  spectralCentroid: 0,
+  formants: { f1: 0, f2: 0 },
+  exhaleRatio: 1.0,
+  pulseRate: 0,
+  breathRate: 0,
+  coherence: 0,
+  vagalTone: 0,
+  sweep: 0,
+  psiLevel: 0,
+  silenceDuration: 0,
+  noiseFloor: 0.01,
+  vowelHistory: new Set(),
+  vowelHistoryTimeout: null,
+  currentVowel: '',
+  breathPhase: 'exhale',               // inhale or exhale
+  breathCycleStart: 0,
+  inhaleTime: 0,
+  exhaleTime: 0,
+  breathCount: 0,
+  breathStartTime: 0,
+  onsetTimes: [],                       // for pulse rate detection
+  lastAmplitude: 0,
+  amplitudeHistory: [],
+  isSounding: false,
+  soundStartTime: 0,
+  silenceStartTime: Date.now(),
+};
+
+// ----- AUDIO CONTEXT & NODES -----
+let audioCtx, analyser, micStream, micSource;
+let timeData, freqData;
+let oscillators = [];
+let oscGains = [];
+let masterGain;
+
+// ----- THREE.JS -----
+let scene, camera, renderer, clock;
+let orbGroup, ringMeshes = [], particleSystems = [], toroidalLines = [];
+
+// ============================================================
+// BOOT SEQUENCE
+// ============================================================
+
+async function boot() {
+  const bootLines = document.querySelectorAll('.boot-line');
+  const statuses = [];
+  for (let i = 0; i < 7; i++) statuses.push(document.getElementById('s' + i));
+
+  // Show lines sequentially
+  for (let i = 0; i < 7; i++) {
+    bootLines[i].classList.add('visible');
+    await sleep(200);
+  }
+  await sleep(300);
+
+  // p=2: Request mic
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    statuses[0].textContent = ' ✓';
+  } catch(e) {
+    statuses[0].textContent = ' ✗';
+    statuses[0].classList.add('fail');
+    return;
+  }
+  await sleep(200);
+
+  // p=3: Init FFT
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = FFT_SIZE;
+  analyser.smoothingTimeConstant = 0.8;
+  micSource = audioCtx.createMediaStreamSource(micStream);
+  micSource.connect(analyser);
+  timeData = new Float32Array(analyser.fftSize);
+  freqData = new Float32Array(analyser.frequencyBinCount);
+  statuses[1].textContent = ' ✓';
+  await sleep(200);
+
+  // p=5: Calibrate noise floor
+  await calibrateNoiseFloor();
+  statuses[2].textContent = ' ✓';
+  await sleep(200);
+
+  // p=7: Formant tracker ready
+  statuses[3].textContent = ' ✓';
+  await sleep(200);
+
+  // p=11: Back-pressure detector ready
+  statuses[4].textContent = ' ✓';
+  await sleep(200);
+
+  // p=13: Vowel space mapper ready
+  statuses[5].textContent = ' ✓';
+  await sleep(200);
+
+  // p=17: Silence tracker ready
+  state.silenceStartTime = Date.now();
+  state.breathStartTime = Date.now();
+  statuses[6].textContent = ' ✓';
+  await sleep(400);
+
+  // Show start button
+  document.getElementById('start-btn').classList.add('visible');
+}
+
+async function calibrateNoiseFloor() {
+  return new Promise(resolve => {
+    let samples = 0;
+    let sum = 0;
+    const interval = setInterval(() => {
+      analyser.getFloatTimeDomainData(timeData);
+      let rms = 0;
+      for (let i = 0; i < timeData.length; i++) rms += timeData[i] * timeData[i];
+      rms = Math.sqrt(rms / timeData.length);
+      sum += rms;
+      samples++;
+      if (samples >= 10) {
+        clearInterval(interval);
+        state.noiseFloor = (sum / samples) * 1.5 + 0.005;
+        resolve();
+      }
+    }, 50);
+  });
+}
+
+function startSystem() {
+  initHarmonicEngine();
+  initVisualEngine();
+  state.running = true;
+  state.breathStartTime = Date.now();
+  document.getElementById('boot-screen').classList.add('hidden');
+  setTimeout(() => { document.getElementById('boot-screen').style.display = 'none'; }, 1500);
+  requestAnimationFrame(mainLoop);
+}
+
+// ============================================================
+// AUDIO ANALYSIS PIPELINE
+// ============================================================
+
+function analyzeAudio() {
+  analyser.getFloatTimeDomainData(timeData);
+  analyser.getFloatFrequencyData(freqData);
+
+  // RMS amplitude
+  let rms = 0;
+  for (let i = 0; i < timeData.length; i++) rms += timeData[i] * timeData[i];
+  rms = Math.sqrt(rms / timeData.length);
+
+  const isSounding = rms > state.noiseFloor;
+  const now = Date.now();
+
+  // --- Silence / Sound transition ---
+  if (isSounding && !state.isSounding) {
+    state.isSounding = true;
+    state.soundStartTime = now;
+    state.silenceDuration = (now - state.silenceStartTime) / 1000;
+  } else if (!isSounding && state.isSounding) {
+    state.isSounding = false;
+    state.silenceStartTime = now;
+  }
+
+  if (!isSounding) {
+    state.silenceDuration = (now - state.silenceStartTime) / 1000;
+  }
+
+  // --- F0 Detection (autocorrelation) ---
+  state.f0 = detectF0(timeData, audioCtx.sampleRate);
+
+  // --- Spectral Centroid ---
+  state.spectralCentroid = computeSpectralCentroid(freqData, audioCtx.sampleRate);
+
+  // --- Formants (approximate via spectral peaks) ---
+  state.formants = estimateFormants(freqData, audioCtx.sampleRate);
+
+  // --- Onset detection (for pulse rate) ---
+  detectOnsets(rms, now);
+
+  // --- Breath phase detection ---
+  detectBreathPhase(rms, now);
+
+  // --- Compute ring activities ---
+  computeR0(rms, now);
+  computeR1();
+  computeR2();
+  computeR3();
+  computeR4();
+  computeR5();
+  computeR6();
+
+  // --- Smooth ---
+  for (let i = 0; i < 7; i++) {
+    state.ringSmoothed[i] += (state.ringActivity[i] - state.ringSmoothed[i]) * 0.15;
+  }
+
+  // --- Composite metrics ---
+  computeMetrics(now);
+
+  // --- Update HUD ---
+  updateHUD();
+}
+
+// ----- F0 via Autocorrelation -----
+function detectF0(buf, sr) {
+  const size = buf.length;
+  let bestCorr = 0, bestLag = 0;
+  // Search 50Hz to 1000Hz
+  const minLag = Math.floor(sr / 1000);
+  const maxLag = Math.floor(sr / 50);
+
+  // Compute RMS to check if signal is strong enough
+  let rms = 0;
+  for (let i = 0; i < size; i++) rms += buf[i] * buf[i];
+  rms = Math.sqrt(rms / size);
+  if (rms < state.noiseFloor) return 0;
+
+  for (let lag = minLag; lag < maxLag && lag < size; lag++) {
+    let corr = 0;
+    for (let i = 0; i < size - lag; i++) {
+      corr += buf[i] * buf[i + lag];
+    }
+    if (corr > bestCorr) {
+      bestCorr = corr;
+      bestLag = lag;
+    }
+  }
+
+  if (bestLag === 0) return 0;
+  return sr / bestLag;
+}
+
+// ----- Spectral Centroid -----
+function computeSpectralCentroid(freq, sr) {
+  let numSum = 0, denSum = 0;
+  const binWidth = sr / (freq.length * 2);
+  for (let i = 0; i < freq.length; i++) {
+    const mag = Math.pow(10, freq[i] / 20); // dB to linear
+    const f = i * binWidth;
+    numSum += f * mag;
+    denSum += mag;
+  }
+  return denSum > 0 ? numSum / denSum : 0;
+}
+
+// ----- Formant Estimation -----
+function estimateFormants(freq, sr) {
+  const binWidth = sr / (freq.length * 2);
+  // Smooth the spectrum
+  const smooth = new Float32Array(freq.length);
+  for (let i = 2; i < freq.length - 2; i++) {
+    smooth[i] = (freq[i-2] + freq[i-1] + freq[i] + freq[i+1] + freq[i+2]) / 5;
+  }
+
+  // Find peaks in 200-3000Hz range
+  const peaks = [];
+  const minBin = Math.floor(200 / binWidth);
+  const maxBin = Math.min(Math.floor(3000 / binWidth), smooth.length - 1);
+
+  for (let i = minBin + 1; i < maxBin - 1; i++) {
+    if (smooth[i] > smooth[i-1] && smooth[i] > smooth[i+1] && smooth[i] > -60) {
+      peaks.push({ freq: i * binWidth, mag: smooth[i] });
+    }
+  }
+
+  peaks.sort((a, b) => b.mag - a.mag);
+
+  let f1 = 0, f2 = 0;
+  if (peaks.length >= 1) f1 = peaks[0].freq;
+  if (peaks.length >= 2) {
+    // F2 should be > F1
+    for (let i = 1; i < peaks.length; i++) {
+      if (Math.abs(peaks[i].freq - f1) > 200) {
+        f2 = peaks[i].freq;
+        break;
+      }
+    }
+  }
+  if (f1 > f2 && f2 > 0) { let t = f1; f1 = f2; f2 = t; }
+
+  return { f1, f2 };
+}
+
+// ----- Onset Detection -----
+function detectOnsets(rms, now) {
+  const prev = state.lastAmplitude;
+  state.lastAmplitude = rms;
+
+  // Onset = sharp amplitude increase
+  if (rms > prev * 1.8 && rms > state.noiseFloor * 2) {
+    state.onsetTimes.push(now);
+  }
+  // Keep only last 2 seconds
+  while (state.onsetTimes.length > 0 && now - state.onsetTimes[0] > 2000) {
+    state.onsetTimes.shift();
+  }
+  state.pulseRate = state.onsetTimes.length / 2; // pulses per second
+}
+
+// ----- Breath Phase -----
+function detectBreathPhase(rms, now) {
+  state.amplitudeHistory.push({ rms, time: now });
+  // Keep 5 seconds
+  while (state.amplitudeHistory.length > 0 && now - state.amplitudeHistory[0].time > 5000) {
+    state.amplitudeHistory.shift();
+  }
+
+  // Detect breath cycles via amplitude envelope
+  if (state.amplitudeHistory.length > 10) {
+    const recent = state.amplitudeHistory.slice(-20);
+    const avgRecent = recent.reduce((s, x) => s + x.rms, 0) / recent.length;
+    const older = state.amplitudeHistory.slice(0, Math.max(1, state.amplitudeHistory.length - 20));
+    const avgOlder = older.reduce((s, x) => s + x.rms, 0) / older.length;
+
+    if (avgRecent > avgOlder * 1.3 && state.breathPhase === 'exhale') {
+      // Inhale detected
+      state.breathPhase = 'inhale';
+      state.exhaleTime += (now - state.breathCycleStart) / 1000;
+      state.breathCycleStart = now;
+      state.breathCount++;
+    } else if (avgRecent < avgOlder * 0.7 && state.breathPhase === 'inhale') {
+      state.breathPhase = 'exhale';
+      state.inhaleTime += (now - state.breathCycleStart) / 1000;
+      state.breathCycleStart = now;
+    }
+  }
+
+  const elapsed = (now - state.breathStartTime) / 60000; // minutes
+  state.breathRate = elapsed > 0.05 ? state.breathCount / elapsed : 0;
+  state.exhaleRatio = state.inhaleTime > 0.1 ? state.exhaleTime / state.inhaleTime : 1.0;
+}
+
+// ============================================================
+// RING DETECTION PIPELINES
+// ============================================================
+
+// R0: DIAPHRAGM ENGINE (p=2) — amplitude envelope, pulsed vs sustained
+function computeR0(rms, now) {
+  let activity = 0;
+  if (state.pulseRate > 4) {
+    // Pulsed mode: laughter, haha
+    activity = Math.min(1, state.pulseRate / 8);
+    state.mode = 'PULSED';
+  } else if (state.isSounding && (now - state.soundStartTime) > 2000) {
+    // Sustained mode: sigh, long tone
+    activity = Math.min(1, rms / (state.noiseFloor * 8));
+    state.mode = 'SUSTAINED';
+  } else if (!state.isSounding && state.silenceDuration > 1) {
+    state.mode = 'SILENT';
+  }
+
+  // Sigh detection: check amplitude history for sharp peak followed by decay
+  if (state.amplitudeHistory.length > 30) {
+    const tail = state.amplitudeHistory.slice(-30);
+    const peak = Math.max(...tail.map(x => x.rms));
+    const last = tail[tail.length - 1].rms;
+    if (peak > state.noiseFloor * 5 && last < peak * 0.3) {
+      activity = Math.max(activity, 0.6);
+    }
+  }
+
+  state.ringActivity[0] = clamp01(activity);
+}
+
+// R1: LARYNGEAL SENSOR (p=3) — voiced vs unvoiced
+function computeR1() {
+  if (!state.isSounding) { state.ringActivity[1] = 0; return; }
+
+  let activity = 0;
+  if (state.f0 > 50 && state.spectralCentroid < 2000) {
+    // Voiced: humming, singing — clear F0, low centroid
+    activity = Math.min(1, (2000 - state.spectralCentroid) / 1500);
+  } else if (state.spectralCentroid > 3000) {
+    // Unvoiced: 'h' sound, turbulent
+    activity = Math.min(1, (state.spectralCentroid - 3000) / 3000);
+  } else {
+    activity = 0.2; // ambiguous
+  }
+
+  state.ringActivity[1] = clamp01(activity);
+}
+
+// R2: BREATH GATE (p=5) — fricatives sh, ss, wh
+function computeR2() {
+  if (!state.isSounding) { state.ringActivity[2] *= 0.95; return; }
+
+  const binWidth = audioCtx.sampleRate / (freqData.length * 2);
+  // 'sh': wide energy 2.5-6kHz
+  let shEnergy = bandEnergy(freqData, 2500, 6000, binWidth);
+  // 'ss': narrow peak >4kHz
+  let ssEnergy = bandEnergy(freqData, 4000, 8000, binWidth);
+  // 'wh': energy 500-2kHz
+  let whEnergy = bandEnergy(freqData, 500, 2000, binWidth);
+  // Total energy for normalization
+  let totalEnergy = bandEnergy(freqData, 100, 8000, binWidth);
+
+  let fricativeScore = 0;
+  if (totalEnergy > 0) {
+    fricativeScore = (shEnergy + ssEnergy * 0.8 + whEnergy * 0.4) / totalEnergy;
+  }
+
+  // Boost by exhale ratio
+  let exhaleBoost = Math.min(1, Math.max(0, (state.exhaleRatio - 1) * 0.5));
+
+  let activity = Math.min(1, fricativeScore * 2 + exhaleBoost * 0.3);
+
+  // Only count if no strong F0 (fricatives are mostly unvoiced)
+  if (state.f0 > 100 && state.spectralCentroid < 2000) activity *= 0.3;
+
+  state.ringActivity[2] = clamp01(activity);
+}
+
+// R3: THORACIC RESONATOR (p=7) — chest voice, oh, ah
+function computeR3() {
+  if (!state.isSounding) { state.ringActivity[3] *= 0.9; return; }
+
+  const { f1, f2 } = state.formants;
+  let activity = 0;
+
+  // 'oh': F1 ~500, F2 ~900
+  if (f1 > 400 && f1 < 600 && f2 > 700 && f2 < 1100) {
+    activity = Math.max(activity, 0.8);
+  }
+  // 'ah': F1 ~750, F2 ~1200
+  if (f1 > 600 && f1 < 900 && f2 > 1000 && f2 < 1400) {
+    activity = Math.max(activity, 0.9);
+  }
+
+  // Chest resonance: energy ratio below 500Hz
+  const binWidth = audioCtx.sampleRate / (freqData.length * 2);
+  const lowEnergy = bandEnergy(freqData, 80, 500, binWidth);
+  const highEnergy = bandEnergy(freqData, 500, 4000, binWidth);
+  if (highEnergy > 0) {
+    const chestRatio = lowEnergy / highEnergy;
+    activity = Math.max(activity, Math.min(1, chestRatio * 0.6));
+  }
+
+  state.ringActivity[3] = clamp01(activity);
+}
+
+// R4: NASOPHARYNGEAL VERIFIER (p=11) — 'ee', nasal resonance
+function computeR4() {
+  if (!state.isSounding) { state.ringActivity[4] *= 0.9; return; }
+
+  const { f2 } = state.formants;
+  let activity = 0;
+
+  // 'ee': F2 ~2300Hz (high front vowel)
+  if (f2 > 2000 && f2 < 2700) {
+    activity = Math.max(activity, 0.8);
+  }
+
+  // Nasal resonance: energy at ~250Hz with antiformant near 500Hz
+  const binWidth = audioCtx.sampleRate / (freqData.length * 2);
+  const nasalEnergy = bandEnergy(freqData, 200, 300, binWidth);
+  const antiformantEnergy = bandEnergy(freqData, 450, 550, binWidth);
+  if (nasalEnergy > antiformantEnergy * 1.5) {
+    activity = Math.max(activity, 0.6);
+  }
+
+  // Pulsed + high F2 + nasal = R4 nasopharyngeal laugh
+  if (state.pulseRate > 3 && f2 > 2000) {
+    activity = Math.max(activity, 0.7);
+  }
+
+  state.ringActivity[4] = clamp01(activity);
+}
+
+// R5: ORAL SHAPER (p=13) — vowel identity
+function computeR5() {
+  if (!state.isSounding) { state.ringActivity[5] *= 0.92; return; }
+
+  const { f1, f2 } = state.formants;
+  let vowel = classifyVowel(f1, f2);
+  state.currentVowel = vowel;
+
+  if (vowel) {
+    state.vowelHistory.add(vowel);
+    // Reset vowel history after 30 seconds of no new vowels
+    clearTimeout(state.vowelHistoryTimeout);
+    state.vowelHistoryTimeout = setTimeout(() => state.vowelHistory.clear(), 30000);
+  }
+
+  // Activity = how much of vowel space has been covered
+  const possibleVowels = ['ee', 'eh', 'ah', 'oh', 'oo', 'mm'];
+  state.sweep = state.vowelHistory.size / possibleVowels.length;
+
+  // Current activity = 1 if currently producing a vowel
+  let activity = vowel ? 0.7 + state.sweep * 0.3 : 0;
+
+  state.ringActivity[5] = clamp01(activity);
+}
+
+// R6: INTENT / SILENCE (p=17) — the observer
+function computeR6() {
+  // Inverse: highest activity in silence
+  let silenceFactor = 0;
+  if (!state.isSounding) {
+    silenceFactor = Math.min(1, state.silenceDuration / 5); // ramps up over 5s of silence
+  }
+
+  // Micro-silence between words also counts a little
+  let microSilence = 0;
+  if (!state.isSounding && state.silenceDuration > 0.2 && state.silenceDuration < 1) {
+    microSilence = 0.3;
+  }
+
+  state.ringActivity[6] = clamp01(Math.max(silenceFactor, microSilence));
+}
+
+// ----- Vowel Classification -----
+function classifyVowel(f1, f2) {
+  if (f1 === 0 || f2 === 0) return '';
+  // Approximate vowel quadrilateral
+  if (f1 < 400 && f2 > 2000) return 'ee';
+  if (f1 > 400 && f1 < 650 && f2 > 1600) return 'eh';
+  if (f1 > 600 && f2 > 900 && f2 < 1500) return 'ah';
+  if (f1 > 350 && f1 < 600 && f2 < 1100) return 'oh';
+  if (f1 < 400 && f2 < 1000) return 'oo';
+  if (f1 < 350 && f2 < 1200) return 'mm';
+  return '';
+}
+
+// ----- Composite Metrics -----
+function computeMetrics(now) {
+  const r = state.ringSmoothed;
+
+  // Vagal Tone: weighted sum
+  state.vagalTone = (r[0]*0.2 + r[1]*0.15 + r[2]*0.15 + r[3]*0.15 + r[4]*0.1 + r[5]*0.1 + r[6]*0.15);
+
+  // Coherence: phi-ratio between adjacent rings
+  let coherenceSum = 0;
+  for (let i = 0; i < 6; i++) {
+    const a = Math.max(r[i], 0.001);
+    const b = Math.max(r[i+1], 0.001);
+    const ratio = Math.max(a, b) / Math.min(a, b);
+    coherenceSum += 1 - Math.abs(ratio - PHI) / PHI;
+  }
+  state.coherence = clamp01(coherenceSum / 6);
+
+  // Psi level
+  state.psiLevel = r[6] * 0.3 + r[5] * 0.3 + r[4] * 0.2 + state.coherence * 0.2;
+}
+
+// ============================================================
+// HARMONIC ENGINE
+// ============================================================
+
+function initHarmonicEngine() {
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.12;
+  masterGain.connect(audioCtx.destination);
+
+  const waveforms = ['sine', 'triangle', 'sawtooth', 'sine', 'sine', 'sine', 'sine'];
+
+  for (let i = 0; i < 7; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0;
+
+    osc.frequency.value = RING_FREQS[i];
+
+    if (i === 2) {
+      // R2: Saw → LP filter
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 600;
+      filter.Q.value = 1;
+      osc.type = 'sawtooth';
+      osc.connect(filter);
+      filter.connect(gain);
+    } else if (i === 4) {
+      // R4: Bell — use a pair of sine oscillators with slight detune
+      osc.type = 'sine';
+      osc.connect(gain);
+      // Add a second partial for bell timbre
+      const osc2 = audioCtx.createOscillator();
+      osc2.frequency.value = RING_FREQS[i] * 2.76; // inharmonic partial
+      const gain2 = audioCtx.createGain();
+      gain2.gain.value = 0.3;
+      osc2.connect(gain2);
+      gain2.connect(gain);
+      osc2.start();
+    } else if (i === 5) {
+      // R5: Choir pad — detuned unison
+      osc.type = 'sine';
+      osc.connect(gain);
+      for (let d = 0; d < 3; d++) {
+        const choirOsc = audioCtx.createOscillator();
+        choirOsc.type = 'sine';
+        choirOsc.frequency.value = RING_FREQS[i] * (1 + (d - 1) * 0.003);
+        const cg = audioCtx.createGain();
+        cg.gain.value = 0.25;
+        choirOsc.connect(cg);
+        cg.connect(gain);
+        choirOsc.start();
+      }
+    } else if (i === 6) {
+      // R6: Crystal — high sine with shimmer
+      osc.type = 'sine';
+      osc.connect(gain);
+      const shimmer = audioCtx.createOscillator();
+      shimmer.type = 'sine';
+      shimmer.frequency.value = RING_FREQS[i] * 2;
+      const sg = audioCtx.createGain();
+      sg.gain.value = 0.15;
+      shimmer.connect(sg);
+      sg.connect(gain);
+      shimmer.start();
+    } else {
+      osc.type = waveforms[i];
+      osc.connect(gain);
+    }
+
+    gain.connect(masterGain);
+    osc.start();
+    oscillators.push(osc);
+    oscGains.push(gain);
+  }
+}
+
+function updateHarmonicEngine() {
+  for (let i = 0; i < 7; i++) {
+    const target = state.ringSmoothed[i] * 0.5; // scale down
+    oscGains[i].gain.setTargetAtTime(target, audioCtx.currentTime, 0.1);
+  }
+}
+
+// ============================================================
+// VISUAL ENGINE — VAGAL ORB (Three.js)
+// ============================================================
+
+function initVisualEngine() {
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x000000, 0.015);
+  clock = new THREE.Clock();
+
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 0, 18);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 1);
+  document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+  orbGroup = new THREE.Group();
+  scene.add(orbGroup);
+
+  // Create 7 concentric shield rings
+  for (let i = 0; i < 7; i++) {
+    const radius = 2.0 + i * 1.2;
+    const ringGeo = new THREE.TorusGeometry(radius, 0.04, 16, 128);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: RING_COLORS[i],
+      transparent: true,
+      opacity: 0.3,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI / 2 + (i * 0.05);
+    orbGroup.add(ring);
+    ringMeshes.push(ring);
+  }
+
+  // Create particle systems for each ring
+  for (let i = 0; i < 7; i++) {
+    const count = 800;
+    const radius = 2.0 + i * 1.2;
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+
+    const c = RING_COLORS[i];
+    for (let j = 0; j < count; j++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = (Math.random() - 0.5) * 0.5;
+      const r = radius + (Math.random() - 0.5) * 0.3;
+      positions[j * 3] = r * Math.cos(theta) * Math.cos(phi);
+      positions[j * 3 + 1] = r * Math.sin(phi);
+      positions[j * 3 + 2] = r * Math.sin(theta) * Math.cos(phi);
+      colors[j * 3] = c.r;
+      colors[j * 3 + 1] = c.g;
+      colors[j * 3 + 2] = c.b;
+      sizes[j] = Math.random() * 2 + 0.5;
+    }
+
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+    const mat = new THREE.PointsMaterial({
+      size: 0.06,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.4,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+
+    const particles = new THREE.Points(geo, mat);
+    orbGroup.add(particles);
+    particleSystems.push(particles);
+  }
+
+  // Toroidal field lines
+  for (let i = 0; i < 12; i++) {
+    const curve = new THREE.CatmullRomCurve3(generateToroidalPoints(6, i * (Math.PI * 2 / 12)));
+    const geo = new THREE.TubeGeometry(curve, 80, 0.015, 4, true);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x334455,
+      transparent: true,
+      opacity: 0.15,
+      blending: THREE.AdditiveBlending,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    orbGroup.add(mesh);
+    toroidalLines.push(mesh);
+  }
+
+  // Ambient light glow at center
+  const centerGeo = new THREE.SphereGeometry(1.5, 32, 32);
+  const centerMat = new THREE.MeshBasicMaterial({
+    color: 0x221100,
+    transparent: true,
+    opacity: 0.3,
+  });
+  const centerOrb = new THREE.Mesh(centerGeo, centerMat);
+  centerOrb.name = 'center';
+  orbGroup.add(centerOrb);
+
+  window.addEventListener('resize', onResize);
+}
+
+function generateToroidalPoints(majorRadius, startAngle) {
+  const points = [];
+  const minorRadius = 8;
+  for (let i = 0; i <= 64; i++) {
+    const t = (i / 64) * Math.PI * 2;
+    const x = (majorRadius + minorRadius * Math.cos(t)) * Math.cos(startAngle + t * 0.5);
+    const y = minorRadius * Math.sin(t) * 0.6;
+    const z = (majorRadius + minorRadius * Math.cos(t)) * Math.sin(startAngle + t * 0.5);
+    points.push(new THREE.Vector3(x, y, z));
+  }
+  return points;
+}
+
+function updateVisuals(dt) {
+  const time = clock.getElapsedTime();
+  const r = state.ringSmoothed;
+
+  // Rotate orb slowly
+  orbGroup.rotation.y += 0.002 + state.vagalTone * 0.005;
+  orbGroup.rotation.x = Math.sin(time * 0.1) * 0.1;
+
+  // Update each ring
+  for (let i = 0; i < 7; i++) {
+    const ring = ringMeshes[i];
+    const activity = r[i];
+
+    // Opacity tracks activity
+    ring.material.opacity = 0.1 + activity * 0.7;
+
+    // Scale pulse
+    const pulse = 1 + activity * 0.08 * Math.sin(time * (3 + i));
+    ring.scale.set(pulse, pulse, pulse);
+
+    // R0 special: strobe in pulsed mode
+    if (i === 0 && state.mode === 'PULSED') {
+      ring.material.opacity = 0.1 + Math.abs(Math.sin(time * state.pulseRate * Math.PI)) * 0.8;
+    }
+
+    // R6 special: glows brighter in silence
+    if (i === 6) {
+      ring.material.opacity = 0.1 + activity * 0.9;
+    }
+
+    // Update ring color for R5 based on current vowel
+    if (i === 5 && state.currentVowel && VOWEL_COLORS[state.currentVowel]) {
+      ring.material.color.lerp(VOWEL_COLORS[state.currentVowel], 0.1);
+    }
+
+    // Tilt rings slightly based on activity
+    ring.rotation.x = Math.PI / 2 + i * 0.05 + Math.sin(time + i) * activity * 0.15;
+    ring.rotation.z = Math.cos(time * 0.5 + i * 0.7) * activity * 0.1;
+  }
+
+  // Update particles
+  for (let i = 0; i < 7; i++) {
+    const ps = particleSystems[i];
+    const activity = r[i];
+    ps.material.opacity = 0.1 + activity * 0.6;
+
+    // Animate particle positions
+    const positions = ps.geometry.attributes.position.array;
+    const radius = 2.0 + i * 1.2;
+    for (let j = 0; j < positions.length; j += 3) {
+      // Gentle orbital motion
+      const x = positions[j];
+      const z = positions[j + 2];
+      const angle = 0.003 * (1 + activity * 2);
+      positions[j] = x * Math.cos(angle) - z * Math.sin(angle);
+      positions[j + 2] = x * Math.sin(angle) + z * Math.cos(angle);
+
+      // R2 gate: particles stream through (outward drift when active)
+      if (i === 2 && activity > 0.3) {
+        const dist = Math.sqrt(positions[j] ** 2 + positions[j+1] ** 2 + positions[j+2] ** 2);
+        const drift = activity * 0.02;
+        positions[j] += (positions[j] / dist) * drift;
+        positions[j + 2] += (positions[j + 2] / dist) * drift;
+        // Reset particles that drift too far
+        if (dist > radius + 2) {
+          const theta = Math.random() * Math.PI * 2;
+          positions[j] = radius * Math.cos(theta);
+          positions[j + 1] = (Math.random() - 0.5) * 0.3;
+          positions[j + 2] = radius * Math.sin(theta);
+        }
+      }
+
+      // R3: expand on 'ah', contract on 'oh'
+      if (i === 3) {
+        const { f1 } = state.formants;
+        if (f1 > 600 && activity > 0.3) {
+          // ah = expand
+          const dist = Math.sqrt(positions[j] ** 2 + positions[j+1] ** 2 + positions[j+2] ** 2);
+          positions[j] += (positions[j] / dist) * 0.01;
+          positions[j + 2] += (positions[j + 2] / dist) * 0.01;
+        }
+      }
+
+      // R4: crystalline flash on pulsed input
+      if (i === 4 && state.mode === 'PULSED') {
+        positions[j + 1] += (Math.random() - 0.5) * 0.05 * activity;
+      }
+    }
+    ps.geometry.attributes.position.needsUpdate = true;
+
+    // R1: visual mode switch
+    if (i === 1) {
+      if (state.f0 > 50 && state.spectralCentroid < 2000) {
+        // Voiced: smooth continuous
+        ps.material.size = 0.05;
+      } else if (state.spectralCentroid > 3000) {
+        // Unvoiced: turbulent spray
+        ps.material.size = 0.03;
+        const posArr = ps.geometry.attributes.position.array;
+        for (let j = 1; j < posArr.length; j += 3) {
+          posArr[j] += (Math.random() - 0.5) * 0.05 * activity;
+        }
+      }
+    }
+  }
+
+  // Toroidal field lines: opacity tracks coherence
+  for (let i = 0; i < toroidalLines.length; i++) {
+    toroidalLines[i].material.opacity = 0.05 + state.coherence * 0.25;
+    toroidalLines[i].rotation.y += 0.001;
+  }
+
+  // Center orb: brightness tracks vagal tone
+  const center = orbGroup.getObjectByName('center');
+  if (center) {
+    const brightness = 0.1 + state.vagalTone * 0.4;
+    center.material.color.setRGB(brightness * 0.8, brightness * 0.5, brightness * 0.2);
+    center.material.opacity = 0.2 + state.vagalTone * 0.3;
+    center.scale.setScalar(1 + state.vagalTone * 0.3);
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ============================================================
+// HUD UPDATE
+// ============================================================
+
+function updateHUD() {
+  document.getElementById('m-tone').textContent = state.vagalTone.toFixed(2);
+
+  const modeEl = document.getElementById('m-mode');
+  modeEl.textContent = state.mode;
+  modeEl.className = 'value mode-' + state.mode.toLowerCase();
+
+  document.getElementById('m-coherence').textContent = state.coherence.toFixed(2);
+  document.getElementById('m-exhale').textContent = state.exhaleRatio.toFixed(2);
+  document.getElementById('m-pulse').textContent = state.pulseRate.toFixed(1);
+  document.getElementById('m-breath').textContent = state.breathRate.toFixed(1);
+  document.getElementById('m-sweep').textContent = Math.round(state.sweep * 100) + '%';
+  document.getElementById('m-psi').textContent = state.psiLevel.toFixed(2);
+
+  // Ring bars
+  for (let i = 0; i < 7; i++) {
+    document.getElementById('rb' + i).style.width = (state.ringSmoothed[i] * 100) + '%';
+  }
+
+  // Breath meter
+  const ratio = Math.min(state.exhaleRatio / 3, 1);
+  document.getElementById('breath-meter-fill').style.width = (ratio * 100) + '%';
+}
+
+// ============================================================
+// MAIN LOOP
+// ============================================================
+
+function mainLoop() {
+  if (!state.running) return;
+  const dt = clock.getDelta();
+
+  analyzeAudio();
+  updateHarmonicEngine();
+  updateVisuals(dt);
+
+  requestAnimationFrame(mainLoop);
+}
+
+// ============================================================
+// UTILITIES
+// ============================================================
+
+function bandEnergy(freqData, lowHz, highHz, binWidth) {
+  const lowBin = Math.floor(lowHz / binWidth);
+  const highBin = Math.min(Math.floor(highHz / binWidth), freqData.length - 1);
+  let energy = 0;
+  for (let i = lowBin; i <= highBin; i++) {
+    energy += Math.pow(10, freqData[i] / 10); // dB to linear power
+  }
+  return energy;
+}
+
+function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+
+document.getElementById('start-btn').addEventListener('click', startSystem);
+boot();
+
+})();
+</script>
+</body>
+</html>

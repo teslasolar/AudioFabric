@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena v3 — ULTIMATE RESONANCE COMBAT</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+
+/* === TOP HUD === */
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:14px 24px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.8),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:3px}
+.hud-r{align-items:flex-end;text-align:right}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#nick:hover{color:#ff0}
+#score{font-size:36px;color:#ff0;text-shadow:0 0 14px #f80,0 0 28px #f804}
+#combo{font-size:20px;color:#f80}
+#blastType{font-size:14px;color:#4af}
+#room{font-size:11px;color:#0ff}
+#peers{font-size:11px;color:#088}
+
+/* === RESONANCE DEPTH HUD === */
+#resHUD{position:fixed;left:20px;top:50%;transform:translateY(-50%);z-index:55;
+  pointer-events:none;opacity:0;transition:opacity 0.4s}
+#resHUD.on{opacity:1}
+#resKanji{font-size:90px;line-height:1;text-shadow:0 0 40px currentColor,0 0 80px currentColor,0 0 120px currentColor;
+  text-align:center;transition:color 0.3s}
+#resLabel{font-size:10px;color:#fff6;text-align:center;margin-top:4px;letter-spacing:2px}
+#resDepth{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.depth-layer{display:flex;align-items:center;gap:8px;opacity:0.2;transition:opacity 0.3s,transform 0.3s}
+.depth-layer.active{opacity:1;transform:translateX(4px)}
+.depth-layer.peak{opacity:1;transform:translateX(8px)}
+.depth-dot{width:12px;height:12px;border-radius:50%;border:2px solid;transition:background 0.3s,box-shadow 0.3s}
+.depth-layer.active .depth-dot{box-shadow:0 0 10px currentColor}
+.depth-layer.peak .depth-dot{background:currentColor;box-shadow:0 0 16px currentColor,0 0 32px currentColor}
+.depth-name{font-size:10px;letter-spacing:1px}
+.depth-mult{font-size:9px;color:#ff08;margin-left:auto}
+#resProgress{width:100%;height:3px;background:#111;border-radius:1px;margin-top:6px;overflow:hidden}
+#resProgressFill{height:100%;width:0%;background:#fff;transition:width 0.08s,background 0.3s;border-radius:1px}
+#resSustain{font-size:9px;color:#fff3;text-align:center;margin-top:4px;font-variant-numeric:tabular-nums}
+#resMultiplier{font-size:26px;color:#ff0;text-align:center;margin-top:6px;
+  text-shadow:0 0 12px #f80;opacity:0;transition:opacity 0.3s}
+#resMultiplier.on{opacity:1}
+
+/* === KANJI HUD === */
+#kanjiHUD{position:fixed;right:20px;top:50%;transform:translateY(-50%);z-index:55;
+  text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#kanjiHUD.on{opacity:1}
+#kanjiChar{font-size:70px;line-height:1;text-shadow:0 0 30px currentColor,0 0 60px currentColor}
+#kanjiName{font-size:10px;color:#fff8;margin-top:4px}
+#kanjiReading{font-size:8px;color:#fff4}
+
+/* === MORPH BALL === */
+#morphBall{position:fixed;right:16px;bottom:20px;z-index:55;pointer-events:none;
+  border-radius:50%;filter:drop-shadow(0 0 20px rgba(255,200,0,0.5))}
+
+/* === CHARGE AURA === */
+#chargeAura{position:fixed;left:50%;top:55%;transform:translate(-50%,-50%);z-index:5;
+  pointer-events:none;opacity:0;transition:opacity 0.3s}
+#chargeAura.on{opacity:1}
+
+/* === DAMAGE LAYER === */
+#dmgLayer{position:fixed;inset:0;z-index:60;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;text-shadow:0 0 10px currentColor,0 0 20px currentColor;
+  animation:dmgUp 1.6s ease-out forwards;pointer-events:none}
+@keyframes dmgUp{0%{opacity:1;transform:translateY(0) scale(1)}
+  60%{opacity:1;transform:translateY(-80px) scale(1.5)}
+  100%{opacity:0;transform:translateY(-160px) scale(2.2)}}
+
+/* === COMMENTARY === */
+#cmt{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:70;
+  background:rgba(0,0,0,0.9);border:2px solid #ff0;border-radius:16px;padding:12px 28px;
+  font-size:20px;color:#ff0;text-shadow:0 0 14px #f80;text-align:center;
+  max-width:700px;opacity:0;transition:opacity 0.3s;pointer-events:none}
+#cmt.show{opacity:1}
+
+/* === LEADERBOARD === */
+#lb{position:fixed;right:10px;top:60%;transform:translateY(-50%);z-index:50;
+  background:rgba(0,0,0,0.85);border:1px solid #ff03;border-radius:8px;padding:10px;
+  min-width:200px;display:none;font-size:11px}
+#lb.on{display:block}
+#lb h3{color:#ff0;font-size:14px;margin-bottom:6px;text-align:center;letter-spacing:3px}
+#lb .row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #ff01}
+#lb .row .n{color:#0ff}#lb .row .s{color:#ff0}
+#lb .me{color:#0f0 !important}
+
+/* === MODULE BADGES === */
+#modBadges{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:55;
+  display:flex;gap:6px;pointer-events:none;flex-wrap:wrap;justify-content:center;max-width:80%}
+.mod-badge{background:#0002;border:1px solid #0ff3;border-radius:4px;padding:2px 8px;
+  font-size:8px;color:#0ff8;letter-spacing:1px}
+.mod-badge.active{color:#0f0;border-color:#0f04}
+
+/* === POWER METER === */
+#powerMeter{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:55;
+  display:flex;gap:3px;align-items:flex-end;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#powerMeter.on{opacity:1}
+.pw-seg{width:6px;background:#222;border-radius:2px;transition:height 0.1s,background 0.3s}
+
+/* === LAYER-UP FLASH === */
+#layerFlash{position:fixed;inset:0;z-index:100;pointer-events:none;opacity:0;
+  transition:opacity 0.05s;background:radial-gradient(circle,rgba(255,255,255,0.4),transparent 60%)}
+#layerFlash.flash{opacity:1}
+
+/* === VERSION === */
+#version{position:fixed;bottom:6px;left:50%;transform:translateX(-50%);z-index:50;
+  font-size:9px;color:#333;letter-spacing:3px;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div class="hud-l">
+    <div id="score">0</div>
+    <div id="combo"></div>
+    <div id="blastType">—</div>
+  </div>
+  <div class="hud-r">
+    <div id="nick" onclick="changeNick()" title="Click to change name"></div>
+    <div id="room">v3</div>
+    <div id="peers"></div>
+  </div>
+</div>
+
+<!-- RESONANCE DEPTH HUD -->
+<div id="resHUD">
+  <div id="resKanji">気</div>
+  <div id="resLabel">RESONANCE</div>
+  <div id="resDepth"></div>
+  <div id="resProgress"><div id="resProgressFill"></div></div>
+  <div id="resSustain">0.0s</div>
+  <div id="resMultiplier">1x</div>
+</div>
+
+<!-- KANJI ELEMENT HUD -->
+<div id="kanjiHUD">
+  <div id="kanjiChar">気</div>
+  <div id="kanjiName">Spirit</div>
+  <div id="kanjiReading">KI</div>
+</div>
+
+<!-- MORPHING KI-BALL PREVIEW -->
+<canvas id="morphBall" width="180" height="180"></canvas>
+
+<!-- CHARGE AURA -->
+<canvas id="chargeAura" width="400" height="400"></canvas>
+
+<!-- POWER METER (bottom) -->
+<div id="powerMeter"></div>
+
+<div id="dmgLayer"></div>
+<div id="cmt"></div>
+<div id="layerFlash"></div>
+<div id="lb"><h3>KI ARENA v3</h3><div id="lbRows"></div></div>
+<div id="modBadges"></div>
+<div id="version">KI ARENA v3 — ULTIMATE RESONANCE</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+// ============================================================
+// KI ARENA v3 — ULTIMATE RESONANCE COMBAT
+//
+// The definitive edition. Combines:
+//   - HD visuals (6000 stars, 4000 vortex particles)
+//   - Resonance depth combat (5 layers)
+//   - Morphing ki-ball preview (shape-shifts per layer)
+//   - Charge aura visualization
+//   - Power meter segments
+//   - Layer-up screen flash
+//   - All communication modules
+//   - Enhanced commentary system
+// ============================================================
+
+import { KI } from '../modules/core.js';
+
+// HD visual modules
+import * as Scene from '../modules/hd-scene.js';
+import * as Vortex from '../modules/hd-vortex.js';
+import * as FX from '../modules/hd-fx.js';
+
+// Resonance depth system
+import * as Resonance from '../modules/resonance.js';
+import * as ResonanceSynths from '../modules/resonance-synths.js';
+
+// Shared modules
+import * as VoiceEngine from '../modules/voice-engine.js';
+import * as Kanji from '../modules/kanji.js';
+import * as KiBlasts from '../modules/ki-blasts.js';
+import * as EmojiSystem from '../modules/emoji-system.js';
+import * as MqttNet from '../modules/mqtt-net.js';
+import * as WebRTCNet from '../modules/webrtc-net.js';
+import * as Presence from '../modules/presence.js';
+import * as Camera from '../modules/camera.js';
+import * as ScreenShare from '../modules/screen-share.js';
+import * as Chat from '../modules/chat.js';
+
+// === PLAYER ===
+KI.player.name = KI.genHash();
+window.changeNick = function() {
+  const n = prompt('Enter nickname (max 16):', KI.player.name);
+  if (n && n.trim()) {
+    KI.player.name = n.trim().slice(0, 16);
+    document.getElementById('nick').textContent = KI.player.name;
+    KI.emit('broadcast', { type: 'nick', name: KI.player.name, score: KI.player.score });
+  }
+};
+
+// === BUILD RESONANCE DEPTH HUD ===
+function buildResHUD() {
+  const cont = document.getElementById('resDepth');
+  Resonance.LAYERS.forEach((layer, i) => {
+    const d = document.createElement('div');
+    d.className = 'depth-layer';
+    d.id = 'dL-' + i;
+    const c6 = '#' + layer.color.toString(16).padStart(6, '0');
+    d.innerHTML =
+      '<div class="depth-dot" style="color:' + c6 + ';border-color:' + c6 + '"></div>' +
+      '<span class="depth-name" style="color:' + c6 + '">' + layer.name.toUpperCase() + '</span>' +
+      '<span class="depth-mult">' + layer.mult + 'x</span>';
+    cont.appendChild(d);
+  });
+}
+
+// === BUILD POWER METER (24 segments) ===
+function buildPowerMeter() {
+  const cont = document.getElementById('powerMeter');
+  for (let i = 0; i < 24; i++) {
+    const seg = document.createElement('div');
+    seg.className = 'pw-seg';
+    seg.style.height = '4px';
+    cont.appendChild(seg);
+  }
+}
+
+// === RESONANCE HUD UPDATES ===
+let currentLayer = -1;
+KI.on('resonance:update', data => {
+  const resHUD = document.getElementById('resHUD');
+  if (data.activeLayer >= 0 || data.sustainTime > 0.1) {
+    resHUD.classList.add('on');
+  } else {
+    resHUD.classList.remove('on');
+  }
+
+  // update layer indicators
+  Resonance.LAYERS.forEach((layer, i) => {
+    const el = document.getElementById('dL-' + i);
+    if (!el) return;
+    el.classList.toggle('active', i <= data.activeLayer);
+    el.classList.toggle('peak', i === data.peakLayer && data.activeLayer >= 0);
+  });
+
+  // progress bar
+  const fill = document.getElementById('resProgressFill');
+  fill.style.width = (data.layerProgress * 100) + '%';
+  if (data.activeLayer >= 0)
+    fill.style.background = '#' + Resonance.LAYERS[data.activeLayer].color.toString(16).padStart(6, '0');
+
+  // sustain timer
+  document.getElementById('resSustain').textContent = data.sustainTime.toFixed(1) + 's';
+
+  // multiplier
+  const multEl = document.getElementById('resMultiplier');
+  if (data.multiplier > 1) {
+    multEl.classList.add('on');
+    multEl.textContent = Math.round(data.multiplier * 10) / 10 + 'x';
+    multEl.style.color = data.activeLayer >= 0 ?
+      '#' + Resonance.LAYERS[data.activeLayer].color.toString(16).padStart(6, '0') : '#ff0';
+  } else {
+    multEl.classList.remove('on');
+  }
+
+  // resonance kanji
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const kj = KANJI[data.vowel];
+  if (kj && data.activeLayer >= 0) {
+    document.getElementById('resKanji').textContent = kj.char;
+    document.getElementById('resKanji').style.color =
+      '#' + Resonance.LAYERS[data.activeLayer].color.toString(16).padStart(6, '0');
+    document.getElementById('resLabel').textContent =
+      Resonance.LAYERS[Math.max(0, data.activeLayer)].name.toUpperCase();
+  }
+
+  // power meter
+  updatePowerMeter(data);
+
+  currentLayer = data.activeLayer;
+});
+
+// === POWER METER UPDATE ===
+function updatePowerMeter(data) {
+  const pm = document.getElementById('powerMeter');
+  const segs = pm.children;
+  if (!segs.length) return;
+  if (data.sustainTime > 0.05) pm.classList.add('on');
+  else pm.classList.remove('on');
+
+  const power = Math.min(1, data.multiplier / 16);
+  const lit = Math.floor(power * 24);
+  for (let i = 0; i < 24; i++) {
+    if (i < lit) {
+      const t = i / 24;
+      const h = 8 + Math.round(t * 28);
+      let col;
+      if (t < 0.33) col = '#4488ff';
+      else if (t < 0.55) col = '#44ffaa';
+      else if (t < 0.75) col = '#ffaa00';
+      else if (t < 0.9) col = '#ff4444';
+      else col = '#ff00ff';
+      segs[i].style.height = h + 'px';
+      segs[i].style.background = col;
+      segs[i].style.boxShadow = '0 0 6px ' + col;
+    } else {
+      segs[i].style.height = '4px';
+      segs[i].style.background = '#222';
+      segs[i].style.boxShadow = 'none';
+    }
+  }
+}
+
+// === LAYER-UP FLASH ===
+KI.on('resonance:layerUp', data => {
+  const layerCmt = [
+    'Surface resonance locked...',
+    'Harmonic alignment!',
+    'DEEP RESONANCE ACHIEVED!',
+    'OVERTONE CASCADE!',
+    'S I N G U L A R I T Y'
+  ];
+  if (data.layer >= 1) showCmt(layerCmt[data.layer] || '');
+
+  // screen flash
+  const flash = document.getElementById('layerFlash');
+  const c = '#' + Resonance.LAYERS[data.layer].color.toString(16).padStart(6, '0');
+  flash.style.background = 'radial-gradient(circle,'+c+'44,transparent 60%)';
+  flash.classList.add('flash');
+  setTimeout(() => flash.classList.remove('flash'), 150);
+});
+
+// === MORPHING KI-BALL ===
+const morphCanvas = document.getElementById('morphBall');
+const mCtx = morphCanvas.getContext('2d');
+
+function drawMorphBall(t) {
+  const W = 180, cx = W / 2, cy = W / 2;
+  mCtx.clearRect(0, 0, W, W);
+
+  const layer = Math.max(0, currentLayer);
+  const lc = Resonance.LAYERS[layer]?.color || 0x4488ff;
+  const r = (lc >> 16) & 0xff, g = (lc >> 8) & 0xff, b = lc & 0xff;
+
+  // shape: circle -> hex -> pentagon -> square -> triangle
+  const sides = [0, 60, 5, 4, 3][layer];
+  const baseR = 40 + currentLayer * 6;
+  const wobble = Math.sin(t * 3) * 4;
+
+  // outer glow
+  const grad = mCtx.createRadialGradient(cx, cy, baseR * 0.5, cx, cy, baseR * 2.2);
+  grad.addColorStop(0, 'rgba('+r+','+g+','+b+',0.3)');
+  grad.addColorStop(1, 'rgba('+r+','+g+','+b+',0)');
+  mCtx.fillStyle = grad;
+  mCtx.beginPath(); mCtx.arc(cx, cy, baseR * 2.2, 0, Math.PI * 2); mCtx.fill();
+
+  // core ball
+  mCtx.save();
+  mCtx.translate(cx, cy);
+  mCtx.rotate(t * 0.5);
+  mCtx.beginPath();
+  if (sides === 0) {
+    mCtx.arc(0, 0, baseR + wobble, 0, Math.PI * 2);
+  } else {
+    for (let i = 0; i <= sides; i++) {
+      const a = (i / sides) * Math.PI * 2 - Math.PI / 2;
+      const rr = baseR + wobble + Math.sin(t * 5 + i) * 3;
+      if (i === 0) mCtx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      else mCtx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    mCtx.closePath();
+  }
+  mCtx.fillStyle = 'rgba('+r+','+g+','+b+',0.5)';
+  mCtx.strokeStyle = 'rgb('+r+','+g+','+b+')';
+  mCtx.lineWidth = 2;
+  mCtx.fill(); mCtx.stroke();
+
+  // hot core
+  const coreGrad = mCtx.createRadialGradient(0, 0, 0, 0, 0, baseR * 0.6);
+  coreGrad.addColorStop(0, 'rgba(255,255,255,0.9)');
+  coreGrad.addColorStop(0.4, 'rgba('+r+','+g+','+b+',0.4)');
+  coreGrad.addColorStop(1, 'rgba('+r+','+g+','+b+',0)');
+  mCtx.fillStyle = coreGrad;
+  mCtx.beginPath(); mCtx.arc(0, 0, baseR * 0.6, 0, Math.PI * 2); mCtx.fill();
+
+  // orbiting sparks
+  const sparkCount = 4 + layer * 2;
+  for (let i = 0; i < sparkCount; i++) {
+    const a = (i / sparkCount) * Math.PI * 2 + t * 2;
+    const sr = baseR + 12 + Math.sin(t * 4 + i * 2) * 8;
+    const sx = Math.cos(a) * sr, sy = Math.sin(a) * sr;
+    mCtx.beginPath();
+    mCtx.arc(sx, sy, 2 + Math.sin(t * 6 + i) * 1.5, 0, Math.PI * 2);
+    mCtx.fillStyle = 'rgba(255,255,255,' + (0.5 + Math.sin(t * 4 + i) * 0.3) + ')';
+    mCtx.fill();
+  }
+
+  // kanji overlay
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const kj = KANJI[KI.voice?.vowel || 'ah'];
+  if (kj && currentLayer >= 0) {
+    mCtx.fillStyle = 'rgba(255,255,255,' + (0.6 + Math.sin(t * 3) * 0.3) + ')';
+    mCtx.font = 'bold ' + (20 + layer * 4) + 'px serif';
+    mCtx.textAlign = 'center'; mCtx.textBaseline = 'middle';
+    mCtx.fillText(kj.char, 0, 0);
+  }
+
+  mCtx.restore();
+}
+
+// === CHARGE AURA ===
+const auraCanvas = document.getElementById('chargeAura');
+const aCtx = auraCanvas.getContext('2d');
+
+function drawChargeAura(t) {
+  const W = 400, cx = W / 2, cy = W / 2;
+  aCtx.clearRect(0, 0, W, W);
+
+  if (currentLayer < 0) {
+    auraCanvas.classList.remove('on');
+    return;
+  }
+  auraCanvas.classList.add('on');
+
+  const lc = Resonance.LAYERS[currentLayer]?.color || 0x4488ff;
+  const r = (lc >> 16) & 0xff, g = (lc >> 8) & 0xff, b = lc & 0xff;
+  const intensity = 0.15 + currentLayer * 0.1;
+
+  // pulsing aura rings
+  for (let ring = 0; ring < 3 + currentLayer; ring++) {
+    const baseR = 60 + ring * 30 + Math.sin(t * 2 + ring * 0.8) * 15;
+    const alpha = intensity * (1 - ring / (3 + currentLayer));
+    aCtx.beginPath();
+    aCtx.arc(cx, cy, baseR, 0, Math.PI * 2);
+    aCtx.strokeStyle = 'rgba('+r+','+g+','+b+','+alpha+')';
+    aCtx.lineWidth = 3 - ring * 0.3;
+    aCtx.stroke();
+  }
+
+  // radial flares
+  const flares = 6 + currentLayer * 2;
+  for (let i = 0; i < flares; i++) {
+    const a = (i / flares) * Math.PI * 2 + t * 0.8;
+    const len = 80 + Math.sin(t * 3 + i * 1.3) * 40 + currentLayer * 20;
+    const grd = aCtx.createLinearGradient(cx, cy,
+      cx + Math.cos(a) * len, cy + Math.sin(a) * len);
+    grd.addColorStop(0, 'rgba('+r+','+g+','+b+','+intensity+')');
+    grd.addColorStop(1, 'rgba('+r+','+g+','+b+',0)');
+    aCtx.beginPath();
+    aCtx.moveTo(cx, cy);
+    aCtx.lineTo(cx + Math.cos(a - 0.08) * len, cy + Math.sin(a - 0.08) * len);
+    aCtx.lineTo(cx + Math.cos(a + 0.08) * len, cy + Math.sin(a + 0.08) * len);
+    aCtx.closePath();
+    aCtx.fillStyle = grd;
+    aCtx.fill();
+  }
+}
+
+// === RESONANCE RELEASE -> BLAST ===
+KI.on('resonance:release', data => {
+  const auraPos = KI._scene?.aura?.position || new THREE.Vector3(0, 2.5, 5);
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const kj = KANJI[data.vowel];
+  const blastType = kj?.blast || 'kiball';
+
+  KI.voice.chargeLevel = Math.min(1, data.multiplier / 8);
+  KI.voice.energy = Math.max(KI.voice.energy, data.multiplier * 0.05);
+
+  const blastMod = KI.get('ki-blasts');
+  if (blastMod) blastMod.fireBlast(blastType, Math.min(1, data.multiplier / 4), auraPos);
+
+  // depth bonus with coherence scaling
+  const depthBonus = Math.round(data.multiplier * 60 * (1 + data.coherenceBonus));
+  KI.player.score += depthBonus;
+  document.getElementById('score').textContent = KI.player.score.toLocaleString();
+
+  // commentary for deep layers
+  if (data.layer >= 4) showCmt('SINGULARITY RELEASE! ' + Math.round(data.multiplier) + 'x POWER!');
+  else if (data.layer >= 3) showCmt('OVERTONE CASCADE! ' + Math.round(data.multiplier) + 'x!');
+  else if (data.layer >= 2) showCmt('DEEP RESONANCE! ' + Math.round(data.multiplier) + 'x!');
+});
+
+// === CHARGE HUD ===
+KI.on('charge:update', data => {
+  document.getElementById('blastType').textContent = data.blastType.name;
+  const kanji = KI.get('kanji');
+  const KANJI = kanji?.KANJI || {};
+  const khud = document.getElementById('kanjiHUD');
+  if (KI.voice.vowel && KI.voice.sounding && KANJI[KI.voice.vowel]) {
+    const kj = KANJI[KI.voice.vowel];
+    khud.classList.add('on');
+    document.getElementById('kanjiChar').textContent = kj.char;
+    document.getElementById('kanjiChar').style.color = kj.color;
+    document.getElementById('kanjiName').textContent = kj.name;
+    document.getElementById('kanjiReading').textContent = kj.reading;
+  } else { khud.classList.remove('on'); }
+});
+
+// === HIT + DAMAGE ===
+KI.on('hit', data => {
+  document.getElementById('score').textContent = KI.player.score.toLocaleString();
+  document.getElementById('combo').textContent = KI.player.combo > 1 ? KI.player.combo + 'x COMBO' : '';
+  showDmg(data.dmg, data.type);
+  if (data.dmg > 400) showCmt(pickCmt('bigHit'));
+  if (data.combo === 5 || data.combo === 10 || data.combo === 20 || data.combo === 50)
+    showCmt(pickCmt('combo'));
+});
+
+KI.on('ko', () => showCmt(pickCmt('ko')));
+
+function showDmg(amount, type) {
+  const kanji = KI.get('kanji');
+  const blasts = KI.get('ki-blasts');
+  const KANJI = kanji?.KANJI || {};
+  const BLAST_TYPES = blasts?.BLAST_TYPES || {};
+  const el = document.createElement('div'); el.className = 'dmg';
+  const bt = BLAST_TYPES[type];
+  const kj = KANJI[bt?.vowel || 'mm'];
+  el.textContent = (kj ? kj.char + ' ' : '') + Math.round(amount);
+  const c = bt ? '#' + bt.color.toString(16).padStart(6, '0') : '#ff0';
+  el.style.color = c;
+  el.style.fontSize = (22 + Math.min(amount / 7, 40)) + 'px';
+  el.style.left = (KI.W / 2 + (Math.random() - 0.5) * 160) + 'px';
+  el.style.top = (KI.H / 2 - 60 + (Math.random() - 0.5) * 60) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1600);
+}
+
+// === COMMENTARY ===
+const CMT = {
+  bigHit: ["INCREDIBLE POWER!", "DEVASTATING FORCE!", "UNBELIEVABLE!", "ABSOLUTE DEVASTATION!", "MAXIMUM OUTPUT!"],
+  combo: ["UNSTOPPABLE COMBO!", "RELENTLESS!", "COMBO MASTER!", "INFINITE CHAIN!", "BEYOND LIMITS!"],
+  ko: ["TARGET ANNIHILATED!", "全滅 OBLITERATED!", "SUPREME VICTORY!", "完全勝利 TOTAL DOMINATION!"]
+};
+function pickCmt(ev) { const a = CMT[ev]; return a[Math.floor(Math.random() * a.length)]; }
+let cmtTimeout = null;
+function showCmt(text) {
+  if (cmtTimeout) return;
+  if (text.length > 80) text = text.slice(0, 80) + '...';
+  const el = document.getElementById('cmt'); el.textContent = text; el.classList.add('show');
+  cmtTimeout = setTimeout(() => { el.classList.remove('show'); cmtTimeout = null; }, 3000);
+}
+
+function showModuleBadge(name) {
+  const b = document.createElement('div'); b.className = 'mod-badge active';
+  b.textContent = name.toUpperCase();
+  document.getElementById('modBadges').appendChild(b);
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+async function boot() {
+  document.getElementById('nick').textContent = KI.player.name;
+  document.getElementById('hud').classList.add('on');
+  document.getElementById('lb').classList.add('on');
+
+  // 1. HD Scene (8000 stars — more than v2)
+  Scene.init({ stars: 8000 });
+  showModuleBadge('hd-scene');
+
+  // 2. Kanji
+  Kanji.init();
+  showModuleBadge('kanji');
+
+  // 3. Resonance depth system
+  Resonance.init();
+  buildResHUD();
+  showModuleBadge('resonance');
+
+  // 4. HD Vortex (4000 particles — dense)
+  Vortex.init({ count: 4000, particleSize: 0.13 });
+  showModuleBadge('hd-vortex');
+
+  // 5. Ki Blasts
+  KiBlasts.init();
+  showModuleBadge('blasts');
+
+  // 6. Emoji
+  EmojiSystem.init();
+  showModuleBadge('emoji');
+
+  // 7. HD FX (aurora + lightning)
+  FX.init({ aurora: true });
+  showModuleBadge('hd-fx');
+
+  // 8. Resonance Synths
+  ResonanceSynths.init();
+  showModuleBadge('res-synths');
+
+  // 9. Power meter
+  buildPowerMeter();
+
+  // 10. Voice engine
+  try {
+    await VoiceEngine.init();
+    showModuleBadge('voice');
+  } catch (e) { console.warn('Voice init failed:', e); }
+
+  // 11. Networking
+  MqttNet.init({ room: 'ARENA-V3' });
+  showModuleBadge('mqtt');
+  WebRTCNet.init({ room: 'ARENA-V3' });
+  showModuleBadge('webrtc');
+
+  // 12. Presence
+  Presence.init();
+  showModuleBadge('presence');
+
+  // 13. Camera + Screen Share + Chat
+  Camera.init();
+  showModuleBadge('camera');
+  ScreenShare.init();
+  showModuleBadge('screen');
+  Chat.init();
+  showModuleBadge('chat');
+
+  // === MAIN LOOP ===
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    drawMorphBall(t);
+    drawChargeAura(t);
+    KI.renderer.render(KI.scene, KI.camera);
+  })();
+
+  console.log('%c KI ARENA v3 — ULTIMATE RESONANCE ', 'background:#000;color:#ff0;font-size:22px;padding:12px;text-shadow:0 0 12px #f80,0 0 24px #ff04');
+  console.log('Modules:', Object.keys(KI._modules).join(', '));
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AudioFabric — SOCIAL</title>
+<link rel="stylesheet" href="../shared/styles.css">
+<style>
+body{overflow-y:auto;overflow-x:hidden}
+canvas#c{position:fixed;z-index:0;pointer-events:none}
+#header{position:fixed;top:0;left:0;right:0;z-index:100;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,rgba(0,0,0,0.9),transparent);pointer-events:none}
+#header *{pointer-events:auto}
+#back{font-size:11px;color:#666;cursor:pointer;text-decoration:none;letter-spacing:2px}
+#back:hover{color:#ff0}
+#cat-title{font-size:16px;letter-spacing:4px;text-transform:uppercase;color:#ff0}
+#cat-sub{font-size:9px;color:#555;letter-spacing:2px}
+#main{position:relative;z-index:10;padding:70px 24px 40px;max-width:1000px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:20px}
+.card{background:rgba(255,255,255,0.02);border:1px solid #1a1a2e;border-radius:10px;padding:18px;cursor:pointer;transition:all 0.3s;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:#ff0;opacity:0.5;border-radius:10px 10px 0 0}
+.card:hover{border-color:#ff04;transform:translateY(-2px);box-shadow:0 4px 20px #ff01}
+.card h3{font-size:14px;color:#ff0;margin-bottom:4px}
+.card p{font-size:10px;color:#666;line-height:1.4}
+#voice-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:200px;height:3px;background:#111;border-radius:2px;overflow:hidden;z-index:50}
+#voice-fill{height:100%;width:0%;background:linear-gradient(90deg,#ff0,#fff);border-radius:2px;transition:width 0.1s}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="header">
+  <a id="back" href="../">&#x2190; AUDIOFABRIC</a>
+  <div style="text-align:right">
+    <div id="cat-title">&#x1F465; SOCIAL</div>
+    <div id="cat-sub">6 experiences</div>
+  </div>
+</div>
+<div id="main">
+  <div class="grid" id="grid"></div>
+</div>
+<div id="voice-bar"><div id="voice-fill"></div></div>
+<div id="af-toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+import { KI } from '../modules/core.js';
+import * as Scene from '../modules/scene.js';
+import * as VoiceEngine from '../modules/voice-engine.js';
+
+const FILES = [
+  { file: 'voice-room.html', name: 'Voice Room', desc: 'Voice chat room' },
+  { file: 'ki-arena-voice-plus-v2.html', name: 'Voice Plus v2', desc: 'Enhanced voice chat' },
+  { file: 'ki-arena-plus-chat.html', name: 'Chat Arena', desc: 'Chat arena' },
+  { file: 'ki-arena-plus-voice.html', name: 'Voice+ Arena', desc: 'Voice+ arena' },
+  { file: 'ki-arena-voice-tools.html', name: 'Voice Tools', desc: 'Voice tools' },
+  { file: 'ki-arena-story-world.html', name: 'Story World', desc: 'Story world' },
+];
+
+const grid = document.getElementById('grid');
+for (const f of FILES) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `<h3>${f.name}</h3><p>${f.desc}</p>`;
+  card.onclick = () => { document.body.style.opacity='0'; setTimeout(()=>location.href=f.file, 300); };
+  grid.appendChild(card);
+}
+
+async function boot() {
+  Scene.init({ stars: 1500 });
+  try { await VoiceEngine.init(); } catch(e) {}
+  KI.running = true;
+  const clock = KI.clock;
+  (function anim() {
+    requestAnimationFrame(anim);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    const e = KI.voice.energy || 0;
+    const fill = document.getElementById('voice-fill');
+    if (fill) fill.style.width = (e * 100) + '%';
+    KI.renderer.render(KI.scene, KI.camera);
+  })();
+}
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

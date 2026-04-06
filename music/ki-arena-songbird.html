@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Songbird — Singing AI Companion</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#06060e;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+
+/* ===== MAIN LAYOUT ===== */
+#ui{position:fixed;inset:0;z-index:40;pointer-events:none;display:flex;flex-direction:column}
+#ui *{pointer-events:auto}
+
+/* ===== TOP BAR ===== */
+#topbar{height:40px;display:flex;align-items:center;padding:0 16px;gap:12px;
+  background:linear-gradient(180deg,rgba(10,8,20,0.9),rgba(10,8,20,0.3));pointer-events:auto}
+#topbar .title{font-size:14px;letter-spacing:2px;
+  background:linear-gradient(90deg,#ff88cc,#88ccff,#ffaa66);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#topbar .emotion{font-size:11px;color:#888;margin-left:auto}
+#topbar .model-status{font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid #333}
+.model-status.loading{color:#ffaa22;border-color:#ffaa22}
+.model-status.ready{color:#44ff88;border-color:#44ff88}
+.model-status.idle{color:#555;border-color:#333}
+
+/* ===== SINGING WAVEFORM / AURA DISPLAY ===== */
+#aura-ring{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:30;
+  pointer-events:none;width:300px;height:300px}
+
+/* ===== CHAT / CONVERSATION ===== */
+#chat-area{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:50;
+  width:600px;max-width:90vw;display:flex;flex-direction:column;gap:8px}
+#messages{max-height:260px;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;
+  scrollbar-width:thin;scrollbar-color:#333 transparent;mask-image:linear-gradient(transparent,#000 30px,#000)}
+.msg{padding:6px 12px;border-radius:12px;font-size:13px;line-height:1.4;max-width:85%;
+  animation:msgIn 0.3s ease-out}
+@keyframes msgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{align-self:flex-end;background:rgba(68,136,255,0.15);border:1px solid rgba(68,136,255,0.2);color:#aaccff}
+.msg.ai{align-self:flex-start;background:rgba(255,136,204,0.1);border:1px solid rgba(255,136,204,0.15);color:#ffccee}
+.msg.ai .singing-tag{font-size:9px;color:#ff88cc;margin-bottom:2px;display:block}
+.msg.system{align-self:center;font-size:10px;color:#555;font-style:italic;border:none;background:none}
+.msg .emotion-tag{font-size:9px;padding:1px 6px;border-radius:8px;margin-left:6px;
+  background:rgba(255,255,255,0.05);color:#888}
+
+/* ===== INPUT ===== */
+#input-row{display:flex;gap:8px;align-items:center}
+#text-input{flex:1;background:rgba(20,18,35,0.8);border:1px solid #2a2a3e;color:#ccd;
+  padding:10px 14px;border-radius:20px;font:13px 'Courier New',monospace;outline:none;
+  transition:border-color 0.3s}
+#text-input:focus{border-color:#ff88cc}
+#text-input::placeholder{color:#444}
+.ctrl-btn{width:36px;height:36px;border-radius:50%;border:1px solid #333;background:rgba(20,18,35,0.8);
+  color:#888;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all 0.2s}
+.ctrl-btn:hover{border-color:#ff88cc;color:#ff88cc;background:rgba(255,136,204,0.05)}
+.ctrl-btn.active{border-color:#44ff88;color:#44ff88;background:rgba(68,255,136,0.05)}
+.ctrl-btn.recording{border-color:#ff4466;color:#ff4466;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,68,102,0.3)}50%{box-shadow:0 0 0 8px rgba(255,68,102,0)}}
+
+/* ===== SIDE PANELS ===== */
+#left-panel{position:fixed;left:12px;top:50%;transform:translateY(-50%);z-index:45;
+  display:flex;flex-direction:column;gap:6px;pointer-events:auto}
+#right-panel{position:fixed;right:12px;top:50%;transform:translateY(-50%);z-index:45;
+  display:flex;flex-direction:column;gap:6px;pointer-events:auto;align-items:flex-end}
+
+/* Voice meters */
+#voice-meter{display:flex;flex-direction:column;gap:3px;padding:8px;
+  background:rgba(10,8,20,0.8);border:1px solid #1a1a2e;border-radius:8px;width:130px}
+.meter-row{display:flex;align-items:center;gap:6px;font-size:9px}
+.meter-label{width:28px;color:#666;text-align:right}
+.meter-bar{flex:1;height:4px;background:#111;border-radius:2px;overflow:hidden}
+.meter-fill{height:100%;border-radius:2px;transition:width 0.06s}
+
+/* Harmony controls */
+#harmony-ctrl{padding:8px;background:rgba(10,8,20,0.8);border:1px solid #1a1a2e;border-radius:8px;
+  display:flex;flex-direction:column;gap:4px;width:120px}
+#harmony-ctrl label{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:1px}
+.harm-btn{padding:3px 8px;font:10px monospace;background:rgba(255,255,255,0.03);
+  border:1px solid #222;border-radius:4px;color:#777;cursor:pointer;transition:all 0.2s;text-align:left}
+.harm-btn:hover{border-color:#ff88cc;color:#ff88cc}
+.harm-btn.active{border-color:#44ff88;color:#44ff88;background:rgba(68,255,136,0.05)}
+
+/* Model picker */
+#model-ctrl{padding:8px;background:rgba(10,8,20,0.8);border:1px solid #1a1a2e;border-radius:8px;
+  display:flex;flex-direction:column;gap:4px;width:130px}
+#model-ctrl label{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:1px}
+#model-ctrl select{background:#0e0e1a;color:#aaa;border:1px solid #222;border-radius:4px;
+  padding:3px;font:10px monospace;outline:none}
+#model-ctrl .prog{font-size:9px;color:#ffaa22;margin-top:2px}
+
+/* Singing status */
+#sing-status{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(160px);
+  z-index:42;text-align:center;pointer-events:none}
+#sing-note{font-size:22px;color:#ff88cc;text-shadow:0 0 20px #ff88cc80;opacity:0;transition:opacity 0.3s}
+#sing-note.on{opacity:1}
+#sing-vowel{font-size:12px;color:#888;margin-top:4px}
+#sing-tier{font-size:10px;color:#555;margin-top:2px}
+
+/* Listening indicator */
+#listening{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);z-index:45;
+  font-size:10px;color:#ff88cc80;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#listening.on{opacity:1}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="topbar">
+    <span class="title">SONGBIRD</span>
+    <span class="emotion" id="emotionDisplay">listening...</span>
+    <span class="model-status idle" id="modelStatus">no model</span>
+  </div>
+</div>
+
+<div id="left-panel">
+  <div id="voice-meter">
+    <div class="meter-row"><span class="meter-label">VOL</span><div class="meter-bar"><div class="meter-fill" id="m-vol" style="width:0;background:#44ff88"></div></div></div>
+    <div class="meter-row"><span class="meter-label">PITCH</span><div class="meter-bar"><div class="meter-fill" id="m-pitch" style="width:0;background:#ffaa22"></div></div></div>
+    <div class="meter-row"><span class="meter-label">TONE</span><div class="meter-bar"><div class="meter-fill" id="m-tone" style="width:0;background:#ff88cc"></div></div></div>
+    <div class="meter-row"><span class="meter-label">HOLD</span><div class="meter-bar"><div class="meter-fill" id="m-sustain" style="width:0;background:#88ccff"></div></div></div>
+    <div class="meter-row"><span class="meter-label">VOWEL</span><div class="meter-bar"><div class="meter-fill" id="m-vowel" style="width:0;background:#aa88ff"></div></div></div>
+  </div>
+  <div id="harmony-ctrl">
+    <label>Harmony</label>
+    <button class="harm-btn" data-harm="off" onclick="setHarmony('off')">Off</button>
+    <button class="harm-btn" data-harm="third" onclick="setHarmony('third')">3rd</button>
+    <button class="harm-btn" data-harm="fifth" onclick="setHarmony('fifth')">5th</button>
+    <button class="harm-btn" data-harm="octave" onclick="setHarmony('octave')">Octave</button>
+    <button class="harm-btn" data-harm="sixth" onclick="setHarmony('sixth')">6th</button>
+  </div>
+</div>
+
+<div id="right-panel">
+  <div id="model-ctrl">
+    <label>AI Model</label>
+    <select id="modelSelect">
+      <option value="">— none —</option>
+    </select>
+    <button class="ctrl-btn" onclick="loadModel()" title="Load model" style="width:100%;border-radius:4px;height:24px;font-size:10px">LOAD</button>
+    <div class="prog" id="modelProg"></div>
+  </div>
+</div>
+
+<div id="sing-status">
+  <div id="sing-note"></div>
+  <div id="sing-vowel"></div>
+  <div id="sing-tier"></div>
+</div>
+<div id="listening">listening to you...</div>
+
+<div id="chat-area">
+  <div id="messages"></div>
+  <div id="input-row">
+    <button class="ctrl-btn" id="micBtn" onclick="toggleSpeechRecog()" title="Voice input">🎤</button>
+    <input id="text-input" type="text" placeholder="Type or speak... she'll sing back ♪" maxlength="300" autocomplete="off">
+    <button class="ctrl-btn" id="singBtn" onclick="toggleAutoSing()" title="Toggle singing responses">♪</button>
+    <button class="ctrl-btn" id="sendBtn" onclick="sendMessage()" title="Send">→</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+import { KI } from '../modules/core.js';
+import * as Scene from '../modules/scene.js';
+import * as VoiceEngine from '../modules/voice-engine.js';
+import * as Kanji from '../modules/kanji.js';
+import * as Vortex from '../modules/vortex.js';
+import * as FX from '../modules/fx.js';
+import * as Synths from '../modules/synths.js';
+import * as Resonance from '../modules/resonance.js';
+import * as FreqBands from '../modules/freq-bands-12.js';
+import * as GeoFolder from '../modules/geo-folder.js';
+import * as SingingVoice from '../modules/singing-voice.js';
+import * as WebLLM from '../modules/web-llm-engine.js';
+
+// ============================================================
+// GLOBALS
+// ============================================================
+let autoSing = true;
+let speechRecog = null;
+let recognizing = false;
+let lastEmotionProfile = null;
+let llmReady = false;
+let conversationContext = [];
+
+// expose to onclick handlers
+window.toggleSpeechRecog = toggleSpeechRecog;
+window.toggleAutoSing = toggleAutoSing;
+window.sendMessage = sendMessage;
+window.setHarmony = setHarmony;
+window.loadModel = loadSelectedModel;
+
+// ============================================================
+// CHAT SYSTEM
+// ============================================================
+function addMessage(text, type, extra) {
+  const box = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + type;
+
+  if (type === 'ai' && extra?.singing) {
+    div.innerHTML = '<span class="singing-tag">♪ singing ♪</span>' + escHtml(text);
+  } else {
+    div.innerHTML = escHtml(text);
+  }
+
+  if (extra?.emotion) {
+    const tag = document.createElement('span');
+    tag.className = 'emotion-tag';
+    tag.textContent = extra.emotion;
+    div.appendChild(tag);
+  }
+
+  box.appendChild(div);
+  while (box.children.length > 60) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function sendMessage() {
+  const input = document.getElementById('text-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  addMessage(text, 'user', { emotion: lastEmotionProfile?.dominant });
+
+  if (llmReady) {
+    // get AI response with emotion context
+    try {
+      const emotionData = lastEmotionProfile || WebLLM.analyzeEmotion(KI.voice);
+      let reply = '';
+
+      addMessage('...', 'ai');
+      const aiMsg = document.getElementById('messages').lastChild;
+
+      reply = await WebLLM.chat(text, emotionData, {
+        stream: true,
+        onChunk: (delta, full) => {
+          aiMsg.innerHTML = escHtml(full);
+        }
+      });
+
+      // sing the response if auto-sing is on
+      if (autoSing && reply) {
+        aiMsg.innerHTML = '<span class="singing-tag">♪ singing ♪</span>' + escHtml(reply);
+        const singEmotion = emotionData.dominant === 'excitement' ? 'excited' :
+          emotionData.dominant === 'calm' ? 'gentle' :
+          emotionData.dominant === 'joy' ? 'happy' :
+          emotionData.dominant === 'sadness' ? 'sad' :
+          emotionData.dominant === 'anger' ? 'excited' : 'neutral';
+        SingingVoice.singResponse(reply, { emotion: singEmotion });
+
+        // also speak it via TTS for words
+        if (WebLLM.isSpeaking) WebLLM.stopSpeaking();
+        WebLLM.speak(reply, {
+          rate: 0.9,
+          pitch: 1.1,
+          volume: 0.4 // lower volume since singing is also playing
+        });
+      }
+    } catch (e) {
+      addMessage('(AI unavailable: ' + e.message + ')', 'system');
+    }
+  } else {
+    // no LLM — just sing the user's text back
+    addMessage("I don't have a brain yet, but I can still sing! ♪", 'ai');
+    if (autoSing) {
+      SingingVoice.singResponse(text, { emotion: 'playful' });
+    }
+  }
+}
+
+// ============================================================
+// SPEECH RECOGNITION
+// ============================================================
+function toggleSpeechRecog() {
+  const btn = document.getElementById('micBtn');
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    addMessage('Speech recognition not supported in this browser.', 'system');
+    return;
+  }
+
+  if (recognizing) {
+    speechRecog.stop();
+    recognizing = false;
+    btn.classList.remove('recording');
+    document.getElementById('listening').classList.remove('on');
+    return;
+  }
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  speechRecog = new SR();
+  speechRecog.continuous = true;
+  speechRecog.interimResults = true;
+  speechRecog.lang = 'en-US';
+
+  speechRecog.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        final += e.results[i][0].transcript;
+      } else {
+        interim += e.results[i][0].transcript;
+      }
+    }
+    document.getElementById('text-input').value = interim || final;
+    if (final) {
+      document.getElementById('text-input').value = final;
+      sendMessage();
+    }
+  };
+
+  speechRecog.onerror = (e) => {
+    if (e.error !== 'no-speech') {
+      addMessage('Speech error: ' + e.error, 'system');
+    }
+  };
+
+  speechRecog.onend = () => {
+    if (recognizing) {
+      speechRecog.start(); // restart if still active
+    }
+  };
+
+  speechRecog.start();
+  recognizing = true;
+  btn.classList.add('recording');
+  document.getElementById('listening').classList.add('on');
+}
+
+// ============================================================
+// HARMONY CONTROL
+// ============================================================
+function setHarmony(mode) {
+  document.querySelectorAll('.harm-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`.harm-btn[data-harm="${mode}"]`);
+  if (btn) btn.classList.add('active');
+
+  if (mode === 'off') {
+    SingingVoice.stopSinging();
+  } else {
+    SingingVoice.harmonizeWith(mode);
+  }
+}
+
+function toggleAutoSing() {
+  autoSing = !autoSing;
+  document.getElementById('singBtn').classList.toggle('active', autoSing);
+}
+
+// ============================================================
+// MODEL LOADING
+// ============================================================
+function populateModels() {
+  const sel = document.getElementById('modelSelect');
+  WebLLM.MODELS.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = `${m.label} (${m.vram}MB)`;
+    sel.appendChild(opt);
+  });
+}
+
+async function loadSelectedModel() {
+  const sel = document.getElementById('modelSelect');
+  const modelId = sel.value;
+  if (!modelId) {
+    addMessage('Select a model first.', 'system');
+    return;
+  }
+
+  const status = document.getElementById('modelStatus');
+  const prog = document.getElementById('modelProg');
+  status.className = 'model-status loading';
+  status.textContent = 'loading...';
+
+  addMessage(`Loading ${modelId}...`, 'system');
+
+  try {
+    await WebLLM.initEngine(modelId, {
+      onProgress: (p, msg) => {
+        prog.textContent = Math.round(p * 100) + '% — ' + (msg || '').slice(0, 40);
+        status.textContent = Math.round(p * 100) + '%';
+      },
+      onReady: () => {
+        status.className = 'model-status ready';
+        status.textContent = 'ready';
+        prog.textContent = '';
+        llmReady = true;
+        WebLLM.initTTS();
+        addMessage('AI loaded! Talk to me or type something — I\'ll sing back ♪', 'ai');
+      },
+      onError: (e) => {
+        status.className = 'model-status idle';
+        status.textContent = 'error';
+        prog.textContent = e.message;
+      }
+    });
+  } catch (e) {
+    addMessage('Failed to load model: ' + e.message, 'system');
+    status.className = 'model-status idle';
+    status.textContent = 'error';
+  }
+}
+
+// ============================================================
+// VOICE METERS + AURA VISUALIZATION
+// ============================================================
+function updateMeters() {
+  const v = KI.voice;
+  document.getElementById('m-vol').style.width = Math.min(100, v.rms * 500) + '%';
+  document.getElementById('m-pitch').style.width = (v.pn * 100) + '%';
+  document.getElementById('m-tone').style.width = (v.energy * 100) + '%';
+  document.getElementById('m-sustain').style.width = Math.min(100, v.sustain * 25) + '%';
+  document.getElementById('m-vowel').style.width = (v.vowel ? 80 : 0) + '%';
+
+  // emotion analysis
+  lastEmotionProfile = WebLLM.analyzeEmotion(v);
+  const emDisplay = document.getElementById('emotionDisplay');
+  if (v.sounding) {
+    emDisplay.textContent = lastEmotionProfile.description;
+    document.getElementById('listening').classList.add('on');
+  } else {
+    emDisplay.textContent = 'listening...';
+    if (!recognizing) document.getElementById('listening').classList.remove('on');
+  }
+
+  // singing status
+  const singState = KI.get('singing-voice')?.state;
+  const noteEl = document.getElementById('sing-note');
+  const vowelEl = document.getElementById('sing-vowel');
+  if (singState && singState.singing && singState.volume > 0.02) {
+    noteEl.classList.add('on');
+    const hz = Math.round(singState.currentNote);
+    const noteName = hzToNote(hz);
+    noteEl.textContent = '♪ ' + noteName + ' ♪';
+    noteEl.style.color = `hsl(${(hz * 0.5) % 360}, 80%, 70%)`;
+    vowelEl.textContent = singState.currentVowel;
+  } else {
+    noteEl.classList.remove('on');
+    vowelEl.textContent = '';
+  }
+
+  // band viz on geo-folder
+  const fb = KI.get('freq-bands-12');
+  if (fb) {
+    const tierEl = document.getElementById('sing-tier');
+    if (tierEl) {
+      const lvl = Math.round(fb.state.geoLevel);
+      const names = ['point','line','triangle','square','pentagon','hexagon',
+        'cube','octahedron','dodecahedron','icosahedron','tesseract','hypercube'];
+      tierEl.textContent = names[lvl] || '';
+    }
+  }
+}
+
+function hzToNote(hz) {
+  if (hz <= 0) return '—';
+  const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const midi = Math.round(12 * Math.log2(hz / 440) + 69);
+  return notes[midi % 12] + Math.floor(midi / 12 - 1);
+}
+
+// ============================================================
+// AURA CANVAS (2D overlay for singing visualization)
+// ============================================================
+let auraCanvas, auraCtx;
+
+function initAuraCanvas() {
+  auraCanvas = document.createElement('canvas');
+  auraCanvas.id = 'aura-canvas';
+  auraCanvas.width = 400;
+  auraCanvas.height = 400;
+  auraCanvas.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:35;pointer-events:none;opacity:0.6';
+  document.body.appendChild(auraCanvas);
+  auraCtx = auraCanvas.getContext('2d');
+}
+
+function drawAura(t) {
+  if (!auraCtx) return;
+  const c = auraCtx;
+  const w = 400, h = 400, cx = w/2, cy = h/2;
+  c.clearRect(0, 0, w, h);
+
+  const v = KI.voice;
+  const singState = KI.get('singing-voice')?.state;
+  const fb = KI.get('freq-bands-12')?.state;
+
+  // user voice ring
+  if (v.sounding) {
+    const r = 80 + v.energy * 60;
+    c.beginPath();
+    for (let i = 0; i <= 64; i++) {
+      const a = (i / 64) * Math.PI * 2;
+      const wobble = Math.sin(a * 6 + t * 4) * v.rms * 20;
+      const px = cx + Math.cos(a) * (r + wobble);
+      const py = cy + Math.sin(a) * (r + wobble);
+      i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
+    }
+    c.closePath();
+    c.strokeStyle = `hsla(${v.pn * 360}, 80%, 60%, ${0.3 + v.energy * 0.4})`;
+    c.lineWidth = 2;
+    c.stroke();
+  }
+
+  // singing voice ring (when she's singing)
+  if (singState && singState.singing && singState.volume > 0.02) {
+    const r = 100 + singState.volume * 80;
+    const hue = (singState.currentNote * 0.3 + t * 20) % 360;
+    c.beginPath();
+    for (let i = 0; i <= 64; i++) {
+      const a = (i / 64) * Math.PI * 2;
+      const wobble = Math.sin(a * 4 - t * 3) * singState.volume * 30;
+      const px = cx + Math.cos(a) * (r + wobble);
+      const py = cy + Math.sin(a) * (r + wobble);
+      i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
+    }
+    c.closePath();
+    c.strokeStyle = `hsla(${hue}, 70%, 70%, ${0.2 + singState.volume * 0.5})`;
+    c.lineWidth = 2.5;
+    c.stroke();
+
+    // inner glow
+    const grad = c.createRadialGradient(cx, cy, 20, cx, cy, r);
+    grad.addColorStop(0, `hsla(${hue}, 80%, 70%, ${singState.volume * 0.15})`);
+    grad.addColorStop(1, 'transparent');
+    c.fillStyle = grad;
+    c.fill();
+  }
+
+  // 12-band frequency ring segments
+  if (fb && fb.totalEnergy > 0.05) {
+    for (let i = 0; i < 12; i++) {
+      const a1 = (i / 12) * Math.PI * 2 - Math.PI / 2;
+      const a2 = ((i + 1) / 12) * Math.PI * 2 - Math.PI / 2;
+      const e = fb.energy[i] || 0;
+      if (e < 0.05) continue;
+      const r1 = 130;
+      const r2 = r1 + e * 60;
+      c.beginPath();
+      c.arc(cx, cy, r1, a1, a2);
+      c.arc(cx, cy, r2, a2, a1, true);
+      c.closePath();
+      const bandHue = (i / 12) * 360;
+      c.fillStyle = `hsla(${bandHue}, 70%, 55%, ${e * 0.5})`;
+      c.fill();
+    }
+  }
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+async function boot() {
+  // populate model picker
+  populateModels();
+
+  // set initial states
+  document.getElementById('singBtn').classList.add('active');
+
+  // init 3D scene
+  Scene.init({ stars: 3000, fogDensity: 0.006 });
+
+  // kanji
+  Kanji.init();
+
+  // vortex
+  Vortex.init({ count: 800, particleSize: 0.1 });
+
+  // fx
+  FX.init({ aurora: true });
+
+  // resonance
+  Resonance.init();
+
+  // 12-band freq
+  FreqBands.init();
+
+  // geo folder (smaller, centered)
+  GeoFolder.init({ position: [0, 2.5, -3], scale: 1.2 });
+
+  // singing voice synth
+  SingingVoice.init();
+
+  // synths for SFX
+  Synths.init();
+
+  // voice engine (mic)
+  try {
+    await VoiceEngine.init();
+  } catch (e) {
+    addMessage('Mic access needed for voice features.', 'system');
+  }
+
+  // init aura canvas
+  initAuraCanvas();
+
+  // enter key sends
+  document.getElementById('text-input').addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') sendMessage();
+  });
+
+  // start main loop
+  KI.running = true;
+  const clock = KI.clock;
+
+  function animate() {
+    if (!KI.running) return;
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t);
+    updateMeters();
+    drawAura(t);
+    KI.renderer.render(KI.scene, KI.camera);
+  }
+  animate();
+
+  addMessage('Welcome! I\'m Songbird — your singing companion. ♪', 'ai');
+  addMessage('Speak or type, and I\'ll sing back. Load an AI model for full conversation.', 'system');
+  addMessage('Try harmonizing — click a harmony interval on the left, then sing into your mic!', 'system');
+
+  console.log('%c SONGBIRD BOOTED ', 'background:#06060e;color:#ff88cc;font-size:20px;padding:10px');
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

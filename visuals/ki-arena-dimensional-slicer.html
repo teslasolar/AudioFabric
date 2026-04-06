@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena — Dimensional Slicer</title>
+<link rel="stylesheet" href="../shared/styles.css">
+<style>
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.7),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#polyName{font-size:18px;color:#88f;text-shadow:0 0 12px #44f}
+/* 4D rotation readout */
+#rotReadout{position:fixed;left:12px;bottom:12px;z-index:55;
+  background:rgba(0,0,0,0.7);border:1px solid #fff1;border-radius:6px;
+  padding:8px 12px;font-size:10px;color:#888;pointer-events:none}
+.rot-axis{display:flex;justify-content:space-between;gap:8px;padding:1px 0}
+.rot-label{color:#88f;width:24px}.rot-val{color:#aaa;font-family:monospace}
+.rot-bar{width:60px;height:3px;background:#111;border-radius:1px;overflow:hidden;align-self:center}
+.rot-fill{height:100%;background:#88f;border-radius:1px}
+/* Polytope pills */
+#polyPills{position:fixed;right:12px;top:50%;transform:translateY(-50%);z-index:55;
+  display:flex;flex-direction:column;gap:3px;pointer-events:none}
+.poly-pill{padding:3px 10px;font-size:9px;color:#448;border:1px solid #fff1;
+  border-radius:10px;background:rgba(0,0,0,0.4);transition:all 0.3s}
+.poly-pill.active{color:#88f;border-color:#88f4;background:rgba(30,20,80,0.4)}
+/* Stats */
+#dimStats{font-size:10px;color:#666}
+/* Dimension announce */
+#dimAnnounce{position:fixed;top:30%;left:50%;transform:translate(-50%,-50%);z-index:60;
+  font-size:28px;color:#88f;text-shadow:0 0 30px #44f,0 0 60px #44f4;
+  opacity:0;transition:opacity 0.3s;pointer-events:none;text-align:center}
+#dimAnnounce.show{opacity:1}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l">
+    <div style="font-size:10px;color:#666;letter-spacing:2px">4TH DIMENSION</div>
+    <div id="polyName">Tesseract</div>
+  </div>
+  <div class="hud-r">
+    <div id="nick" onclick="changeNick()"></div>
+    <div id="dimStats"></div>
+  </div>
+</div>
+<div id="rotReadout">
+  <div style="font-size:9px;color:#88f;margin-bottom:4px">4D ROTATION</div>
+  <div class="rot-axis"><span class="rot-label">XW</span><div class="rot-bar"><div class="rot-fill" id="rotXW"></div></div><span class="rot-val" id="rxw">0</span></div>
+  <div class="rot-axis"><span class="rot-label">YW</span><div class="rot-bar"><div class="rot-fill" id="rotYW"></div></div><span class="rot-val" id="ryw">0</span></div>
+  <div class="rot-axis"><span class="rot-label">ZW</span><div class="rot-bar"><div class="rot-fill" id="rotZW"></div></div><span class="rot-val" id="rzw">0</span></div>
+  <div style="margin-top:4px;font-size:9px;color:#555">Proj: <span id="projDist">3.0</span></div>
+</div>
+<div id="polyPills">
+  <div class="poly-pill active">Tesseract</div>
+  <div class="poly-pill">16-cell</div>
+  <div class="poly-pill">24-cell</div>
+  <div class="poly-pill">5-cell</div>
+  <div class="poly-pill">Dual Compound</div>
+</div>
+<div id="dimAnnounce"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+import { KI } from '../modules/core.js';
+import * as Scene from '../modules/scene.js';
+import * as VoiceEngine from '../modules/voice-engine.js';
+import * as FreqBands from '../modules/freq-bands-12.js';
+import * as Synths from '../modules/synths.js';
+import * as Resonance from '../modules/resonance.js';
+import * as DimensionalSlicer from '../modules/dimensional-slicer.js';
+import * as MqttNet from '../modules/mqtt-net.js';
+import * as WebRTCNet from '../modules/webrtc-net.js';
+import * as Presence from '../modules/presence.js';
+import * as Chat from '../modules/chat.js';
+import * as PlayerProfile from '../modules/player-profile.js';
+import * as NavOverlay from '../modules/nav-overlay.js';
+
+const ROOM = 'DIM4-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+KI.player.name = KI.genHash();
+document.getElementById('nick').textContent = KI.player.name;
+window.changeNick = function() {
+  const n = prompt('Nickname:', KI.player.name);
+  if (n && n.trim()) { KI.player.name = n.trim().slice(0,16); document.getElementById('nick').textContent = KI.player.name; }
+};
+
+let announceTimer = null;
+KI.on('dimensional-slicer:polytope-change', data => {
+  const el = document.getElementById('dimAnnounce');
+  el.textContent = data.name;
+  el.classList.add('show');
+  clearTimeout(announceTimer);
+  announceTimer = setTimeout(() => el.classList.remove('show'), 2500);
+});
+
+KI.on('dimensional-slicer:update', data => {
+  document.getElementById('polyName').textContent = data.polytope;
+  document.getElementById('dimStats').textContent = data.vertexCount + ' verts / ' + data.edgeCount + ' edges';
+
+  const normAngle = (a) => ((parseFloat(a) % 6.28 + 6.28) % 6.28) / 6.28 * 100;
+  document.getElementById('rotXW').style.width = normAngle(data.rotXW) + '%';
+  document.getElementById('rotYW').style.width = normAngle(data.rotYW) + '%';
+  document.getElementById('rotZW').style.width = normAngle(data.rotZW) + '%';
+  document.getElementById('rxw').textContent = data.rotXW;
+  document.getElementById('ryw').textContent = data.rotYW;
+  document.getElementById('rzw').textContent = data.rotZW;
+  document.getElementById('projDist').textContent = data.projDist;
+
+  const pills = document.querySelectorAll('.poly-pill');
+  pills.forEach(p => p.classList.remove('active'));
+  pills.forEach(p => { if (p.textContent === data.polytope) p.classList.add('active'); });
+});
+
+async function boot() {
+  document.getElementById('hud').classList.add('on');
+  Scene.init({ stars: 1500 });
+  try { await VoiceEngine.init(); } catch(e) { console.warn('voice:', e); }
+  FreqBands.init(); Synths.init(); Resonance.init();
+  DimensionalSlicer.init({ position: [0, 2.5, -4] });
+  MqttNet.init({ room: ROOM }); WebRTCNet.init({ room: ROOM });
+  Presence.init(); Chat.init(); PlayerProfile.init(); NavOverlay.init();
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return; requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t); KI.renderer.render(KI.scene, KI.camera);
+  })();
+  console.log('%c DIMENSIONAL SLICER BOOTED ', 'background:#000;color:#88f;font-size:22px;padding:12px');
+}
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

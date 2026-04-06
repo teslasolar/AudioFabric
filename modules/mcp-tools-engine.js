@@ -179,38 +179,38 @@ export function getPreviewableFiles() {
 // ─── AudioFabric Project Registry ───
 // Real HTML pages from the AudioFabric project that can be loaded in the preview iframe
 export const PROJECT_PAGES = [
-  { file: 'index.html',                 name: 'Audio Fabric Main',        cat: 'core',    desc: 'Vagal phoneme engine — the original' },
-  { file: 'kamehameha.html',            name: 'Kamehameha',               cat: 'game',    desc: 'Voice-powered energy beam (single player)' },
-  { file: 'kamehameha-duel.html',       name: 'Kamehameha Duel',          cat: 'game',    desc: 'P2P voice beam fighting with automatch' },
-  { file: 'voice-duel.html',            name: 'Voice Duel',               cat: 'game',    desc: '1v1 voice combat with resonance layers' },
-  { file: 'pvp-battle.html',            name: 'PvP Battle',               cat: 'game',    desc: 'Player vs player voice battle' },
-  { file: 'ki-arena-ultra.html',        name: 'Ki Arena Ultra',           cat: 'arena',   desc: 'HD multiplayer ki arena' },
-  { file: 'ki-arena-royale.html',       name: 'Ki Arena Royale',          cat: 'arena',   desc: 'Battle royale mode' },
-  { file: 'ki-arena-plus-voice.html',   name: 'Ki Arena + Voice',         cat: 'arena',   desc: 'Arena with voice chat' },
-  { file: 'ki-arena-plus-chat.html',    name: 'Ki Arena + Chat',          cat: 'arena',   desc: 'Arena with text chat' },
-  { file: 'ki-arena-boss-colossus.html',name: 'Boss: Colossus',           cat: 'boss',    desc: 'Giant boss fight' },
-  { file: 'ki-arena-boss-elemental.html',name:'Boss: Elemental',          cat: 'boss',    desc: 'Elemental boss fight' },
-  { file: 'ki-arena-boss-rush.html',    name: 'Boss Rush',                cat: 'boss',    desc: 'Sequential boss rush mode' },
-  { file: 'ki-arena-boss-void.html',    name: 'Boss: Void',               cat: 'boss',    desc: 'Void boss fight' },
-  { file: 'ki-arena.html',              name: 'Ki Arena (Original)',       cat: 'arena',   desc: 'Original ki arena' },
-  { file: 'ki-arena-v2.html',           name: 'Ki Arena v2',              cat: 'arena',   desc: 'Ki arena second version' },
-  { file: 'ki-arena-v3.html',           name: 'Ki Arena v3',              cat: 'arena',   desc: 'Ki arena third version' },
-  { file: 'ki-arena-plus.html',         name: 'Ki Arena Plus',            cat: 'arena',   desc: 'Enhanced ki arena' },
-  { file: 'voice-room.html',            name: 'Voice Room',               cat: 'social',  desc: 'Multiplayer voice hang space' },
-  { file: 'jam-session.html',           name: 'Jam Session',              cat: 'music',   desc: 'Collaborative music jamming' },
-  { file: 'sing-self.html',             name: 'Sing Self',                cat: 'music',   desc: 'Solo singing visualization' },
-  { file: 'sing-universe.html',         name: 'Sing Universe',            cat: 'music',   desc: 'Universal singing experience' },
-  { file: 'audio-gen.html',             name: 'Audio Gen',                cat: 'music',   desc: 'Audio generation playground' },
-  { file: 'zen-garden.html',            name: 'Zen Garden',               cat: 'relax',   desc: 'Meditative voice garden' },
-  { file: 'web-llm-arena.html',         name: 'WebLLM Arena',             cat: 'ai',      desc: 'LLM-powered arena experience' },
-  { file: 'web-llm-sandbox.html',       name: 'WebLLM Sandbox v1',        cat: 'ai',      desc: 'Voice-powered code builder (original)' },
-  { file: 'web-llm-sandbox-v2.html',    name: 'WebLLM Sandbox v2',        cat: 'ai',      desc: 'Enhanced code builder with editor+terminal' },
-  { file: 'risk-arena.html',            name: 'Risk Arena',               cat: 'game',    desc: 'Risk-style strategic arena' },
-  { file: 'd2r-runeword-arena.html',    name: 'D2R Runeword Arena',       cat: 'game',    desc: 'Diablo 2 runeword voice game' },
-  { file: 'periodic-table-arena.html',  name: 'Periodic Table Arena',     cat: 'game',    desc: 'Chemistry elements battle arena' },
-  { file: 'gcp-shield.html',            name: 'GCP Shield',               cat: 'visual',  desc: 'Geometric shield visualization' },
-  { file: 'thomas-shield.html',         name: 'Thomas Shield',            cat: 'visual',  desc: 'Shield visual effect' },
-  { file: 'shield-127d.html',           name: 'Shield 127D',              cat: 'visual',  desc: '127-dimensional shield display' }
+  { file: 'vagal/vagal-engine.html',              name: 'Audio Fabric Main',        cat: 'core',      desc: 'Vagal phoneme engine — the original' },
+  { file: 'combat/kamehameha.html',               name: 'Kamehameha',               cat: 'combat',    desc: 'Voice-powered energy beam (single player)' },
+  { file: 'combat/kamehameha-duel.html',           name: 'Kamehameha Duel',          cat: 'combat',    desc: 'P2P voice beam fighting with automatch' },
+  { file: 'combat/voice-duel.html',                name: 'Voice Duel',               cat: 'combat',    desc: '1v1 voice combat with resonance layers' },
+  { file: 'combat/pvp-battle.html',                name: 'PvP Battle',               cat: 'combat',    desc: 'Player vs player voice battle' },
+  { file: 'arena/ki-arena-ultra.html',             name: 'Ki Arena Ultra',           cat: 'arena',     desc: 'HD multiplayer ki arena' },
+  { file: 'arena/ki-arena-royale.html',            name: 'Ki Arena Royale',          cat: 'arena',     desc: 'Battle royale mode' },
+  { file: 'social/ki-arena-plus-voice.html',       name: 'Ki Arena + Voice',         cat: 'social',    desc: 'Arena with voice chat' },
+  { file: 'social/ki-arena-plus-chat.html',        name: 'Ki Arena + Chat',          cat: 'social',    desc: 'Arena with text chat' },
+  { file: 'boss/ki-arena-boss-colossus.html',      name: 'Boss: Colossus',           cat: 'boss',      desc: 'Giant boss fight' },
+  { file: 'boss/ki-arena-boss-elemental.html',     name: 'Boss: Elemental',          cat: 'boss',      desc: 'Elemental boss fight' },
+  { file: 'boss/ki-arena-boss-rush.html',          name: 'Boss Rush',                cat: 'boss',      desc: 'Sequential boss rush mode' },
+  { file: 'boss/ki-arena-boss-void.html',          name: 'Boss: Void',               cat: 'boss',      desc: 'Void boss fight' },
+  { file: 'arena/ki-arena.html',                   name: 'Ki Arena (Original)',       cat: 'arena',     desc: 'Original ki arena' },
+  { file: 'arena/ki-arena-v2.html',                name: 'Ki Arena v2',              cat: 'arena',     desc: 'Ki arena second version' },
+  { file: 'arena/ki-arena-v3.html',                name: 'Ki Arena v3',              cat: 'arena',     desc: 'Ki arena third version' },
+  { file: 'arena/ki-arena-plus.html',              name: 'Ki Arena Plus',            cat: 'arena',     desc: 'Enhanced ki arena' },
+  { file: 'social/voice-room.html',                name: 'Voice Room',               cat: 'social',    desc: 'Multiplayer voice hang space' },
+  { file: 'music/jam-session.html',                name: 'Jam Session',              cat: 'music',     desc: 'Collaborative music jamming' },
+  { file: 'music/sing-self.html',                  name: 'Sing Self',                cat: 'music',     desc: 'Solo singing visualization' },
+  { file: 'music/sing-universe.html',              name: 'Sing Universe',            cat: 'music',     desc: 'Universal singing experience' },
+  { file: 'music/audio-gen.html',                  name: 'Audio Gen',                cat: 'music',     desc: 'Audio generation playground' },
+  { file: 'worlds/zen-garden.html',                name: 'Zen Garden',               cat: 'worlds',    desc: 'Meditative voice garden' },
+  { file: 'ai/web-llm-arena.html',                 name: 'WebLLM Arena',             cat: 'ai',        desc: 'LLM-powered arena experience' },
+  { file: 'ai/web-llm-sandbox.html',               name: 'WebLLM Sandbox v1',        cat: 'ai',        desc: 'Voice-powered code builder (original)' },
+  { file: 'ai/web-llm-sandbox-v2.html',            name: 'WebLLM Sandbox v2',        cat: 'ai',        desc: 'Enhanced code builder with editor+terminal' },
+  { file: 'knowledge/risk-arena.html',             name: 'Risk Arena',               cat: 'knowledge', desc: 'Risk-style strategic arena' },
+  { file: 'knowledge/d2r-runeword-arena.html',     name: 'D2R Runeword Arena',       cat: 'knowledge', desc: 'Diablo 2 runeword voice game' },
+  { file: 'knowledge/periodic-table-arena.html',   name: 'Periodic Table Arena',     cat: 'knowledge', desc: 'Chemistry elements battle arena' },
+  { file: 'shields/gcp-shield.html',               name: 'GCP Shield',               cat: 'shields',   desc: 'Geometric shield visualization' },
+  { file: 'shields/thomas-shield.html',            name: 'Thomas Shield',            cat: 'shields',   desc: 'Shield visual effect' },
+  { file: 'shields/shield-127d.html',              name: 'Shield 127D',              cat: 'shields',   desc: '127-dimensional shield display' }
 ];
 
 export function listProjectPages(category) {
@@ -543,15 +543,15 @@ TO DELETE: \`\`\`delete /file.txt\`\`\`
 TO COMMIT: \`\`\`commit Added hello page\`\`\`
 TO LIST FILES: \`\`\`list\`\`\`
 
-TO LOAD AN AUDIOFABRIC PAGE into the preview iframe: \`\`\`load kamehameha.html\`\`\`
-TO BROWSE ALL PROJECT PAGES: \`\`\`browse\`\`\` or \`\`\`browse game\`\`\` (filter by category)
-TO FETCH SOURCE CODE of a project page: \`\`\`fetch voice-duel.html\`\`\`
+TO LOAD AN AUDIOFABRIC PAGE into the preview iframe: \`\`\`load combat/kamehameha.html\`\`\`
+TO BROWSE ALL PROJECT PAGES: \`\`\`browse\`\`\` or \`\`\`browse combat\`\`\` (filter by category)
+TO FETCH SOURCE CODE of a project page: \`\`\`fetch combat/voice-duel.html\`\`\`
 TO LOAD ANY URL: \`\`\`url https://example.com\`\`\`
 
-AVAILABLE PROJECT CATEGORIES: game, arena, boss, music, social, ai, visual, relax, core
-NOTABLE PAGES: kamehameha.html (voice beam), kamehameha-duel.html (P2P fight), voice-duel.html (1v1),
-  ki-arena-ultra.html (multiplayer arena), zen-garden.html (meditative), jam-session.html (music),
-  web-llm-arena.html (AI arena), sing-universe.html (singing)
+AVAILABLE PROJECT CATEGORIES: combat, arena, boss, music, social, ai, shields, worlds, knowledge, core
+NOTABLE PAGES: combat/kamehameha.html (voice beam), combat/kamehameha-duel.html (P2P fight), combat/voice-duel.html (1v1),
+  arena/ki-arena-ultra.html (multiplayer arena), worlds/zen-garden.html (meditative), music/jam-session.html (music),
+  ai/web-llm-arena.html (AI arena), music/sing-universe.html (singing)
 
 RULES:
 1. ALWAYS use code blocks to create files — never just describe what you would do

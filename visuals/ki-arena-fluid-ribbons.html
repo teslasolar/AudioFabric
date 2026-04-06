@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena — Fluid Ribbons</title>
+<link rel="stylesheet" href="../shared/styles.css">
+<style>
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.7),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#flowName{font-size:16px;color:#f48;text-shadow:0 0 12px #f48;text-transform:uppercase;letter-spacing:3px}
+#ribbonCount{font-size:11px;color:#888}
+#inkInfo{font-size:10px;color:#666}
+/* Flow pattern pills */
+#flowPills{position:fixed;right:12px;bottom:12px;z-index:55;
+  display:flex;gap:4px;pointer-events:none}
+.flow-pill{padding:3px 10px;font-size:9px;color:#644;border:1px solid #fff1;
+  border-radius:10px;background:rgba(0,0,0,0.4);transition:all 0.3s}
+.flow-pill.active{color:#f48;border-color:#f484}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l">
+    <div style="font-size:9px;color:#555;letter-spacing:2px">FLUID RIBBONS</div>
+    <div id="flowName">helix</div>
+  </div>
+  <div class="hud-r">
+    <div id="nick" onclick="changeNick()"></div>
+    <div id="ribbonCount">0 ribbons</div>
+    <div id="inkInfo">0 ink drops</div>
+  </div>
+</div>
+<div id="flowPills">
+  <div class="flow-pill active">helix</div>
+  <div class="flow-pill">figure8</div>
+  <div class="flow-pill">cascade</div>
+  <div class="flow-pill">bloom</div>
+  <div class="flow-pill">veil</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+import { KI } from '../modules/core.js';
+import * as Scene from '../modules/scene.js';
+import * as VoiceEngine from '../modules/voice-engine.js';
+import * as FreqBands from '../modules/freq-bands-12.js';
+import * as Synths from '../modules/synths.js';
+import * as Resonance from '../modules/resonance.js';
+import * as FluidRibbons from '../modules/fluid-ribbons.js';
+import * as MqttNet from '../modules/mqtt-net.js';
+import * as WebRTCNet from '../modules/webrtc-net.js';
+import * as Presence from '../modules/presence.js';
+import * as Chat from '../modules/chat.js';
+import * as PlayerProfile from '../modules/player-profile.js';
+import * as NavOverlay from '../modules/nav-overlay.js';
+
+const ROOM = 'RIBN-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+KI.player.name = KI.genHash();
+document.getElementById('nick').textContent = KI.player.name;
+window.changeNick = function() {
+  const n = prompt('Nickname:', KI.player.name);
+  if (n && n.trim()) { KI.player.name = n.trim().slice(0,16); document.getElementById('nick').textContent = KI.player.name; }
+};
+
+KI.on('fluid-ribbons:update', data => {
+  document.getElementById('flowName').textContent = data.pattern;
+  document.getElementById('ribbonCount').textContent = data.ribbonCount + ' ribbons';
+  document.getElementById('inkInfo').textContent = data.inkDrops + ' ink drops';
+  document.querySelectorAll('.flow-pill').forEach(p => {
+    p.classList.toggle('active', p.textContent === data.pattern);
+  });
+});
+
+async function boot() {
+  document.getElementById('hud').classList.add('on');
+  Scene.init({ stars: 600 });
+  try { await VoiceEngine.init(); } catch(e) { console.warn('voice:', e); }
+  FreqBands.init(); Synths.init(); Resonance.init();
+  FluidRibbons.init({ position: [0, 2, -3] });
+  MqttNet.init({ room: ROOM }); WebRTCNet.init({ room: ROOM });
+  Presence.init(); Chat.init(); PlayerProfile.init(); NavOverlay.init();
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return; requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t); KI.renderer.render(KI.scene, KI.camera);
+  })();
+  console.log('%c FLUID RIBBONS BOOTED ', 'background:#000;color:#f48;font-size:22px;padding:12px');
+}
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

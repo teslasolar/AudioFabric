@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KAMEHAMEHA DUEL</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#050510;font-family:'Courier New',monospace}
+canvas{display:block}
+
+/* ===== START SCREEN ===== */
+#start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:30;background:linear-gradient(180deg,#050510 0%,#0a0820 50%,#050510 100%)}
+#start h1{font-family:Impact,'Arial Black',sans-serif;font-size:clamp(32px,7vw,72px);font-weight:900;
+  background:linear-gradient(135deg,#44aaff,#ff44aa,#ffaa44,#44ffaa);background-size:300% 300%;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:titleShift 4s ease infinite;letter-spacing:4px}
+@keyframes titleShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+#start .sub{font-size:11px;color:rgba(255,255,255,0.12);letter-spacing:8px;margin:6px 0 4px;text-transform:uppercase}
+#start .desc{font-size:12px;color:rgba(150,180,255,0.18);max-width:480px;text-align:center;line-height:2;margin-bottom:24px}
+#start .desc b{color:rgba(200,200,255,0.35)}
+#startBtn{background:none;border:2px solid rgba(100,160,255,0.25);color:rgba(100,180,255,0.6);
+  font-family:Impact,'Arial Black',sans-serif;font-size:22px;padding:16px 56px;cursor:pointer;
+  letter-spacing:6px;transition:all 0.4s;text-transform:uppercase;border-radius:4px;position:relative;overflow:hidden}
+#startBtn:hover{border-color:rgba(100,180,255,0.5);color:rgba(150,220,255,0.9);
+  text-shadow:0 0 30px rgba(100,180,255,0.3);box-shadow:0 0 40px rgba(100,180,255,0.1)}
+#startBtn::after{content:'';position:absolute;inset:-2px;background:linear-gradient(90deg,transparent,rgba(100,180,255,0.05),transparent);
+  animation:btnSweep 3s ease infinite}
+@keyframes btnSweep{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+#queueInfo{font-size:10px;color:rgba(255,255,255,0.08);margin-top:16px;letter-spacing:2px;min-height:20px}
+
+/* ===== HUD ===== */
+#hud{position:fixed;top:0;left:0;right:0;z-index:10;display:none;pointer-events:none}
+.hp-row{display:flex;align-items:center;justify-content:space-between;padding:12px 20px 4px}
+.hp-block{display:flex;flex-direction:column;gap:4px;width:38%}
+.hp-block.right{align-items:flex-end}
+.hp-name{font-size:12px;letter-spacing:3px;font-weight:700}
+.hp-name.p1{color:rgba(80,160,255,0.5)}
+.hp-name.p2{color:rgba(255,80,100,0.5)}
+.hp-bar{width:100%;height:14px;background:rgba(255,255,255,0.03);border-radius:3px;overflow:hidden;
+  border:1px solid rgba(255,255,255,0.06)}
+.hp-fill{height:100%;border-radius:2px;transition:width 0.3s ease}
+.hp-fill.p1{background:linear-gradient(90deg,#2255cc,#44aaff,#88ccff)}
+.hp-fill.p2{background:linear-gradient(270deg,#cc2244,#ff4466,#ff8888)}
+.hp-pct{font-size:9px;color:rgba(255,255,255,0.15);margin-top:2px}
+#roundLabel{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:11px;
+  color:rgba(255,200,100,0.2);letter-spacing:4px;font-weight:700}
+#centerLabel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:15;
+  font-family:Impact,'Arial Black',sans-serif;font-size:clamp(36px,8vw,80px);
+  pointer-events:none;text-align:center;letter-spacing:6px;text-transform:uppercase;
+  opacity:0;transition:opacity 0.4s;color:rgba(255,255,255,0.9);
+  text-shadow:0 0 40px rgba(100,200,255,0.5),0 0 80px rgba(255,100,200,0.3)}
+#centerLabel.on{opacity:1}
+
+/* ===== VOCAL RANGE BARS ===== */
+.vr-panel{position:fixed;top:50%;transform:translateY(-50%);z-index:12;pointer-events:none;
+  display:flex;flex-direction:column;gap:5px;padding:8px}
+.vr-panel.left{left:8px}
+.vr-panel.right{right:8px}
+.vr-row{display:flex;align-items:center;gap:6px;opacity:0.12;transition:opacity 0.2s,transform 0.2s}
+.vr-row.active{opacity:1;transform:scale(1.05)}
+.vr-panel.left .vr-row.active{transform:translateX(4px) scale(1.05)}
+.vr-panel.right .vr-row.active{transform:translateX(-4px) scale(1.05)}
+.vr-dot{width:8px;height:8px;border-radius:50%;border:1.5px solid;transition:all 0.2s}
+.vr-row.active .vr-dot{background:currentColor;box-shadow:0 0 10px currentColor}
+.vr-label{font-size:8px;letter-spacing:1px}
+.vr-energy{width:40px;height:3px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden}
+.vr-energy-fill{height:100%;border-radius:2px;transition:width 0.1s}
+.vr-hz{font-size:7px;color:rgba(255,255,255,0.08)}
+.vr-practice{font-size:7px;color:rgba(255,255,255,0.06);max-width:100px;line-height:1.3;display:none}
+.vr-row.active .vr-practice{display:block}
+
+/* ===== CHARGE BARS ===== */
+.charge-bar{position:fixed;bottom:24px;height:6px;width:28%;z-index:10;
+  background:rgba(255,255,255,0.02);border-radius:3px;overflow:hidden;border:1px solid rgba(255,255,255,0.04)}
+.charge-bar.left{left:20px}
+.charge-bar.right{right:20px}
+.charge-fill{height:100%;border-radius:2px;transition:width 0.1s}
+.charge-fill.p1{background:linear-gradient(90deg,#0044ff,#00ccff,#ffffff)}
+.charge-fill.p2{background:linear-gradient(270deg,#ff0044,#ff8800,#ffffff)}
+
+/* ===== WINNER BANNER ===== */
+#winner{position:fixed;top:35%;left:50%;transform:translate(-50%,-50%);z-index:20;
+  font-family:Impact,'Arial Black',sans-serif;font-size:clamp(28px,6vw,56px);
+  text-align:center;opacity:0;transition:opacity 0.5s;pointer-events:none}
+#winner.on{opacity:1}
+#winText{background:linear-gradient(135deg,#ffcc00,#ff8800,#ff4466);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:4px}
+#winSub{font-size:12px;color:rgba(255,255,255,0.15);margin-top:8px;letter-spacing:2px;
+  -webkit-text-fill-color:rgba(255,255,255,0.15)}
+
+/* ===== BOTTOM BAR ===== */
+#bottomBar{position:fixed;bottom:4px;left:50%;transform:translateX(-50%);z-index:12;
+  display:none;gap:10px}
+.action-btn{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+  color:rgba(255,255,255,0.2);padding:6px 18px;cursor:pointer;font-size:9px;font-family:monospace;
+  border-radius:16px;letter-spacing:1px;transition:all 0.3s}
+.action-btn:hover{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.5);border-color:rgba(255,255,255,0.15)}
+
+/* ===== STATUS ===== */
+#status{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:10;
+  font-size:9px;color:rgba(255,255,255,0.06);letter-spacing:2px;text-align:center;pointer-events:none}
+
+/* ===== DAMAGE POPUPS ===== */
+#dmgLayer{position:fixed;inset:0;z-index:14;pointer-events:none}
+.dmg{position:absolute;font-weight:bold;font-family:Impact,sans-serif;
+  text-shadow:0 0 10px currentColor,0 0 20px currentColor;
+  animation:dmgFloat 1.4s ease-out forwards;pointer-events:none}
+@keyframes dmgFloat{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-120px) scale(1.8)}}
+
+/* ===== WAIT OVERLAY ===== */
+#waitOverlay{position:fixed;inset:0;z-index:18;display:none;flex-direction:column;
+  align-items:center;justify-content:center;background:rgba(5,5,16,0.85)}
+#waitText{font-size:16px;color:rgba(100,180,255,0.4);letter-spacing:6px;
+  animation:waitPulse 2s ease infinite}
+@keyframes waitPulse{0%,100%{opacity:0.4}50%{opacity:0.8}}
+#waitSub{font-size:10px;color:rgba(255,255,255,0.08);margin-top:10px;letter-spacing:2px}
+#waitCancel{margin-top:20px;pointer-events:all}
+</style>
+</head>
+<body>
+
+<!-- START SCREEN -->
+<div id="start">
+  <h1>KAMEHAMEHA DUEL</h1>
+  <div class="sub">VOICE POWERED P2P COMBAT</div>
+  <div class="desc">
+    <b>global automatch</b> — join the queue, fight the next challenger<br>
+    <b>sing</b> to charge your beam. <b>yell</b> to fire.<br>
+    different <b>vocal ranges</b> power different attacks.<br>
+    beams <b>clash</b> in the center — push your opponent back.<br>
+    <b>drain their HP</b> to win. the crowd is watching.
+  </div>
+  <button id="startBtn" onclick="beginGame()">ENTER THE ARENA</button>
+  <div id="queueInfo"></div>
+</div>
+
+<!-- MAIN CANVAS -->
+<canvas id="c"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hp-row">
+    <div class="hp-block">
+      <div class="hp-name p1" id="p1Name">YOU</div>
+      <div class="hp-bar"><div class="hp-fill p1" id="p1HP" style="width:100%"></div></div>
+      <div class="hp-pct" id="p1Pct">100%</div>
+    </div>
+    <div id="roundLabel">VS</div>
+    <div class="hp-block right">
+      <div class="hp-name p2" id="p2Name">???</div>
+      <div class="hp-bar"><div class="hp-fill p2" id="p2HP" style="width:100%"></div></div>
+      <div class="hp-pct" id="p2Pct">100%</div>
+    </div>
+  </div>
+</div>
+
+<div id="centerLabel"></div>
+
+<!-- VOCAL RANGE PANELS -->
+<div class="vr-panel left" id="vrLeft"></div>
+<div class="vr-panel right" id="vrRight"></div>
+
+<!-- CHARGE BARS -->
+<div class="charge-bar left"><div class="charge-fill p1" id="chargeFill1" style="width:0%"></div></div>
+<div class="charge-bar right"><div class="charge-fill p2" id="chargeFill2" style="width:0%"></div></div>
+
+<!-- WINNER -->
+<div id="winner"><div id="winText"></div><div id="winSub"></div></div>
+
+<!-- WAIT OVERLAY -->
+<div id="waitOverlay">
+  <div id="waitText">SEARCHING FOR OPPONENT</div>
+  <div id="waitSub">global queue — next challenger incoming</div>
+  <button class="action-btn" id="waitCancel" onclick="cancelQueue()">CANCEL</button>
+</div>
+
+<!-- BOTTOM BAR -->
+<div id="bottomBar">
+  <button class="action-btn" onclick="requestRematch()">REMATCH</button>
+  <button class="action-btn" onclick="backToQueue()">NEW OPPONENT</button>
+</div>
+
+<div id="dmgLayer"></div>
+<div id="status"></div>
+
+<!-- MQTT library -->
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+<script type="module">
+// ╔═══════════════════════════════════════════════════════════════════════╗
+// ║  KAMEHAMEHA DUEL — P2P Voice Fighting with Global Automatch          ║
+// ║  Sing to charge. Yell to fire. Vocal ranges = different powers.      ║
+// ║  FIFO queue matchmaking. WebRTC combat. Beams clash center-screen.   ║
+// ╚═══════════════════════════════════════════════════════════════════════╝
+
+import { KI } from '../modules/core.js';
+import * as VoiceEngine from '../modules/voice-engine.js';
+import * as Automatch from '../modules/automatch.js';
+import * as VocalRanges from '../modules/vocal-ranges.js';
+
+// ===== CONFIG =====
+const MAX_HP = 1000;
+const ROUND_TIME = 90;
+const CHARGE_SPEED = 0.6;
+const BEAM_DAMAGE_BASE = 25;
+const CLASH_PUSH_RATE = 0.008;
+
+// ===== CANVAS =====
+const c = document.getElementById('c'), ctx = c.getContext('2d');
+let W, H, t = 0, running = false;
+function resize() { W = c.width = innerWidth; H = c.height = innerHeight; }
+resize(); window.onresize = resize;
+
+// ===== PLAYER NAME =====
+KI.player.name = localStorage.getItem('kd_nick') || KI.genHash();
+const savedNick = localStorage.getItem('kd_nick');
+if (!savedNick) {
+  const n = prompt('Your fighter name:', KI.player.name);
+  if (n?.trim()) { KI.player.name = n.trim().slice(0, 16); localStorage.setItem('kd_nick', KI.player.name); }
+}
+
+// ===== GAME STATE =====
+const game = {
+  phase: 'menu',        // menu, queue, countdown, fight, ko
+  myHP: MAX_HP,
+  opHP: MAX_HP,
+  mySide: 1,            // 1=left, 2=right
+  opName: '???',
+  chargeLevel: 0,       // 0-1
+  chargeTime: 0,
+  firing: false,
+  fireTime: 0,
+  fireDecay: 0,
+  chargePeak: 0,
+  beamLength: 0,
+  beamWidth: 0,
+  clashX: 0.5,          // 0-1, where beams meet (0.5=center)
+  clashIntensity: 0,
+  opCharge: 0,
+  opFiring: false,
+  opFireDecay: 0,
+  opBeamLength: 0,
+  opBeamWidth: 0,
+  opRange: -1,
+  countdownTimer: 3,
+  roundTimer: ROUND_TIME,
+  koTimer: 0,
+  screenShake: 0,
+  flashAlpha: 0,
+  myScore: 0,
+  opScore: 0,
+  comboCount: 0,
+  comboTimer: 0
+};
+
+// ===== PARTICLES =====
+let chargeParticles = [], beamParticles = [], sparkParticles = [];
+let impactParticles = [], auraParticles = [], clashParticles = [];
+
+// ===== AUDIO (synth SFX) =====
+let audioCtx = null;
+let chargeOsc, chargeGain, zapOsc, zapGain, rumbleOsc, rumbleGain, beamNoiseNode, beamGain;
+
+function initSynths() {
+  audioCtx = KI.audioCtx;
+  if (!audioCtx) return;
+  const master = audioCtx.createGain();
+  master.gain.value = 0.25;
+  master.connect(audioCtx.destination);
+
+  chargeOsc = audioCtx.createOscillator();
+  chargeOsc.type = 'sine'; chargeOsc.frequency.value = 80;
+  chargeGain = audioCtx.createGain(); chargeGain.gain.value = 0;
+  const cf = audioCtx.createBiquadFilter(); cf.type = 'lowpass'; cf.frequency.value = 400; cf.Q.value = 5;
+  chargeOsc.connect(cf); cf.connect(chargeGain); chargeGain.connect(master); chargeOsc.start();
+
+  zapOsc = audioCtx.createOscillator();
+  zapOsc.type = 'sawtooth'; zapOsc.frequency.value = 2000;
+  zapGain = audioCtx.createGain(); zapGain.gain.value = 0;
+  const zf = audioCtx.createBiquadFilter(); zf.type = 'bandpass'; zf.frequency.value = 3000; zf.Q.value = 1;
+  zapOsc.connect(zf); zf.connect(zapGain); zapGain.connect(master); zapOsc.start();
+
+  rumbleOsc = audioCtx.createOscillator();
+  rumbleOsc.type = 'sine'; rumbleOsc.frequency.value = 30;
+  rumbleGain = audioCtx.createGain(); rumbleGain.gain.value = 0;
+  rumbleOsc.connect(rumbleGain); rumbleGain.connect(master); rumbleOsc.start();
+
+  const bufSize = audioCtx.sampleRate * 2;
+  const noiseBuf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+  const nd = noiseBuf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) nd[i] = Math.random() * 2 - 1;
+  beamNoiseNode = audioCtx.createBufferSource();
+  beamNoiseNode.buffer = noiseBuf; beamNoiseNode.loop = true;
+  beamGain = audioCtx.createGain(); beamGain.gain.value = 0;
+  const bf = audioCtx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 1500; bf.Q.value = 0.5;
+  beamNoiseNode.connect(bf); bf.connect(beamGain); beamGain.connect(master); beamNoiseNode.start();
+}
+
+function updateSynths() {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  if (game.chargeLevel > 0.01 && !game.firing) {
+    chargeOsc.frequency.linearRampToValueAtTime(80 + game.chargeLevel * 400, now + 0.1);
+    chargeGain.gain.linearRampToValueAtTime(game.chargeLevel * 0.12, now + 0.1);
+    const zv = game.chargeLevel > 0.3 ? (Math.random() < game.chargeLevel * 0.4 ? game.chargeLevel * 0.06 : 0) : 0;
+    zapGain.gain.linearRampToValueAtTime(zv, now + 0.02);
+    rumbleGain.gain.linearRampToValueAtTime(game.chargeLevel * 0.15, now + 0.1);
+    beamGain.gain.linearRampToValueAtTime(0, now + 0.1);
+  } else if (game.firing) {
+    chargeOsc.frequency.linearRampToValueAtTime(600 + game.chargePeak * 800, now + 0.05);
+    chargeGain.gain.linearRampToValueAtTime(0.15 * game.fireDecay, now + 0.05);
+    beamGain.gain.linearRampToValueAtTime(0.2 * game.chargePeak * game.fireDecay, now + 0.05);
+    zapOsc.frequency.linearRampToValueAtTime(2000 + Math.random() * 4000, now + 0.02);
+    zapGain.gain.linearRampToValueAtTime(0.08 * game.fireDecay, now + 0.02);
+    rumbleGain.gain.linearRampToValueAtTime(0.25 * game.chargePeak * game.fireDecay, now + 0.05);
+  } else {
+    chargeGain.gain.linearRampToValueAtTime(0, now + 0.3);
+    zapGain.gain.linearRampToValueAtTime(0, now + 0.1);
+    rumbleGain.gain.linearRampToValueAtTime(0, now + 0.3);
+    beamGain.gain.linearRampToValueAtTime(0, now + 0.3);
+  }
+}
+
+function triggerZap() {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const o = audioCtx.createOscillator();
+  o.type = 'sawtooth'; o.frequency.value = 3000 + Math.random() * 5000;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.06, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.05 + Math.random() * 0.05);
+  o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now + 0.1);
+}
+
+// ===== VOCAL RANGE PANEL BUILD =====
+function buildVocalRangePanels() {
+  ['vrLeft', 'vrRight'].forEach(id => {
+    const panel = document.getElementById(id);
+    panel.innerHTML = '';
+    VocalRanges.RANGES.forEach((r, i) => {
+      const row = document.createElement('div');
+      row.className = 'vr-row';
+      row.id = id + '-' + i;
+      row.innerHTML =
+        '<div class="vr-dot" style="color:' + r.color + ';border-color:' + r.color + '"></div>' +
+        '<div style="display:flex;flex-direction:column;gap:1px">' +
+          '<span class="vr-label" style="color:' + r.color + '">' + r.label + '</span>' +
+          '<div class="vr-energy"><div class="vr-energy-fill" id="' + id + '-e' + i + '" style="background:' + r.color + '"></div></div>' +
+          '<span class="vr-hz">' + r.minHz + '-' + r.maxHz + 'Hz</span>' +
+          '<span class="vr-practice">' + r.practice + '</span>' +
+        '</div>';
+      panel.appendChild(row);
+    });
+  });
+}
+
+function updateVocalRangePanels() {
+  const vrMod = KI.get('vocal-ranges');
+  if (!vrMod) return;
+  const st = vrMod.state;
+  const myRange = st.activeRange;
+  const opRange = game.opRange;
+
+  VocalRanges.RANGES.forEach((r, i) => {
+    // left panel = my ranges
+    const lRow = document.getElementById('vrLeft-' + i);
+    if (lRow) lRow.classList.toggle('active', i === myRange);
+    const lFill = document.getElementById('vrLeft-e' + i);
+    if (lFill) lFill.style.width = Math.min(100, st.rangeEnergy[i] * 500) + '%';
+    // right panel = opponent ranges
+    const rRow = document.getElementById('vrRight-' + i);
+    if (rRow) rRow.classList.toggle('active', i === opRange);
+  });
+}
+
+// ===== POSITIONS =====
+function getP1Pos() {
+  return { x: W * 0.15, y: H * 0.48, handX: W * 0.15 + 60, handY: H * 0.48, dir: 1 };
+}
+function getP2Pos() {
+  return { x: W * 0.85, y: H * 0.48, handX: W * 0.85 - 60, handY: H * 0.48, dir: -1 };
+}
+function getMyPos() { return game.mySide === 1 ? getP1Pos() : getP2Pos(); }
+function getOpPos() { return game.mySide === 1 ? getP2Pos() : getP1Pos(); }
+
+// ===== DRAW CHARACTER =====
+function drawFighter(px, py, dir, charge, firing, fireDecay, hue, rangeIdx, label) {
+  const alpha = 0.25 + charge * 0.35;
+  const rangeColor = rangeIdx >= 0 ? VocalRanges.RANGES[rangeIdx].color : (dir > 0 ? 'rgba(80,160,255,' : 'rgba(255,80,100,');
+
+  // aura glow
+  if (charge > 0.05 || firing) {
+    const auraR = 50 + charge * 120;
+    const aAlpha = firing ? fireDecay * 0.1 : charge * 0.08;
+    const ag = ctx.createRadialGradient(px, py, 0, px, py, auraR);
+    ag.addColorStop(0, (rangeIdx >= 0 ? VocalRanges.RANGES[rangeIdx].color : 'rgba(100,180,255,1)').replace('1)', aAlpha + ')').replace('rgb', 'rgba'));
+    if (rangeIdx >= 0) {
+      const rc = VocalRanges.RANGES[rangeIdx];
+      ag.addColorStop(0, hexToRgba(rc.color, aAlpha));
+      ag.addColorStop(0.5, hexToRgba(rc.color, aAlpha * 0.4));
+    } else {
+      ag.addColorStop(0, 'rgba(100,180,255,' + aAlpha + ')');
+      ag.addColorStop(0.5, 'rgba(60,100,200,' + aAlpha * 0.4 + ')');
+    }
+    ag.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = ag;
+    ctx.fillRect(px - auraR, py - auraR, auraR * 2, auraR * 2);
+
+    // aura particles
+    if (Math.random() < charge * 0.4) {
+      const aa = Math.random() * Math.PI * 2;
+      auraParticles.push({
+        x: px + Math.cos(aa) * (20 + Math.random() * 40),
+        y: py + Math.sin(aa) * (30 + Math.random() * 50),
+        vy: -1 - Math.random() * 3, size: 1 + Math.random() * 3,
+        life: 0.3 + Math.random() * 0.4,
+        hue: rangeIdx >= 0 ? VocalRanges.RANGES[rangeIdx].hue : (dir > 0 ? 210 : 350)
+      });
+    }
+  }
+
+  // stick figure
+  const figColor = rangeIdx >= 0 ? VocalRanges.RANGES[rangeIdx].color :
+    (dir > 0 ? 'rgba(80,160,255,' + alpha + ')' : 'rgba(255,80,100,' + alpha + ')');
+  ctx.strokeStyle = figColor;
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+
+  // head
+  ctx.beginPath(); ctx.arc(px, py - 55, 13, 0, Math.PI * 2); ctx.stroke();
+  // body
+  ctx.beginPath(); ctx.moveTo(px, py - 42); ctx.lineTo(px, py + 12); ctx.stroke();
+  // legs
+  ctx.beginPath(); ctx.moveTo(px, py + 12); ctx.lineTo(px - 16 * dir, py + 50); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px, py + 12); ctx.lineTo(px + 10 * dir, py + 50); ctx.stroke();
+
+  // arms — kamehameha pose
+  const handX = px + 60 * dir;
+  const handY = py;
+  const armExt = firing ? 1.0 : 0.3 + charge * 0.7;
+  const elbowX = px + (15 + armExt * 15) * dir;
+  const elbowY = py - 15 + 5 - armExt * 5;
+  ctx.beginPath(); ctx.moveTo(px, py - 30); ctx.lineTo(elbowX, elbowY); ctx.lineTo(handX, handY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px, py - 30); ctx.lineTo(elbowX, elbowY + 10); ctx.lineTo(handX, handY); ctx.stroke();
+
+  // name label
+  ctx.font = '10px monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, px, py + 68);
+}
+
+// ===== DRAW CHARGE SPHERE =====
+function drawChargeSphere(handX, handY, charge, rangeIdx) {
+  if (charge < 0.02) return;
+  const r = 8 + charge * 50;
+  const pulse = r + Math.sin(t * 15) * 3 * charge;
+  const hue = rangeIdx >= 0 ? VocalRanges.RANGES[rangeIdx].hue : 210;
+
+  // outer glow
+  const sg = ctx.createRadialGradient(handX, handY, 0, handX, handY, pulse * 2.5);
+  sg.addColorStop(0, 'hsla(' + hue + ',80%,70%,' + charge * 0.2 + ')');
+  sg.addColorStop(0.4, 'hsla(' + hue + ',70%,50%,' + charge * 0.08 + ')');
+  sg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sg;
+  ctx.fillRect(handX - pulse * 3, handY - pulse * 3, pulse * 6, pulse * 6);
+
+  // core
+  const sg2 = ctx.createRadialGradient(handX, handY, 0, handX, handY, pulse);
+  sg2.addColorStop(0, 'rgba(255,255,255,' + (0.3 + charge * 0.5) + ')');
+  sg2.addColorStop(0.3, 'hsla(' + hue + ',70%,70%,' + (0.2 + charge * 0.4) + ')');
+  sg2.addColorStop(0.7, 'hsla(' + hue + ',60%,40%,' + charge * 0.2 + ')');
+  sg2.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sg2;
+  ctx.beginPath(); ctx.arc(handX, handY, pulse, 0, Math.PI * 2); ctx.fill();
+
+  // rings
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath(); ctx.arc(handX, handY, pulse * (0.3 + i * 0.25), 0, Math.PI * 2);
+    ctx.strokeStyle = 'hsla(' + hue + ',60%,80%,' + charge * 0.08 * (3 - i) + ')';
+    ctx.lineWidth = 0.5; ctx.stroke();
+  }
+}
+
+// ===== DRAW BEAM =====
+function drawBeam(handX, handY, dir, length, width, decay, rangeIdx) {
+  if (decay <= 0 || length < 1) return;
+  const hue = rangeIdx >= 0 ? VocalRanges.RANGES[rangeIdx].hue : (dir > 0 ? 210 : 350);
+  const bw = width;
+  const bl = length;
+
+  // beam glow
+  const bg = ctx.createLinearGradient(handX, handY, handX + bl * dir, handY);
+  bg.addColorStop(0, 'rgba(255,255,255,' + decay * 0.7 + ')');
+  bg.addColorStop(0.1, 'hsla(' + hue + ',70%,70%,' + decay * 0.5 + ')');
+  bg.addColorStop(0.8, 'hsla(' + hue + ',60%,50%,' + decay * 0.3 + ')');
+  bg.addColorStop(1, 'hsla(' + hue + ',50%,30%,' + decay * 0.15 + ')');
+
+  // wavy beam shape
+  ctx.beginPath();
+  const startX = handX, endX = handX + bl * dir;
+  const step = 8 * dir;
+  ctx.moveTo(startX, handY - bw * 0.3);
+  for (let x = startX; dir > 0 ? x <= endX : x >= endX; x += step) {
+    const wave = Math.sin(x * 0.05 + t * 20) * bw * 0.1;
+    const progress = Math.abs(x - startX) / Math.abs(bl);
+    const taper = progress < 0.05 ? progress / 0.05 : 1;
+    ctx.lineTo(x, handY - bw * 0.5 * taper + wave);
+  }
+  for (let x = endX; dir > 0 ? x >= startX : x <= startX; x -= step) {
+    const wave = Math.sin(x * 0.05 + t * 20 + 1) * bw * 0.1;
+    const progress = Math.abs(x - startX) / Math.abs(bl);
+    const taper = progress < 0.05 ? progress / 0.05 : 1;
+    ctx.lineTo(x, handY + bw * 0.5 * taper + wave);
+  }
+  ctx.closePath();
+  ctx.fillStyle = bg;
+  ctx.fill();
+
+  // inner core
+  ctx.beginPath();
+  ctx.moveTo(startX, handY);
+  for (let x = startX; dir > 0 ? x <= endX : x >= endX; x += step * 1.5) {
+    ctx.lineTo(x, handY + Math.sin(x * 0.08 + t * 25) * bw * 0.03);
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,' + decay * 0.4 + ')';
+  ctx.lineWidth = bw * 0.12;
+  ctx.stroke();
+
+  // origin flash
+  const og = ctx.createRadialGradient(handX, handY, 0, handX, handY, bw);
+  og.addColorStop(0, 'rgba(255,255,255,' + decay * 0.5 + ')');
+  og.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = og;
+  ctx.fillRect(handX - bw, handY - bw, bw * 2, bw * 2);
+
+  // beam edge particles
+  if (Math.random() < 0.4 * decay) {
+    const px = handX + Math.random() * bl * dir;
+    const py = handY + (Math.random() - 0.5) * bw;
+    beamParticles.push({
+      x: px, y: py, vx: dir * (2 + Math.random() * 8), vy: (Math.random() - 0.5) * 3,
+      size: 1 + Math.random() * 2.5, life: 0.4 + Math.random() * 0.3, hue
+    });
+  }
+}
+
+// ===== DRAW CLASH POINT =====
+function drawClashPoint(cx, cy, intensity) {
+  if (intensity < 0.01) return;
+
+  // shockwave rings
+  for (let r = 0; r < 3; r++) {
+    const ringR = 10 + r * 12 + Math.sin(t * 8 + r * 2) * 8;
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringR * intensity, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,' + (0.15 - r * 0.04) * intensity + ')';
+    ctx.lineWidth = 2 - r * 0.5;
+    ctx.stroke();
+  }
+
+  // sparks
+  const count = Math.floor(8 + intensity * 20);
+  for (let i = 0; i < count; i++) {
+    const a = t * 3 + i * Math.PI * 2 / count;
+    const rad = 5 + Math.sin(t * 10 + i * 1.5) * 15 * intensity;
+    const sx = 1 + Math.random() * 2;
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad, sx, 0, Math.PI * 2);
+    ctx.fillStyle = i % 3 === 0 ? '#fff' : (i % 3 === 1 ? '#ff0' : '#0ff');
+    ctx.globalAlpha = 0.5 * intensity;
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // energy cross
+  ctx.globalAlpha = 0.1 * intensity;
+  for (let i = 0; i < 6; i++) {
+    const a = t * 0.7 + i * Math.PI / 3;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * 50 * intensity, cy + Math.sin(a) * 50 * intensity);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // clash particles
+  if (Math.random() < intensity * 0.5) {
+    const a = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * 6;
+    clashParticles.push({
+      x: cx, y: cy, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+      size: 1 + Math.random() * 3, life: 0.4 + Math.random() * 0.3,
+      hue: Math.random() < 0.5 ? 210 : 350
+    });
+  }
+}
+
+// ===== SPAWN HELPERS =====
+function spawnChargeParticles(handX, handY, charge, rangeIdx, count) {
+  const hue = rangeIdx >= 0 ? VocalRanges.RANGES[rangeIdx].hue : 210;
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 80 + Math.random() * 200 * (1 + charge);
+    chargeParticles.push({
+      x: handX + Math.cos(angle) * dist, y: handY + Math.sin(angle) * dist,
+      size: 1 + Math.random() * 3 * charge, speed: 2 + Math.random() * 4 + charge * 3,
+      angle: angle + Math.PI, life: 1, hue: hue + Math.random() * 30 - 15, tx: handX, ty: handY
+    });
+  }
+}
+
+function spawnZapSpark(cx, cy, radius) {
+  const points = [];
+  const segments = 4 + Math.floor(Math.random() * 6);
+  let angle = Math.random() * Math.PI * 2;
+  let px = cx, py = cy;
+  for (let s = 0; s <= segments; s++) {
+    points.push({ x: px, y: py });
+    const len = radius * (0.2 + Math.random() * 0.4) / segments;
+    angle += (Math.random() - 0.5) * 2;
+    px += Math.cos(angle) * len;
+    py += Math.sin(angle) * len;
+  }
+  sparkParticles.push({ points, life: 0.1 + Math.random() * 0.15, width: 0.5 + Math.random() * 2, hue: 200 + Math.random() * 60 });
+}
+
+function spawnDmgPopup(text, color, side) {
+  const el = document.createElement('div');
+  el.className = 'dmg'; el.textContent = text; el.style.color = color || '#ff0';
+  el.style.left = side === 'left' ? (8 + Math.random() * 18) + '%' : (72 + Math.random() * 18) + '%';
+  el.style.top = (20 + Math.random() * 20) + '%';
+  el.style.fontSize = (18 + Math.random() * 14) + 'px';
+  document.getElementById('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1500);
+}
+
+// ===== GAME LOGIC =====
+function updateGame(dt) {
+  if (game.phase !== 'fight') return;
+  const v = KI.voice;
+  const vrMod = KI.get('vocal-ranges');
+  const myRange = vrMod ? vrMod.state.activeRange : -1;
+  const rangeMult = myRange >= 0 ? VocalRanges.RANGES[myRange].mult : 1;
+  const myPos = getMyPos();
+  const opPos = getOpPos();
+
+  // combo decay
+  game.comboTimer -= dt;
+  if (game.comboTimer <= 0) { game.comboCount = 0; game.comboTimer = 0; }
+
+  // round timer
+  game.roundTimer -= dt;
+  if (game.roundTimer <= 0) {
+    game.roundTimer = 0;
+    // time's up — whoever has more HP wins
+    if (game.myHP > game.opHP) doKO('win');
+    else if (game.opHP > game.myHP) doKO('lose');
+    else doKO('draw');
+    return;
+  }
+
+  if (!game.firing) {
+    // === CHARGING ===
+    if (v.sounding && v.sustain > 0.15) {
+      const chargeRate = (v.energy * 0.6 + v.coherence * 0.3 + v.pn * 0.1) * CHARGE_SPEED;
+      game.chargeLevel = Math.min(1, game.chargeLevel + chargeRate * rangeMult * dt);
+      game.chargeTime += dt;
+
+      // charge particles
+      const spawnCount = Math.floor(2 + game.chargeLevel * 18);
+      spawnChargeParticles(myPos.handX, myPos.handY, game.chargeLevel, myRange, spawnCount);
+
+      // sparks at high charge
+      if (game.chargeLevel > 0.25 && Math.random() < game.chargeLevel * 0.3) {
+        spawnZapSpark(myPos.handX, myPos.handY, 20 + game.chargeLevel * 50);
+        if (Math.random() < 0.12) triggerZap();
+      }
+
+      game.screenShake = game.chargeLevel * 3;
+    } else if (game.chargeLevel > 0.1 && game.chargeTime > 0.3) {
+      // stopped singing with charge — FIRE!
+      game.firing = true;
+      game.chargePeak = game.chargeLevel;
+      game.fireTime = 0;
+      game.fireDecay = 1;
+      game.beamWidth = 10 + game.chargePeak * 80;
+      game.beamLength = 0;
+      game.flashAlpha = 0.4 + game.chargePeak * 0.4;
+      game.screenShake = game.chargePeak * 12;
+      for (let z = 0; z < 6; z++) triggerZap();
+
+      // send blast to opponent
+      const am = KI.get('automatch');
+      if (am) am.sendMsg({
+        type: 'blast', name: KI.player.name,
+        power: game.chargePeak, range: myRange, mult: rangeMult
+      });
+    } else {
+      game.chargeLevel *= 0.95;
+      if (game.chargeLevel < 0.01) { game.chargeLevel = 0; game.chargeTime = 0; }
+    }
+  } else {
+    // === FIRING ===
+    game.fireTime += dt;
+    const maxLen = Math.abs(getMyPos().handX - getOpPos().handX) * game.clashX;
+    game.beamLength = Math.min(maxLen, game.beamLength + (20 + game.chargePeak * 50));
+    game.beamWidth = (10 + game.chargePeak * 80) * game.fireDecay * (0.85 + Math.sin(game.fireTime * 30) * 0.15);
+    game.screenShake *= 0.96;
+
+    // beam particles along beam
+    if (Math.random() < 0.6 * game.fireDecay) {
+      spawnZapSpark(
+        myPos.handX + Math.random() * game.beamLength * myPos.dir,
+        myPos.handY + (Math.random() - 0.5) * game.beamWidth,
+        game.beamWidth * 0.5
+      );
+    }
+
+    game.fireDecay = Math.max(0, game.fireDecay - dt * (0.25 + (1 - game.chargePeak) * 0.4));
+    if (game.fireDecay <= 0) {
+      game.firing = false;
+      game.chargeLevel = 0;
+      game.chargeTime = 0;
+      game.beamLength = 0;
+    }
+  }
+
+  // === OPPONENT BEAM (from network data) ===
+  const opData = game;
+  if (game.opFiring) {
+    game.opFireDecay -= dt * 0.3;
+    game.opBeamLength = Math.min(
+      Math.abs(getP1Pos().handX - getP2Pos().handX) * (1 - game.clashX),
+      game.opBeamLength + 25
+    );
+    game.opBeamWidth = (10 + game.opCharge * 80) * Math.max(0, game.opFireDecay) *
+      (0.85 + Math.sin(t * 28) * 0.15);
+    if (game.opFireDecay <= 0) {
+      game.opFiring = false;
+      game.opCharge = 0;
+      game.opBeamLength = 0;
+    }
+  }
+
+  // === CLASH ===
+  if (game.firing && game.opFiring && game.fireDecay > 0 && game.opFireDecay > 0) {
+    // both beams active — clash!
+    game.clashIntensity = Math.min(1, game.clashIntensity + dt * 3);
+    // push based on power difference
+    const myPower = game.chargePeak * game.fireDecay;
+    const opPower = game.opCharge * game.opFireDecay;
+    const push = (myPower - opPower) * CLASH_PUSH_RATE;
+    game.clashX = Math.max(0.15, Math.min(0.85, game.clashX + push * (game.mySide === 1 ? 1 : -1)));
+    game.screenShake = Math.max(game.screenShake, game.clashIntensity * 6);
+  } else {
+    game.clashIntensity *= 0.9;
+    game.clashX += (0.5 - game.clashX) * 0.02; // drift back to center
+  }
+
+  // flash decay
+  game.flashAlpha *= 0.93;
+}
+
+// ===== HANDLE OPPONENT MESSAGES =====
+KI.on('automatch:opState', data => {
+  game.opCharge = data.charge || 0;
+  game.opRange = data.range ?? -1;
+});
+
+KI.on('automatch:opBlast', data => {
+  if (game.phase !== 'fight') return;
+  game.opFiring = true;
+  game.opFireDecay = 1;
+  game.opCharge = data.power || 0.5;
+  game.opRange = data.range ?? -1;
+  game.opBeamLength = 0;
+  game.opBeamWidth = 10 + game.opCharge * 80;
+
+  // deal damage
+  const mult = data.mult || 1;
+  let dmg = Math.round(BEAM_DAMAGE_BASE * (1 + data.power) * mult);
+
+  // if we're also firing, clash reduces damage
+  if (game.firing && game.fireDecay > 0) {
+    const myPower = game.chargePeak * game.fireDecay;
+    if (myPower > data.power * 0.8) {
+      dmg = Math.max(5, Math.round(dmg * 0.25));
+      spawnDmgPopup('BLOCKED!', '#0ff', game.mySide === 1 ? 'left' : 'right');
+    } else {
+      spawnDmgPopup('-' + dmg, '#f44', game.mySide === 1 ? 'left' : 'right');
+    }
+  } else {
+    spawnDmgPopup('-' + dmg, '#f44', game.mySide === 1 ? 'left' : 'right');
+  }
+  game.myHP = Math.max(0, game.myHP - dmg);
+  game.screenShake = Math.max(game.screenShake, dmg * 0.02);
+  if (game.myHP <= 0) doKO('lose');
+});
+
+// when our beam finishes, score damage on opponent
+function onMyBeamHit() {
+  if (game.phase !== 'fight') return;
+  const vrMod = KI.get('vocal-ranges');
+  const myRange = vrMod ? vrMod.state.activeRange : -1;
+  const mult = myRange >= 0 ? VocalRanges.RANGES[myRange].mult : 1;
+  let dmg = Math.round(BEAM_DAMAGE_BASE * (1 + game.chargePeak) * mult);
+
+  // combo bonus
+  game.comboCount++;
+  game.comboTimer = 4;
+  if (game.comboCount > 1) {
+    dmg = Math.round(dmg * (1 + game.comboCount * 0.15));
+    spawnDmgPopup(game.comboCount + 'x COMBO', '#ff0', game.mySide === 1 ? 'right' : 'left');
+  }
+
+  game.opHP = Math.max(0, game.opHP - dmg);
+  game.myScore += dmg;
+  spawnDmgPopup('+' + dmg, '#4af', game.mySide === 1 ? 'right' : 'left');
+
+  if (game.opHP <= 0) doKO('win');
+}
+
+// ===== KO =====
+function doKO(result) {
+  game.phase = 'ko';
+  game.koTimer = 0;
+  const winEl = document.getElementById('winner');
+  const winText = document.getElementById('winText');
+  const winSub = document.getElementById('winSub');
+  if (result === 'win') {
+    winText.textContent = 'YOU WIN!';
+    winSub.textContent = 'Score: ' + game.myScore;
+  } else if (result === 'lose') {
+    winText.textContent = game.opName.toUpperCase() + ' WINS!';
+    winSub.textContent = 'Better luck next time';
+  } else {
+    winText.textContent = 'DRAW!';
+    winSub.textContent = 'Both warriors stand';
+  }
+  winEl.classList.add('on');
+  document.getElementById('bottomBar').style.display = 'flex';
+  game.flashAlpha = 0.8;
+  game.screenShake = 15;
+}
+
+// ===== BROADCAST MY STATE =====
+let broadcastTimer = 0;
+function broadcastMyState(dt) {
+  broadcastTimer += dt;
+  if (broadcastTimer < 0.06) return;
+  broadcastTimer = 0;
+  const am = KI.get('automatch');
+  const vrMod = KI.get('vocal-ranges');
+  if (!am) return;
+  am.broadcastState({
+    name: KI.player.name,
+    charge: game.chargeLevel,
+    firing: game.firing,
+    range: vrMod ? vrMod.state.activeRange : -1,
+    hp: game.myHP,
+    score: game.myScore
+  });
+}
+
+// ===== COUNTDOWN =====
+function startCountdown() {
+  game.phase = 'countdown';
+  game.countdownTimer = 3;
+  game.myHP = MAX_HP;
+  game.opHP = MAX_HP;
+  game.chargeLevel = 0;
+  game.chargeTime = 0;
+  game.firing = false;
+  game.opFiring = false;
+  game.clashX = 0.5;
+  game.myScore = 0;
+  game.opScore = 0;
+  game.roundTimer = ROUND_TIME;
+
+  const lbl = document.getElementById('centerLabel');
+  lbl.classList.add('on');
+  lbl.textContent = 'VS';
+
+  let count = 3;
+  const iv = setInterval(() => {
+    count--;
+    if (count > 0) {
+      lbl.textContent = count.toString();
+    } else {
+      lbl.textContent = 'FIGHT!';
+      game.phase = 'fight';
+      setTimeout(() => lbl.classList.remove('on'), 1500);
+      clearInterval(iv);
+    }
+  }, 1000);
+}
+
+// ===== MATCHMAKING EVENTS =====
+KI.on('automatch:connected', data => {
+  game.mySide = data.side;
+  game.opName = data.opponent || '???';
+  document.getElementById('waitOverlay').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('p1Name').textContent = game.mySide === 1 ? KI.player.name : game.opName;
+  document.getElementById('p2Name').textContent = game.mySide === 1 ? game.opName : KI.player.name;
+  startCountdown();
+});
+
+KI.on('automatch:opponentHello', data => {
+  game.opName = data.name;
+  document.getElementById('p1Name').textContent = game.mySide === 1 ? KI.player.name : game.opName;
+  document.getElementById('p2Name').textContent = game.mySide === 1 ? game.opName : KI.player.name;
+});
+
+KI.on('automatch:matching', data => {
+  document.getElementById('waitText').textContent = 'FOUND: ' + (data.opponent || '???');
+  document.getElementById('waitSub').textContent = 'connecting...';
+});
+
+KI.on('automatch:timeout', () => {
+  document.getElementById('waitText').textContent = 'MATCH TIMED OUT';
+  document.getElementById('waitSub').textContent = 'retrying...';
+  setTimeout(() => {
+    const am = KI.get('automatch');
+    if (am && am.state.phase === 'idle') {
+      am.state.phase = 'idle';
+      Automatch.joinQueue();
+    }
+  }, 2000);
+});
+
+KI.on('automatch:disconnected', () => {
+  if (game.phase === 'fight') {
+    doKO('win'); // opponent disconnected
+    spawnDmgPopup('DISCONNECTED', '#ff0', 'right');
+  }
+});
+
+KI.on('automatch:opRematch', () => {
+  startCountdown();
+});
+
+KI.on('automatch:queueUpdate', data => {
+  const qi = document.getElementById('queueInfo');
+  if (qi && game.phase === 'queue') {
+    qi.textContent = data.size + ' warrior' + (data.size !== 1 ? 's' : '') + ' in queue';
+  }
+});
+
+// ===== UI ACTIONS =====
+window.cancelQueue = () => {
+  Automatch.leaveQueue();
+  document.getElementById('waitOverlay').style.display = 'none';
+  game.phase = 'menu';
+};
+
+window.requestRematch = () => {
+  const am = KI.get('automatch');
+  if (am) am.sendMsg({ type: 'rematch', name: KI.player.name });
+  document.getElementById('winner').classList.remove('on');
+  document.getElementById('bottomBar').style.display = 'none';
+  startCountdown();
+};
+
+window.backToQueue = () => {
+  document.getElementById('winner').classList.remove('on');
+  document.getElementById('bottomBar').style.display = 'none';
+  document.getElementById('hud').style.display = 'none';
+  game.phase = 'queue';
+  document.getElementById('waitOverlay').style.display = 'flex';
+  document.getElementById('waitText').textContent = 'SEARCHING FOR OPPONENT';
+  document.getElementById('waitSub').textContent = 'global queue — next challenger incoming';
+  Automatch.joinQueue();
+};
+
+// ===== UTILITY =====
+function hexToRgba(hex, a) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+
+// ===== HUD UPDATE =====
+function updateHUD() {
+  document.getElementById('p1HP').style.width = (game.mySide === 1 ? game.myHP : game.opHP) / MAX_HP * 100 + '%';
+  document.getElementById('p2HP').style.width = (game.mySide === 1 ? game.opHP : game.myHP) / MAX_HP * 100 + '%';
+  document.getElementById('p1Pct').textContent = Math.round((game.mySide === 1 ? game.myHP : game.opHP) / MAX_HP * 100) + '%';
+  document.getElementById('p2Pct').textContent = Math.round((game.mySide === 1 ? game.opHP : game.myHP) / MAX_HP * 100) + '%';
+  document.getElementById('chargeFill1').style.width = (game.mySide === 1 ? game.chargeLevel : game.opCharge) * 100 + '%';
+  document.getElementById('chargeFill2').style.width = (game.mySide === 1 ? game.opCharge : game.chargeLevel) * 100 + '%';
+  document.getElementById('roundLabel').textContent = Math.ceil(game.roundTimer) + 's';
+
+  const vrMod = KI.get('vocal-ranges');
+  const myRange = vrMod ? vrMod.state.activeRange : -1;
+  document.getElementById('status').textContent =
+    (myRange >= 0 ? VocalRanges.RANGES[myRange].name + ' ' + Math.round(vrMod.state.f0Smooth) + 'Hz' : '—') +
+    '  |  ' + game.myScore + ' pts' +
+    (game.comboCount > 1 ? '  |  ' + game.comboCount + 'x combo' : '');
+}
+
+// ===== MAIN DRAW LOOP =====
+function draw() {
+  requestAnimationFrame(draw);
+  if (!running) { ctx.fillStyle = '#050510'; ctx.fillRect(0, 0, W, H); return; }
+
+  const dt = 0.016;
+  t += dt;
+
+  // screen shake
+  const shX = (Math.random() - 0.5) * game.screenShake * 2;
+  const shY = (Math.random() - 0.5) * game.screenShake * 2;
+  ctx.save();
+  ctx.translate(shX, shY);
+
+  // fade/clear
+  ctx.fillStyle = game.firing || game.opFiring ? 'rgba(5,5,16,0.15)' : 'rgba(5,5,16,0.1)';
+  ctx.fillRect(-10, -10, W + 20, H + 20);
+
+  // background grid (subtle)
+  ctx.strokeStyle = 'rgba(100,140,255,0.012)';
+  ctx.lineWidth = 0.5;
+  const gridSize = 60;
+  for (let gx = 0; gx < W; gx += gridSize) {
+    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+  }
+  for (let gy = 0; gy < H; gy += gridSize) {
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+  }
+
+  // ground line
+  const groundY = H * 0.48 + 55;
+  ctx.strokeStyle = 'rgba(100,140,255,0.04)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
+
+  // update game
+  updateGame(dt);
+  updateSynths();
+  broadcastMyState(dt);
+
+  // get positions
+  const p1 = getP1Pos(), p2 = getP2Pos();
+  const myPos = getMyPos(), opPos = getOpPos();
+  const vrMod = KI.get('vocal-ranges');
+  const myRange = vrMod ? vrMod.state.activeRange : -1;
+
+  // === DRAW P1 (LEFT) ===
+  const p1Charge = game.mySide === 1 ? game.chargeLevel : game.opCharge;
+  const p1Firing = game.mySide === 1 ? game.firing : game.opFiring;
+  const p1Decay = game.mySide === 1 ? game.fireDecay : game.opFireDecay;
+  const p1Range = game.mySide === 1 ? myRange : game.opRange;
+  const p1Name = game.mySide === 1 ? KI.player.name : game.opName;
+  drawFighter(p1.x, p1.y, 1, p1Charge, p1Firing, p1Decay, 210, p1Range, p1Name);
+  if (!p1Firing) drawChargeSphere(p1.handX, p1.handY, p1Charge, p1Range);
+
+  // === DRAW P2 (RIGHT) ===
+  const p2Charge = game.mySide === 2 ? game.chargeLevel : game.opCharge;
+  const p2Firing = game.mySide === 2 ? game.firing : game.opFiring;
+  const p2Decay = game.mySide === 2 ? game.fireDecay : game.opFireDecay;
+  const p2Range = game.mySide === 2 ? myRange : game.opRange;
+  const p2Name = game.mySide === 2 ? KI.player.name : game.opName;
+  drawFighter(p2.x, p2.y, -1, p2Charge, p2Firing, p2Decay, 350, p2Range, p2Name);
+  if (!p2Firing) drawChargeSphere(p2.handX, p2.handY, p2Charge, p2Range);
+
+  // === BEAMS ===
+  const clashWorldX = p1.handX + (p2.handX - p1.handX) * game.clashX;
+  if (p1Firing && p1Decay > 0) {
+    const bl = game.mySide === 1 ? game.beamLength : game.opBeamLength;
+    const bw = game.mySide === 1 ? game.beamWidth : game.opBeamWidth;
+    drawBeam(p1.handX, p1.handY, 1, Math.min(bl, clashWorldX - p1.handX), bw, p1Decay, p1Range);
+  }
+  if (p2Firing && p2Decay > 0) {
+    const bl = game.mySide === 2 ? game.beamLength : game.opBeamLength;
+    const bw = game.mySide === 2 ? game.beamWidth : game.opBeamWidth;
+    drawBeam(p2.handX, p2.handY, -1, Math.min(bl, p2.handX - clashWorldX), bw, p2Decay, p2Range);
+  }
+
+  // === CLASH POINT ===
+  if (game.clashIntensity > 0.01) {
+    drawClashPoint(clashWorldX, H * 0.48, game.clashIntensity);
+  }
+
+  // when my beam reaches clash point and decays, score a hit
+  if (game.firing && game.fireDecay > 0 && game.fireDecay < 0.15 && game.beamLength > 50) {
+    onMyBeamHit();
+    game.fireDecay = 0; // prevent double scoring
+  }
+
+  // === ALL PARTICLES ===
+  // charge particles spiral inward
+  chargeParticles.forEach(p => {
+    const dx = p.tx - p.x, dy = p.ty - p.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 1) {
+      p.x += (dx / dist) * p.speed;
+      p.y += (dy / dist) * p.speed;
+      const perp = Math.atan2(dy, dx) + Math.PI / 2;
+      p.x += Math.cos(perp) * p.speed * 0.3;
+      p.y += Math.sin(perp) * p.speed * 0.3;
+    }
+    p.life -= 0.015;
+    if (dist < 15) p.life -= 0.1;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = 'hsla(' + p.hue + ',80%,70%,' + p.life * 0.4 + ')';
+    ctx.fill();
+  });
+  chargeParticles = chargeParticles.filter(p => p.life > 0);
+
+  // beam particles
+  beamParticles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = 'hsla(' + p.hue + ',80%,70%,' + p.life * 0.3 + ')';
+    ctx.fill();
+  });
+  beamParticles = beamParticles.filter(p => p.life > 0);
+
+  // aura particles
+  auraParticles.forEach(p => {
+    p.y += p.vy; p.life -= 0.015;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = 'hsla(' + p.hue + ',70%,60%,' + p.life * 0.12 + ')';
+    ctx.fill();
+  });
+  auraParticles = auraParticles.filter(p => p.life > 0);
+
+  // spark arcs
+  sparkParticles.forEach(sp => {
+    sp.life -= 0.016;
+    if (sp.points.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(sp.points[0].x, sp.points[0].y);
+    for (let i = 1; i < sp.points.length; i++) ctx.lineTo(sp.points[i].x, sp.points[i].y);
+    ctx.strokeStyle = 'hsla(' + sp.hue + ',80%,80%,' + sp.life * 3 + ')';
+    ctx.lineWidth = sp.width;
+    ctx.stroke();
+    ctx.strokeStyle = 'hsla(' + sp.hue + ',60%,90%,' + sp.life * 1.5 + ')';
+    ctx.lineWidth = sp.width * 3;
+    ctx.globalAlpha = 0.3; ctx.stroke(); ctx.globalAlpha = 1;
+  });
+  sparkParticles = sparkParticles.filter(sp => sp.life > 0);
+
+  // clash particles
+  clashParticles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.life -= 0.02; p.vx *= 0.97; p.vy *= 0.97;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fillStyle = 'hsla(' + p.hue + ',80%,70%,' + Math.max(0, p.life) + ')';
+    ctx.fill();
+  });
+  clashParticles = clashParticles.filter(p => p.life > 0);
+
+  // impact particles
+  impactParticles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.3; p.life -= 0.015;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = 'hsla(' + p.hue + ',90%,60%,' + p.life * 0.5 + ')';
+    ctx.fill();
+  });
+  impactParticles = impactParticles.filter(p => p.life > 0);
+
+  // === FLASH ===
+  if (game.flashAlpha > 0.01) {
+    ctx.fillStyle = 'rgba(200,220,255,' + game.flashAlpha + ')';
+    ctx.fillRect(-10, -10, W + 20, H + 20);
+  }
+
+  ctx.restore(); // end screen shake
+  game.screenShake *= 0.94;
+
+  // update HUD
+  if (game.phase === 'fight' || game.phase === 'ko') {
+    updateHUD();
+    updateVocalRangePanels();
+  }
+
+  // particle limits
+  if (chargeParticles.length > 2000) chargeParticles = chargeParticles.slice(-1500);
+  if (beamParticles.length > 1500) beamParticles = beamParticles.slice(-1000);
+  if (sparkParticles.length > 150) sparkParticles = sparkParticles.slice(-100);
+  if (auraParticles.length > 500) auraParticles = auraParticles.slice(-400);
+  if (clashParticles.length > 300) clashParticles = clashParticles.slice(-200);
+}
+
+// ===== BOOT =====
+window.beginGame = async function() {
+  try {
+    await VoiceEngine.init();
+  } catch (e) {
+    alert('Microphone required for voice-powered Kamehameha Duel!\n\n' + e.message);
+    return;
+  }
+
+  VocalRanges.init();
+  initSynths();
+  buildVocalRangePanels();
+
+  Automatch.init();
+
+  document.getElementById('start').style.display = 'none';
+  running = true;
+  game.phase = 'queue';
+
+  document.getElementById('waitOverlay').style.display = 'flex';
+  Automatch.joinQueue();
+
+  draw();
+
+  console.log('%c KAMEHAMEHA DUEL ', 'background:#050510;color:#44aaff;font-size:18px;padding:8px;font-weight:bold');
+};
+
+draw();
+</script>
+</body>
+</html>

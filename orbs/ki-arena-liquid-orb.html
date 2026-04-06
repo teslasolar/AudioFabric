@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena — Liquid Orb</title>
+<link rel="stylesheet" href="../shared/styles.css">
+<style>
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;display:none;padding:10px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.7),transparent);pointer-events:none}
+#hud.on{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-l,.hud-r{display:flex;flex-direction:column;gap:2px}
+.hud-r{align-items:flex-end;text-align:right}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04}
+#liquidName{font-size:20px;text-shadow:0 0 15px currentColor;text-transform:uppercase;letter-spacing:3px;transition:color 0.5s}
+#waveInfo{font-size:10px;color:#888}
+/* Liquid type pills */
+#liquidPills{position:fixed;right:12px;top:50%;transform:translateY(-50%);z-index:55;
+  display:flex;flex-direction:column;gap:4px;pointer-events:none}
+.liq-pill{padding:4px 12px;font-size:10px;border:1px solid #fff1;
+  border-radius:10px;background:rgba(0,0,0,0.4);transition:all 0.4s}
+.liq-pill.active{border-color:currentColor}
+/* Wave mode meter */
+#waveModeMeter{position:fixed;left:12px;bottom:12px;z-index:55;
+  background:rgba(0,0,0,0.6);border:1px solid #fff1;border-radius:6px;
+  padding:8px;pointer-events:none}
+#waveModes{display:flex;gap:2px;align-items:flex-end;height:30px}
+.wm-bar{width:12px;background:#0884;border-radius:2px 2px 0 0;transition:height 0.15s}
+#modeLabel{font-size:8px;color:#555;margin-top:4px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="hud-l">
+    <div id="liquidName" style="color:#28c">water</div>
+    <div id="waveInfo">0 modes</div>
+  </div>
+  <div class="hud-r">
+    <div id="nick" onclick="changeNick()"></div>
+  </div>
+</div>
+<div id="liquidPills">
+  <div class="liq-pill active" style="color:#28c">Water</div>
+  <div class="liq-pill" style="color:#aaa">Mercury</div>
+  <div class="liq-pill" style="color:#f42">Lava</div>
+  <div class="liq-pill" style="color:#a4f">Plasma</div>
+  <div class="liq-pill" style="color:#84a">Oil</div>
+</div>
+<div id="waveModeMeter">
+  <div id="waveModes"></div>
+  <div id="modeLabel">WAVE MODES</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script type="module">
+import { KI } from '../modules/core.js';
+import * as Scene from '../modules/scene.js';
+import * as VoiceEngine from '../modules/voice-engine.js';
+import * as FreqBands from '../modules/freq-bands-12.js';
+import * as Synths from '../modules/synths.js';
+import * as Resonance from '../modules/resonance.js';
+import * as LiquidOrb from '../modules/liquid-orb.js';
+import * as MqttNet from '../modules/mqtt-net.js';
+import * as WebRTCNet from '../modules/webrtc-net.js';
+import * as Presence from '../modules/presence.js';
+import * as Chat from '../modules/chat.js';
+import * as PlayerProfile from '../modules/player-profile.js';
+import * as NavOverlay from '../modules/nav-overlay.js';
+
+const ROOM = 'LORB-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+KI.player.name = KI.genHash();
+document.getElementById('nick').textContent = KI.player.name;
+window.changeNick = function() {
+  const n = prompt('Nickname:', KI.player.name);
+  if (n && n.trim()) { KI.player.name = n.trim().slice(0,16); document.getElementById('nick').textContent = KI.player.name; }
+};
+
+// Build wave mode bars
+const wmContainer = document.getElementById('waveModes');
+for (let i = 0; i < 8; i++) {
+  const bar = document.createElement('div');
+  bar.className = 'wm-bar'; bar.id = 'wm-' + i;
+  bar.style.height = '2px';
+  wmContainer.appendChild(bar);
+}
+
+const LIQUID_COLORS = { water:'#28c', mercury:'#aaa', lava:'#f42', plasma:'#a4f', oil:'#84a' };
+const LIQUID_LIST = ['water','mercury','lava','plasma','oil'];
+const pills = document.querySelectorAll('.liq-pill');
+
+KI.on('liquid-orb:update', data => {
+  document.getElementById('liquidName').textContent = data.liquidType;
+  document.getElementById('liquidName').style.color = LIQUID_COLORS[data.liquidType] || '#28c';
+  document.getElementById('waveInfo').textContent = data.activeModes + ' modes / amp ' + data.waveAmplitude;
+  pills.forEach((p, i) => p.classList.toggle('active', LIQUID_LIST[i] === data.liquidType));
+});
+
+async function boot() {
+  document.getElementById('hud').classList.add('on');
+  Scene.init({ stars: 1000 });
+  try { await VoiceEngine.init(); } catch(e) { console.warn('voice:', e); }
+  FreqBands.init(); Synths.init(); Resonance.init();
+  LiquidOrb.init({ position: [0, 2.5, -3.5] });
+  MqttNet.init({ room: ROOM }); WebRTCNet.init({ room: ROOM });
+  Presence.init(); Chat.init(); PlayerProfile.init(); NavOverlay.init();
+  KI.running = true;
+  const clock = KI.clock;
+  (function animate() {
+    if (!KI.running) return; requestAnimationFrame(animate);
+    const dt = clock.getDelta(), t = clock.elapsedTime;
+    KI.runUpdates(dt, t); KI.renderer.render(KI.scene, KI.camera);
+  })();
+  console.log('%c LIQUID ORB BOOTED ', 'background:#000;color:#28c;font-size:22px;padding:12px');
+}
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
