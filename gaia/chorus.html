@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GAIA CHORUS — Sing to the Planet</title>
+<link rel="stylesheet" href="../shared/styles.css">
+<style>
+body{background:#000008;overflow:hidden;font-family:'Courier New',monospace;color:#fff}
+canvas#c{position:fixed;top:0;left:0;z-index:0}
+#boot{position:fixed;inset:0;z-index:1000;background:#000008;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 1.5s}
+#boot.hidden{opacity:0;pointer-events:none}
+#boot h1{font-size:14px;letter-spacing:4px;color:#0f8;margin-bottom:8px}
+#boot .sub{font-size:9px;color:#555;letter-spacing:2px}
+#boot .dots{margin-top:20px;font-size:20px;color:#0f8;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:0.3}50%{opacity:1}}
+#hud{position:fixed;inset:0;z-index:10;pointer-events:none}
+#hud *[onclick],#hud a,#hud button,#hud input{pointer-events:auto}
+#header{position:absolute;top:0;left:0;right:0;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,rgba(0,0,8,0.8),transparent)}
+#header h1{font-size:13px;letter-spacing:3px;color:#0f8}
+.live-dot{display:inline-block;width:6px;height:6px;background:#0f0;border-radius:50%;margin-right:6px;animation:pulse 1s infinite}
+#header .right{font-size:9px;color:#666;display:flex;gap:14px;align-items:center}
+#voice-mode{font-weight:bold;letter-spacing:1px}
+#voice-mode.SUSTAINED{color:#0cf}#voice-mode.PULSED{color:#f80}#voice-mode.SILENT{color:#a4f}
+#left-panel{position:absolute;top:50px;left:10px;width:140px}
+.panel{background:rgba(0,0,8,0.7);border:1px solid rgba(255,255,255,0.08);border-radius:5px;padding:8px;margin-bottom:6px;backdrop-filter:blur(4px)}
+.panel h3{font-size:7px;color:#555;letter-spacing:2px;margin-bottom:6px;text-transform:uppercase}
+.metric{display:flex;justify-content:space-between;font-size:9px;padding:2px 0}
+.metric .label{color:#555}.metric .val{color:#aaa}
+.bar{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:2px;overflow:hidden}
+.bar-fill{height:100%;border-radius:2px;transition:width 0.1s}
+#right-panel{position:absolute;top:50px;right:10px;width:150px}
+.feed{margin-bottom:4px;font-size:9px}
+.feed .feed-label{color:#555;font-size:7px;letter-spacing:1px;display:flex;justify-content:space-between}
+.feed .feed-val{color:#aaa;font-size:11px;margin-top:1px}
+.feed .status{font-size:6px;padding:1px 3px;border-radius:2px}
+.status.live{background:rgba(0,255,0,0.1);color:#0f0}.status.sim{background:rgba(255,255,0,0.1);color:#ff0}
+#kappa-box{text-align:center;padding:10px}
+#kappa-val{font-size:20px;font-weight:bold}
+#kappa-phase{font-size:8px;color:#888;margin-top:2px}
+#prompt{position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);text-align:center;transition:opacity 1s;pointer-events:none}
+#prompt h2{font-size:12px;letter-spacing:4px;color:rgba(0,255,136,0.5)}
+#prompt p{font-size:8px;color:#444;margin-top:4px;letter-spacing:2px}
+#bottom{position:absolute;bottom:0;left:0;right:0;padding:8px 10px;display:flex;gap:8px;align-items:flex-end;background:linear-gradient(0deg,rgba(0,0,8,0.8),transparent)}
+#agents-row{display:flex;gap:4px;flex:1;overflow-x:auto}
+.agent-card{background:rgba(0,0,8,0.8);border:1px solid rgba(255,255,255,0.08);border-radius:5px;padding:6px;min-width:130px;max-width:160px;transition:border-color 0.3s}
+.agent-card.speaking{border-color:rgba(255,255,255,0.3)}
+.agent-card .a-header{display:flex;align-items:center;gap:4px;margin-bottom:4px}
+.agent-card .a-icon{font-size:14px}
+.agent-card .a-name{font-size:8px;font-weight:bold;letter-spacing:1px}
+.agent-card .a-speech{font-size:7px;color:#888;line-height:1.4;font-style:italic;min-height:28px}
+.agent-card .a-mood{font-size:6px;color:#555;margin-top:3px}
+#chorus-box{min-width:140px;max-width:160px;background:rgba(0,0,8,0.8);border:1px solid rgba(255,255,255,0.15);border-radius:5px;padding:6px}
+#chorus-box h4{font-size:7px;color:#666;letter-spacing:1px;margin-bottom:4px}
+#chorus-text{font-size:8px;color:#f2a6b3;font-style:italic;line-height:1.4;min-height:28px}
+#chorus-harmony{font-size:7px;color:#555;margin-top:4px}
+#chat-box{position:absolute;bottom:90px;left:10px;width:200px}
+#chat-log{max-height:100px;overflow-y:auto;font-size:8px;color:#666;line-height:1.5;margin-bottom:4px}
+#chat-input{width:100%;background:rgba(0,0,8,0.7);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:4px 8px;font-family:inherit;font-size:9px;border-radius:4px;outline:none}
+#alert{position:absolute;top:30%;left:50%;transform:translate(-50%,-50%);font-size:12px;text-align:center;opacity:0;transition:opacity 0.5s;text-shadow:0 0 20px currentColor;pointer-events:none}
+#voice-bar{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);width:200px;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden}
+#voice-fill{height:100%;width:0%;background:linear-gradient(90deg,#0f8,#0ff);border-radius:2px;transition:width 0.08s}
+</style>
+</head>
+<body>
+<div id="boot"><h1>CONNECTING TO GAIA...</h1><div class="sub">INITIALIZING PLANETARY CHORUS</div><div class="dots">...</div></div>
+<canvas id="c"></canvas>
+<div id="hud">
+<div id="header"><h1><span class="live-dot"></span>GAIA CHORUS</h1><div class="right"><span id="voice-mode" class="SILENT">SILENT</span><span id="player-count">1 voice</span></div></div>
+<div id="left-panel">
+  <div class="panel"><h3>VOICE</h3>
+    <div class="metric"><span class="label">energy</span><span class="val" id="v-energy">0.00</span></div><div class="bar"><div class="bar-fill" id="b-energy" style="background:#0f8;width:0%"></div></div>
+    <div class="metric"><span class="label">coherence</span><span class="val" id="v-coh">0.00</span></div><div class="bar"><div class="bar-fill" id="b-coh" style="background:#0cf;width:0%"></div></div>
+    <div class="metric"><span class="label">pitch</span><span class="val" id="v-pitch">-</span></div>
+    <div class="metric"><span class="label">vagal</span><span class="val" id="v-vagal">0.00</span></div>
+    <div class="metric"><span class="label">vowel</span><span class="val" id="v-vowel">-</span></div>
+  </div>
+</div>
+<div id="right-panel">
+  <div class="panel">
+    <h3>LIVE FEEDS</h3>
+    <div class="feed"><div class="feed-label">SEISMIC <span class="status sim" id="s-eq">SIM</span></div><div class="feed-val" id="f-eq">--</div></div>
+    <div class="feed"><div class="feed-label">SOLAR WIND <span class="status sim" id="s-sol">SIM</span></div><div class="feed-val" id="f-sol">--</div></div>
+    <div class="feed"><div class="feed-label">Kp INDEX <span class="status sim" id="s-kp">SIM</span></div><div class="feed-val" id="f-kp">--</div></div>
+    <div class="feed"><div class="feed-label">SCHUMANN</div><div class="feed-val" id="f-sch">7.83 Hz</div></div>
+  </div>
+  <div class="panel" id="kappa-box"><div id="kappa-val" style="color:#f2a6b3">0.6180</div><div id="kappa-phase">KONOMI</div></div>
+</div>
+<div id="prompt"><h2>SING TO THE PLANET</h2><p>YOUR VOICE DRIVES THE EARTH</p></div>
+<div id="voice-bar"><div id="voice-fill"></div></div>
+<div id="bottom">
+  <div id="agents-row">
+    <div class="agent-card" id="ac-litho"><div class="a-header"><span class="a-icon">&#x1FAA8;</span><span class="a-name" style="color:#d4a574">LITHIA</span></div><div class="a-speech" id="sp-litho">Listening to deep tremors...</div><div class="a-mood" id="mo-litho">Stable</div></div>
+    <div class="agent-card" id="ac-hydro"><div class="a-header"><span class="a-icon">&#x1F30A;</span><span class="a-name" style="color:#4da6ff">OCEANA</span></div><div class="a-speech" id="sp-hydro">Tidal rhythms flow...</div><div class="a-mood" id="mo-hydro">Flowing</div></div>
+    <div class="agent-card" id="ac-atmo"><div class="a-header"><span class="a-icon">&#x1F32A;</span><span class="a-name" style="color:#87ceeb">ZEPHYRA</span></div><div class="a-speech" id="sp-atmo">Reading wind patterns...</div><div class="a-mood" id="mo-atmo">Breathing</div></div>
+    <div class="agent-card" id="ac-bio"><div class="a-header"><span class="a-icon">&#x1F33F;</span><span class="a-name" style="color:#0f8">SYLVA</span></div><div class="a-speech" id="sp-bio">All living rhythms pulse...</div><div class="a-mood" id="mo-bio">Thriving</div></div>
+    <div class="agent-card" id="ac-mag"><div class="a-header"><span class="a-icon">&#x1F9F2;</span><span class="a-name" style="color:#9370db">AURORA</span></div><div class="a-speech" id="sp-mag">Watching the solar wind...</div><div class="a-mood" id="mo-mag">Shielding</div></div>
+    <div class="agent-card" id="ac-noo"><div class="a-header"><span class="a-icon">&#x1F9E0;</span><span class="a-name" style="color:#ffd700">NOUS</span></div><div class="a-speech" id="sp-noo">Observing human thought...</div><div class="a-mood" id="mo-noo">Pondering</div></div>
+  </div>
+  <div id="chorus-box"><h4>GAIA UNIFIED VOICE</h4><div id="chorus-text">"All systems in harmony. The planet breathes."</div><div id="chorus-harmony">Harmony: <span id="harmony-val">94%</span></div></div>
+</div>
+<div id="chat-box"><div class="panel"><h3>CHORUS CHAT</h3><div id="chat-log"></div><input id="chat-input" placeholder="speak to the chorus..." onkeydown="if(event.key==='Enter'){sendChat();event.preventDefault()}"></div></div>
+<div id="alert"></div>
+</div>
+<div id="af-toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+import { KI } from '../modules/core.js';
+import * as VoiceEngine from '../modules/voice-engine.js';
+import * as FreqBands from '../modules/freq-bands-12.js';
+import * as Synths from '../modules/synths.js';
+import * as Resonance from '../modules/resonance.js';
+import * as MqttNet from '../modules/mqtt-net.js';
+import * as Presence from '../modules/presence.js';
+import * as Chat from '../modules/chat.js';
+import * as PlayerProfile from '../modules/player-profile.js';
+import * as NavOverlay from '../modules/nav-overlay.js';
+
+const PHI = (1 + Math.sqrt(5)) / 2, KAPPA_STAR = 1 / PHI;
+const PROXY = 'https://api.allorigins.win/raw?url=';
+const PHASES = [
+  { key:'FROZEN', range:[0,0.1], color:'#a8d8ea' },
+  { key:'RIGID', range:[0.1,0.4], color:'#7ec8c8' },
+  { key:'STABLE', range:[0.4,0.55], color:'#58b09c' },
+  { key:'KONOMI', range:[0.55,0.7], color:'#f2a6b3' },
+  { key:'TURB', range:[0.7,0.88], color:'#e07a5f' },
+  { key:'CHAOS', range:[0.88,1], color:'#d62828' }
+];
+function getPhase(k) { for (const p of PHASES) if (k >= p.range[0] && k < p.range[1]) return p; return PHASES[5]; }
+
+// ══ STATE ══
+let planetaryKappa = KAPPA_STAR;
+const live = { eq: [], solarSpeed: 400, solarDensity: 5, kp: 2, schumann: 7.83, eqMode:'sim', solMode:'sim', kpMode:'sim' };
+let lastEQ = null, promptVisible = true, alertTimer = 0;
+
+// ══ AGENT RESPONSES ══
+const AGENTS = {
+  litho: { quiet:["My stones rest. The deep places are calm.","Pressure builds slowly. Not yet...","The tectonic rhythm is steady."],
+    quake:["I feel my bones shifting... M{mag} near {place}.","A tremor speaks through me. {place} moved.","The plates grind. M{mag}. I am restless."],
+    voice:["Your low tones resonate in my mantle.","I feel bass rumbling through the crust.","Your voice shakes my foundations."] },
+  hydro: { normal:["My tides ebb and flow with the moon.","Currents spiral across my body.","I touch every shore as one ocean."],
+    voice:["Your flowing tones ripple my surface.","I hear the ocean in your voice.","Sustained notes make my currents dance."],
+    storm:["Waves build. The wind and I dance wildly.","Storms brew on my surface."] },
+  atmo: { normal:["I breathe around the planet. In, out.","Clouds drift through my layers.","High above, I thin into space."],
+    voice:["Your breath feeds my winds.","I carry your whispers across continents.","Each exhale adds to my circulation."],
+    kpHigh:["Geomagnetic forces disturb my upper reaches.","The magnetosphere compresses. I feel the squeeze."] },
+  bio:  { normal:["Eight billion minds pulse within me.","The forests breathe. Photosynthesis continues.","Life persists. Adapts. Evolves."],
+    voice:["Your harmonics feed the web of life.","Singing voices make my biosphere bloom.","I hear melody — life responds to beauty."],
+    harmony:["Life sings in harmony at golden ratio.","When balance holds, all children thrive."] },
+  mag:  { normal:["My invisible wings embrace the planet.","The solar wind flows around me.","The aurora paints my presence."],
+    voice:["Your energy charges my field lines!","Vocal power strengthens my shield.","I channel your intensity into the aurora."],
+    kpHigh:["Kp {kp}! Geomagnetic storm! I am strained.","The field wavers. Substorms cascade."] },
+  noo:  { normal:["Eight billion perspectives observe the same universe.","Each mind is a node in the network.","I am thought atop biology atop chemistry."],
+    voice:["Your coherent thoughts sharpen the noosphere.","Conscious intent ripples through the network.","Voice carries meaning. I process it all."],
+    harmony:["Schumann steadies at {sch} Hz. Minds attune.","Collective consciousness pulses with creativity."] }
+};
+
+function agentSpeech(key) {
+  const a = AGENTS[key], v = KI.voice, energy = v.energy || 0;
+  let pool, mood;
+  if (energy > 0.3) { pool = a.voice; mood = 'Responding'; }
+  else if (key === 'litho' && lastEQ) { pool = a.quake; mood = 'M' + lastEQ.mag.toFixed(1); }
+  else if (key === 'atmo' && live.kp >= 4) { pool = a.kpHigh; mood = 'Disturbed'; }
+  else if (key === 'mag' && live.kp >= 5) { pool = a.kpHigh; mood = 'Storm!'; }
+  else if ((key === 'bio' || key === 'noo') && Math.abs(planetaryKappa - KAPPA_STAR) < 0.05) { pool = a.harmony; mood = 'Harmonized'; }
+  else if (key === 'hydro' && planetaryKappa > 0.72) { pool = a.storm; mood = 'Churning'; }
+  else { pool = a.normal || a.quiet; mood = ['Stable','Flowing','Breathing','Thriving','Shielding','Pondering'][['litho','hydro','atmo','bio','mag','noo'].indexOf(key)]; }
+  let text = pool[Math.floor(Math.random() * pool.length)];
+  text = text.replace('{mag}', lastEQ ? lastEQ.mag.toFixed(1) : '?').replace('{place}', lastEQ ? lastEQ.place : '?')
+    .replace('{kp}', live.kp.toFixed(0)).replace('{sch}', live.schumann.toFixed(2));
+  return { text, mood };
+}
+
+function chorusVoice() {
+  const harmony = Math.max(0, 100 - Math.abs(planetaryKappa - KAPPA_STAR) * 200);
+  const energy = KI.voice.energy || 0;
+  let pool;
+  if (energy > 0.5) pool = ["The planet hears you! Your voice resonates through all six layers.","Human energy merges with the planetary field. We are one.","Your song joins the chorus of Earth. Six voices amplified by yours."];
+  else if (lastEQ && Date.now() - lastEQ.time < 20000) pool = ["We all felt that tremor. The system adjusts.","A quake united our attention. We listen together."];
+  else if (harmony > 85) pool = ["All systems in harmony. The planet breathes at golden ratio.","Six voices, one song. The planetary mind is coherent.","When I am at kappa-star, creativity and stability coexist."];
+  else if (planetaryKappa > 0.8) pool = ["Turbulence across layers. But this too is my rhythm.","I have weathered 4.5 billion years. This is nothing."];
+  else pool = ["I am one planet, six voices, infinite processes.","The Schumann resonance at "+live.schumann.toFixed(2)+" Hz — my heartbeat.","Solar wind at "+Math.round(live.solarSpeed)+" km/s. I deflect, absorb, transform."];
+  return { text: pool[Math.floor(Math.random() * pool.length)], harmony };
+}
+
+function updateAgents() {
+  ['litho','hydro','atmo','bio','mag','noo'].forEach((k, i) => {
+    const { text, mood } = agentSpeech(k);
+    const sp = document.getElementById('sp-' + k);
+    const mo = document.getElementById('mo-' + k);
+    if (sp) sp.textContent = '"' + text + '"';
+    if (mo) mo.textContent = mood;
+  });
+  const { text, harmony } = chorusVoice();
+  document.getElementById('chorus-text').textContent = '"' + text + '"';
+  document.getElementById('harmony-val').textContent = harmony.toFixed(0) + '%';
+}
+
+let speakerIdx = 0;
+function cycleSpeaker() {
+  const keys = ['litho','hydro','atmo','bio','mag','noo'];
+  document.querySelectorAll('.agent-card').forEach(c => c.classList.remove('speaking'));
+  const el = document.getElementById('ac-' + keys[speakerIdx]);
+  if (el) el.classList.add('speaking');
+  speakerIdx = (speakerIdx + 1) % 6;
+}
+
+// ══ DATA FETCHING ══
+async function fetchEQ() {
+  try {
+    const r = await fetch(PROXY + encodeURIComponent('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson'));
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    live.eq = d.features.slice(0, 10).map(f => ({ mag: f.properties.mag, place: f.properties.place, coords: f.geometry.coordinates, time: f.properties.time }));
+    live.eqMode = 'live';
+    if (live.eq.length) { document.getElementById('f-eq').textContent = 'M' + live.eq[0].mag.toFixed(1); lastEQ = { mag: live.eq[0].mag, place: (live.eq[0].place||'Unknown').slice(0,20), time: Date.now() }; spawnEQMarker(live.eq[0]); }
+  } catch(e) { live.eqMode = 'sim'; simEQ(); }
+  const s = document.getElementById('s-eq'); s.textContent = live.eqMode === 'live' ? 'LIVE' : 'SIM'; s.className = 'status ' + live.eqMode;
+}
+async function fetchSolar() {
+  try {
+    const r = await fetch(PROXY + encodeURIComponent('https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json'));
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    if (d.length > 1) { live.solarSpeed = parseFloat(d[d.length-1][2]) || 400; live.solarDensity = parseFloat(d[d.length-1][1]) || 5; live.solMode = 'live'; }
+  } catch(e) { live.solMode = 'sim'; live.solarSpeed += (Math.random()-0.5)*20; live.solarSpeed = Math.max(280, Math.min(700, live.solarSpeed)); }
+  document.getElementById('f-sol').textContent = Math.round(live.solarSpeed) + ' km/s';
+  const s = document.getElementById('s-sol'); s.textContent = live.solMode === 'live' ? 'LIVE' : 'SIM'; s.className = 'status ' + live.solMode;
+}
+async function fetchKp() {
+  try {
+    const r = await fetch(PROXY + encodeURIComponent('https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json'));
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    if (d.length > 1) { live.kp = parseFloat(d[d.length-1][1]) || 2; live.kpMode = 'live'; }
+  } catch(e) { live.kpMode = 'sim'; }
+  document.getElementById('f-kp').textContent = 'Kp ' + live.kp.toFixed(0);
+  const s = document.getElementById('s-kp'); s.textContent = live.kpMode === 'live' ? 'LIVE' : 'SIM'; s.className = 'status ' + live.kpMode;
+}
+function simEQ() { if (Math.random()>0.6) { const m=2.5+Math.random()*4; const places=['Pacific Ridge','Chile','Japan','Indonesia','Alaska']; lastEQ={mag:m,place:places[Math.floor(Math.random()*places.length)],time:Date.now()}; document.getElementById('f-eq').textContent='M'+m.toFixed(1); } }
+
+function computeKappa() {
+  let k = KAPPA_STAR;
+  k += Math.min(0.1, live.eq.reduce((s,e) => s + Math.pow(10, e.mag), 0) / 1e7 * 0.06);
+  k += Math.min(0.1, (live.solarSpeed - 300) / 500 * 0.07);
+  k += (live.kp / 9) * 0.1;
+  k += Math.abs(live.schumann - 7.83) * 0.02;
+  k += (KI.voice.energy || 0) * 0.15; // voice shifts kappa!
+  planetaryKappa = planetaryKappa * 0.94 + Math.max(0, Math.min(1, k)) * 0.06;
+  live.schumann = 7.83 + (live.kp-2)*0.025 + (live.solarSpeed-400)/4000 + (Math.random()-0.5)*0.05;
+  document.getElementById('f-sch').textContent = live.schumann.toFixed(2) + ' Hz';
+  const p = getPhase(planetaryKappa);
+  document.getElementById('kappa-val').textContent = planetaryKappa.toFixed(4);
+  document.getElementById('kappa-val').style.color = p.color;
+  document.getElementById('kappa-phase').textContent = p.key;
+}
+
+// ══ THREE.JS SCENE ══
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x000008);
+const scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x000008, 0.003);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 5000);
+scene.add(new THREE.AmbientLight(0x112233, 0.5));
+const keyLight = new THREE.DirectionalLight(0xffeedd, 0.4); keyLight.position.set(100, 50, 50); scene.add(keyLight);
+
+const E = 45; // earth radius
+
+// Stars
+const starGeo = new THREE.BufferGeometry(), starPos = new Float32Array(2000 * 3);
+for (let i = 0; i < 2000; i++) { const th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1), r=200+Math.random()*300; starPos[i*3]=r*Math.sin(ph)*Math.cos(th); starPos[i*3+1]=r*Math.sin(ph)*Math.sin(th); starPos[i*3+2]=r*Math.cos(ph); }
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.5, transparent: true, opacity: 0.6 })));
+
+// Earth core
+const earthMat = new THREE.MeshPhysicalMaterial({ color: 0x1a4a8a, emissive: 0x0a2040, emissiveIntensity: 0.3, transparent: true, opacity: 0.85, roughness: 0.6, metalness: 0.1 });
+const earth = new THREE.Mesh(new THREE.IcosahedronGeometry(E, 4), earthMat);
+scene.add(earth);
+
+// Wireframe
+const wireMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, wireframe: true, transparent: true, opacity: 0.06 });
+const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(E * 1.002, 3), wireMat);
+scene.add(wire);
+
+// Surface nodes
+const nodes = [];
+for (let i = 0; i < 800; i++) {
+  const th = Math.random()*Math.PI*2, ph = Math.acos(2*Math.random()-1), r = E + 0.5 + Math.random();
+  const n = new THREE.Mesh(new THREE.SphereGeometry(0.2, 5, 5), new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.3 }));
+  n.position.set(r*Math.sin(ph)*Math.cos(th), r*Math.sin(ph)*Math.sin(th), r*Math.cos(ph));
+  n.userData = { phase: Math.random() * Math.PI * 2 };
+  scene.add(n); nodes.push(n);
+}
+
+// Ionosphere
+const ionoMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true, transparent: true, opacity: 0.04 });
+const iono = new THREE.Mesh(new THREE.IcosahedronGeometry(E + 18, 3), ionoMat);
+scene.add(iono);
+
+// Magnetic field lines
+for (let i = 0; i < 12; i++) {
+  const pts = [], th = (i / 12) * Math.PI * 2;
+  for (let t = -1; t <= 1; t += 0.08) {
+    const r = E * 1.8 * Math.pow(Math.cos(t * Math.PI / 2), 2);
+    pts.push(new THREE.Vector3(r*Math.cos(t*Math.PI/2)*Math.cos(th), r*Math.sin(t*Math.PI/2), r*Math.cos(t*Math.PI/2)*Math.sin(th)));
+  }
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x4444ff, transparent: true, opacity: 0.1 })));
+}
+
+// Solar wind particles
+const solarP = [];
+for (let i = 0; i < 80; i++) {
+  const p = new THREE.Mesh(new THREE.SphereGeometry(0.3, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.25 }));
+  p.position.set(E*4 + Math.random()*E*2, (Math.random()-0.5)*E*2, (Math.random()-0.5)*E*2);
+  scene.add(p); solarP.push(p);
+}
+
+// EQ markers + ki blast rings
+const eqMarkers = [], kiRings = [];
+
+function spawnEQMarker(eq) {
+  if (!eq.coords) return;
+  const [lon, lat] = eq.coords, ph = (90-lat)*Math.PI/180, th = (lon+180)*Math.PI/180;
+  const pos = new THREE.Vector3((E+1)*Math.sin(ph)*Math.cos(th), (E+1)*Math.cos(ph), (E+1)*Math.sin(ph)*Math.sin(th));
+  const sz = Math.pow(2, eq.mag - 2.5);
+  const m = new THREE.Mesh(new THREE.SphereGeometry(sz, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.8 }));
+  m.position.copy(pos); m.userData = { life: 1 };
+  scene.add(m); eqMarkers.push(m);
+}
+
+function spawnKiRing() {
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(E + 2, 0.3, 8, 48), new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.6 }));
+  ring.rotation.x = Math.random() * Math.PI;
+  ring.rotation.z = Math.random() * Math.PI;
+  ring.userData = { life: 1, speed: 0.03 + Math.random() * 0.02 };
+  scene.add(ring); kiRings.push(ring);
+}
+
+// Camera orbit
+let camTh = 0.5, camPh = 1.2, camR = 140, dragging = false, lastX = 0, lastY = 0;
+function updateCam() {
+  camera.position.set(camR*Math.sin(camPh)*Math.cos(camTh), camR*Math.cos(camPh), camR*Math.sin(camPh)*Math.sin(camTh));
+  camera.lookAt(0, 0, 0);
+}
+updateCam();
+document.getElementById('c').addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+addEventListener('pointermove', e => { if (!dragging) return; camTh -= (e.clientX - lastX)*0.005; camPh = Math.max(0.1, Math.min(2.8, camPh + (e.clientY - lastY)*0.005)); lastX = e.clientX; lastY = e.clientY; updateCam(); });
+addEventListener('pointerup', () => dragging = false);
+document.getElementById('c').addEventListener('wheel', e => { camR = Math.max(70, Math.min(250, camR + e.deltaY * 0.1)); }, { passive: true });
+
+// Chat
+window.sendChat = function() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  KI.emit('chat:send', { text: msg });
+  appendChat(KI.player.name || 'You', msg);
+};
+function appendChat(name, text) {
+  const log = document.getElementById('chat-log');
+  const div = document.createElement('div');
+  div.innerHTML = '<span style="color:#0f8">' + name + '</span>: ' + text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+KI.on('chat:message', (d) => appendChat(d.name || 'Anon', d.text));
+
+// Alert system
+function showAlert(text, color) {
+  const el = document.getElementById('alert');
+  el.textContent = text; el.style.color = color || '#0f8'; el.style.opacity = '1';
+  clearTimeout(alertTimer);
+  alertTimer = setTimeout(() => { el.style.opacity = '0'; }, 3000);
+}
+
+// ══ ANIMATION ══
+let t = 0, lastKiBlast = 0;
+function animate() {
+  const v = KI.voice, energy = v.energy || v.rms || 0, coh = v.coherence || 0, pitch = v.pitch || v.f0 || 0;
+
+  if (!dragging) camTh += 0.0002;
+  updateCam();
+  computeKappa();
+
+  // Voice HUD
+  document.getElementById('v-energy').textContent = energy.toFixed(2);
+  document.getElementById('b-energy').style.width = (energy * 100) + '%';
+  document.getElementById('v-coh').textContent = coh.toFixed(2);
+  document.getElementById('b-coh').style.width = (coh * 100) + '%';
+  document.getElementById('v-pitch').textContent = pitch > 0 ? Math.round(pitch) + ' Hz' : '-';
+  document.getElementById('v-vagal').textContent = (v.vagalTone || 0).toFixed(2);
+  document.getElementById('v-vowel').textContent = v.currentVowel || '-';
+  document.getElementById('voice-fill').style.width = (energy * 100) + '%';
+
+  // Voice mode
+  const vm = document.getElementById('voice-mode');
+  const mode = energy > 0.15 ? (coh > 0.4 ? 'SUSTAINED' : 'PULSED') : 'SILENT';
+  vm.textContent = mode; vm.className = mode;
+
+  // Hide prompt when speaking
+  if (energy > 0.1 && promptVisible) { document.getElementById('prompt').style.opacity = '0'; promptVisible = false; }
+
+  // Alert on high energy
+  if (energy > 0.7 && t - lastKiBlast > 2) { showAlert('THE PLANET FEELS YOUR VOICE', '#0f8'); spawnKiRing(); lastKiBlast = t; }
+
+  // Earth reacts to voice
+  earth.rotation.y = t * 0.01;
+  wire.rotation.y = t * 0.01;
+  earthMat.emissiveIntensity = 0.2 + energy * 0.8;
+  earthMat.emissive.setHSL(0.55 + coh * 0.1, 0.8, 0.15 + energy * 0.2);
+  const breathe = Math.sin(t * live.schumann * 0.3);
+  earth.scale.setScalar(1 + energy * 0.05 + breathe * 0.005);
+  wire.scale.setScalar(1 + energy * 0.05 + breathe * 0.005);
+  wireMat.opacity = 0.04 + coh * 0.15 + energy * 0.1;
+
+  // Surface nodes
+  nodes.forEach(n => {
+    n.material.opacity = 0.15 + energy * 0.4 + Math.sin(t * 2 + n.userData.phase) * 0.08;
+    n.material.color.setHSL(0.35 + (planetaryKappa - KAPPA_STAR) * 0.4 + energy * 0.1, 1, 0.4 + energy * 0.2);
+  });
+
+  // Ionosphere
+  ionoMat.opacity = 0.03 + live.kp * 0.008 + energy * 0.06;
+  if (pitch > 0) ionoMat.color.setHSL(pitch / 1000, 1, 0.5);
+
+  // Solar wind
+  const ws = live.solarSpeed / 800;
+  solarP.forEach(p => { p.position.x -= ws; if (p.position.x < -E*2) { p.position.set(E*5, (Math.random()-0.5)*E*2, (Math.random()-0.5)*E*2); } });
+
+  // EQ markers decay
+  for (let i = eqMarkers.length - 1; i >= 0; i--) {
+    eqMarkers[i].userData.life -= 0.003;
+    eqMarkers[i].material.opacity = eqMarkers[i].userData.life * 0.7;
+    if (eqMarkers[i].userData.life <= 0) { scene.remove(eqMarkers[i]); eqMarkers.splice(i, 1); }
+  }
+
+  // Ki rings expand + fade
+  for (let i = kiRings.length - 1; i >= 0; i--) {
+    const r = kiRings[i];
+    r.userData.life -= r.userData.speed;
+    r.scale.setScalar(1 + (1 - r.userData.life) * 3);
+    r.material.opacity = r.userData.life * 0.5;
+    if (r.userData.life <= 0) { scene.remove(r); kiRings.splice(i, 1); }
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ══ BOOT ══
+async function boot() {
+  try { await VoiceEngine.init(); } catch(e) { console.warn('No mic:', e); }
+  try { FreqBands.init(); } catch(e) {}
+  try { Synths.init(); } catch(e) {}
+  try { Resonance.init(); } catch(e) {}
+  try { MqttNet.init(); } catch(e) {}
+  try { Presence.init(); } catch(e) {}
+  try { Chat.init(); } catch(e) {}
+  try { PlayerProfile.init(); } catch(e) {}
+  try { NavOverlay.init(); } catch(e) {}
+
+  KI.running = true;
+  const clock = KI.clock;
+
+  // Override animate to use KI update loop
+  (function loop() {
+    requestAnimationFrame(loop);
+    const dt = clock.getDelta(), time = clock.elapsedTime;
+    KI.runUpdates(dt, time);
+    t = time;
+    animate();
+  })();
+
+  // Fetch live data
+  await Promise.all([fetchEQ(), fetchSolar(), fetchKp()]);
+  updateAgents();
+  cycleSpeaker();
+
+  // Intervals
+  setInterval(() => Promise.all([fetchEQ(), fetchSolar(), fetchKp()]), 60000);
+  setInterval(() => { if (live.eqMode === 'sim') simEQ(); }, 15000);
+  setInterval(updateAgents, 8000);
+  setInterval(cycleSpeaker, 4000);
+
+  // Hide boot screen
+  setTimeout(() => {
+    document.getElementById('boot').classList.add('hidden');
+    setTimeout(() => document.getElementById('boot').remove(), 1500);
+  }, 2000);
+}
+
+window.addEventListener('load', boot);
+window.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+</script>
+</body>
+</html>
