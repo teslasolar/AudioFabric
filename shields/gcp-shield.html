@@ -164,11 +164,21 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
         <div>Density: <span id="m-dens" style="color:rgba(255,215,0,0.6)">0.000</span></div>
       </div>
     </div>
+    <div class="hud-section" id="melody-hud" style="display:none">
+      <div class="hud-title">Melody</div>
+      <div style="font-size:9px;color:rgba(255,248,231,0.3);line-height:1.6">
+        <div>Note: <span id="m-note" style="color:rgba(0,200,255,0.7);font-size:13px">—</span></div>
+        <div>Scale: <span id="m-scale" style="color:rgba(255,215,0,0.6)">—</span></div>
+        <div>Mood: <span id="m-mood" style="color:rgba(255,215,0,0.6)">—</span></div>
+        <div style="margin-top:4px;font-size:8px;color:rgba(255,248,231,0.15);max-width:120px;word-wrap:break-word" id="m-phrase"></div>
+      </div>
+    </div>
   </div>
 
   <!-- CONTROLS -->
   <div id="ctrl-bar">
     <button class="ctrl-btn active" id="btn-sound" onclick="toggleSound()">SOUND ON</button>
+    <button class="ctrl-btn" id="btn-melody" onclick="toggleMelody()">MELODY</button>
     <button class="ctrl-btn" onclick="setEggCount(32)">32 EGGS</button>
     <button class="ctrl-btn active" onclick="setEggCount(65)">65 EGGS</button>
     <button class="ctrl-btn" onclick="triggerCoherence()">COHERENCE SURGE</button>
@@ -509,6 +519,237 @@ function toggleSound() {
   if(soundEnabled && !audioCtx) initAudio();
   if(!soundEnabled && oscGains){
     oscGains.forEach(function(g){g.gain.linearRampToValueAtTime(0, audioCtx.currentTime+0.3);});
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  MELODY ENGINE — GCP-driven song composition                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+var melodyEnabled = false;
+var melodyOsc = null;
+var melodyGain = null;
+var melodyPad = []; // 3 pad oscillators for chords
+var melodyPadGains = [];
+var melodyBass = null;
+var melodyBassGain = null;
+var melodyTimer = null;
+var melodyStep = 0;
+var melodyPhrase = [];
+var currentMood = 'neutral';
+
+// Scales indexed by mood (MIDI intervals from root)
+var SCALES = {
+  luminous:   [0,2,4,7,9,12,14,16],        // major pentatonic + octave ext
+  hopeful:    [0,2,4,5,7,9,11,12],          // major
+  serene:     [0,2,3,7,8,12,14,15],         // Japanese in-sen
+  neutral:    [0,2,4,5,7,9,11,12],          // major
+  unsettled:  [0,2,3,5,7,8,10,12],          // natural minor
+  turbulent:  [0,1,3,5,6,8,10,12],          // locrian
+  dark:       [0,1,4,5,7,8,11,12]           // phrygian dominant
+};
+
+var CHORD_VOICINGS = {
+  luminous:   [[0,4,7,12],[0,5,9,12],[0,4,7,11]],
+  hopeful:    [[0,4,7],[0,5,9],[0,4,7,11],[0,2,7]],
+  serene:     [[0,7,12],[0,5,12],[0,7,14]],
+  neutral:    [[0,4,7],[0,3,7],[0,5,7]],
+  unsettled:  [[0,3,7],[0,3,8],[0,5,7]],
+  turbulent:  [[0,3,6],[0,1,6],[0,3,6,10]],
+  dark:       [[0,1,5],[0,4,8],[0,3,6,9]]
+};
+
+var NOTE_NAMES = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+
+function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+
+function getMelodyMood() {
+  var z = gcpZ;
+  if (z > 2) return 'luminous';
+  if (z > 1) return 'hopeful';
+  if (z > 0.3) return 'serene';
+  if (z > -0.3) return 'neutral';
+  if (z > -1) return 'unsettled';
+  if (z > -2) return 'turbulent';
+  return 'dark';
+}
+
+function getMelodyRoot() {
+  // Root note shifts with GCP coherence — higher coherence = brighter key
+  var base = 60; // middle C
+  var shift = Math.round(gcpCoherence * 3); // ±3 semitones
+  return base + shift;
+}
+
+function generatePhrase(root, scale, len) {
+  var phrase = [];
+  var pos = Math.floor(Math.random() * 4); // start somewhere in scale
+  for (var i = 0; i < len; i++) {
+    // Use egg data to guide note choices
+    var eggIdx = Math.floor((i / len) * eggs.length);
+    var eggVal = eggs[eggIdx] || 0.5;
+
+    // Step through scale with egg-influenced direction
+    var jump = eggVal > 0.6 ? 1 : eggVal < 0.4 ? -1 : (Math.random() > 0.5 ? 1 : 0);
+    pos = Math.max(0, Math.min(scale.length - 1, pos + jump));
+
+    var midi = root + scale[pos];
+    // Occasional octave shift for interest
+    if (Math.random() < 0.15) midi += 12;
+    if (Math.random() < 0.08) midi -= 12;
+
+    // Duration influenced by GCP tempo
+    var tempo = 60 + gcpCoherence * 40;
+    var beatLen = 60 / tempo;
+    var durations = [beatLen * 0.5, beatLen, beatLen * 1.5, beatLen * 2];
+    var durIdx = Math.floor(eggVal * durations.length);
+    durIdx = Math.min(durIdx, durations.length - 1);
+
+    // Rest probability — more rests when anti-coherent
+    var isRest = Math.random() < (gcpZ < 0 ? 0.25 : 0.1);
+
+    phrase.push({
+      midi: midi,
+      freq: midiToFreq(midi),
+      dur: durations[durIdx],
+      vel: 0.3 + eggVal * 0.4,
+      rest: isRest,
+      name: NOTE_NAMES[midi % 12] + Math.floor(midi / 12 - 1)
+    });
+  }
+  return phrase;
+}
+
+function initMelody() {
+  if (!audioCtx) initAudio();
+
+  // Melody lead voice — sine with gentle vibrato
+  melodyOsc = audioCtx.createOscillator();
+  melodyOsc.type = 'sine';
+  melodyOsc.frequency.value = 440;
+  var vibLfo = audioCtx.createOscillator();
+  vibLfo.frequency.value = 5;
+  var vibGain = audioCtx.createGain();
+  vibGain.gain.value = 3;
+  vibLfo.connect(vibGain);
+  vibGain.connect(melodyOsc.frequency);
+  vibLfo.start();
+  melodyGain = audioCtx.createGain();
+  melodyGain.gain.value = 0;
+  melodyOsc.connect(melodyGain);
+  melodyGain.connect(masterGain);
+  melodyOsc.start();
+
+  // Pad — 3 oscillators for chord tones
+  for (var i = 0; i < 3; i++) {
+    var po = audioCtx.createOscillator();
+    po.type = i === 0 ? 'sine' : 'triangle';
+    po.frequency.value = 220;
+    var pg = audioCtx.createGain();
+    pg.gain.value = 0;
+    po.connect(pg);
+    pg.connect(masterGain);
+    po.start();
+    melodyPad.push(po);
+    melodyPadGains.push(pg);
+  }
+
+  // Bass
+  melodyBass = audioCtx.createOscillator();
+  melodyBass.type = 'triangle';
+  melodyBass.frequency.value = 55;
+  melodyBassGain = audioCtx.createGain();
+  melodyBassGain.gain.value = 0;
+  melodyBass.connect(melodyBassGain);
+  melodyBassGain.connect(masterGain);
+  melodyBass.start();
+
+  startMelodyLoop();
+}
+
+function startMelodyLoop() {
+  if (melodyTimer) clearTimeout(melodyTimer);
+
+  function playNextNote() {
+    if (!melodyEnabled || !audioCtx) return;
+    var now = audioCtx.currentTime;
+    var mood = getMelodyMood();
+    currentMood = mood;
+    var root = getMelodyRoot();
+    var scale = SCALES[mood] || SCALES.neutral;
+
+    // Generate new phrase every 8 notes
+    if (melodyStep % 8 === 0) {
+      melodyPhrase = generatePhrase(root, scale, 8);
+
+      // Update chord pad
+      var chords = CHORD_VOICINGS[mood] || CHORD_VOICINGS.neutral;
+      var chord = chords[Math.floor(Math.random() * chords.length)];
+      for (var c = 0; c < Math.min(chord.length, 3); c++) {
+        var chordFreq = midiToFreq(root - 12 + chord[c]);
+        melodyPad[c].frequency.linearRampToValueAtTime(chordFreq, now + 0.5);
+        melodyPadGains[c].gain.linearRampToValueAtTime(0.04, now + 0.3);
+      }
+
+      // Update bass
+      var bassFreq = midiToFreq(root - 24);
+      melodyBass.frequency.linearRampToValueAtTime(bassFreq, now + 0.2);
+      melodyBassGain.gain.linearRampToValueAtTime(0.06, now + 0.2);
+    }
+
+    var note = melodyPhrase[melodyStep % melodyPhrase.length];
+    melodyStep++;
+
+    if (note && !note.rest) {
+      // Play the note
+      melodyOsc.frequency.linearRampToValueAtTime(note.freq, now + 0.02);
+      melodyGain.gain.linearRampToValueAtTime(note.vel * 0.12, now + 0.02);
+      melodyGain.gain.linearRampToValueAtTime(note.vel * 0.06, now + note.dur * 0.7);
+      melodyGain.gain.linearRampToValueAtTime(0, now + note.dur * 0.95);
+
+      // Update HUD
+      document.getElementById('m-note').textContent = note.name;
+      document.getElementById('m-phrase').textContent = melodyPhrase.map(function(n) {
+        return n.rest ? '·' : NOTE_NAMES[n.midi % 12];
+      }).join(' ');
+    } else {
+      melodyGain.gain.linearRampToValueAtTime(0, now + 0.05);
+      document.getElementById('m-note').textContent = '·';
+    }
+
+    // Update mood display
+    var moodLabels = {luminous:'Luminous',hopeful:'Hopeful',serene:'Serene',neutral:'Neutral',unsettled:'Unsettled',turbulent:'Turbulent',dark:'Dark'};
+    document.getElementById('m-mood').textContent = moodLabels[mood] || mood;
+    document.getElementById('m-scale').textContent = NOTE_NAMES[root % 12] + ' ' + mood;
+
+    melodyTimer = setTimeout(playNextNote, (note ? note.dur : 0.5) * 1000);
+  }
+
+  playNextNote();
+}
+
+function stopMelody() {
+  if (melodyTimer) { clearTimeout(melodyTimer); melodyTimer = null; }
+  if (!audioCtx) return;
+  var now = audioCtx.currentTime;
+  if (melodyGain) melodyGain.gain.linearRampToValueAtTime(0, now + 0.3);
+  melodyPadGains.forEach(function(g) { g.gain.linearRampToValueAtTime(0, now + 0.5); });
+  if (melodyBassGain) melodyBassGain.gain.linearRampToValueAtTime(0, now + 0.5);
+}
+
+function toggleMelody() {
+  melodyEnabled = !melodyEnabled;
+  var btn = document.getElementById('btn-melody');
+  btn.classList.toggle('active', melodyEnabled);
+  btn.textContent = melodyEnabled ? 'MELODY ON' : 'MELODY';
+  document.getElementById('melody-hud').style.display = melodyEnabled ? 'block' : 'none';
+
+  if (melodyEnabled) {
+    if (!soundEnabled) toggleSound();
+    if (!melodyOsc) initMelody();
+    else startMelodyLoop();
+  } else {
+    stopMelody();
   }
 }
 
