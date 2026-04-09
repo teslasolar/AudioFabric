@@ -325,17 +325,26 @@ function onYouTubeIframeAPIReady() {
     height: '100%', width: '100%',
     playerVars: {
       autoplay: 0, controls: 1, modestbranding: 1,
-      rel: 0, fs: 0, playsinline: 1
+      rel: 0, fs: 0, playsinline: 1,
+      origin: window.location.origin
     },
     events: {
       onReady: function() {
         ytReady = true;
         // Auto-load channel if no saved playlist
         if (playlist.length === 0) {
-          setTimeout(loadChannel, 500);
+          setTimeout(loadChannel, 1000);
+        } else if (playlist.length > 0 && plIndex < 0) {
+          // Resume saved playlist
+          plIndex = 0;
+          ytPlayer.cueVideoById(playlist[0].id);
         }
       },
-      onStateChange: onYTStateChange
+      onStateChange: onYTStateChange,
+      onError: function(event) {
+        // Suppress player errors (2=invalid param, 5=HTML5 error, 100=not found, 101/150=embed blocked)
+        console.warn('YT player error:', event.data);
+      }
     }
   });
 }
@@ -558,59 +567,59 @@ function loadChannel() {
   btn.textContent = 'loading...';
   btn.disabled = true;
 
-  // Primary: fetch channel page via CORS proxy to extract video IDs directly.
-  // YouTube's embedded search (cuePlaylist listType:'search') is restricted
-  // and often returns zero results, so we scrape the channel /videos page.
-  var proxyUrl = 'https://api.allorigins.win/raw?url=' +
-    encodeURIComponent('https://www.youtube.com/@' + CHANNEL_HANDLE + '/videos');
+  // Fetch channel /videos page via CORS proxies to extract video IDs.
+  // YouTube's embedded cuePlaylist(listType:'search') is restricted and
+  // shows a player error, so we avoid it entirely.
+  var channelUrl = 'https://www.youtube.com/@' + CHANNEL_HANDLE + '/videos';
+  var proxies = [
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(channelUrl),
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(channelUrl),
+    'https://corsproxy.io/?' + encodeURIComponent(channelUrl)
+  ];
 
-  fetch(proxyUrl).then(function(r) {
-    if (!r.ok) throw new Error('proxy ' + r.status);
+  tryProxies(proxies, 0, function(videoIds) {
+    if (videoIds && videoIds.length > 0) {
+      addVideosToPlaylist(videoIds);
+      finalizeChannelLoad();
+      if (channelId) setTimeout(tryLoadUploadsPlaylist, 2000);
+    } else {
+      // All proxies failed or returned no videos
+      btn.textContent = '\u25b6 LOAD ALL CHANNEL VIDEOS';
+      btn.disabled = false;
+      status.textContent = 'auto-load unavailable \u2014 paste YouTube URLs above';
+    }
+  });
+}
+
+function tryProxies(proxies, idx, callback) {
+  if (idx >= proxies.length) { callback(null); return; }
+  var status = document.getElementById('channel-status');
+  status.textContent = 'loading channel videos... (attempt ' + (idx + 1) + ')';
+
+  fetch(proxies[idx]).then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.text();
   }).then(function(html) {
     var videoIds = [];
     var seen = {};
-    // Extract videoId values from the serialized page data
     var re = /"videoId"\s*:\s*"([a-zA-Z0-9_-]{11})"/g;
     var m;
     while ((m = re.exec(html)) !== null) {
       if (!seen[m[1]]) { seen[m[1]] = true; videoIds.push(m[1]); }
     }
-    // Discover channel ID for uploads playlist
     var chIdMatch = html.match(/"channelId"\s*:\s*"(UC[a-zA-Z0-9_-]+)"/);
     if (chIdMatch) channelId = chIdMatch[1];
 
     if (videoIds.length > 0) {
-      addVideosToPlaylist(videoIds);
-      finalizeChannelLoad();
-      // Also try uploads playlist for complete listing
-      if (channelId) setTimeout(tryLoadUploadsPlaylist, 2000);
+      callback(videoIds);
     } else {
-      // Proxy returned page but no video IDs — fall back to search
-      loadChannelViaSearch();
+      // This proxy returned data but no video IDs — try next
+      tryProxies(proxies, idx + 1, callback);
     }
   }).catch(function(e) {
-    console.warn('CORS proxy failed, falling back to search:', e);
-    status.textContent = 'proxy unavailable, trying search...';
-    loadChannelViaSearch();
+    console.warn('Proxy ' + (idx + 1) + ' failed:', e.message);
+    tryProxies(proxies, idx + 1, callback);
   });
-}
-
-// Fallback: use YouTube IFrame API search (unreliable but better than nothing)
-function loadChannelViaSearch() {
-  ytPlayer.cuePlaylist({ listType: 'search', list: CHANNEL_HANDLE });
-  setTimeout(function() {
-    syncPlaylistFromPlayer();
-    if (playlist.length === 0) {
-      ytPlayer.cuePlaylist({ listType: 'search', list: 'Thomas Solar Crypto Engine' });
-      setTimeout(function() {
-        syncPlaylistFromPlayer();
-        finalizeChannelLoad();
-      }, 3000);
-    } else {
-      finalizeChannelLoad();
-    }
-  }, 3000);
 }
 
 // Merge discovered video IDs into the playlist
