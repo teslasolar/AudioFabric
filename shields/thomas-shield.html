@@ -192,6 +192,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
     <button onclick="ytAddFromInput()">+ add</button>
   </div>
   <div style="display:flex;gap:4px;margin-bottom:8px">
+    <input type="file" id="local-file-input" accept=".mp3,.mp4,.m4a,.wav,.ogg,.webm" style="display:none" onchange="handleLocalFile(this)">
+    <button class="yt-btn" onclick="document.getElementById('local-file-input').click()" style="flex:1;padding:6px;color:#0af;border-color:rgba(0,170,255,0.3);background:rgba(0,170,255,0.06)">&#128190; LOAD LOCAL FILE</button>
+  </div>
+  <div style="display:flex;gap:4px;margin-bottom:8px">
     <button class="yt-btn" id="btn-load-channel" onclick="loadChannel()" style="flex:1;padding:6px;color:#4f8;border-color:rgba(79,248,138,0.3);background:rgba(79,248,138,0.06)">&#9656; LOAD ALL CHANNEL VIDEOS</button>
   </div>
   <div id="channel-status" style="font-size:9px;color:rgba(255,248,231,0.25);text-align:center;margin-bottom:6px;display:none"></div>
@@ -208,6 +212,38 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
   <div class="fold-slider-row"><label>dim-fold</label><input type="range" id="sl-dimfold" min="1" max="127" value="127"><span class="sv" id="sv-dimfold">127</span></div>
   <div class="fold-slider-row"><label>phase-&phi;</label><input type="range" id="sl-phi" min="0" max="100" value="62"><span class="sv" id="sv-phi">0.62</span></div>
   <div class="fold-slider-row"><label>density</label><input type="range" id="sl-density" min="10" max="100" value="80"><span class="sv" id="sv-density">0.80</span></div>
+
+  <div class="panel-title" style="cursor:pointer" onclick="toggleAiPanel()">ai assistant <span id="ai-status" style="color:#555">offline</span></div>
+  <div id="ai-panel" style="display:none">
+    <div id="ai-chat" style="max-height:200px;overflow-y:auto;margin-bottom:8px;font-size:9px;color:rgba(255,248,231,0.5);line-height:1.5"></div>
+    <div style="display:flex;gap:4px">
+      <input type="text" id="ai-input" placeholder="ask AI to control the shield..." style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,215,0,0.12);color:#fff8e7;padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:3px;outline:none" onkeydown="if(event.key==='Enter')aiSend()">
+      <button onclick="aiSend()" style="padding:5px 10px;background:rgba(136,85,255,0.15);border:1px solid rgba(136,85,255,0.4);color:#a879ff;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:3px;white-space:nowrap">send</button>
+    </div>
+    <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+      <button class="yt-btn" onclick="aiSend('describe what you see')">describe</button>
+      <button class="yt-btn" onclick="aiSend('make it pulse')">pulse</button>
+      <button class="yt-btn" onclick="aiSend('play a chord')">chord</button>
+      <button class="yt-btn" onclick="aiSend('expand the shield')">expand</button>
+    </div>
+  </div>
+
+  <div class="panel-title" style="cursor:pointer" onclick="toggleMcpPanel()">mcp sandbox <span id="mcp-status" style="color:#555">0 tools</span></div>
+  <div id="mcp-panel" style="display:none">
+    <div style="font-size:9px;color:rgba(255,248,231,0.25);margin-bottom:8px">Define custom tools the AI can call to control the shield.</div>
+    <textarea id="mcp-editor" style="width:100%;height:120px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,215,0,0.12);color:#fff8e7;font-family:'JetBrains Mono',monospace;font-size:9px;padding:8px;border-radius:3px;resize:vertical" placeholder='// Define MCP tools as JSON array:
+[{
+  "name": "set_ring_color",
+  "description": "Set ring hue",
+  "params": {"ring": "number 0-6", "hue": "number 0-360"},
+  "handler": "SHIELD_RINGS[$ring].color.setHSL($hue/360, 1, 0.5)"
+}]'></textarea>
+    <div style="display:flex;gap:4px;margin-top:6px">
+      <button class="yt-btn" onclick="mcpLoad()" style="flex:1;color:#ffd700;border-color:rgba(255,215,0,0.3)">load tools</button>
+      <button class="yt-btn" onclick="mcpReset()">reset</button>
+    </div>
+    <div id="mcp-log" style="max-height:80px;overflow-y:auto;margin-top:6px;font-size:8px;color:rgba(255,248,231,0.2)"></div>
+  </div>
 </div>
 
 <div id="breach-alert"></div>
@@ -301,12 +337,30 @@ var dimPhase = new Float32Array(DIM_COUNT);
 for (var _i = 0; _i < DIM_COUNT; _i++) { dimEnergy[_i] = 0.1; dimPhase[_i] = Math.random() * TAU; }
 var waveformCtx = null;
 
+// ===== LOCAL MEDIA STATE =====
+var localMediaEl = null; // current <audio> or <video> element
+var localMediaSource = null; // MediaElementSourceNode
+
+// ===== AI + MCP STATE =====
+var aiEngine = null;
+var aiMessages = [];
+var aiLoading = false;
+var mcpTools = [];
+
+var MCP_DEFAULTS = [
+  { name: 'set_ring_intensity', description: 'Set a shield ring intensity', params: { ring: 'number 0-6', intensity: 'number 0-1' }, handler: 'SHIELD_RINGS[{ring}].target = {intensity}' },
+  { name: 'play_tone', description: 'Play a tone at given frequency', params: { freq: 'number', duration: 'number seconds' }, handler: 'playMcpTone({freq}, {duration})' },
+  { name: 'set_mode', description: 'Set shield mode', params: { mode: 'string' }, handler: 'activateMode("{mode}")' },
+  { name: 'set_expansion', description: 'Set shield expansion', params: { value: 'number 0-1' }, handler: 'controls.expansion = {value}; document.getElementById("sl-expansion").value = {value}*100' },
+  { name: 'set_rotation', description: 'Set rotation speed', params: { value: 'number 0-1' }, handler: 'controls.rotationSpeed = {value}; document.getElementById("sl-rotation").value = {value}*100' }
+];
+
 // ===== YOUTUBE STATE =====
 var ytPlayer = null;
 var ytReady = false;
 var ytLoop = false;
 var ytVideoHidden = false;
-var playlist = []; // { id, title }
+var playlist = []; // { id, title, type:'yt'|'local', blob? }
 var plIndex = -1;
 
 // ╔══════════════════════════════════════════════════════════════════╗
@@ -983,9 +1037,10 @@ function computeR5() {
   voice.ringActivity[5]=clamp01(v?0.7+voice.sweep*0.3:0);
 }
 function computeR6() {
-  var s=0;if(!voice.isSounding)s=Math.min(1,voice.silenceDuration/5);
-  var ms=0;if(!voice.isSounding&&voice.silenceDuration>0.2&&voice.silenceDuration<1)ms=0.3;
-  voice.ringActivity[6]=clamp01(Math.max(s,ms));
+  if(!voice.isSounding){voice.ringActivity[6]*=0.92;return;}
+  var ms=0;
+  if(voice.isSounding&&voice.rms>voice.noiseFloor*2)ms=Math.min(1,voice.rms/(voice.noiseFloor*6));
+  voice.ringActivity[6]=clamp01(ms);
 }
 
 function classifyVowel(f1,f2) {
@@ -1028,6 +1083,9 @@ function initHarmonicEngine() {
 }
 
 function updateHarmonicEngine() {
+  var silenceGate = (voice.isSounding || voice.rms >= 0.01) ? 1.0 : 0.0;
+  var targetMaster = silenceGate * 0.08;
+  masterGain.gain.setTargetAtTime(targetMaster, audioCtx.currentTime, silenceGate > 0 ? 0.05 : 0.3);
   for (var i=0;i<7;i++) oscGains[i].gain.setTargetAtTime(voice.ringSmoothed[i]*0.35, audioCtx.currentTime, 0.1);
 }
 
