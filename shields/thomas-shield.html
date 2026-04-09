@@ -470,7 +470,7 @@ function ytAddFromInput() {
   if (!id) { alert('Could not parse video ID'); return; }
   // Title from URL or generic
   var title = 'Track ' + (playlist.length + 1) + ' [' + id + ']';
-  playlist.push({ id: id, title: title });
+  playlist.push({ id: id, title: title, type: 'yt' });
   input.value = '';
   renderPlaylist();
   // Auto-play if first track
@@ -479,12 +479,16 @@ function ytAddFromInput() {
 }
 
 function ytAddTrack(id, title) {
-  playlist.push({ id: id, title: title || ('Track [' + id + ']') });
+  playlist.push({ id: id, title: title || ('Track [' + id + ']'), type: 'yt' });
   renderPlaylist();
   savePlaylist();
 }
 
 function ytRemoveTrack(idx) {
+  var removed = playlist[idx];
+  if (removed && removed.type === 'local' && removed.blob) {
+    try { URL.revokeObjectURL(removed.blob); } catch(e) {}
+  }
   playlist.splice(idx, 1);
   if (plIndex >= playlist.length) plIndex = playlist.length - 1;
   renderPlaylist();
@@ -492,27 +496,42 @@ function ytRemoveTrack(idx) {
 }
 
 function ytPlayIndex(idx) {
-  if (idx < 0 || idx >= playlist.length || !ytReady) return;
+  if (idx < 0 || idx >= playlist.length) return;
+  // Stop any currently playing local media
+  if (localMediaEl) { localMediaEl.pause(); localMediaEl.currentTime = 0; }
   plIndex = idx;
-  ytPlayer.loadVideoById(playlist[idx].id);
+  var item = playlist[idx];
+  if (item.type === 'local') {
+    playLocalTrack(idx);
+  } else {
+    if (!ytReady) return;
+    ytPlayer.loadVideoById(item.id);
+    // Try to get actual video title
+    setTimeout(function() {
+      try {
+        var data = ytPlayer.getVideoData();
+        if (data && data.title) {
+          playlist[idx].title = data.title;
+          renderPlaylist();
+          updateNowPlaying();
+          savePlaylist();
+        }
+      } catch(e) {}
+    }, 2000);
+  }
   renderPlaylist();
   updateNowPlaying();
-
-  // Try to get actual video title
-  setTimeout(function() {
-    try {
-      var data = ytPlayer.getVideoData();
-      if (data && data.title) {
-        playlist[idx].title = data.title;
-        renderPlaylist();
-        updateNowPlaying();
-        savePlaylist();
-      }
-    } catch(e) {}
-  }, 2000);
 }
 
 function ytTogglePlay() {
+  // Handle local media
+  if (plIndex >= 0 && plIndex < playlist.length && playlist[plIndex].type === 'local') {
+    if (localMediaEl) {
+      if (localMediaEl.paused) { localMediaEl.play(); document.getElementById('yt-play-btn').innerHTML = '&#10074;&#10074;'; }
+      else { localMediaEl.pause(); document.getElementById('yt-play-btn').innerHTML = '&#9654;'; }
+    }
+    return;
+  }
   if (!ytReady) return;
   var state = ytPlayer.getPlayerState();
   if (state === YT.PlayerState.PLAYING) ytPlayer.pauseVideo();
@@ -521,7 +540,9 @@ function ytTogglePlay() {
 }
 
 function ytStop() {
+  if (localMediaEl) { localMediaEl.pause(); localMediaEl.currentTime = 0; }
   if (ytReady) ytPlayer.stopVideo();
+  document.getElementById('yt-play-btn').innerHTML = '&#9654;';
   document.getElementById('now-playing').textContent = '';
 }
 
@@ -576,9 +597,10 @@ function renderPlaylist() {
     return;
   }
   el.innerHTML = playlist.map(function(item, i) {
+    var icon = item.type === 'local' ? '\u266B ' : '';
     return '<div class="pl-item' + (i === plIndex ? ' active' : '') + '" onclick="ytPlayIndex(' + i + ')">' +
       '<span class="pl-num">' + (i + 1) + '</span>' +
-      '<span class="pl-title">' + escapeHtml(item.title) + '</span>' +
+      '<span class="pl-title">' + icon + escapeHtml(item.title) + '</span>' +
       '<span class="pl-remove" onclick="event.stopPropagation();ytRemoveTrack(' + i + ')">\u00d7</span>' +
     '</div>';
   }).join('');
@@ -682,7 +704,7 @@ function addVideosToPlaylist(videoIds) {
   playlist.forEach(function(p) { existingIds[p.id] = true; });
   videoIds.forEach(function(id) {
     if (!existingIds[id]) {
-      playlist.push({ id: id, title: 'Track ' + (playlist.length + 1) + ' [' + id + ']' });
+      playlist.push({ id: id, title: 'Track ' + (playlist.length + 1) + ' [' + id + ']', type: 'yt' });
       titleFetchQueue.push(playlist.length - 1);
     }
   });
@@ -704,7 +726,7 @@ function syncPlaylistFromPlayer() {
     var newCount = 0;
     ids.forEach(function(id, idx) {
       if (!existingIds[id]) {
-        playlist.push({ id: id, title: 'Track ' + (playlist.length + 1) + ' [' + id + ']' });
+        playlist.push({ id: id, title: 'Track ' + (playlist.length + 1) + ' [' + id + ']', type: 'yt' });
         newCount++;
         titleFetchQueue.push(playlist.length - 1);
       }
@@ -1328,6 +1350,391 @@ function drawWaveform() {
   for(var i=0;i<w;i++){var y=(timeData[i*step]+1)/2*h;if(i===0)waveformCtx.moveTo(i,y);else waveformCtx.lineTo(i,y);}
   waveformCtx.stroke();waveformCtx.globalAlpha=1;
 }
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  LOCAL FILE LOADING                                               ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function handleLocalFile(input) {
+  if (!input.files || !input.files[0]) return;
+  loadLocalFile(input.files[0]);
+  input.value = '';
+}
+
+function loadLocalFile(file) {
+  var blobUrl = URL.createObjectURL(file);
+  var ext = file.name.split('.').pop().toLowerCase();
+  var isVideo = (ext === 'mp4' || ext === 'webm');
+  var title = file.name.replace(/\.[^.]+$/, '');
+  var idx = playlist.length;
+
+  playlist.push({ id: 'local-' + Date.now(), title: title, type: 'local', blob: blobUrl, isVideo: isVideo });
+  renderPlaylist();
+  document.getElementById('pl-count').textContent = '(' + playlist.length + ')';
+  savePlaylist();
+
+  // Auto-play if first track
+  if (playlist.length === 1) ytPlayIndex(0);
+}
+
+function playLocalTrack(idx) {
+  var item = playlist[idx];
+  if (!item || item.type !== 'local') return;
+
+  // Stop YouTube if playing
+  if (ytReady) { try { ytPlayer.stopVideo(); } catch(e) {} }
+
+  // Clean up previous local media
+  if (localMediaSource) { try { localMediaSource.disconnect(); } catch(e) {} localMediaSource = null; }
+  if (localMediaEl) { localMediaEl.pause(); localMediaEl.remove(); localMediaEl = null; }
+
+  // Create appropriate element
+  var wrap = document.getElementById('yt-player-wrap');
+  if (item.isVideo) {
+    localMediaEl = document.createElement('video');
+    localMediaEl.style.cssText = 'width:100%;height:100%;border:none';
+    // Show in player wrap
+    wrap.classList.remove('minimized');
+    wrap.appendChild(localMediaEl);
+    document.getElementById('yt-minimize-btn').textContent = 'hide video';
+    ytVideoHidden = false;
+  } else {
+    localMediaEl = document.createElement('audio');
+  }
+
+  localMediaEl.src = item.blob;
+  localMediaEl.crossOrigin = 'anonymous';
+
+  // Connect to AudioContext for analysis
+  if (audioCtx) {
+    try {
+      localMediaSource = audioCtx.createMediaElementSource(localMediaEl);
+      localMediaSource.connect(analyser);
+      localMediaSource.connect(audioCtx.destination);
+    } catch(e) {
+      console.warn('Could not connect local media to AudioContext:', e);
+    }
+  }
+
+  localMediaEl.play();
+  document.getElementById('yt-play-btn').innerHTML = '&#10074;&#10074;';
+
+  // Handle end of track
+  localMediaEl.addEventListener('ended', function() {
+    if (ytLoop) {
+      localMediaEl.currentTime = 0;
+      localMediaEl.play();
+    } else {
+      ytNext();
+    }
+  });
+}
+
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  AI ASSISTANT (WebLLM)                                            ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+var AI_SYSTEM_PROMPT = 'You are the Thomas Shield AI. You control a 127-dimensional voice-reactive energy shield. You can control the shield by outputting JSON commands in ```json blocks. Available commands: {action:"pulse", ring:0-6, intensity:0-1}, {action:"expand", value:0-1}, {action:"rotate", speed:0-1}, {action:"chord", notes:[freq1,freq2,...]}, {action:"color", ring:0-6, hue:0-360}, {action:"dim", count:1-127}, {action:"mode", name:"VOICE|STANDBY|ALERT|PRIME_LOCK|FORTRESS|BLOOM|COLLAPSE"}. Respond conversationally but include commands when the user wants you to change something.';
+
+function toggleAiPanel() {
+  var panel = document.getElementById('ai-panel');
+  var visible = panel.style.display !== 'none';
+  panel.style.display = visible ? 'none' : 'block';
+  if (!visible && !aiEngine && !aiLoading) {
+    initAI();
+  }
+}
+
+function initAI() {
+  if (aiEngine || aiLoading) return;
+  aiLoading = true;
+  var statusEl = document.getElementById('ai-status');
+  statusEl.textContent = 'loading...';
+  statusEl.style.color = '#ff8800';
+
+  // Dynamically load WebLLM from CDN
+  var script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm';
+  script.onload = function() {
+    statusEl.textContent = 'initializing...';
+    try {
+      var engine = new webllm.MLCEngine();
+      var initProgressCallback = function(report) {
+        statusEl.textContent = report.text || 'loading model...';
+      };
+      engine.setInitProgressCallback(initProgressCallback);
+      engine.reload('Llama-3.2-1B-Instruct-q4f16_1-MLC').then(function() {
+        aiEngine = engine;
+        aiLoading = false;
+        statusEl.textContent = 'online';
+        statusEl.style.color = '#4f8';
+        aiMessages = [{ role: 'system', content: getAiSystemPrompt() }];
+        aiAppendChat('system', 'AI assistant online. Ask me to control the shield.');
+      }).catch(function(err) {
+        aiLoading = false;
+        statusEl.textContent = 'error';
+        statusEl.style.color = '#f44';
+        console.error('WebLLM init error:', err);
+        aiAppendChat('system', 'Failed to load AI model: ' + err.message);
+      });
+    } catch(err) {
+      aiLoading = false;
+      statusEl.textContent = 'error';
+      statusEl.style.color = '#f44';
+      console.error('WebLLM init error:', err);
+    }
+  };
+  script.onerror = function() {
+    aiLoading = false;
+    statusEl.textContent = 'load failed';
+    statusEl.style.color = '#f44';
+    aiAppendChat('system', 'Failed to load WebLLM from CDN.');
+  };
+  document.head.appendChild(script);
+}
+
+function getAiSystemPrompt() {
+  var prompt = AI_SYSTEM_PROMPT;
+  if (mcpTools.length > 0) {
+    prompt += '\n\nYou also have access to these MCP tools. To call a tool, output a JSON block with {tool_call: "<tool_name>", params: {<params>}}:\n';
+    mcpTools.forEach(function(t) {
+      prompt += '- ' + t.name + ': ' + t.description + ' (params: ' + JSON.stringify(t.params) + ')\n';
+    });
+  }
+  return prompt;
+}
+
+function aiSend(text) {
+  if (!text) {
+    var inputEl = document.getElementById('ai-input');
+    text = inputEl.value.trim();
+    inputEl.value = '';
+  }
+  if (!text) return;
+
+  aiAppendChat('user', text);
+
+  if (!aiEngine) {
+    aiAppendChat('system', 'AI is loading, please wait...');
+    return;
+  }
+
+  aiMessages.push({ role: 'user', content: text });
+
+  var statusEl = document.getElementById('ai-status');
+  statusEl.textContent = 'thinking...';
+  statusEl.style.color = '#ff8800';
+
+  aiEngine.chat.completions.create({
+    messages: aiMessages,
+    max_tokens: 512,
+    temperature: 0.7
+  }).then(function(reply) {
+    var content = reply.choices[0].message.content || '';
+    aiMessages.push({ role: 'assistant', content: content });
+    aiAppendChat('ai', content);
+    statusEl.textContent = 'online';
+    statusEl.style.color = '#4f8';
+
+    // Parse and execute any JSON commands
+    var jsonBlocks = content.match(/```json\s*([\s\S]*?)```/g);
+    if (jsonBlocks) {
+      jsonBlocks.forEach(function(block) {
+        var json = block.replace(/```json\s*/, '').replace(/```/, '').trim();
+        try {
+          var cmds = JSON.parse(json);
+          if (!Array.isArray(cmds)) cmds = [cmds];
+          cmds.forEach(function(cmd) {
+            if (cmd.tool_call) {
+              mcpExecute(cmd.tool_call, cmd.params || {});
+            } else {
+              executeAiCommand(cmd);
+            }
+          });
+        } catch(e) {
+          console.warn('AI JSON parse error:', e);
+        }
+      });
+    }
+  }).catch(function(err) {
+    statusEl.textContent = 'error';
+    statusEl.style.color = '#f44';
+    aiAppendChat('system', 'Error: ' + err.message);
+    console.error('AI error:', err);
+  });
+}
+
+function aiAppendChat(role, text) {
+  var chatEl = document.getElementById('ai-chat');
+  var div = document.createElement('div');
+  div.style.marginBottom = '4px';
+  if (role === 'user') {
+    div.style.color = 'rgba(255,248,231,0.7)';
+    div.textContent = '> ' + text;
+  } else if (role === 'ai') {
+    div.style.color = 'rgba(168,121,255,0.8)';
+    div.textContent = text;
+  } else {
+    div.style.color = 'rgba(255,215,0,0.4)';
+    div.style.fontStyle = 'italic';
+    div.textContent = text;
+  }
+  chatEl.appendChild(div);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function executeAiCommand(cmd) {
+  if (!cmd || !cmd.action) return;
+  switch(cmd.action) {
+    case 'pulse':
+      var ring = clamp01((cmd.ring || 0) / 6) * 6;
+      var ri = Math.round(ring);
+      var intensity = cmd.intensity != null ? clamp01(cmd.intensity) : 0.8;
+      SHIELD_RINGS[ri].target = intensity;
+      setTimeout(function() { SHIELD_RINGS[ri].target = 0; }, 1500);
+      break;
+    case 'expand':
+      var val = cmd.value != null ? clamp01(cmd.value) : 0.8;
+      controls.expansion = val;
+      document.getElementById('sl-expansion').value = val * 100;
+      document.getElementById('sv-expansion').textContent = val.toFixed(2);
+      break;
+    case 'rotate':
+      var spd = cmd.speed != null ? clamp01(cmd.speed) : 0.5;
+      controls.rotation = spd;
+      document.getElementById('sl-rotation').value = spd * 100;
+      document.getElementById('sv-rotation').textContent = spd.toFixed(2);
+      break;
+    case 'chord':
+      if (cmd.notes && cmd.notes.length > 0) {
+        cmd.notes.forEach(function(freq) { playMcpTone(freq, 2); });
+      }
+      break;
+    case 'color':
+      // Color changes are approximated via ring intensity
+      if (cmd.ring != null && cmd.ring >= 0 && cmd.ring < 7) {
+        SHIELD_RINGS[cmd.ring].target = 1.0;
+      }
+      break;
+    case 'dim':
+      var count = Math.max(1, Math.min(127, cmd.count || 127));
+      controls.dimFold = count;
+      document.getElementById('sl-dimfold').value = count;
+      document.getElementById('sv-dimfold').textContent = count;
+      break;
+    case 'mode':
+      if (cmd.name) activateMode(cmd.name);
+      break;
+  }
+}
+
+function activateMode(name) {
+  var modeName = name.toUpperCase().replace(/\s+/g, '_');
+  if (SHIELD_MODES[modeName]) {
+    setShieldMode(modeName);
+  }
+}
+
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  MCP SANDBOX                                                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+function toggleMcpPanel() {
+  var panel = document.getElementById('mcp-panel');
+  var visible = panel.style.display !== 'none';
+  panel.style.display = visible ? 'none' : 'block';
+  if (!visible && mcpTools.length === 0) {
+    // Load defaults
+    mcpTools = JSON.parse(JSON.stringify(MCP_DEFAULTS));
+    document.getElementById('mcp-editor').value = JSON.stringify(mcpTools, null, 2);
+    document.getElementById('mcp-status').textContent = mcpTools.length + ' tools';
+    mcpLog('Loaded ' + mcpTools.length + ' default tools');
+    updateAiToolsPrompt();
+  }
+}
+
+function mcpLoad() {
+  var editor = document.getElementById('mcp-editor');
+  var text = editor.value.trim();
+  if (!text) { mcpLog('Error: empty editor'); return; }
+  try {
+    var parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) { mcpLog('Error: must be a JSON array'); return; }
+    var valid = [];
+    parsed.forEach(function(tool, i) {
+      if (!tool.name) { mcpLog('Warning: tool at index ' + i + ' has no name, skipped'); return; }
+      if (!tool.handler) { mcpLog('Warning: tool "' + tool.name + '" has no handler, skipped'); return; }
+      valid.push(tool);
+    });
+    mcpTools = valid;
+    document.getElementById('mcp-status').textContent = mcpTools.length + ' tools';
+    mcpLog('Loaded ' + mcpTools.length + ' tools: ' + mcpTools.map(function(t) { return t.name; }).join(', '));
+    updateAiToolsPrompt();
+  } catch(e) {
+    mcpLog('JSON parse error: ' + e.message);
+  }
+}
+
+function mcpReset() {
+  mcpTools = JSON.parse(JSON.stringify(MCP_DEFAULTS));
+  document.getElementById('mcp-editor').value = JSON.stringify(mcpTools, null, 2);
+  document.getElementById('mcp-status').textContent = mcpTools.length + ' tools';
+  mcpLog('Reset to ' + mcpTools.length + ' default tools');
+  updateAiToolsPrompt();
+}
+
+function mcpLog(msg) {
+  var logEl = document.getElementById('mcp-log');
+  var div = document.createElement('div');
+  div.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function mcpExecute(toolName, params) {
+  var tool = null;
+  for (var i = 0; i < mcpTools.length; i++) {
+    if (mcpTools[i].name === toolName) { tool = mcpTools[i]; break; }
+  }
+  if (!tool) { mcpLog('Unknown tool: ' + toolName); return; }
+  var handler = tool.handler;
+  // Substitute params into handler string
+  Object.keys(params).forEach(function(key) {
+    handler = handler.replace(new RegExp('\\{' + key + '\\}', 'g'), params[key]);
+    handler = handler.replace(new RegExp('\\$' + key, 'g'), params[key]);
+  });
+  mcpLog('Executing ' + toolName + ': ' + handler);
+  try {
+    var fn = new Function(handler);
+    fn();
+  } catch(e) {
+    mcpLog('Execution error: ' + e.message);
+  }
+}
+
+function updateAiToolsPrompt() {
+  // Update the AI system prompt with current MCP tools
+  if (aiMessages.length > 0 && aiMessages[0].role === 'system') {
+    aiMessages[0].content = getAiSystemPrompt();
+  }
+}
+
+function playMcpTone(freq, duration) {
+  if (!audioCtx || !masterGain) return;
+  var osc = audioCtx.createOscillator();
+  var gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.value = 0.3;
+  osc.connect(gain);
+  gain.connect(masterGain);
+  osc.start();
+  gain.gain.setTargetAtTime(0, audioCtx.currentTime + Math.max(0.1, duration - 0.1), 0.1);
+  osc.stop(audioCtx.currentTime + duration + 0.2);
+}
+
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  LAUNCH                                                           ║
