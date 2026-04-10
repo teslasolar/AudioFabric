@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AudioFabric — DTMF Shield</title>
+<link rel="stylesheet" href="../shared/styles.css">
+<style>
+body{background:#0a0f08;overflow:hidden;font-family:'JetBrains Mono',monospace;color:#ffa500}
+canvas#c{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+/* CRT scanline effect */
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,0.15) 0px,rgba(0,0,0,0.15) 1px,transparent 1px,transparent 3px);pointer-events:none;z-index:200}
+#header{position:fixed;top:0;left:0;right:0;z-index:50;padding:10px 18px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,rgba(10,15,8,0.9),transparent);pointer-events:none}
+#header *{pointer-events:auto}
+#back{font-size:10px;color:#554;text-decoration:none;letter-spacing:2px}
+#back:hover{color:#ffa500}
+#title{font-size:13px;letter-spacing:4px;text-transform:uppercase;color:#ffa500;text-shadow:0 0 12px #ffa50088}
+#detected-tones{font-size:10px;color:#8f8;font-family:'JetBrains Mono',monospace}
+
+.panel{position:fixed;z-index:40;background:rgba(10,15,8,0.85);border:1px solid #ffa50044;border-radius:4px;padding:10px;font-size:9px;color:#886;backdrop-filter:blur(6px)}
+#keypad{top:60px;left:50%;transform:translateX(-50%);width:320px}
+.keypad-title{font-size:8px;color:#ffa500;letter-spacing:3px;margin-bottom:10px;text-align:center}
+.keypad-grid{display:grid;grid-template-columns:40px 1fr 1fr 1fr 1fr;gap:4px;font-size:10px}
+.kp-col-header{text-align:center;font-size:8px;color:#886;padding:4px}
+.kp-row-header{text-align:right;font-size:8px;color:#886;padding:4px;align-self:center}
+.kp-cell{background:rgba(255,165,0,0.04);border:1px solid #ffa50033;border-radius:3px;padding:10px;text-align:center;font-size:16px;font-weight:bold;color:#ffa500;cursor:pointer;transition:all 0.15s;position:relative}
+.kp-cell:hover{background:rgba(255,165,0,0.1);border-color:#ffa500}
+.kp-cell.near{background:rgba(255,255,0,0.15);border-color:#ff0;color:#ff0;box-shadow:0 0 12px #ff08}
+.kp-cell.matched{background:rgba(0,255,128,0.2);border-color:#0f8;color:#0f8;box-shadow:0 0 16px #0f8}
+.kp-cell.mismatched{background:rgba(255,68,68,0.15);border-color:#f44;color:#f44}
+.kp-cell .play{position:absolute;top:2px;right:3px;font-size:8px;opacity:0.3;cursor:pointer}
+.kp-cell .play:hover{opacity:1}
+.kp-cell .cmd{position:absolute;bottom:1px;left:0;right:0;font-size:6px;color:#886;font-weight:normal}
+
+#left-panel{top:60px;left:12px;width:180px}
+#right-panel{top:60px;right:12px;width:200px}
+.panel-title{font-size:8px;color:#ffa500;letter-spacing:2px;margin-bottom:8px;text-transform:uppercase}
+.metric{display:flex;justify-content:space-between;padding:3px 0;font-size:9px}
+.metric .lbl{color:#553}
+.metric .val{color:#8f8}
+
+.tone-display{padding:6px;background:rgba(255,165,0,0.04);border-radius:3px;margin-bottom:6px}
+.tone-label{font-size:7px;color:#886;margin-bottom:2px}
+.tone-hz{font-size:16px;color:#ffa500;font-weight:bold}
+.tone-target{font-size:9px;color:#8f8}
+.tone-conf{height:3px;background:rgba(255,255,255,0.05);border-radius:1px;margin-top:4px;overflow:hidden}
+.tone-conf-fill{height:100%;background:#ffa500;transition:width 0.1s}
+
+#cmd-buffer{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:40;background:rgba(10,15,8,0.85);border:1px solid #ffa50044;border-radius:4px;padding:8px 16px;font-size:14px;color:#ffa500;font-family:'JetBrains Mono',monospace;letter-spacing:4px;backdrop-filter:blur(6px);min-width:300px;text-align:center}
+#cmd-buffer-label{font-size:7px;color:#886;letter-spacing:2px;margin-bottom:3px}
+
+#cmd-log{position:fixed;bottom:80px;right:12px;z-index:40;background:rgba(10,15,8,0.7);border:1px solid #ffa50033;border-radius:4px;padding:8px;width:200px;max-height:120px;overflow-y:auto;font-size:9px;color:#886;backdrop-filter:blur(6px)}
+.log-line{padding:2px 0;border-bottom:1px solid #ffa50011}
+.log-line .sym{color:#ffa500;font-weight:bold;margin-right:4px}
+.log-line .time{color:#553;font-size:7px;float:right}
+
+#train-btn{background:rgba(255,165,0,0.1);border:1px solid #ffa50044;color:#ffa500;padding:4px 12px;font-family:'JetBrains Mono',monospace;font-size:9px;cursor:pointer;border-radius:3px;letter-spacing:2px;margin-top:8px;width:100%}
+#train-btn:hover{background:rgba(255,165,0,0.2)}
+#train-btn.active{background:rgba(0,255,128,0.2);border-color:#0f8;color:#0f8}
+
+#instruction{position:fixed;top:50%;left:50%;transform:translate(-50%,40%);z-index:30;color:#ffa50055;font-size:10px;letter-spacing:3px;text-align:center;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="header">
+  <a id="back" href="../">&#x2190; AUDIOFABRIC</a>
+  <div id="title">&#x2637; DTMF SHIELD</div>
+  <div id="detected-tones">L: --- Hz  H: --- Hz</div>
+</div>
+
+<div id="keypad" class="panel">
+  <div class="keypad-title">DUAL-TONE MULTI-FREQUENCY KEYPAD</div>
+  <div class="keypad-grid" id="kpgrid"></div>
+  <button id="train-btn" onclick="toggleTrain()">TRAIN MODE</button>
+</div>
+
+<div id="left-panel" class="panel">
+  <div class="panel-title">DETECTED TONES</div>
+  <div class="tone-display">
+    <div class="tone-label">LOW GROUP</div>
+    <div class="tone-hz" id="low-hz">--- Hz</div>
+    <div class="tone-target" id="low-target">target: ---</div>
+    <div class="tone-conf"><div class="tone-conf-fill" id="low-conf"></div></div>
+  </div>
+  <div class="tone-display">
+    <div class="tone-label">HIGH GROUP</div>
+    <div class="tone-hz" id="high-hz">--- Hz</div>
+    <div class="tone-target" id="high-target">target: ---</div>
+    <div class="tone-conf"><div class="tone-conf-fill" id="high-conf"></div></div>
+  </div>
+  <div class="panel-title" style="margin-top:10px">DATA RATE</div>
+  <div class="metric"><span class="lbl">Commands/sec</span><span class="val" id="m-rate">0.0</span></div>
+  <div class="metric"><span class="lbl">Bit rate</span><span class="val" id="m-bps">0 bps</span></div>
+  <div class="metric"><span class="lbl">Max theoretical</span><span class="val">20 bps</span></div>
+</div>
+
+<div id="right-panel" class="panel">
+  <div class="panel-title">SHIELD STATE</div>
+  <div class="metric"><span class="lbl">Mode</span><span class="val" id="m-mode">default</span></div>
+  <div class="metric"><span class="lbl">Active ring</span><span class="val" id="m-ring">none</span></div>
+  <div class="metric"><span class="lbl">Color</span><span class="val" id="m-color">white</span></div>
+  <div class="panel-title" style="margin-top:10px">STATS</div>
+  <div class="metric"><span class="lbl">Commands</span><span class="val" id="m-cmds">0</span></div>
+  <div class="metric"><span class="lbl">Accuracy</span><span class="val" id="m-acc">--</span></div>
+  <div class="metric"><span class="lbl">Uptime</span><span class="val" id="m-time">00:00</span></div>
+</div>
+
+<div id="cmd-buffer">
+  <div id="cmd-buffer-label">COMMAND BUFFER</div>
+  <div id="cmd-buffer-text">-</div>
+</div>
+
+<div id="cmd-log"></div>
+
+<div id="instruction">SING TWO NOTES SIMULTANEOUSLY</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════
+// DTMF SHIELD — Dual-tone voice command interface
+// ═══════════════════════════════════════════════════════
+
+// Target frequencies (scaled down from phone DTMF to comfortable singing range)
+const LOW_FREQS = [130.81, 164.81, 196.00, 233.08];   // C3, E3, G3, A#3
+const HIGH_FREQS = [293.66, 349.23, 415.30, 493.88];  // D4, F4, G#4, B4
+const LOW_NAMES = ['C3', 'E3', 'G3', 'A#3'];
+const HIGH_NAMES = ['D4', 'F4', 'G#4', 'B4'];
+
+const SYMBOLS = [
+  ['1','2','3','A'],
+  ['4','5','6','B'],
+  ['7','8','9','C'],
+  ['*','0','#','D']
+];
+
+const COMMANDS = {
+  '1':'ring 0','2':'ring 1','3':'ring 2','A':'red mode',
+  '4':'ring 3','5':'ring 4','6':'ring 5','B':'green mode',
+  '7':'ring 6','8':'ring 7','9':'ring 8','C':'blue mode',
+  '*':'prev mode','0':'reset','#':'next mode','D':'rainbow mode'
+};
+
+// Build keypad
+const kpgrid = document.getElementById('kpgrid');
+kpgrid.innerHTML = '<div></div>' + HIGH_NAMES.map(n => `<div class="kp-col-header">${n}<br><span style="font-size:7px">${HIGH_FREQS[HIGH_NAMES.indexOf(n)].toFixed(0)}Hz</span></div>`).join('');
+for (let r = 0; r < 4; r++) {
+  kpgrid.innerHTML += `<div class="kp-row-header">${LOW_NAMES[r]}<br><span style="font-size:7px">${LOW_FREQS[r].toFixed(0)}Hz</span></div>`;
+  for (let c = 0; c < 4; c++) {
+    kpgrid.innerHTML += `<div class="kp-cell" id="kp-${r}-${c}" onclick="playTonePair(${r},${c})">${SYMBOLS[r][c]}<span class="play">&#9658;</span><span class="cmd">${COMMANDS[SYMBOLS[r][c]]}</span></div>`;
+  }
+}
+
+// Audio setup
+let audioCtx = null, analyser = null, source = null;
+let freqData = null;
+const FFT_SIZE = 8192;  // high resolution for pitch detection
+let voiceReady = false;
+
+async function initAudio() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = FFT_SIZE;
+    analyser.smoothingTimeConstant = 0.6;
+    source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    voiceReady = true;
+    document.getElementById('instruction').textContent = 'SING TWO NOTES SIMULTANEOUSLY';
+  } catch (e) {
+    document.getElementById('instruction').textContent = 'MIC ACCESS DENIED';
+  }
+}
+
+// Find two strongest frequency peaks
+function findPeaks() {
+  if (!voiceReady) return [null, null];
+  analyser.getByteFrequencyData(freqData);
+  const sr = audioCtx.sampleRate;
+  const binHz = sr / FFT_SIZE;
+
+  // Find peaks above threshold
+  const peaks = [];
+  for (let i = 3; i < Math.min(freqData.length, 800); i++) {
+    if (freqData[i] > 60 &&
+        freqData[i] > freqData[i - 1] &&
+        freqData[i] > freqData[i + 1] &&
+        freqData[i] > freqData[i - 2] &&
+        freqData[i] > freqData[i + 2]) {
+      peaks.push({ hz: i * binHz, v: freqData[i] });
+    }
+  }
+  peaks.sort((a, b) => b.v - a.v);
+
+  // Find the lowest + a higher one
+  if (peaks.length < 1) return [null, null];
+
+  // Top 2 peaks by magnitude, sorted by frequency
+  const top2 = peaks.slice(0, 4);
+  top2.sort((a, b) => a.hz - b.hz);
+
+  // Look for a low and high in the expected ranges
+  let lowPeak = null, highPeak = null;
+  for (const p of top2) {
+    if (p.hz >= 100 && p.hz <= 280 && !lowPeak) lowPeak = p;
+    else if (p.hz >= 260 && p.hz <= 600 && !highPeak) highPeak = p;
+  }
+  return [lowPeak, highPeak];
+}
+
+// Match frequency to nearest target (±15 cents tolerance = ratio 2^(15/1200))
+function matchFreq(hz, targets) {
+  if (!hz) return { idx: -1, conf: 0 };
+  let bestIdx = -1, bestConf = 0;
+  for (let i = 0; i < targets.length; i++) {
+    const ratio = hz / targets[i];
+    const cents = Math.abs(1200 * Math.log2(ratio));
+    if (cents < 50) {  // within 50 cents
+      const conf = 1 - (cents / 50);
+      if (conf > bestConf) { bestConf = conf; bestIdx = i; }
+    }
+  }
+  return { idx: bestIdx, conf: bestConf };
+}
+
+// Command detection state
+let holdStart = 0;
+let lastLowIdx = -1, lastHighIdx = -1;
+let commandHistory = [];
+let totalCommands = 0;
+let startTime = Date.now();
+
+function detectCommand() {
+  const [lowP, highP] = findPeaks();
+  // Update displays
+  document.getElementById('detected-tones').textContent =
+    'L: ' + (lowP ? lowP.hz.toFixed(0) : '---') + ' Hz  H: ' + (highP ? highP.hz.toFixed(0) : '---') + ' Hz';
+  document.getElementById('low-hz').textContent = (lowP ? lowP.hz.toFixed(1) : '---') + ' Hz';
+  document.getElementById('high-hz').textContent = (highP ? highP.hz.toFixed(1) : '---') + ' Hz';
+
+  const lowMatch = matchFreq(lowP ? lowP.hz : null, LOW_FREQS);
+  const highMatch = matchFreq(highP ? highP.hz : null, HIGH_FREQS);
+
+  document.getElementById('low-conf').style.width = (lowMatch.conf * 100) + '%';
+  document.getElementById('high-conf').style.width = (highMatch.conf * 100) + '%';
+  if (lowMatch.idx >= 0) document.getElementById('low-target').textContent = 'target: ' + LOW_NAMES[lowMatch.idx];
+  if (highMatch.idx >= 0) document.getElementById('high-target').textContent = 'target: ' + HIGH_NAMES[highMatch.idx];
+
+  // Clear all cell states
+  document.querySelectorAll('.kp-cell').forEach(c => c.classList.remove('near','matched'));
+
+  if (lowMatch.idx >= 0 && highMatch.idx >= 0) {
+    const cellId = 'kp-' + lowMatch.idx + '-' + highMatch.idx;
+    const cell = document.getElementById(cellId);
+    if (cell) cell.classList.add('near');
+
+    // Hold check
+    if (lowMatch.idx === lastLowIdx && highMatch.idx === lastHighIdx) {
+      if (Date.now() - holdStart > 200) {
+        // Trigger command!
+        const sym = SYMBOLS[lowMatch.idx][highMatch.idx];
+        triggerCommand(sym, cell);
+        holdStart = Date.now() + 500; // cooldown
+      }
+    } else {
+      holdStart = Date.now();
+      lastLowIdx = lowMatch.idx;
+      lastHighIdx = highMatch.idx;
+    }
+  } else {
+    lastLowIdx = -1; lastHighIdx = -1;
+  }
+}
+
+// Trigger a command
+let currentMode = 'default', activeRing = 'none', currentColor = 'white';
+function triggerCommand(sym, cell) {
+  if (cell) {
+    cell.classList.add('matched');
+    setTimeout(() => cell.classList.remove('matched'), 500);
+  }
+  const cmd = COMMANDS[sym];
+  totalCommands++;
+  commandHistory.push({ sym, cmd, t: Date.now() });
+  if (commandHistory.length > 20) commandHistory.shift();
+
+  // Update command buffer
+  const bufText = commandHistory.slice(-15).map(c => c.sym).join(' ');
+  document.getElementById('cmd-buffer-text').textContent = bufText;
+
+  // Log
+  const log = document.getElementById('cmd-log');
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  const now = new Date();
+  const ts = String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+  line.innerHTML = '<span class="sym">' + sym + '</span>' + cmd + '<span class="time">' + ts + '</span>';
+  log.insertBefore(line, log.firstChild);
+  while (log.children.length > 10) log.removeChild(log.lastChild);
+
+  // Apply to shield
+  applyCommand(sym);
+  spawnParticles();
+}
+
+function applyCommand(sym) {
+  if (sym === '0') { currentMode='default'; activeRing='none'; currentColor='white'; }
+  else if (sym >= '1' && sym <= '9') { activeRing = 'R' + (sym.charCodeAt(0) - 49); }
+  else if (sym === 'A') currentColor = 'red';
+  else if (sym === 'B') currentColor = 'green';
+  else if (sym === 'C') currentColor = 'blue';
+  else if (sym === 'D') currentColor = 'rainbow';
+  else if (sym === '#') currentMode = nextMode(currentMode);
+  else if (sym === '*') currentMode = prevMode(currentMode);
+
+  document.getElementById('m-mode').textContent = currentMode;
+  document.getElementById('m-ring').textContent = activeRing;
+  document.getElementById('m-color').textContent = currentColor;
+}
+
+const MODES = ['default','pulse','wave','spiral','burst'];
+function nextMode(m) { const i = MODES.indexOf(m); return MODES[(i+1) % MODES.length]; }
+function prevMode(m) { const i = MODES.indexOf(m); return MODES[(i-1+MODES.length) % MODES.length]; }
+
+// Play reference tone pair
+function playTonePair(r, c) {
+  if (!audioCtx) { initAudio().then(() => setTimeout(() => playTonePair(r,c), 500)); return; }
+  const lo = audioCtx.createOscillator();
+  const hi = audioCtx.createOscillator();
+  const gl = audioCtx.createGain();
+  const gh = audioCtx.createGain();
+  lo.frequency.value = LOW_FREQS[r];
+  hi.frequency.value = HIGH_FREQS[c];
+  lo.type = 'sine'; hi.type = 'sine';
+  lo.connect(gl); hi.connect(gh);
+  gl.connect(audioCtx.destination); gh.connect(audioCtx.destination);
+  gl.gain.setValueAtTime(0, audioCtx.currentTime);
+  gh.gain.setValueAtTime(0, audioCtx.currentTime);
+  gl.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 0.02);
+  gh.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 0.02);
+  gl.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+  gh.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+  lo.start();
+  hi.start();
+  lo.stop(audioCtx.currentTime + 0.5);
+  hi.stop(audioCtx.currentTime + 0.5);
+}
+window.playTonePair = playTonePair;
+
+// Training mode
+let trainMode = false;
+let trainStep = 0;
+let trainInterval = null;
+function toggleTrain() {
+  trainMode = !trainMode;
+  const btn = document.getElementById('train-btn');
+  btn.classList.toggle('active', trainMode);
+  btn.textContent = trainMode ? 'STOP TRAINING' : 'TRAIN MODE';
+  if (trainMode) {
+    trainStep = 0;
+    trainInterval = setInterval(() => {
+      const r = Math.floor(trainStep / 4);
+      const c = trainStep % 4;
+      document.querySelectorAll('.kp-cell').forEach(el => el.style.outline = '');
+      const cell = document.getElementById('kp-' + r + '-' + c);
+      if (cell) {
+        cell.style.outline = '2px solid #0f8';
+        playTonePair(r, c);
+      }
+      trainStep = (trainStep + 1) % 16;
+    }, 2000);
+  } else if (trainInterval) {
+    clearInterval(trainInterval);
+    document.querySelectorAll('.kp-cell').forEach(el => el.style.outline = '');
+  }
+}
+window.toggleTrain = toggleTrain;
+
+// 3D Scene
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 500);
+camera.position.set(0, 0, 20);
+
+scene.add(new THREE.AmbientLight(0x443322, 0.4));
+const light = new THREE.DirectionalLight(0xffa500, 0.8);
+light.position.set(10, 10, 10);
+scene.add(light);
+
+// Central shield
+const shieldGeo = new THREE.OctahedronGeometry(4, 2);
+const shieldMat = new THREE.MeshStandardMaterial({ color: 0xffa500, emissive: 0xaa6600, emissiveIntensity: 0.5, wireframe: false, transparent: true, opacity: 0.8 });
+const shield = new THREE.Mesh(shieldGeo, shieldMat);
+scene.add(shield);
+
+// Wireframe overlay
+const wireGeo = new THREE.OctahedronGeometry(4.2, 2);
+const wireMat = new THREE.LineBasicMaterial({ color: 0xffa500, transparent: true, opacity: 0.4 });
+const wire = new THREE.LineSegments(new THREE.EdgesGeometry(wireGeo), wireMat);
+scene.add(wire);
+
+// 16 keypad markers in 3D
+const kpMarkers = [];
+for (let r = 0; r < 4; r++) {
+  for (let c = 0; c < 4; c++) {
+    const m = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffa500, transparent: true, opacity: 0.2 })
+    );
+    m.position.set((c - 1.5) * 3, (1.5 - r) * 3, -10);
+    scene.add(m);
+    kpMarkers.push(m);
+  }
+}
+
+// Particle bursts
+const bursts = [];
+function spawnParticles() {
+  for (let i = 0; i < 20; i++) {
+    const p = new THREE.Mesh(
+      new THREE.SphereGeometry(0.1, 4, 4),
+      new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 1 })
+    );
+    const a = Math.random() * Math.PI * 2;
+    const e = Math.acos(2 * Math.random() - 1);
+    p.position.set(0, 0, 0);
+    p.userData = {
+      vx: Math.sin(e) * Math.cos(a) * 0.3,
+      vy: Math.sin(e) * Math.sin(a) * 0.3,
+      vz: Math.cos(e) * 0.3,
+      life: 1
+    };
+    scene.add(p);
+    bursts.push(p);
+  }
+}
+
+// Starfield
+const starGeo = new THREE.BufferGeometry();
+const starPos = new Float32Array(2000 * 3);
+for (let i = 0; i < 2000; i++) {
+  starPos[i*3] = (Math.random() - 0.5) * 400;
+  starPos[i*3+1] = (Math.random() - 0.5) * 400;
+  starPos[i*3+2] = (Math.random() - 0.5) * 400;
+}
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x887766, size: 0.5 }));
+scene.add(stars);
+
+function animate() {
+  requestAnimationFrame(animate);
+  detectCommand();
+
+  shield.rotation.y += 0.005;
+  shield.rotation.x += 0.002;
+  wire.rotation.y += 0.005;
+  wire.rotation.x += 0.002;
+
+  // Shield color
+  const colorMap = { red: 0xff3333, green: 0x33ff88, blue: 0x3388ff, rainbow: null, white: 0xffa500 };
+  if (currentColor === 'rainbow') {
+    shieldMat.color.setHSL((performance.now() * 0.0003) % 1, 1, 0.5);
+    wireMat.color.setHSL((performance.now() * 0.0003) % 1, 1, 0.6);
+  } else {
+    shieldMat.color.setHex(colorMap[currentColor] || 0xffa500);
+    wireMat.color.setHex(colorMap[currentColor] || 0xffa500);
+  }
+
+  // Pulse with command
+  const t = performance.now() * 0.001;
+  shield.scale.setScalar(1 + Math.sin(t * 2) * 0.05);
+
+  // Update bursts
+  for (let i = bursts.length - 1; i >= 0; i--) {
+    const p = bursts[i];
+    p.position.x += p.userData.vx;
+    p.position.y += p.userData.vy;
+    p.position.z += p.userData.vz;
+    p.userData.life -= 0.02;
+    p.material.opacity = p.userData.life;
+    if (p.userData.life <= 0) {
+      scene.remove(p);
+      bursts.splice(i, 1);
+    }
+  }
+
+  // Update stats
+  const elapsed = (Date.now() - startTime) / 1000;
+  const recentCmds = commandHistory.filter(c => Date.now() - c.t < 10000).length;
+  const rate = recentCmds / 10;
+  document.getElementById('m-rate').textContent = rate.toFixed(1);
+  document.getElementById('m-bps').textContent = Math.round(rate * 4) + ' bps';
+  document.getElementById('m-cmds').textContent = totalCommands;
+  const mm = Math.floor(elapsed / 60), ss = Math.floor(elapsed % 60);
+  document.getElementById('m-time').textContent = String(mm).padStart(2,'0') + ':' + String(ss).padStart(2,'0');
+
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+document.addEventListener('click', () => { if (!audioCtx) initAudio(); }, { once: true });
+initAudio();
+animate();
+</script>
+</body>
+</html>

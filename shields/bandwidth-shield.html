@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AudioFabric — Bandwidth Shield</title>
+<link rel="stylesheet" href="../shared/styles.css">
+<style>
+body{background:#000;overflow:hidden;font-family:'JetBrains Mono',monospace;color:#0f8}
+canvas#c{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+#header{position:fixed;top:0;left:0;right:0;z-index:50;padding:10px 18px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,rgba(0,0,0,0.9),transparent);pointer-events:none}
+#header *{pointer-events:auto}
+#back{font-size:10px;color:#555;text-decoration:none;letter-spacing:2px}
+#back:hover{color:#0f8}
+#title{font-size:13px;letter-spacing:4px;text-transform:uppercase;color:#0f8;text-shadow:0 0 12px #0f84}
+#mic-dot{width:8px;height:8px;border-radius:50%;background:#f44;display:inline-block;margin-right:6px}
+#mic-dot.on{background:#0f8;box-shadow:0 0 8px #0f8}
+
+#center-display{position:fixed;top:50%;left:50%;transform:translate(-50%,-60%);z-index:30;text-align:center;pointer-events:none}
+#rate-big{font-size:72px;font-weight:700;color:#0f8;text-shadow:0 0 30px #0f84;font-family:'JetBrains Mono',monospace;letter-spacing:-2px;line-height:1}
+#rate-unit{font-size:14px;color:#0cf;letter-spacing:4px;margin-top:4px}
+#rate-msg{font-size:11px;color:#666;margin-top:16px;letter-spacing:2px;min-height:14px}
+
+#rate-graph{position:fixed;top:56%;left:50%;transform:translateX(-50%);width:500px;height:60px;z-index:30;pointer-events:none}
+
+.panel{position:fixed;z-index:40;background:rgba(0,0,0,0.6);border:1px solid #0f82;border-radius:4px;padding:10px;font-size:9px;color:#888;backdrop-filter:blur(6px)}
+#left-panel{top:50px;left:12px;width:220px;max-height:calc(100vh - 70px);overflow-y:auto}
+#right-panel{top:50px;right:12px;width:180px}
+.panel-title{font-size:8px;color:#0f8;letter-spacing:2px;margin-bottom:8px;text-transform:uppercase}
+
+.channel{margin-bottom:6px;padding:4px;background:rgba(255,255,255,0.02);border-radius:3px;border-left:2px solid #0f84}
+.channel.active{border-left-color:#0f8}
+.ch-name{font-size:9px;color:#0f8;font-weight:bold}
+.ch-bits{float:right;font-size:8px;color:#0cf}
+.ch-val{font-size:8px;color:#666;margin-top:2px}
+.ch-bar{height:3px;background:rgba(255,255,255,0.04);border-radius:1px;margin-top:3px;overflow:hidden}
+.ch-fill{height:100%;background:linear-gradient(90deg,#0f8,#0cf);transition:width 0.15s;border-radius:1px}
+
+.metric{display:flex;justify-content:space-between;padding:3px 0;font-size:9px}
+.metric .lbl{color:#555}
+.metric .val{color:#0f8}
+
+#packet-log{position:fixed;bottom:12px;left:12px;right:12px;height:80px;z-index:40;background:rgba(0,0,0,0.7);border:1px solid #0f82;border-radius:4px;padding:6px;overflow:hidden;font-size:9px;color:#0f84;backdrop-filter:blur(6px)}
+#packet-log-title{font-size:7px;color:#0f8;letter-spacing:2px;margin-bottom:4px}
+#packet-log-content{font-family:'JetBrains Mono',monospace;font-size:8px;line-height:1.4;color:#0f6;white-space:pre-wrap;overflow:hidden;max-height:60px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="header">
+  <a id="back" href="../">&#x2190; AUDIOFABRIC</a>
+  <div id="title"><span id="mic-dot"></span>BANDWIDTH SHIELD</div>
+  <div style="font-size:10px;color:#0cf" id="hdr-rate">0 bps</div>
+</div>
+
+<div id="center-display">
+  <div id="rate-big">0</div>
+  <div id="rate-unit">BITS PER SECOND</div>
+  <div id="rate-msg">Waiting for mic...</div>
+</div>
+<canvas id="rate-graph"></canvas>
+
+<div id="left-panel" class="panel">
+  <div class="panel-title">12 PARALLEL CHANNELS</div>
+  <div id="channels"></div>
+</div>
+
+<div id="right-panel" class="panel">
+  <div class="panel-title">THROUGHPUT METRICS</div>
+  <div class="metric"><span class="lbl">Current</span><span class="val" id="m-cur">0 bps</span></div>
+  <div class="metric"><span class="lbl">Peak</span><span class="val" id="m-peak">0 bps</span></div>
+  <div class="metric"><span class="lbl">Avg 10s</span><span class="val" id="m-avg">0 bps</span></div>
+  <div class="metric"><span class="lbl">Max theoretical</span><span class="val" id="m-max">2900 bps</span></div>
+  <div class="metric"><span class="lbl">Efficiency</span><span class="val" id="m-eff">0%</span></div>
+  <div class="metric"><span class="lbl">Frame rate</span><span class="val" id="m-fps">0 fps</span></div>
+  <div class="metric"><span class="lbl">Total sent</span><span class="val" id="m-total">0 bytes</span></div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid #0f82">
+    <div style="font-size:7px;color:#0f8;letter-spacing:2px;margin-bottom:6px">ENTROPY (H)</div>
+    <div class="metric"><span class="lbl">Total H</span><span class="val" id="m-h">0.00</span></div>
+    <div class="metric"><span class="lbl">Compression</span><span class="val" id="m-comp">0%</span></div>
+  </div>
+</div>
+
+<div id="packet-log">
+  <div id="packet-log-title">PACKET STREAM</div>
+  <div id="packet-log-content"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════
+// BANDWIDTH SHIELD — extract max bits from voice
+// ═══════════════════════════════════════════════════════
+
+const CHANNELS = [
+  { key: 'f0',       name: 'F0 Pitch',          bits: 7, unit: 'Hz',  extract: v => v.f0 },
+  { key: 'f1',       name: 'F1 Formant',        bits: 6, unit: 'Hz',  extract: v => v.f1 },
+  { key: 'f2',       name: 'F2 Formant',        bits: 6, unit: 'Hz',  extract: v => v.f2 },
+  { key: 'f3',       name: 'F3 Formant',        bits: 5, unit: 'Hz',  extract: v => v.f3 },
+  { key: 'rms',      name: 'RMS Loudness',      bits: 5, unit: 'dB',  extract: v => v.rms },
+  { key: 'centroid', name: 'Spectral Centroid', bits: 6, unit: 'Hz',  extract: v => v.centroid },
+  { key: 'tilt',     name: 'Spectral Tilt',     bits: 5, unit: 'dB',  extract: v => v.tilt },
+  { key: 'flux',     name: 'Spectral Flux',     bits: 5, unit: '',    extract: v => v.flux },
+  { key: 'zcr',      name: 'Zero-Crossing',     bits: 5, unit: '',    extract: v => v.zcr },
+  { key: 'voicing',  name: 'Voicing Ratio',     bits: 3, unit: '',    extract: v => v.voicing },
+  { key: 'hnr',      name: 'Harmonic/Noise',    bits: 4, unit: 'dB',  extract: v => v.hnr },
+  { key: 'onset',    name: 'Onset Detect',      bits: 1, unit: '',    extract: v => v.onset }
+];
+const TOTAL_BITS = CHANNELS.reduce((s, c) => s + c.bits, 0); // 58 bits/frame
+
+// Build channel UI
+const channelsDiv = document.getElementById('channels');
+CHANNELS.forEach(c => {
+  const el = document.createElement('div');
+  el.className = 'channel';
+  el.id = 'ch-' + c.key;
+  el.innerHTML = `
+    <div><span class="ch-name">${c.name}</span><span class="ch-bits">${c.bits} bit</span></div>
+    <div class="ch-val"><span id="cv-${c.key}">-</span> ${c.unit} · H=<span id="ch-${c.key}">0.0</span></div>
+    <div class="ch-bar"><div class="ch-fill" id="cf-${c.key}" style="width:0%"></div></div>
+  `;
+  channelsDiv.appendChild(el);
+});
+
+// Audio setup
+let audioCtx = null, analyser = null, source = null;
+let freqData = null, timeData = null, prevFreqData = null;
+const FFT_SIZE = 2048;
+let voiceReady = false;
+
+async function initAudio() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = FFT_SIZE;
+    analyser.smoothingTimeConstant = 0.3;
+    source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    prevFreqData = new Uint8Array(analyser.frequencyBinCount);
+    timeData = new Uint8Array(analyser.fftSize);
+    voiceReady = true;
+    document.getElementById('mic-dot').classList.add('on');
+    document.getElementById('rate-msg').textContent = 'Speak, sing, or whisper...';
+  } catch (e) {
+    document.getElementById('rate-msg').textContent = 'Mic denied';
+  }
+}
+
+// Feature extraction
+function extractFeatures() {
+  if (!voiceReady) return null;
+  analyser.getByteFrequencyData(freqData);
+  analyser.getByteTimeDomainData(timeData);
+  const sr = audioCtx.sampleRate;
+  const binHz = sr / FFT_SIZE;
+
+  // RMS
+  let sumSq = 0;
+  for (let i = 0; i < timeData.length; i++) {
+    const v = (timeData[i] - 128) / 128;
+    sumSq += v * v;
+  }
+  const rms = Math.sqrt(sumSq / timeData.length);
+
+  // Zero-crossing rate
+  let zc = 0;
+  for (let i = 1; i < timeData.length; i++) {
+    if ((timeData[i] - 128) * (timeData[i - 1] - 128) < 0) zc++;
+  }
+  const zcr = zc / timeData.length;
+
+  // Find peaks (simple F0-F3 estimation)
+  const peaks = [];
+  for (let i = 3; i < Math.min(freqData.length, 800); i++) {
+    if (freqData[i] > 50 && freqData[i] > freqData[i - 1] && freqData[i] > freqData[i + 1]) {
+      peaks.push({ i, v: freqData[i] });
+    }
+  }
+  peaks.sort((a, b) => b.v - a.v);
+  const f0 = peaks[0] ? peaks[0].i * binHz : 0;
+  // Sort by index for formants
+  const sortedByIdx = peaks.slice(0, 8).sort((a, b) => a.i - b.i);
+  const f1 = sortedByIdx[0] ? sortedByIdx[0].i * binHz : 0;
+  const f2 = sortedByIdx[1] ? sortedByIdx[1].i * binHz : 0;
+  const f3 = sortedByIdx[2] ? sortedByIdx[2].i * binHz : 0;
+
+  // Spectral centroid
+  let num = 0, den = 0;
+  for (let i = 0; i < freqData.length; i++) {
+    num += i * freqData[i];
+    den += freqData[i];
+  }
+  const centroid = den > 0 ? (num / den) * binHz : 0;
+
+  // Spectral tilt (slope of spectrum)
+  let tiltNum = 0, tiltDen = 0;
+  const mid = freqData.length / 2;
+  for (let i = 0; i < freqData.length; i++) {
+    tiltNum += (i - mid) * (freqData[i] - 128);
+    tiltDen += (i - mid) * (i - mid);
+  }
+  const tilt = tiltDen > 0 ? tiltNum / tiltDen : 0;
+
+  // Spectral flux (diff from previous frame)
+  let flux = 0;
+  for (let i = 0; i < freqData.length; i++) {
+    const d = freqData[i] - prevFreqData[i];
+    flux += d * d;
+  }
+  flux = Math.sqrt(flux / freqData.length);
+  prevFreqData.set(freqData);
+
+  // Voicing ratio (low-freq energy / total)
+  let lowE = 0, totE = 0;
+  for (let i = 0; i < freqData.length; i++) {
+    totE += freqData[i];
+    if (i < 50) lowE += freqData[i];
+  }
+  const voicing = totE > 0 ? lowE / totE : 0;
+
+  // Harmonic-to-noise ratio (peak strength vs. average)
+  const avgE = totE / freqData.length;
+  const peakE = peaks[0] ? peaks[0].v : 0;
+  const hnr = avgE > 0 ? 20 * Math.log10(peakE / (avgE + 1)) : 0;
+
+  // Onset detection (flux spike)
+  const onset = flux > 30 ? 1 : 0;
+
+  return { f0, f1, f2, f3, rms, centroid, tilt, flux, zcr, voicing, hnr, onset };
+}
+
+// Quantize value to N bits
+function quantize(value, bits, min, max) {
+  const levels = Math.pow(2, bits);
+  const clamped = Math.max(min, Math.min(max, value));
+  return Math.floor(((clamped - min) / (max - min)) * (levels - 1));
+}
+
+// Entropy calculation from sliding window
+const WINDOW_SIZE = 100;
+const channelHistory = {};
+CHANNELS.forEach(c => channelHistory[c.key] = []);
+
+function entropy(samples, bits) {
+  if (samples.length < 2) return 0;
+  const counts = {};
+  for (const s of samples) counts[s] = (counts[s] || 0) + 1;
+  let h = 0;
+  const total = samples.length;
+  for (const k in counts) {
+    const p = counts[k] / total;
+    h -= p * Math.log2(p);
+  }
+  return Math.min(h, bits);
+}
+
+// Rate history graph
+const graphCanvas = document.getElementById('rate-graph');
+graphCanvas.width = 500;
+graphCanvas.height = 60;
+const graphCtx = graphCanvas.getContext('2d');
+const rateHistory = [];
+const MAX_RATE_HIST = 200;
+
+function drawGraph() {
+  graphCtx.clearRect(0, 0, 500, 60);
+  graphCtx.strokeStyle = '#0f8';
+  graphCtx.lineWidth = 1;
+  graphCtx.globalAlpha = 0.8;
+  graphCtx.beginPath();
+  const max = 3000;
+  for (let i = 0; i < rateHistory.length; i++) {
+    const x = (i / MAX_RATE_HIST) * 500;
+    const y = 60 - (rateHistory[i] / max) * 60;
+    if (i === 0) graphCtx.moveTo(x, y);
+    else graphCtx.lineTo(x, y);
+  }
+  graphCtx.stroke();
+  // Grid
+  graphCtx.strokeStyle = '#0f82';
+  graphCtx.globalAlpha = 0.4;
+  for (let g = 0; g < 4; g++) {
+    const y = (g / 4) * 60;
+    graphCtx.beginPath();
+    graphCtx.moveTo(0, y);
+    graphCtx.lineTo(500, y);
+    graphCtx.stroke();
+  }
+  graphCtx.globalAlpha = 1;
+}
+
+// Main loop
+let peakRate = 0;
+let rateSum10s = 0, rateCount10s = 0;
+let lastT = performance.now();
+let fpsCounter = 0, fpsT = performance.now();
+let currentFps = 60;
+let totalBytes = 0;
+const packetLog = document.getElementById('packet-log-content');
+let logLines = [];
+
+function loop() {
+  requestAnimationFrame(loop);
+  const features = extractFeatures();
+  if (!features) return;
+
+  // Quantize each channel + update histories
+  const ranges = {
+    f0: [50, 1200], f1: [200, 1500], f2: [500, 3500], f3: [1500, 4500],
+    rms: [0, 0.5], centroid: [0, 6000], tilt: [-5, 5], flux: [0, 100],
+    zcr: [0, 0.5], voicing: [0, 1], hnr: [-30, 30], onset: [0, 1]
+  };
+  const quantized = {};
+  const packetBytes = [];
+  CHANNELS.forEach(c => {
+    const v = c.extract(features);
+    const r = ranges[c.key];
+    const q = quantize(v, c.bits, r[0], r[1]);
+    quantized[c.key] = q;
+    channelHistory[c.key].push(q);
+    if (channelHistory[c.key].length > WINDOW_SIZE) channelHistory[c.key].shift();
+
+    // Update UI
+    document.getElementById('cv-' + c.key).textContent = v.toFixed(1);
+    document.getElementById('cf-' + c.key).style.width = ((q / (Math.pow(2, c.bits) - 1)) * 100).toFixed(0) + '%';
+
+    packetBytes.push(q);
+  });
+
+  // Compute per-channel entropy (bits of actual info)
+  let totalH = 0;
+  CHANNELS.forEach(c => {
+    const h = entropy(channelHistory[c.key], c.bits);
+    totalH += h;
+    document.getElementById('ch-' + c.key).textContent = h.toFixed(2);
+    document.getElementById('ch-' + c.key).parentElement.parentElement.parentElement.classList.toggle('active', h > 0.5);
+  });
+
+  // Current bit rate = entropy × fps
+  const currentRate = Math.round(totalH * currentFps);
+  rateHistory.push(currentRate);
+  if (rateHistory.length > MAX_RATE_HIST) rateHistory.shift();
+  if (currentRate > peakRate) peakRate = currentRate;
+
+  rateSum10s += currentRate;
+  rateCount10s++;
+  if (rateCount10s > currentFps * 10) {
+    rateSum10s -= rateHistory[rateHistory.length - 1 - Math.floor(currentFps * 10)] || 0;
+  }
+  const avgRate = rateCount10s > 0 ? Math.round(rateSum10s / rateCount10s) : 0;
+
+  // Update displays
+  document.getElementById('rate-big').textContent = currentRate;
+  document.getElementById('hdr-rate').textContent = currentRate + ' bps';
+  document.getElementById('m-cur').textContent = currentRate + ' bps';
+  document.getElementById('m-peak').textContent = peakRate + ' bps';
+  document.getElementById('m-avg').textContent = avgRate + ' bps';
+  document.getElementById('m-max').textContent = (TOTAL_BITS * currentFps) + ' bps';
+  document.getElementById('m-eff').textContent = Math.round((currentRate / (TOTAL_BITS * currentFps)) * 100) + '%';
+  document.getElementById('m-h').textContent = totalH.toFixed(2);
+  document.getElementById('m-comp').textContent = Math.round((totalH / TOTAL_BITS) * 100) + '%';
+  document.getElementById('m-fps').textContent = Math.round(currentFps) + ' fps';
+
+  totalBytes += Math.ceil(totalH / 8);
+  document.getElementById('m-total').textContent = totalBytes + ' bytes';
+
+  // Message
+  let msg = 'Waiting for mic...';
+  if (currentRate < 200) msg = 'Try varying your voice...';
+  else if (currentRate < 800) msg = 'Good signal';
+  else if (currentRate < 1500) msg = 'High bandwidth!';
+  else if (currentRate < 2200) msg = 'Excellent throughput!';
+  else msg = 'MAXIMUM THROUGHPUT';
+  document.getElementById('rate-msg').textContent = msg;
+
+  // Packet log — show as hex
+  const hexLine = packetBytes.map(b => b.toString(16).padStart(2, '0')).join(' ');
+  logLines.push(hexLine);
+  if (logLines.length > 5) logLines.shift();
+  packetLog.textContent = logLines.join('\n');
+
+  drawGraph();
+
+  // FPS tracking
+  fpsCounter++;
+  const now = performance.now();
+  if (now - fpsT > 500) {
+    currentFps = (fpsCounter * 1000) / (now - fpsT);
+    fpsCounter = 0;
+    fpsT = now;
+  }
+}
+
+// Background canvas — flowing binary digits
+const bgCanvas = document.getElementById('c');
+const bgCtx = bgCanvas.getContext('2d');
+function resize() { bgCanvas.width = innerWidth; bgCanvas.height = innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+const DIGIT_COUNT = 200;
+const digits = [];
+for (let i = 0; i < DIGIT_COUNT; i++) {
+  digits.push({
+    x: Math.random() * innerWidth,
+    y: Math.random() * innerHeight,
+    v: 0.3 + Math.random() * 2,
+    ch: Math.random() > 0.5 ? '1' : '0',
+    a: 0.1 + Math.random() * 0.3
+  });
+}
+
+function drawBg() {
+  bgCtx.fillStyle = 'rgba(0,0,0,0.15)';
+  bgCtx.fillRect(0, 0, innerWidth, innerHeight);
+  bgCtx.font = '12px JetBrains Mono, monospace';
+  const speed = 1 + (rateHistory[rateHistory.length - 1] || 0) / 500;
+  digits.forEach(d => {
+    d.y += d.v * speed;
+    if (d.y > innerHeight) { d.y = -10; d.x = Math.random() * innerWidth; d.ch = Math.random() > 0.5 ? '1' : '0'; }
+    bgCtx.fillStyle = 'rgba(0,255,136,' + d.a + ')';
+    bgCtx.fillText(d.ch, d.x, d.y);
+  });
+  requestAnimationFrame(drawBg);
+}
+drawBg();
+
+// Start
+document.addEventListener('click', () => { if (!audioCtx) initAudio(); }, { once: true });
+initAudio();
+loop();
+</script>
+</body>
+</html>

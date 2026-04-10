@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AudioFabric — Spectral Shield</title>
+<link rel="stylesheet" href="../shared/styles.css">
+<style>
+body{background:#000;overflow:hidden;font-family:'JetBrains Mono',monospace;color:#0f8}
+canvas#c{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+#header{position:fixed;top:0;left:0;right:0;z-index:50;padding:10px 18px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,rgba(0,0,0,0.9),transparent);pointer-events:none}
+#header *{pointer-events:auto}
+#back{font-size:10px;color:#555;text-decoration:none;letter-spacing:2px}
+#back:hover{color:#0f8}
+#title{font-size:13px;letter-spacing:4px;text-transform:uppercase;color:#0f8;text-shadow:0 0 12px #0f84}
+#throughput{font-size:11px;color:#0cf;font-weight:bold}
+.panel{position:fixed;z-index:40;background:rgba(0,0,0,0.6);border:1px solid #0f82;border-radius:4px;padding:10px;font-size:9px;color:#888;backdrop-filter:blur(6px)}
+#left-panel{top:50px;left:12px;width:160px}
+#right-panel{top:50px;right:12px;width:180px}
+.panel-title{font-size:8px;color:#0f8;letter-spacing:2px;margin-bottom:8px;text-transform:uppercase}
+.metric{display:flex;justify-content:space-between;padding:2px 0;font-size:9px}
+.metric .lbl{color:#555}
+.metric .val{color:#0f8}
+.band-row{display:flex;align-items:center;gap:4px;margin-bottom:3px}
+.band-name{width:60px;font-size:8px;color:#666}
+.band-bar{flex:1;height:6px;background:rgba(255,255,255,0.04);border-radius:2px;overflow:hidden}
+.band-fill{height:100%;background:#0f8;border-radius:2px;transition:width 0.1s}
+.band-val{width:30px;text-align:right;font-size:8px;color:#0cf}
+#modes{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:50;display:flex;gap:6px;pointer-events:auto}
+.mode-btn{background:rgba(0,0,0,0.8);border:1px solid #0f84;color:#0f8;padding:6px 14px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:3px;letter-spacing:2px;transition:all 0.2s}
+.mode-btn:hover{background:#0f82;color:#fff}
+.mode-btn.active{background:#0f83;color:#fff;border-color:#0f8;box-shadow:0 0 12px #0f84}
+#freq-scale{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:40;font-size:8px;color:#444;display:flex;gap:30px;pointer-events:none}
+#voice-prompt{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:30;color:#0f84;font-size:11px;letter-spacing:3px;text-align:center;pointer-events:none;transition:opacity 1s}
+#voice-prompt.hidden{opacity:0}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="header">
+  <a id="back" href="../">&#x2190; AUDIOFABRIC</a>
+  <div id="title">&#x2735; SPECTRAL SHIELD</div>
+  <div id="throughput">0 kbps</div>
+</div>
+
+<div id="left-panel" class="panel">
+  <div class="panel-title">FREQUENCY BANDS</div>
+  <div class="band-row"><span class="band-name">SUB</span><div class="band-bar"><div class="band-fill" id="bf-0"></div></div><span class="band-val" id="bv-0">-</span></div>
+  <div class="band-row"><span class="band-name">BASS</span><div class="band-bar"><div class="band-fill" id="bf-1"></div></div><span class="band-val" id="bv-1">-</span></div>
+  <div class="band-row"><span class="band-name">LOW-MID</span><div class="band-bar"><div class="band-fill" id="bf-2"></div></div><span class="band-val" id="bv-2">-</span></div>
+  <div class="band-row"><span class="band-name">MID</span><div class="band-bar"><div class="band-fill" id="bf-3"></div></div><span class="band-val" id="bv-3">-</span></div>
+  <div class="band-row"><span class="band-name">HI-MID</span><div class="band-bar"><div class="band-fill" id="bf-4"></div></div><span class="band-val" id="bv-4">-</span></div>
+  <div class="band-row"><span class="band-name">PRESENCE</span><div class="band-bar"><div class="band-fill" id="bf-5"></div></div><span class="band-val" id="bv-5">-</span></div>
+  <div class="band-row"><span class="band-name">BRILLIANCE</span><div class="band-bar"><div class="band-fill" id="bf-6"></div></div><span class="band-val" id="bv-6">-</span></div>
+</div>
+
+<div id="right-panel" class="panel">
+  <div class="panel-title">SPECTRAL METRICS</div>
+  <div class="metric"><span class="lbl">FFT Size</span><span class="val" id="m-fft">2048</span></div>
+  <div class="metric"><span class="lbl">Active Bins</span><span class="val" id="m-active">0</span></div>
+  <div class="metric"><span class="lbl">Peak Freq</span><span class="val" id="m-peak">- Hz</span></div>
+  <div class="metric"><span class="lbl">Spectral Flat</span><span class="val" id="m-flat">0.00</span></div>
+  <div class="metric"><span class="lbl">Freq Res</span><span class="val" id="m-fres">- Hz</span></div>
+  <div class="metric"><span class="lbl">Time Res</span><span class="val" id="m-tres">- ms</span></div>
+  <div class="metric"><span class="lbl">Theoretical</span><span class="val" id="m-theo">245 kbps</span></div>
+  <div class="metric"><span class="lbl">Displayed</span><span class="val" id="m-disp">0 kbps</span></div>
+</div>
+
+<div id="voice-prompt">SPEAK OR SING<br><span style="font-size:9px;color:#0f84">fly through your voice spectrum</span></div>
+
+<div id="modes">
+  <button class="mode-btn active" id="mb-1" onclick="setMode(1)">[1] TUNNEL</button>
+  <button class="mode-btn" id="mb-2" onclick="setMode(2)">[2] WALL</button>
+  <button class="mode-btn" id="mb-3" onclick="setMode(3)">[3] TOWER</button>
+</div>
+
+<div id="freq-scale">
+  <span>20Hz</span><span>200Hz</span><span>1kHz</span><span>5kHz</span><span>10kHz</span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+// ═══════════════════════════════════════════════════════
+// SPECTRAL SHIELD — fly through your voice FFT spectrum
+// ═══════════════════════════════════════════════════════
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x000000);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000000, 0.018);
+
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 2000);
+camera.position.set(0, 0, 0);
+camera.lookAt(0, 0, -100);
+
+scene.add(new THREE.AmbientLight(0x222244, 0.5));
+
+// ═══ Audio / FFT Setup ═══
+let audioCtx = null, analyser = null, freqData = null, timeData = null, source = null;
+const FFT_SIZE = 2048;
+const BIN_COUNT = FFT_SIZE / 2;
+let voiceActive = false;
+let rms = 0, peakBin = 0, spectralFlatness = 0, activeBins = 0;
+
+async function initAudio() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = FFT_SIZE;
+    analyser.smoothingTimeConstant = 0.5;
+    source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    timeData = new Uint8Array(analyser.fftSize);
+    voiceActive = true;
+    document.getElementById('voice-prompt').classList.add('hidden');
+
+    const sr = audioCtx.sampleRate;
+    document.getElementById('m-fres').textContent = (sr / FFT_SIZE).toFixed(1) + ' Hz';
+    document.getElementById('m-tres').textContent = ((FFT_SIZE / sr) * 1000).toFixed(1) + ' ms';
+  } catch (e) {
+    console.warn('Mic denied:', e);
+    document.getElementById('voice-prompt').innerHTML = 'MIC ACCESS DENIED<br><span style="font-size:9px">check browser permissions</span>';
+  }
+}
+
+// ═══ Frequency Band Analysis (7 bands) ═══
+const BAND_RANGES = [[20,80],[80,250],[250,500],[500,2000],[2000,4000],[4000,6000],[6000,12000]];
+function analyzeBands() {
+  if (!freqData || !audioCtx) return;
+  analyser.getByteFrequencyData(freqData);
+  analyser.getByteTimeDomainData(timeData);
+
+  const sr = audioCtx.sampleRate;
+  const binHz = sr / FFT_SIZE;
+
+  // RMS from time domain
+  let sum = 0;
+  for (let i = 0; i < timeData.length; i++) {
+    const v = (timeData[i] - 128) / 128;
+    sum += v * v;
+  }
+  rms = Math.sqrt(sum / timeData.length);
+
+  // Band levels
+  for (let b = 0; b < 7; b++) {
+    const lo = Math.floor(BAND_RANGES[b][0] / binHz);
+    const hi = Math.min(Math.ceil(BAND_RANGES[b][1] / binHz), BIN_COUNT - 1);
+    let bandSum = 0;
+    for (let i = lo; i <= hi; i++) bandSum += freqData[i];
+    const avg = bandSum / (hi - lo + 1);
+    const pct = Math.round((avg / 255) * 100);
+    const fill = document.getElementById('bf-' + b);
+    if (fill) fill.style.width = pct + '%';
+    const val = document.getElementById('bv-' + b);
+    if (val) val.textContent = pct;
+  }
+
+  // Peak bin
+  let peak = 0, peakIdx = 0;
+  for (let i = 1; i < BIN_COUNT; i++) {
+    if (freqData[i] > peak) { peak = freqData[i]; peakIdx = i; }
+  }
+  peakBin = peakIdx;
+
+  // Active bins (above threshold)
+  activeBins = 0;
+  for (let i = 0; i < BIN_COUNT; i++) if (freqData[i] > 30) activeBins++;
+
+  // Spectral flatness (geometric mean / arithmetic mean)
+  let geoSum = 0, arithSum = 0, count = 0;
+  for (let i = 2; i < BIN_COUNT; i++) {
+    const v = freqData[i] / 255 + 0.0001;
+    geoSum += Math.log(v);
+    arithSum += v;
+    count++;
+  }
+  const geo = Math.exp(geoSum / count);
+  const arith = arithSum / count;
+  spectralFlatness = arith > 0 ? geo / arith : 0;
+
+  document.getElementById('m-active').textContent = activeBins;
+  document.getElementById('m-peak').textContent = Math.round(peakIdx * binHz) + ' Hz';
+  document.getElementById('m-flat').textContent = spectralFlatness.toFixed(3);
+  const disp = Math.round((activeBins / BIN_COUNT) * 245);
+  document.getElementById('m-disp').textContent = disp + ' kbps';
+  document.getElementById('throughput').textContent = disp + ' kbps';
+}
+
+// ═══ Three Display Modes ═══
+let currentMode = 1; // 1=TUNNEL, 2=WALL, 3=TOWER
+const tunnelRings = []; // ring of vertices, moves backward over time
+const MAX_RINGS = 200;
+const RING_SEGMENTS = 128;
+
+// Tunnel mode setup
+const tunnelGroup = new THREE.Group();
+scene.add(tunnelGroup);
+
+// Wall mode setup
+const wallGroup = new THREE.Group();
+wallGroup.visible = false;
+scene.add(wallGroup);
+const wallSlices = [];
+const WALL_SLICES = 150;
+for (let i = 0; i < WALL_SLICES; i++) {
+  const geo = new THREE.PlaneGeometry(40, 20, 64, 1);
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+  const colors = new Float32Array(65 * 2 * 3);
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.z = -i * 0.8;
+  wallGroup.add(mesh);
+  wallSlices.push({ mesh, colors });
+}
+
+// Tower mode setup
+const towerGroup = new THREE.Group();
+towerGroup.visible = false;
+scene.add(towerGroup);
+const TOWER_BINS = 64;
+const TOWER_DEPTH = 100;
+const towerBars = [];
+for (let i = 0; i < TOWER_BINS; i++) {
+  const bars = [];
+  for (let z = 0; z < TOWER_DEPTH; z++) {
+    const geo = new THREE.BoxGeometry(0.4, 0.1, 0.4);
+    const hue = i / TOWER_BINS;
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(hue, 1, 0.5), transparent: true, opacity: 0 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set((i - TOWER_BINS / 2) * 0.5, 0, -z);
+    towerGroup.add(mesh);
+    bars.push(mesh);
+  }
+  towerBars.push(bars);
+}
+
+// ═══ Tunnel Ring Creation ═══
+function createTunnelRing() {
+  const positions = new Float32Array(RING_SEGMENTS * 3);
+  const colors = new Float32Array(RING_SEGMENTS * 3);
+  for (let i = 0; i < RING_SEGMENTS; i++) {
+    const a = (i / RING_SEGMENTS) * Math.PI * 2;
+    positions[i * 3] = Math.cos(a) * 10;
+    positions[i * 3 + 1] = Math.sin(a) * 10;
+    positions[i * 3 + 2] = 0;
+    colors[i * 3] = 0; colors[i * 3 + 1] = 1; colors[i * 3 + 2] = 0.5;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const indices = [];
+  for (let i = 0; i < RING_SEGMENTS; i++) indices.push(i, (i + 1) % RING_SEGMENTS);
+  geo.setIndex(indices);
+  const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 1 });
+  const line = new THREE.LineSegments(geo, mat);
+  tunnelGroup.add(line);
+  return { line, positions, colors, mat };
+}
+
+// Pre-create tunnel rings
+for (let i = 0; i < MAX_RINGS; i++) {
+  const ring = createTunnelRing();
+  ring.line.position.z = -i * 0.6;
+  tunnelRings.push(ring);
+}
+
+// ═══ Update Tunnel Mode ═══
+let ringWriteIdx = 0;
+function updateTunnel() {
+  if (!freqData) return;
+
+  // Move all rings backward
+  for (let r = 0; r < tunnelRings.length; r++) {
+    tunnelRings[r].line.position.z -= 0.6;
+    if (tunnelRings[r].line.position.z < -120) {
+      tunnelRings[r].line.position.z = 0;
+      ringWriteIdx = r;
+    }
+  }
+
+  // Write new FFT data to current ring
+  const ring = tunnelRings[ringWriteIdx];
+  const positions = ring.positions;
+  const colors = ring.colors;
+  for (let i = 0; i < RING_SEGMENTS; i++) {
+    const binIdx = Math.floor((i / RING_SEGMENTS) * Math.min(BIN_COUNT, 400));
+    const mag = freqData[binIdx] / 255;
+    const radius = 6 + mag * 14;
+    const a = (i / RING_SEGMENTS) * Math.PI * 2;
+    positions[i * 3] = Math.cos(a) * radius;
+    positions[i * 3 + 1] = Math.sin(a) * radius;
+    const hue = binIdx / 400;
+    const c = new THREE.Color().setHSL(hue, 1, 0.4 + mag * 0.3);
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  ring.line.geometry.attributes.position.needsUpdate = true;
+  ring.line.geometry.attributes.color.needsUpdate = true;
+
+  // Camera wobble with RMS
+  camera.position.x = Math.sin(performance.now() * 0.001) * rms * 2;
+  camera.position.y = Math.cos(performance.now() * 0.0013) * rms * 2;
+  camera.lookAt(0, 0, -60);
+}
+
+// ═══ Update Wall Mode ═══
+function updateWall() {
+  if (!freqData) return;
+  // Shift all wall slices backward
+  wallSlices.forEach(s => s.mesh.position.z -= 0.8);
+  // Recycle farthest slice to front
+  let recycled = null;
+  for (const s of wallSlices) {
+    if (s.mesh.position.z < -WALL_SLICES * 0.8) {
+      s.mesh.position.z += WALL_SLICES * 0.8;
+      recycled = s;
+      break;
+    }
+  }
+  if (recycled) {
+    const pos = recycled.mesh.geometry.attributes.position.array;
+    const colors = recycled.colors;
+    for (let i = 0; i < 65; i++) {
+      const binIdx = Math.floor((i / 65) * Math.min(BIN_COUNT, 400));
+      const mag = freqData[binIdx] / 255;
+      // Top and bottom vertices
+      pos[i * 3 + 1] = mag * 10;
+      pos[(i + 65) * 3 + 1] = -mag * 10;
+      const hue = binIdx / 400;
+      const c = new THREE.Color().setHSL(hue, 1, 0.3 + mag * 0.5);
+      colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+      colors[(i + 65) * 3] = c.r; colors[(i + 65) * 3 + 1] = c.g; colors[(i + 65) * 3 + 2] = c.b;
+    }
+    recycled.mesh.geometry.attributes.position.needsUpdate = true;
+    recycled.mesh.geometry.attributes.color.needsUpdate = true;
+  }
+}
+
+// ═══ Update Tower Mode ═══
+let towerShiftIdx = 0;
+function updateTower() {
+  if (!freqData) return;
+  // Shift all bars in time (z direction)
+  for (let i = 0; i < TOWER_BINS; i++) {
+    const bars = towerBars[i];
+    // Shift opacity down the chain
+    for (let z = TOWER_DEPTH - 1; z > 0; z--) {
+      bars[z].scale.y = bars[z - 1].scale.y;
+      bars[z].material.opacity = Math.max(0, bars[z - 1].material.opacity * 0.98);
+    }
+    // New value at front
+    const binIdx = Math.floor((i / TOWER_BINS) * Math.min(BIN_COUNT, 400));
+    const mag = freqData[binIdx] / 255;
+    bars[0].scale.y = 1 + mag * 40;
+    bars[0].material.opacity = 0.3 + mag * 0.6;
+  }
+}
+
+// ═══ Mode Switcher ═══
+window.setMode = function(m) {
+  currentMode = m;
+  tunnelGroup.visible = (m === 1);
+  wallGroup.visible = (m === 2);
+  towerGroup.visible = (m === 3);
+  for (let i = 1; i <= 3; i++) {
+    const btn = document.getElementById('mb-' + i);
+    if (btn) btn.classList.toggle('active', i === m);
+  }
+  if (m === 1) camera.position.set(0, 0, 0);
+  if (m === 2) camera.position.set(0, 0, 20);
+  if (m === 3) camera.position.set(0, 15, 25);
+  if (m === 1) camera.lookAt(0, 0, -60);
+  else if (m === 2) camera.lookAt(0, 0, -60);
+  else camera.lookAt(0, 0, -40);
+};
+
+// Keyboard shortcuts
+window.addEventListener('keydown', (e) => {
+  if (e.key === '1') setMode(1);
+  else if (e.key === '2') setMode(2);
+  else if (e.key === '3') setMode(3);
+});
+
+// ═══ Main Loop ═══
+function animate() {
+  requestAnimationFrame(animate);
+  analyzeBands();
+  if (currentMode === 1) updateTunnel();
+  else if (currentMode === 2) updateWall();
+  else if (currentMode === 3) updateTower();
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// Click anywhere to start audio
+document.addEventListener('click', () => {
+  if (!audioCtx) initAudio();
+}, { once: true });
+
+// Also try to init on page load
+initAudio();
+animate();
+</script>
+</body>
+</html>
