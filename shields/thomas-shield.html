@@ -242,7 +242,21 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
       <button class="yt-btn" onclick="mcpLoad()" style="flex:1;color:#ffd700;border-color:rgba(255,215,0,0.3)">load tools</button>
       <button class="yt-btn" onclick="mcpReset()">reset</button>
     </div>
-    <div id="mcp-log" style="max-height:80px;overflow-y:auto;margin-top:6px;font-size:8px;color:rgba(255,248,231,0.2)"></div>
+  <div class="panel-title" style="cursor:pointer" onclick="toggleChatPanel()">p2p chat <span id="chat-status" style="color:#555">offline</span></div>
+  <div id="chat-panel" style="display:none">
+    <div style="display:flex;gap:4px;margin-bottom:6px">
+      <input type="text" id="chat-room" placeholder="room name" value="THOMAS" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(0,200,255,0.2);color:#fff8e7;padding:4px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;border-radius:3px;outline:none">
+      <input type="text" id="chat-name" placeholder="your name" style="width:70px;background:rgba(255,255,255,0.04);border:1px solid rgba(0,200,255,0.2);color:#fff8e7;padding:4px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;border-radius:3px;outline:none">
+    </div>
+    <div style="display:flex;gap:4px;margin-bottom:6px">
+      <button class="yt-btn" id="chat-connect-btn" onclick="chatConnect()" style="flex:1;color:#0cf;border-color:rgba(0,200,255,0.3);background:rgba(0,200,255,0.08)">&#9734; CONNECT</button>
+    </div>
+    <div id="chat-peers" style="font-size:8px;color:rgba(0,200,255,0.4);margin-bottom:6px;min-height:12px">0 peers</div>
+    <div id="chat-messages" style="max-height:180px;min-height:80px;overflow-y:auto;margin-bottom:6px;font-size:9px;color:rgba(255,248,231,0.6);line-height:1.5;background:rgba(0,0,0,0.3);border:1px solid rgba(0,200,255,0.1);border-radius:3px;padding:6px"></div>
+    <div style="display:flex;gap:4px">
+      <input type="text" id="chat-input" placeholder="type message..." maxlength="200" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(0,200,255,0.2);color:#fff8e7;padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:3px;outline:none" onkeydown="if(event.key==='Enter')chatSend();event.stopPropagation()">
+      <button onclick="chatSend()" style="padding:5px 10px;background:rgba(0,200,255,0.15);border:1px solid rgba(0,200,255,0.4);color:#0cf;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:3px;white-space:nowrap">send</button>
+    </div>
   </div>
 </div>
 
@@ -251,6 +265,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06040e;color:#fff8e
 
 <!-- YouTube IFrame API -->
 <script src="https://www.youtube.com/iframe_api"></script>
+<!-- MQTT for P2P chat -->
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
 <script>
 // ╔══════════════════════════════════════════════════════════════════╗
@@ -1733,6 +1749,249 @@ function playMcpTone(freq, duration) {
   osc.start();
   gain.gain.setTargetAtTime(0, audioCtx.currentTime + Math.max(0.1, duration - 0.1), 0.1);
   osc.stop(audioCtx.currentTime + duration + 0.2);
+}
+
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  P2P CHAT — MQTT-based with presence                             ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+var CHAT_BROKERS = [
+  'wss://broker.emqx.io:8084/mqtt',
+  'wss://broker.hivemq.com:8884/mqtt',
+  'wss://test.mosquitto.org:8081'
+];
+var chatClient = null;
+var chatConnected = false;
+var chatRoom = 'THOMAS';
+var chatName = '';
+var chatPeers = {}; // name -> { lastSeen }
+var chatPresenceTimer = null;
+
+function loadChatName() {
+  try {
+    var saved = localStorage.getItem('thomas-shield-chat-name');
+    if (saved) return saved;
+  } catch (e) {}
+  return 'user-' + Math.random().toString(36).substr(2, 5);
+}
+
+function saveChatName(name) {
+  try { localStorage.setItem('thomas-shield-chat-name', name); } catch (e) {}
+}
+
+function toggleChatPanel() {
+  var panel = document.getElementById('chat-panel');
+  var open = panel.style.display === 'none';
+  panel.style.display = open ? 'block' : 'none';
+  if (open && !chatName) {
+    chatName = loadChatName();
+    document.getElementById('chat-name').value = chatName;
+  }
+}
+
+function chatConnect() {
+  if (chatConnected) {
+    chatDisconnect();
+    return;
+  }
+  if (typeof mqtt === 'undefined') {
+    chatLog('system', 'mqtt library not loaded');
+    return;
+  }
+
+  chatRoom = (document.getElementById('chat-room').value || 'THOMAS').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  chatName = (document.getElementById('chat-name').value || loadChatName()).slice(0, 16).replace(/[^\w-]/g, '');
+  if (!chatName) chatName = loadChatName();
+  saveChatName(chatName);
+
+  document.getElementById('chat-status').textContent = 'connecting...';
+  document.getElementById('chat-status').style.color = '#fa0';
+  document.getElementById('chat-connect-btn').textContent = '... CONNECTING';
+
+  tryConnectChat(0);
+}
+
+function tryConnectChat(idx) {
+  if (idx >= CHAT_BROKERS.length) {
+    document.getElementById('chat-status').textContent = 'failed';
+    document.getElementById('chat-status').style.color = '#f44';
+    document.getElementById('chat-connect-btn').textContent = '\u2736 CONNECT';
+    chatLog('system', 'all brokers failed');
+    return;
+  }
+
+  var topicBase = 'thomas-shield/' + chatRoom + '/';
+  var cid = 'tsc_' + chatName + '_' + Math.random().toString(36).slice(2, 8);
+
+  try {
+    chatClient = mqtt.connect(CHAT_BROKERS[idx], {
+      clientId: cid,
+      clean: true,
+      connectTimeout: 6000,
+      reconnectPeriod: 0,
+      keepalive: 30,
+      will: {
+        topic: topicBase + 'presence/' + chatName,
+        payload: JSON.stringify({ name: chatName, status: 'leave', t: Date.now() }),
+        qos: 0,
+        retain: false
+      }
+    });
+
+    chatClient.on('connect', function() {
+      chatConnected = true;
+      document.getElementById('chat-status').textContent = chatRoom + ' \u2022 live';
+      document.getElementById('chat-status').style.color = '#0f8';
+      document.getElementById('chat-connect-btn').textContent = '\u25A0 DISCONNECT';
+      document.getElementById('chat-connect-btn').style.color = '#f84';
+      document.getElementById('chat-connect-btn').style.borderColor = 'rgba(255,136,68,0.3)';
+
+      chatClient.subscribe(topicBase + 'msg/#');
+      chatClient.subscribe(topicBase + 'presence/#');
+
+      // Announce presence
+      chatPublish('presence/' + chatName, { name: chatName, status: 'join', t: Date.now() });
+      chatLog('system', 'connected to ' + chatRoom + ' as ' + chatName);
+
+      // Heartbeat every 15s
+      if (chatPresenceTimer) clearInterval(chatPresenceTimer);
+      chatPresenceTimer = setInterval(function() {
+        if (chatConnected) chatPublish('presence/' + chatName, { name: chatName, status: 'here', t: Date.now() });
+        chatCleanupPeers();
+      }, 15000);
+    });
+
+    chatClient.on('message', function(topic, payload) {
+      try {
+        var data = JSON.parse(payload.toString());
+        if (!data || !data.name) return;
+        if (data.name === chatName) return; // ignore own echo
+
+        if (topic.indexOf('/presence/') >= 0) {
+          if (data.status === 'leave') {
+            delete chatPeers[data.name];
+            chatLog('system', data.name + ' left');
+          } else {
+            var isNew = !chatPeers[data.name];
+            chatPeers[data.name] = { lastSeen: Date.now() };
+            if (isNew && data.status === 'join') chatLog('system', data.name + ' joined');
+          }
+          chatUpdatePeerCount();
+        } else if (topic.indexOf('/msg/') >= 0) {
+          chatLog('peer', data.text, data.name, data.t);
+          // Keep them in peers list even if we missed presence
+          chatPeers[data.name] = { lastSeen: Date.now() };
+          chatUpdatePeerCount();
+        }
+      } catch (e) {}
+    });
+
+    chatClient.on('error', function(err) {
+      console.warn('chat broker ' + idx + ' error:', err && err.message);
+      try { chatClient.end(true); } catch (e) {}
+      chatClient = null;
+      tryConnectChat(idx + 1);
+    });
+
+    chatClient.on('close', function() {
+      if (chatConnected) {
+        chatConnected = false;
+        document.getElementById('chat-status').textContent = 'disconnected';
+        document.getElementById('chat-status').style.color = '#888';
+        document.getElementById('chat-connect-btn').textContent = '\u2736 CONNECT';
+        document.getElementById('chat-connect-btn').style.color = '#0cf';
+        document.getElementById('chat-connect-btn').style.borderColor = 'rgba(0,200,255,0.3)';
+        chatLog('system', 'disconnected');
+        if (chatPresenceTimer) { clearInterval(chatPresenceTimer); chatPresenceTimer = null; }
+      }
+    });
+  } catch (e) {
+    tryConnectChat(idx + 1);
+  }
+}
+
+function chatDisconnect() {
+  if (!chatConnected || !chatClient) return;
+  chatPublish('presence/' + chatName, { name: chatName, status: 'leave', t: Date.now() });
+  setTimeout(function() {
+    try { chatClient.end(true); } catch (e) {}
+    chatClient = null;
+    chatConnected = false;
+    chatPeers = {};
+    chatUpdatePeerCount();
+  }, 100);
+}
+
+function chatPublish(subtopic, data) {
+  if (!chatClient || !chatConnected) return;
+  try {
+    chatClient.publish('thomas-shield/' + chatRoom + '/' + subtopic, JSON.stringify(data), { qos: 0 });
+  } catch (e) {}
+}
+
+function chatSend() {
+  if (!chatConnected) {
+    chatLog('system', 'not connected \u2014 click CONNECT first');
+    return;
+  }
+  var input = document.getElementById('chat-input');
+  var text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  var now = Date.now();
+  chatLog('self', text, chatName, now);
+  chatPublish('msg/' + chatName, { name: chatName, text: text, t: now });
+}
+
+function chatLog(kind, text, name, t) {
+  var box = document.getElementById('chat-messages');
+  if (!box) return;
+  var ts = new Date(t || Date.now());
+  var timeStr = String(ts.getHours()).padStart(2, '0') + ':' + String(ts.getMinutes()).padStart(2, '0');
+  var line = document.createElement('div');
+  line.style.marginBottom = '3px';
+  line.style.wordWrap = 'break-word';
+  if (kind === 'system') {
+    line.style.color = 'rgba(255,215,0,0.4)';
+    line.style.fontStyle = 'italic';
+    line.innerHTML = '<span style="color:rgba(255,248,231,0.2)">' + timeStr + '</span> ' + escapeHtml(text);
+  } else if (kind === 'self') {
+    line.innerHTML = '<span style="color:rgba(255,248,231,0.2)">' + timeStr + '</span> ' +
+      '<span style="color:#ffd700">' + escapeHtml(name) + ':</span> ' +
+      '<span style="color:#fff8e7">' + escapeHtml(text) + '</span>';
+  } else {
+    line.innerHTML = '<span style="color:rgba(255,248,231,0.2)">' + timeStr + '</span> ' +
+      '<span style="color:#0cf">' + escapeHtml(name) + ':</span> ' +
+      '<span style="color:rgba(255,248,231,0.7)">' + escapeHtml(text) + '</span>';
+  }
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+  // Cap at 100 messages
+  while (box.children.length > 100) box.removeChild(box.firstChild);
+}
+
+function chatCleanupPeers() {
+  var now = Date.now();
+  var changed = false;
+  for (var name in chatPeers) {
+    if (now - chatPeers[name].lastSeen > 45000) {
+      delete chatPeers[name];
+      changed = true;
+    }
+  }
+  if (changed) chatUpdatePeerCount();
+}
+
+function chatUpdatePeerCount() {
+  var names = Object.keys(chatPeers);
+  var el = document.getElementById('chat-peers');
+  if (!el) return;
+  if (names.length === 0) {
+    el.textContent = '0 peers';
+  } else {
+    el.textContent = names.length + ' peer' + (names.length === 1 ? '' : 's') + ': ' + names.join(', ');
+  }
 }
 
 
