@@ -356,6 +356,13 @@ var waveformCtx = null;
 // ===== LOCAL MEDIA STATE =====
 var localMediaEl = null; // current <audio> or <video> element
 var localMediaSource = null; // MediaElementSourceNode
+var musicAnalyser = null; // dedicated analyser for music (clean, no mic)
+var musicTimeData = null;
+var musicFreqData = null;
+var musicMode = false; // true when music is actively playing through local source
+var musicOrb = null; // second 3D orb for music visualization
+var musicRings = []; // music-driven frequency rings
+var musicRMS = 0, musicBass = 0, musicMid = 0, musicHi = 0;
 
 // ===== AI + MCP STATE =====
 var aiEngine = null;
@@ -520,6 +527,9 @@ function ytPlayIndex(idx) {
   if (item.type === 'local') {
     playLocalTrack(idx);
   } else {
+    // Switching to YouTube — exit music mode (YT runs in iframe, can't tap)
+    musicMode = false;
+    if (musicOrb) musicOrb.visible = false;
     if (!ytReady) return;
     ytPlayer.loadVideoById(item.id);
     // Try to get actual video title
@@ -558,6 +568,9 @@ function ytTogglePlay() {
 function ytStop() {
   if (localMediaEl) { localMediaEl.pause(); localMediaEl.currentTime = 0; }
   if (ytReady) ytPlayer.stopVideo();
+  // Exit music mode — hide second orb
+  musicMode = false;
+  if (musicOrb) musicOrb.visible = false;
   document.getElementById('yt-play-btn').innerHTML = '&#9654;';
   document.getElementById('now-playing').textContent = '';
 }
@@ -855,7 +868,7 @@ async function runBoot() {
         case 0: await initMicrophone(); break;
         case 1: initAudioAnalyser(); break;
         case 2: await calibrateNoiseFloor(); break;
-        case 3: initScene(); initCore(); initShieldRings(); initParticleField(); initToroidalFields(); initDimThreads(); break;
+        case 3: initScene(); initCore(); initMusicOrb(); initShieldRings(); initParticleField(); initToroidalFields(); initDimThreads(); break;
         case 4: initHarmonicEngine(); break;
         case 5: loadPlaylist(); break; // YT API loads itself
         case 6: initHUD(); break;
@@ -872,8 +885,9 @@ async function runBoot() {
 }
 
 async function initMicrophone() {
+  // Echo cancellation ON: prevents music from speakers bleeding into voice analysis
   micStream = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false }
   });
   audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
 }
@@ -886,6 +900,13 @@ function initAudioAnalyser() {
   micSource.connect(analyser);
   timeData = new Float32Array(analyser.fftSize);
   freqData = new Float32Array(analyser.frequencyBinCount);
+
+  // Dedicated music analyser — fed only by local media, NOT by mic
+  musicAnalyser = audioCtx.createAnalyser();
+  musicAnalyser.fftSize = FFT_SIZE;
+  musicAnalyser.smoothingTimeConstant = 0.75;
+  musicTimeData = new Float32Array(musicAnalyser.fftSize);
+  musicFreqData = new Float32Array(musicAnalyser.frequencyBinCount);
 }
 
 async function calibrateNoiseFloor() {
@@ -1162,6 +1183,61 @@ function initCore() {
   var sl=new THREE.PointLight(0x4466ff,1.5,20);sl.name='softLight';orbGroup.add(sl);
 }
 
+// ─── Music Orb — second sphere visualizing music FFT ───
+function initMusicOrb() {
+  musicOrb = new THREE.Group();
+  musicOrb.position.set(2.8, 0, 0); // offset to the right of main shield
+  musicOrb.visible = false; // hidden until music plays
+  scene.add(musicOrb);
+
+  // Core sphere — blue/cyan palette (opposite of gold voice orb)
+  var coreMat = new THREE.MeshPhongMaterial({ color: 0x44aaff, emissive: 0x0066cc, emissiveIntensity: 0.6, transparent: true, opacity: 0.8 });
+  var core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 2), coreMat);
+  core.name = 'musicCore';
+  musicOrb.add(core);
+
+  // Wireframe shell
+  var wireMat = new THREE.MeshBasicMaterial({ color: 0x88ccff, wireframe: true, transparent: true, opacity: 0.3 });
+  var wire = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 1), wireMat);
+  wire.name = 'musicWire';
+  musicOrb.add(wire);
+
+  // Light
+  var ml = new THREE.PointLight(0x66ccff, 2.0, 10);
+  ml.name = 'musicLight';
+  musicOrb.add(ml);
+
+  // Frequency rings — 3 concentric rings representing bass / mid / hi
+  var ringColors = [0x00aaff, 0x44ccff, 0x88ffff];
+  var ringRadii = [0.55, 0.75, 0.95];
+  for (var i = 0; i < 3; i++) {
+    var torusGeo = new THREE.TorusGeometry(ringRadii[i], 0.015, 8, 48);
+    var torusMat = new THREE.MeshBasicMaterial({ color: ringColors[i], transparent: true, opacity: 0.2 });
+    var torus = new THREE.Mesh(torusGeo, torusMat);
+    torus.rotation.x = Math.PI / 2 * (i / 2);
+    torus.rotation.y = Math.PI / 3 * i;
+    musicOrb.add(torus);
+    musicRings.push({ mesh: torus, mat: torusMat, baseRadius: ringRadii[i] });
+  }
+
+  // Waveform ring — displays actual time-domain signal as a circular trace
+  var wavePoints = 128;
+  var waveGeo = new THREE.BufferGeometry();
+  var wavePositions = new Float32Array(wavePoints * 3);
+  for (var j = 0; j < wavePoints; j++) {
+    var a = (j / wavePoints) * TAU;
+    wavePositions[j*3] = Math.cos(a) * 1.1;
+    wavePositions[j*3+1] = Math.sin(a) * 1.1;
+    wavePositions[j*3+2] = 0;
+  }
+  waveGeo.setAttribute('position', new THREE.BufferAttribute(wavePositions, 3));
+  var waveMat = new THREE.LineBasicMaterial({ color: 0xaaeeff, transparent: true, opacity: 0.6 });
+  var waveLine = new THREE.LineLoop(waveGeo, waveMat);
+  waveLine.name = 'musicWave';
+  musicOrb.add(waveLine);
+  musicRings.push({ mesh: waveLine, mat: waveMat, isWave: true, geo: waveGeo, positions: wavePositions, count: wavePoints });
+}
+
 function initShieldRings() {
   SHIELD_RINGS.forEach(function(ring,i){
     var g=new THREE.Group();
@@ -1279,12 +1355,109 @@ var touchSD=0,touchSR=0;
 function onTouchStart(e){if(e.touches.length===1){isDragging=true;dragPrevX=e.touches[0].clientX;dragPrevY=e.touches[0].clientY;orbitState.autoRotate=false;orbitState.lastInteraction=Date.now();}else if(e.touches.length===2){var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;touchSD=Math.sqrt(dx*dx+dy*dy);touchSR=orbitState.radius;}e.preventDefault();}
 function onTouchMove(e){if(e.touches.length===1&&isDragging){orbitState.theta-=(e.touches[0].clientX-dragPrevX)*0.005;orbitState.phi=Math.max(0.1,Math.min(Math.PI-0.1,orbitState.phi-(e.touches[0].clientY-dragPrevY)*0.005));dragPrevX=e.touches[0].clientX;dragPrevY=e.touches[0].clientY;}else if(e.touches.length===2){var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;orbitState.radius=Math.max(3,Math.min(60,touchSR*(touchSD/Math.max(Math.sqrt(dx*dx+dy*dy),1))));}orbitState.lastInteraction=Date.now();e.preventDefault();}
 function onTouchEnd(){isDragging=false;}
-function updateOrbitCamera(){if(Date.now()-orbitState.lastInteraction>5000)orbitState.autoRotate=true;if(orbitState.autoRotate)orbitState.theta+=0.001+controls.rotation*0.003;camera.position.set(orbitState.radius*Math.sin(orbitState.phi)*Math.cos(orbitState.theta),orbitState.radius*Math.cos(orbitState.phi),orbitState.radius*Math.sin(orbitState.phi)*Math.sin(orbitState.theta));camera.lookAt(0,0,0);}
+function updateOrbitCamera(){if(Date.now()-orbitState.lastInteraction>5000)orbitState.autoRotate=true;if(orbitState.autoRotate)orbitState.theta+=0.001+controls.rotation*0.003;var lookX=musicMode?1.4:0;camera.position.set(lookX+orbitState.radius*Math.sin(orbitState.phi)*Math.cos(orbitState.theta),orbitState.radius*Math.cos(orbitState.phi),orbitState.radius*Math.sin(orbitState.phi)*Math.sin(orbitState.theta));camera.lookAt(lookX,0,0);}
 function onResize(){camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);}
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║  ANIMATION LOOP                                                   ║
 // ╚══════════════════════════════════════════════════════════════════╝
+
+// ─── Music Analysis — read from dedicated music analyser ───
+function analyzeMusic() {
+  if (!musicMode || !musicAnalyser || !musicFreqData) { musicRMS = 0; return; }
+  musicAnalyser.getFloatTimeDomainData(musicTimeData);
+  musicAnalyser.getFloatFrequencyData(musicFreqData);
+
+  // RMS (loudness) from time domain
+  var sum = 0;
+  for (var i = 0; i < musicTimeData.length; i++) sum += musicTimeData[i] * musicTimeData[i];
+  musicRMS = Math.sqrt(sum / musicTimeData.length);
+
+  // Frequency bands from dB data (-100..0)
+  var sr = audioCtx.sampleRate;
+  var binHz = sr / FFT_SIZE;
+  var bassLo = Math.floor(40 / binHz),   bassHi = Math.floor(250 / binHz);
+  var midLo  = Math.floor(250 / binHz),  midHi  = Math.floor(2000 / binHz);
+  var hiLo   = Math.floor(2000 / binHz), hiHi   = Math.floor(8000 / binHz);
+
+  function bandAvg(lo, hi) {
+    var s = 0, n = 0;
+    for (var k = lo; k <= hi && k < musicFreqData.length; k++) {
+      // Convert dB (-100..0) to linear (0..1)
+      var lin = Math.max(0, (musicFreqData[k] + 100) / 100);
+      s += lin; n++;
+    }
+    return n > 0 ? s / n : 0;
+  }
+  // Smooth with previous value
+  musicBass = musicBass * 0.6 + bandAvg(bassLo, bassHi) * 0.4;
+  musicMid  = musicMid  * 0.6 + bandAvg(midLo, midHi)  * 0.4;
+  musicHi   = musicHi   * 0.6 + bandAvg(hiLo, hiHi)    * 0.4;
+}
+
+// ─── Update Music Orb visuals from music analyser data ───
+function updateMusicOrb(time) {
+  if (!musicOrb) return;
+  if (!musicMode) {
+    musicOrb.visible = false;
+    return;
+  }
+  musicOrb.visible = true;
+
+  // Core sphere — pulse with bass
+  var core = musicOrb.getObjectByName('musicCore');
+  if (core) {
+    var bassPulse = 1 + musicBass * 0.6;
+    core.scale.setScalar(bassPulse);
+    core.material.emissiveIntensity = 0.3 + musicBass * 1.2;
+    core.material.opacity = 0.6 + musicMid * 0.4;
+    core.rotation.y += 0.008 + musicMid * 0.03;
+    core.rotation.x += 0.003 + musicHi * 0.02;
+  }
+
+  // Wireframe — pulse with mid + hi
+  var wire = musicOrb.getObjectByName('musicWire');
+  if (wire) {
+    wire.scale.setScalar(1 + musicMid * 0.3 + musicHi * 0.2);
+    wire.material.opacity = 0.2 + (musicRMS * 4);
+    wire.rotation.y -= 0.01;
+    wire.rotation.z += 0.005;
+  }
+
+  // Light — flares with RMS
+  var light = musicOrb.getObjectByName('musicLight');
+  if (light) light.intensity = 1 + musicRMS * 8;
+
+  // Frequency rings — bass/mid/hi
+  var bands = [musicBass, musicMid, musicHi];
+  for (var i = 0; i < 3 && i < musicRings.length; i++) {
+    var r = musicRings[i];
+    if (!r || r.isWave) continue;
+    r.mesh.scale.setScalar(1 + bands[i] * 0.5);
+    r.mat.opacity = 0.15 + bands[i] * 0.7;
+    r.mesh.rotation.y += 0.005 * (i + 1);
+    r.mesh.rotation.z += 0.002 * (i + 1);
+  }
+
+  // Waveform ring — distort circle by time-domain signal
+  var waveRing = musicRings[musicRings.length - 1];
+  if (waveRing && waveRing.isWave && musicTimeData) {
+    var step = Math.floor(musicTimeData.length / waveRing.count);
+    for (var j = 0; j < waveRing.count; j++) {
+      var a = (j / waveRing.count) * TAU;
+      var sample = musicTimeData[j * step] || 0;
+      var radius = 1.1 + sample * 1.5;
+      waveRing.positions[j*3]   = Math.cos(a) * radius;
+      waveRing.positions[j*3+1] = Math.sin(a) * radius;
+    }
+    waveRing.geo.attributes.position.needsUpdate = true;
+    waveRing.mat.opacity = 0.5 + musicRMS * 0.5;
+  }
+
+  // Gentle position oscillation
+  musicOrb.position.x = 2.8 + Math.sin(time * 0.3) * 0.1;
+  musicOrb.position.y = Math.cos(time * 0.25) * 0.15;
+}
 
 function animate() {
   requestAnimationFrame(animate);
@@ -1292,6 +1465,8 @@ function animate() {
   var time = (Date.now()-startTime)*0.001;
 
   analyzeVoice();
+  analyzeMusic();
+  updateMusicOrb(time);
   updateHarmonicEngine();
   updateOrbitCamera();
 
@@ -1421,16 +1596,21 @@ function playLocalTrack(idx) {
   localMediaEl.src = item.blob;
   localMediaEl.crossOrigin = 'anonymous';
 
-  // Connect to AudioContext for analysis
+  // Connect ONLY to the dedicated music analyser + destination.
+  // NOT to the main (mic) analyser — this keeps voice visualization clean.
   if (audioCtx) {
     try {
       localMediaSource = audioCtx.createMediaElementSource(localMediaEl);
-      localMediaSource.connect(analyser);
+      if (musicAnalyser) localMediaSource.connect(musicAnalyser);
       localMediaSource.connect(audioCtx.destination);
     } catch(e) {
       console.warn('Could not connect local media to AudioContext:', e);
     }
   }
+
+  // Entering music mode
+  musicMode = true;
+  if (musicOrb) musicOrb.visible = true;
 
   localMediaEl.play();
   document.getElementById('yt-play-btn').innerHTML = '&#10074;&#10074;';
@@ -1443,6 +1623,9 @@ function playLocalTrack(idx) {
     } else {
       ytNext();
     }
+  });
+  localMediaEl.addEventListener('pause', function() {
+    // Stay in music mode if just paused — user may resume
   });
 }
 
