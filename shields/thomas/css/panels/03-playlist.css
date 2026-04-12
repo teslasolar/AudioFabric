@@ -1,0 +1,17 @@
+.yt-player-wrap{width:100%;aspect-ratio:16/9;background:#000;border-radius:4px;overflow:hidden;margin-bottom:10px;position:relative}
+.yt-player-wrap iframe{width:100%;height:100%;border:none}
+.yt-player-wrap.minimized{height:0;aspect-ratio:auto;margin-bottom:0;overflow:hidden}
+.yt-controls{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+.yt-btn{padding:4px 8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:rgba(255,248,231,0.5);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;border-radius:3px;transition:all 0.15s}
+.yt-btn:hover{border-color:rgba(255,215,0,0.3);color:#ffd700}
+.yt-btn.active{background:rgba(255,215,0,0.1);border-color:rgba(255,215,0,0.4);color:#ffd700}
+.yt-url-row{display:flex;gap:4px;margin-bottom:8px}
+.yt-url-row input{flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,215,0,0.12);color:#fff8e7;padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:3px;outline:none}
+.yt-url-row input:focus{border-color:rgba(255,215,0,0.35)}
+.yt-url-row input::placeholder{color:rgba(255,248,231,0.2)}
+.yt-url-row button{padding:5px 10px;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.3);color:#ffd700;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:3px;white-space:nowrap}
+.yt-url-row button:hover{background:rgba(255,215,0,0.2)}
+.channel-link{display:block;text-align:center;padding:6px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);border-radius:3px;color:#f66;font-size:9px;text-decoration:none;margin-bottom:10px;letter-spacing:1px;transition:all 0.15s}
+.channel-link:hover{background:rgba(255,68,68,0.15);color:#f88}
+
+/* Playlist */

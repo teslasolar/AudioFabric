@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thomas Shield — 127D Voice + Music</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/boot.css">
+<link rel="stylesheet" href="css/panels/00-panels.css">
+<link rel="stylesheet" href="css/panels/01-right-panel-music-controls.css">
+<link rel="stylesheet" href="css/panels/02-youtube-player.css">
+<link rel="stylesheet" href="css/panels/03-playlist.css">
+<link rel="stylesheet" href="css/panels/04-shield-modes.css">
+<link rel="stylesheet" href="css/panels/05-breach.css">
+<link rel="stylesheet" href="css/panels/06-chunk-6.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+<!-- BOOT -->
+<div id="boot-screen">
+  <div class="boot-logo">Thomas Shield</div>
+  <div class="boot-sub">127D Voice + Music &middot; Prime Frequency Architecture</div>
+  <div id="boot-phases">
+    <div class="boot-phase" data-phase="2"><span class="prime">p= 2</span><span class="label">diaphragm engine &mdash; request microphone</span><span class="status">&middot;</span></div>
+    <div class="boot-phase" data-phase="3"><span class="prime">p= 3</span><span class="label">laryngeal sensor &mdash; init FFT analyser</span><span class="status">&middot;</span></div>
+    <div class="boot-phase" data-phase="5"><span class="prime">p= 5</span><span class="label">breath gate &mdash; calibrate noise floor</span><span class="status">&middot;</span></div>
+    <div class="boot-phase" data-phase="7"><span class="prime">p= 7</span><span class="label">thoracic resonator &mdash; init shield geometry</span><span class="status">&middot;</span></div>
+    <div class="boot-phase" data-phase="11"><span class="prime">p=11</span><span class="label">nasopharyngeal ERP &mdash; init harmonic engine</span><span class="status">&middot;</span></div>
+    <div class="boot-phase" data-phase="13"><span class="prime">p=13</span><span class="label">oral shaper &mdash; init YouTube player</span><span class="status">&middot;</span></div>
+    <div class="boot-phase" data-phase="17"><span class="prime">p=17</span><span class="label">intent observer &mdash; deploy interface</span><span class="status">&middot;</span></div>
+  </div>
+  <button id="boot-enter">enter the shield &rarr;</button>
+  <div class="boot-fold">fold(voice) = 2 &middot; 3 &middot; 5 &middot; 7 &middot; 11 &middot; 13 &middot; 17 = 510,510</div>
+</div>
+
+<!-- TOP BAR -->
+<div id="top-bar" class="panel" style="display:none">
+  <span class="sys-name">THOMAS SHIELD</span>
+  <div class="sys-right">
+    <span class="now-playing" id="now-playing"></span>
+    <span class="voice-mode silent" id="voice-mode">SILENT</span>
+    <span class="clock" id="sys-clock">00:00:00</span>
+  </div>
+</div>
+
+<!-- LEFT PANEL -->
+<div id="left-panel" class="panel" style="display:none">
+  <div class="panel-title">shield integrity</div>
+  <div id="shield-bars"></div>
+
+  <div class="panel-title">voice analysis</div>
+  <div class="voice-meter"><span class="vm-label">F0</span><div class="vm-track"><div class="vm-fill" id="vm-f0" style="background:#ff8800;width:0%"></div></div></div>
+  <div class="voice-meter"><span class="vm-label">centroid</span><div class="vm-track"><div class="vm-fill" id="vm-centroid" style="background:#ffcc00;width:0%"></div></div></div>
+  <div class="voice-meter"><span class="vm-label">F1</span><div class="vm-track"><div class="vm-fill" id="vm-f1" style="background:#44ff66;width:0%"></div></div></div>
+  <div class="voice-meter"><span class="vm-label">F2</span><div class="vm-track"><div class="vm-fill" id="vm-f2" style="background:#00ccff;width:0%"></div></div></div>
+  <div class="voice-meter"><span class="vm-label">RMS</span><div class="vm-track"><div class="vm-fill" id="vm-rms" style="background:#ffd700;width:0%"></div></div></div>
+  <div class="waveform-box"><canvas id="waveform-canvas"></canvas></div>
+
+  <div class="panel-title">metrics</div>
+  <div id="left-metrics">
+    <div class="metric-row"><span class="ml">vagal tone</span><span class="mv" id="rd-vagal">0.00</span></div>
+    <div class="metric-row"><span class="ml">fold state</span><span class="mv" id="rd-fold">1.00</span></div>
+    <div class="metric-row"><span class="ml">coherence</span><span class="mv cyan" id="rd-coh">0.00</span></div>
+    <div class="metric-row"><span class="ml">&psi; level</span><span class="mv" id="rd-psi">0.00</span></div>
+    <div class="metric-row"><span class="ml">exhale ratio</span><span class="mv" id="rd-exhale">0.00</span></div>
+    <div class="metric-row"><span class="ml">vowel</span><span class="mv cyan" id="rd-vowel">-</span></div>
+    <div class="metric-row"><span class="ml">sweep</span><span class="mv" id="rd-sweep">0%</span></div>
+    <div class="metric-row"><span class="ml">F0</span><span class="mv cyan" id="rd-f0">-</span></div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div id="right-panel" class="panel" style="display:none">
+  <div class="panel-title">music player</div>
+  <a class="channel-link" href="https://www.youtube.com/@ThomasTheSolarCryptoEngine" target="_blank" rel="noopener">&#9654; OPEN YOUTUBE CHANNEL</a>
+  <div class="yt-player-wrap" id="yt-player-wrap">
+    <div id="yt-player"></div>
+  </div>
+  <div class="yt-controls">
+    <button class="yt-btn" onclick="ytPrev()" title="Previous">&laquo;</button>
+    <button class="yt-btn" id="yt-play-btn" onclick="ytTogglePlay()" title="Play/Pause">&#9654;</button>
+    <button class="yt-btn" onclick="ytNext()" title="Next">&raquo;</button>
+    <button class="yt-btn" onclick="ytStop()" title="Stop">&#9632;</button>
+    <button class="yt-btn" id="yt-minimize-btn" onclick="ytToggleVideo()">hide video</button>
+    <button class="yt-btn" id="yt-loop-btn" onclick="ytToggleLoop()">loop</button>
+    <button class="yt-btn" onclick="ytShuffle()">shuffle</button>
+  </div>
+  <div class="yt-url-row">
+    <input type="text" id="yt-url-input" placeholder="paste YouTube URL or video ID...">
+    <button onclick="ytAddFromInput()">+ add</button>
+  </div>
+  <div style="display:flex;gap:4px;margin-bottom:8px">
+    <input type="file" id="local-file-input" accept=".mp3,.mp4,.m4a,.wav,.ogg,.webm" style="display:none" onchange="handleLocalFile(this)">
+    <button class="yt-btn" onclick="document.getElementById('local-file-input').click()" style="flex:1;padding:6px;color:#0af;border-color:rgba(0,170,255,0.3);background:rgba(0,170,255,0.06)">&#128190; LOAD LOCAL FILE</button>
+  </div>
+  <div style="display:flex;gap:4px;margin-bottom:8px">
+    <button class="yt-btn" id="btn-load-channel" onclick="loadChannel()" style="flex:1;padding:6px;color:#4f8;border-color:rgba(79,248,138,0.3);background:rgba(79,248,138,0.06)">&#9656; LOAD ALL CHANNEL VIDEOS</button>
+  </div>
+  <div id="channel-status" style="font-size:9px;color:rgba(255,248,231,0.25);text-align:center;margin-bottom:6px;display:none"></div>
+
+  <div class="panel-title">playlist <span id="pl-count" style="color:rgba(255,248,231,0.2);font-weight:400"></span></div>
+  <div class="playlist" id="playlist" style="max-height:300px"></div>
+
+  <div class="panel-title">shield mode</div>
+  <div class="modes-grid" id="modes-grid"></div>
+
+  <div class="panel-title">fold controls</div>
+  <div class="fold-slider-row"><label>rotation</label><input type="range" id="sl-rotation" min="0" max="100" value="30"><span class="sv" id="sv-rotation">0.30</span></div>
+  <div class="fold-slider-row"><label>expansion</label><input type="range" id="sl-expansion" min="0" max="100" value="50"><span class="sv" id="sv-expansion">0.50</span></div>
+  <div class="fold-slider-row"><label>dim-fold</label><input type="range" id="sl-dimfold" min="1" max="127" value="127"><span class="sv" id="sv-dimfold">127</span></div>
+  <div class="fold-slider-row"><label>phase-&phi;</label><input type="range" id="sl-phi" min="0" max="100" value="62"><span class="sv" id="sv-phi">0.62</span></div>
+  <div class="fold-slider-row"><label>density</label><input type="range" id="sl-density" min="10" max="100" value="80"><span class="sv" id="sv-density">0.80</span></div>
+
+  <div class="panel-title" style="cursor:pointer" onclick="toggleAiPanel()">ai assistant <span id="ai-status" style="color:#555">offline</span></div>
+  <div id="ai-panel" style="display:none">
+    <div id="ai-chat" style="max-height:200px;overflow-y:auto;margin-bottom:8px;font-size:9px;color:rgba(255,248,231,0.5);line-height:1.5"></div>
+    <div style="display:flex;gap:4px">
+      <input type="text" id="ai-input" placeholder="ask AI to control the shield..." style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,215,0,0.12);color:#fff8e7;padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:3px;outline:none" onkeydown="if(event.key==='Enter')aiSend()">
+      <button onclick="aiSend()" style="padding:5px 10px;background:rgba(136,85,255,0.15);border:1px solid rgba(136,85,255,0.4);color:#a879ff;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:3px;white-space:nowrap">send</button>
+    </div>
+    <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+      <button class="yt-btn" onclick="aiSend('describe what you see')">describe</button>
+      <button class="yt-btn" onclick="aiSend('make it pulse')">pulse</button>
+      <button class="yt-btn" onclick="aiSend('play a chord')">chord</button>
+      <button class="yt-btn" onclick="aiSend('expand the shield')">expand</button>
+    </div>
+  </div>
+
+  <div class="panel-title" style="cursor:pointer" onclick="toggleMcpPanel()">mcp sandbox <span id="mcp-status" style="color:#555">0 tools</span></div>
+  <div id="mcp-panel" style="display:none">
+    <div style="font-size:9px;color:rgba(255,248,231,0.25);margin-bottom:8px">Define custom tools the AI can call to control the shield.</div>
+    <textarea id="mcp-editor" style="width:100%;height:120px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,215,0,0.12);color:#fff8e7;font-family:'JetBrains Mono',monospace;font-size:9px;padding:8px;border-radius:3px;resize:vertical" placeholder='// Define MCP tools as JSON array:
+[{
+  "name": "set_ring_color",
+  "description": "Set ring hue",
+  "params": {"ring": "number 0-6", "hue": "number 0-360"},
+  "handler": "SHIELD_RINGS[$ring].color.setHSL($hue/360, 1, 0.5)"
+}]'></textarea>
+    <div style="display:flex;gap:4px;margin-top:6px">
+      <button class="yt-btn" onclick="mcpLoad()" style="flex:1;color:#ffd700;border-color:rgba(255,215,0,0.3)">load tools</button>
+      <button class="yt-btn" onclick="mcpReset()">reset</button>
+    </div>
+  <div class="panel-title" style="cursor:pointer" onclick="toggleChatPanel()">p2p chat <span id="chat-status" style="color:#555">offline</span></div>
+  <div id="chat-panel" style="display:none">
+    <div style="display:flex;gap:4px;margin-bottom:6px">
+      <input type="text" id="chat-room" placeholder="room name" value="THOMAS" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(0,200,255,0.2);color:#fff8e7;padding:4px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;border-radius:3px;outline:none">
+      <input type="text" id="chat-name" placeholder="your name" style="width:70px;background:rgba(255,255,255,0.04);border:1px solid rgba(0,200,255,0.2);color:#fff8e7;padding:4px 6px;font-family:'JetBrains Mono',monospace;font-size:9px;border-radius:3px;outline:none">
+    </div>
+    <div style="display:flex;gap:4px;margin-bottom:6px">
+      <button class="yt-btn" id="chat-connect-btn" onclick="chatConnect()" style="flex:1;color:#0cf;border-color:rgba(0,200,255,0.3);background:rgba(0,200,255,0.08)">&#9734; CONNECT</button>
+    </div>
+    <div id="chat-peers" style="font-size:8px;color:rgba(0,200,255,0.4);margin-bottom:6px;min-height:12px">0 peers</div>
+    <div id="chat-messages" style="max-height:180px;min-height:80px;overflow-y:auto;margin-bottom:6px;font-size:9px;color:rgba(255,248,231,0.6);line-height:1.5;background:rgba(0,0,0,0.3);border:1px solid rgba(0,200,255,0.1);border-radius:3px;padding:6px"></div>
+    <div style="display:flex;gap:4px">
+      <input type="text" id="chat-input" placeholder="type message..." maxlength="200" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(0,200,255,0.2);color:#fff8e7;padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:3px;outline:none" onkeydown="if(event.key==='Enter')chatSend();event.stopPropagation()">
+      <button onclick="chatSend()" style="padding:5px 10px;background:rgba(0,200,255,0.15);border:1px solid rgba(0,200,255,0.4);color:#0cf;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;border-radius:3px;white-space:nowrap">send</button>
+    </div>
+  </div>
+</div>
+
+<div id="breach-alert"></div>
+<div id="canvas-container"></div>
+
+<!-- YouTube IFrame API -->
+
+<!-- MQTT for P2P chat -->
+
+<!-- Thomas Shield JS modules (load order matters) -->
+<script src="js/00-prelude/00-tail.js"></script>
+<script src="js/04-voice-analyze/00-voice-analysis-pipeline.js"></script>
+<script src="js/04-voice-analyze/01-analyzevoice.js"></script>
+<script src="js/04-voice-analyze/02-voice-analysis-pipeline.js"></script>
+<script src="js/04-voice-analyze/03-estimateformants.js"></script>
+<script src="js/04-voice-analyze/04-detectbreathphase.js"></script>
+<script src="js/04-voice-analyze/05-voice-analysis-pipeline.js"></script>
+<script src="js/04-voice-analyze/06-computer2.js"></script>
+<script src="js/04-voice-analyze/07-computer4.js"></script>
+<script src="js/04-voice-analyze/08-computer6.js"></script>
+<script src="js/04-voice-analyze/09-bande.js"></script>
+<script src="js/06-harmonic/00-harmonic-engine.js"></script>
+<script src="js/06-harmonic/01-initharmonicengine.js"></script>
+<script src="js/06-harmonic/02-harmonic-engine.js"></script>
+<script src="js/07-scene/00-three-js-scene-shield-geometry.js"></script>
+<script src="js/07-scene/01-initscene.js"></script>
+<script src="js/07-scene/02-three-js-scene-shield-geometry.js"></script>
+<script src="js/07-scene/03-initmusicorb.js"></script>
+<script src="js/07-scene/04-three-js-scene-shield-geometry.js"></script>
+<script src="js/07-scene/05-initshieldrings.js"></script>
+<script src="js/07-scene/06-three-js-scene-shield-geometry.js"></script>
+<script src="js/07-scene/07-initparticlefield.js"></script>
+<script src="js/07-scene/08-three-js-scene-shield-geometry.js"></script>
+<script src="js/07-scene/09-initdimthreads.js"></script>
+<script src="js/12-hud/00-hud-modes-controls.js"></script>
+<script src="js/12-hud/01-inithud.js"></script>
+<script src="js/12-hud/02-hud-modes-controls.js"></script>
+<script src="js/12-hud/03-triggerbreach.js"></script>
+<script src="js/12-hud/04-onwheel.js"></script>
+<script src="js/12-hud/05-ontouchmove.js"></script>
+<script src="js/12-hud/06-updateorbitcamera.js"></script>
+<script src="js/14-animate/00-animation-loop.js"></script>
+<script src="js/14-animate/01-analyzemusic.js"></script>
+<script src="js/14-animate/02-animation-loop.js"></script>
+<script src="js/14-animate/03-updatemusicorb.js"></script>
+<script src="js/14-animate/04-animation-loop.js"></script>
+<script src="js/14-animate/05-animate.js"></script>
+<script src="js/14-animate/06-animation-loop.js"></script>
+<script src="js/14-animate/07-updatehud.js"></script>
+<script src="js/14-animate/08-setm.js"></script>
+<script src="js/15-boot/00-boot-sequence.js"></script>
+<script src="js/15-boot/01-initaudioanalyser.js"></script>
+<script src="js/15-boot/02-boot-sequence.js"></script>
+<script src="js/15-boot/03-enterfold.js"></script>
+<script src="js/17-youtube/00-youtube-player.js"></script>
+<script src="js/17-youtube/01-onyoutubeiframeapiready.js"></script>
+<script src="js/17-youtube/02-onytstatechange.js"></script>
+<script src="js/17-youtube/03-youtube-player.js"></script>
+<script src="js/17-youtube/04-ytaddfrominput.js"></script>
+<script src="js/17-youtube/05-ytplayindex.js"></script>
+<script src="js/17-youtube/06-yttoggleplay.js"></script>
+<script src="js/17-youtube/07-ytnext.js"></script>
+<script src="js/17-youtube/08-ytshuffle.js"></script>
+<script src="js/17-youtube/09-renderplaylist.js"></script>
+<script src="js/17-youtube/10-loadplaylist.js"></script>
+<script src="js/18-channel/00-channel-auto-loader.js"></script>
+<script src="js/18-channel/01-loadchannel.js"></script>
+<script src="js/18-channel/02-channel-auto-loader.js"></script>
+<script src="js/18-channel/03-tryproxies.js"></script>
+<script src="js/18-channel/04-channel-auto-loader.js"></script>
+<script src="js/18-channel/05-syncplaylistfromplayer.js"></script>
+<script src="js/18-channel/06-channel-auto-loader.js"></script>
+<script src="js/18-channel/07-tryloaduploadsplaylist.js"></script>
+<script src="js/18-channel/08-channel-auto-loader.js"></script>
+<script src="js/19-local-media/00-local-file-loading.js"></script>
+<script src="js/19-local-media/01-playlocaltrack.js"></script>
+<script src="js/19-local-media/02-local-file-loading.js"></script>
+<script src="js/22-ai/00-ai-assistant-webllm.js"></script>
+<script src="js/22-ai/01-initai.js"></script>
+<script src="js/22-ai/02-ai-assistant-webllm.js"></script>
+<script src="js/22-ai/03-aisend.js"></script>
+<script src="js/22-ai/04-ai-assistant-webllm.js"></script>
+<script src="js/22-ai/05-executeaicommand.js"></script>
+<script src="js/22-ai/06-ai-assistant-webllm.js"></script>
+<script src="js/23-mcp/00-mcp-sandbox.js"></script>
+<script src="js/23-mcp/01-mcpload.js"></script>
+<script src="js/23-mcp/02-mcpreset.js"></script>
+<script src="js/23-mcp/03-mcpexecute.js"></script>
+<script src="js/23-mcp/04-playmcptone.js"></script>
+<script src="js/24-chat/00-p2p-chat-mqtt-based-with-presence.js"></script>
+<script src="js/24-chat/01-chatconnect.js"></script>
+<script src="js/24-chat/02-tryconnectchat.js"></script>
+<script src="js/24-chat/03-p2p-chat-mqtt-based-with-presence.js"></script>
+<script src="js/24-chat/04-chatlog.js"></script>
+<script src="js/24-chat/05-p2p-chat-mqtt-based-with-presence.js"></script>
+<script src="js/99-launch.js"></script>
+</body>
+</html>

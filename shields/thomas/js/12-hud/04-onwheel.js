@@ -1,0 +1,3 @@
+function onWheel(e){e.preventDefault();orbitState.radius=Math.max(3,Math.min(60,orbitState.radius+e.deltaY*0.03));orbitState.lastInteraction=Date.now();orbitState.autoRotate=false;}
+var touchSD=0,touchSR=0;
+function onTouchStart(e){if(e.touches.length===1){isDragging=true;dragPrevX=e.touches[0].clientX;dragPrevY=e.touches[0].clientY;orbitState.autoRotate=false;orbitState.lastInteraction=Date.now();}else if(e.touches.length===2){var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;touchSD=Math.sqrt(dx*dx+dy*dy);touchSR=orbitState.radius;}e.preventDefault();}

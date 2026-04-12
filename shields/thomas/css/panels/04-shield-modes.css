@@ -1,0 +1,10 @@
+.playlist{max-height:200px;overflow-y:auto;margin-bottom:10px}
+.pl-item{display:flex;align-items:center;gap:6px;padding:5px 6px;font-size:9px;border-bottom:1px solid rgba(255,255,255,0.03);cursor:pointer;transition:background 0.15s}
+.pl-item:hover{background:rgba(255,215,0,0.05)}
+.pl-item.active{background:rgba(255,215,0,0.08);color:#ffd700}
+.pl-item .pl-num{width:16px;color:rgba(255,248,231,0.3);text-align:right}
+.pl-item .pl-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-item .pl-remove{color:rgba(255,68,68,0.4);cursor:pointer;font-size:12px;padding:0 2px}
+.pl-item .pl-remove:hover{color:#f44}
+
+/* Shield modes */

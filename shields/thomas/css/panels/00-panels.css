@@ -1,0 +1,13 @@
+/* PANELS */
+.panel{position:fixed;z-index:100;background:rgba(6,4,14,0.92);backdrop-filter:blur(16px);border:1px solid rgba(255,215,0,0.08)}
+#top-bar{top:0;left:0;right:0;height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid rgba(255,215,0,0.08);font-size:10px;z-index:200}
+#top-bar .sys-name{color:#ffd700;font-weight:500;letter-spacing:2px}
+#top-bar .sys-right{display:flex;gap:16px;align-items:center}
+#top-bar .clock{color:rgba(255,248,231,0.35)}
+#top-bar .voice-mode{font-weight:700;letter-spacing:1px}
+#top-bar .voice-mode.sustained{color:#00ccff}
+#top-bar .voice-mode.pulsed{color:#ff6600}
+#top-bar .voice-mode.silent{color:#cc44ff}
+#top-bar .now-playing{color:#4f8;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px}
+
+/* LEFT PANEL */

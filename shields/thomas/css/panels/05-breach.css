@@ -1,0 +1,16 @@
+.modes-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:10px}
+.mode-btn{padding:5px 4px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);color:rgba(255,248,231,0.4);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:8px;border-radius:3px;text-transform:uppercase;letter-spacing:1px;transition:all 0.2s;text-align:center}
+.mode-btn:hover{border-color:rgba(255,215,0,0.3);color:#ffd700}
+.mode-btn.active{background:rgba(255,215,0,0.1);border-color:rgba(255,215,0,0.4);color:#ffd700}
+.mode-btn.voice-active{background:rgba(0,204,255,0.1);border-color:rgba(0,204,255,0.4);color:#0cf}
+.fold-slider-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.fold-slider-row label{font-size:9px;color:rgba(255,248,231,0.3);width:50px;text-align:right}
+.fold-slider-row input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:rgba(255,255,255,0.08);border-radius:2px;outline:none}
+.fold-slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:#ffd700;cursor:pointer}
+.fold-slider-row .sv{width:28px;text-align:right;font-size:9px;color:rgba(255,248,231,0.5)}
+.metric-row{display:flex;justify-content:space-between;padding:2px 0;font-size:9px;border-bottom:1px solid rgba(255,255,255,0.02)}
+.metric-row .ml{color:rgba(255,248,231,0.25)}
+.metric-row .mv{color:#ffd700;font-weight:500}
+.metric-row .mv.cyan{color:#0af}
+
+/* Breach */

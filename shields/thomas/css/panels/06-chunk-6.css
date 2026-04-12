@@ -1,0 +1,5 @@
+#breach-alert{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:250;font-size:16px;font-weight:700;color:#f44;text-shadow:0 0 30px rgba(255,68,68,0.6);opacity:0;transition:opacity 0.3s;pointer-events:none;text-align:center;text-transform:uppercase;letter-spacing:4px}
+#canvas-container{position:fixed;inset:0;z-index:1}
+
+@media(max-width:800px){#left-panel{width:160px}#right-panel{width:200px}}
+@media(max-width:600px){#left-panel,#right-panel{display:none}}
