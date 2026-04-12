@@ -1,4 +1,6 @@
-function onYouTubeIframeAPIReady() {
+function _createYtPlayer() {
+  if (typeof YT === 'undefined' || !YT.Player) return false;
+  if (ytPlayer) return true;
   ytPlayer = new YT.Player('yt-player', {
     height: '100%', width: '100%',
     playerVars: {
@@ -9,21 +11,25 @@ function onYouTubeIframeAPIReady() {
     events: {
       onReady: function() {
         ytReady = true;
-        // Auto-load channel if no saved playlist
         if (playlist.length === 0) {
           setTimeout(loadChannel, 1000);
         } else if (playlist.length > 0 && plIndex < 0) {
-          // Resume saved playlist
           plIndex = 0;
           ytPlayer.cueVideoById(playlist[0].id);
         }
       },
       onStateChange: onYTStateChange,
-      onError: function(event) {
-        // Suppress player errors (2=invalid param, 5=HTML5 error, 100=not found, 101/150=embed blocked)
-        console.warn('YT player error:', event.data);
-      }
+      onError: function(event) { console.warn('YT player error:', event.data); }
     }
   });
+  return true;
 }
 
+// YT iframe API calls this global when ready
+function onYouTubeIframeAPIReady() { window._ytApiReady = true; _createYtPlayer(); }
+
+// In case the API loaded BEFORE this script (race), poll briefly
+(function pollYt() {
+  if (_createYtPlayer()) return;
+  setTimeout(pollYt, 200);
+})();

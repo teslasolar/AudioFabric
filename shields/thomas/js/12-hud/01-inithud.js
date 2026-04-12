@@ -15,4 +15,11 @@ function initHUD() {
   setupSlider('dimfold',function(v){controls.dimFold=Math.round(v*126+1);document.getElementById('sv-dimfold').textContent=controls.dimFold;});
   setupSlider('phi',function(v){controls.phiPhase=v;document.getElementById('sv-phi').textContent=v.toFixed(2);});
   setupSlider('density');
+
+  // Sync voice-sound button to saved state
+  var vsBtn = document.getElementById('voice-sound-btn');
+  if (vsBtn) {
+    vsBtn.textContent = window.voiceSoundMuted ? 'VOICE TONE: OFF' : 'VOICE TONE: ON';
+    vsBtn.classList.toggle('active', !window.voiceSoundMuted);
+  }
 }

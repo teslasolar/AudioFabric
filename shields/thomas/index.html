@@ -15,8 +15,12 @@
 <link rel="stylesheet" href="css/panels/05-breach.css">
 <link rel="stylesheet" href="css/panels/06-chunk-6.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://www.youtube.com/iframe_api"></script>
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script>
+// Pre-define YT callback so we don't miss it if iframe API loads before our scripts
+window._ytApiReady = false;
+window.onYouTubeIframeAPIReady = function() { window._ytApiReady = true; };
+</script>
 </head>
 <body>
 <!-- BOOT -->
@@ -103,6 +107,9 @@
 
   <div class="panel-title">playlist <span id="pl-count" style="color:rgba(255,248,231,0.2);font-weight:400"></span></div>
   <div class="playlist" id="playlist" style="max-height:300px"></div>
+
+  <div class="panel-title">audio</div>
+  <button id="voice-sound-btn" class="yt-btn" onclick="toggleVoiceSound()" style="width:100%;margin-bottom:8px;padding:6px">VOICE TONE: OFF</button>
 
   <div class="panel-title">shield mode</div>
   <div class="modes-grid" id="modes-grid"></div>
@@ -257,5 +264,8 @@
 <script src="js/24-chat/04-chatlog.js"></script>
 <script src="js/24-chat/05-p2p-chat-mqtt-based-with-presence.js"></script>
 <script src="js/99-launch.js"></script>
+
+<!-- YouTube IFrame API — loaded LAST so onYouTubeIframeAPIReady is defined before YT API fires it -->
+<script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
