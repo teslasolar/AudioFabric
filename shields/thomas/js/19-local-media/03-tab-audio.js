@@ -58,6 +58,7 @@ function captureTabAudio() {
 
     musicMode = true;
     if (musicOrb) musicOrb.visible = true;
+    try { setSpectrogramSource('tab audio'); } catch (e) {}
 
     if (btn) {
       btn.textContent = '\u25A0 UNLINK TAB AUDIO';

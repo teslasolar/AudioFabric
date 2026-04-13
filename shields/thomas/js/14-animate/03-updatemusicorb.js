@@ -1,4 +1,5 @@
 function updateMusicOrb(time) {
+  try { updateSpectrogram(); } catch (e) {}
   if (!musicOrb) return;
   // Standby state when no music: dim, idle pulse, still visible as a small companion orb
   if (!musicMode) {

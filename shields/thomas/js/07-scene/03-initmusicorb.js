@@ -1,4 +1,5 @@
 function initMusicOrb() {
+  try { initSpectrogram(); } catch (e) { console.warn('spectrogram init failed:', e); }
   musicOrb = new THREE.Group();
   musicOrb.position.set(2.8, 0, 0); // offset to the right of main shield
   musicOrb.visible = true; // shown in standby mode, fully lit during music playback

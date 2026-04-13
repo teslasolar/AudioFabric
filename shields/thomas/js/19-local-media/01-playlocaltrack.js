@@ -41,6 +41,7 @@ function playLocalTrack(idx) {
   // Entering music mode
   musicMode = true;
   if (musicOrb) musicOrb.visible = true;
+  try { setSpectrogramSource(item.title || 'local file'); } catch (e) {}
 
   localMediaEl.play();
   document.getElementById('yt-play-btn').innerHTML = '&#10074;&#10074;';
