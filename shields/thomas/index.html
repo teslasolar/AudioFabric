@@ -109,7 +109,9 @@ window.onYouTubeIframeAPIReady = function() { window._ytApiReady = true; };
   <div class="playlist" id="playlist" style="max-height:300px"></div>
 
   <div class="panel-title">audio</div>
-  <button id="voice-sound-btn" class="yt-btn" onclick="toggleVoiceSound()" style="width:100%;margin-bottom:8px;padding:6px">VOICE TONE: OFF</button>
+  <button id="voice-sound-btn" class="yt-btn" onclick="toggleVoiceSound()" style="width:100%;margin-bottom:6px;padding:6px">VOICE TONE: OFF</button>
+  <button id="tab-audio-btn" class="yt-btn" onclick="captureTabAudio()" style="width:100%;margin-bottom:4px;padding:6px;color:#0cf;border-color:rgba(0,200,255,0.3);background:rgba(0,200,255,0.06)">&#10022; LINK TAB AUDIO</button>
+  <div style="font-size:8px;color:rgba(255,248,231,0.25);margin-bottom:8px;line-height:1.4">Feeds YouTube audio into the music orb. When prompted, pick <b>THIS TAB</b> and tick <b>Share audio</b>.</div>
 
   <div class="panel-title">shield mode</div>
   <div class="modes-grid" id="modes-grid"></div>
@@ -245,6 +247,7 @@ window.onYouTubeIframeAPIReady = function() { window._ytApiReady = true; };
 <script src="js/19-local-media/00-local-file-loading.js"></script>
 <script src="js/19-local-media/01-playlocaltrack.js"></script>
 <script src="js/19-local-media/02-local-file-loading.js"></script>
+<script src="js/19-local-media/03-tab-audio.js"></script>
 <script src="js/22-ai/00-ai-assistant-webllm.js"></script>
 <script src="js/22-ai/01-initai.js"></script>
 <script src="js/22-ai/02-ai-assistant-webllm.js"></script>
