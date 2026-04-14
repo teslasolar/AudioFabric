@@ -11,8 +11,8 @@ function initSpectrogram() {
   // Create a fixed-position canvas at the bottom center of the screen
   var wrap = document.createElement('div');
   wrap.id = 'spectrogram-wrap';
-  wrap.style.cssText = 'position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:60;background:rgba(6,4,14,0.85);border:1px solid rgba(0,200,255,0.25);border-radius:4px;padding:6px 8px 4px;backdrop-filter:blur(8px);display:none;pointer-events:none';
-  wrap.innerHTML = '<div style="font-size:8px;color:rgba(0,200,255,0.6);letter-spacing:3px;margin-bottom:4px;font-family:\'JetBrains Mono\',monospace">\u25B8 SPECTROGRAM <span id="spectrogram-source" style="color:rgba(255,248,231,0.3);margin-left:8px"></span></div>';
+  wrap.style.cssText = 'position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:60;background:rgba(6,4,14,0.85);border:1px solid rgba(0,200,255,0.25);border-radius:4px;padding:6px 8px 4px;backdrop-filter:blur(8px);pointer-events:none;transition:border-color 0.3s,opacity 0.3s;opacity:0.7';
+  wrap.innerHTML = '<div style="font-size:8px;color:rgba(0,200,255,0.6);letter-spacing:3px;margin-bottom:4px;font-family:\'JetBrains Mono\',monospace">\u25B8 SPECTROGRAM <span id="spectrogram-source" style="color:rgba(255,248,231,0.3);margin-left:8px">idle &mdash; link tab audio to activate</span></div>';
   spectrogramCanvas = document.createElement('canvas');
   spectrogramCanvas.width = spectrogramW;
   spectrogramCanvas.height = spectrogramH;
@@ -57,14 +57,30 @@ function spectrogramColor(db) {
 }
 
 function updateSpectrogram() {
-  if (!spectrogramCanvas || !spectrogramCtx || !musicAnalyser || !musicFreqData) return;
+  if (!spectrogramCanvas || !spectrogramCtx) return;
 
   var wrap = document.getElementById('spectrogram-wrap');
-  if (!musicMode) {
-    if (wrap) wrap.style.display = 'none';
+
+  // Always visible — but in idle mode, draw a dim baseline hint pattern
+  if (!musicMode || !musicAnalyser || !musicFreqData) {
+    if (wrap) { wrap.style.opacity = '0.6'; wrap.style.borderColor = 'rgba(0,200,255,0.15)'; }
+    // Draw a slow-moving dim gradient so it's obviously idle
+    var t = (performance.now() / 1000) % 4 / 4;
+    spectrogramCtx.drawImage(spectrogramCanvas, -1, 0);
+    var idleCol = spectrogramColumn.data;
+    for (var iy = 0; iy < spectrogramH; iy++) {
+      var iv = 8 + Math.floor(Math.sin((iy / spectrogramH + t) * Math.PI * 2) * 6);
+      idleCol[iy * 4]     = iv;
+      idleCol[iy * 4 + 1] = iv;
+      idleCol[iy * 4 + 2] = iv + 8;
+      idleCol[iy * 4 + 3] = 255;
+    }
+    spectrogramCtx.putImageData(spectrogramColumn, spectrogramW - 1, 0);
     return;
   }
-  if (wrap && wrap.style.display === 'none') wrap.style.display = 'block';
+
+  // Active mode
+  if (wrap) { wrap.style.opacity = '1'; wrap.style.borderColor = 'rgba(0,200,255,0.5)'; }
 
   // Fetch latest FFT
   musicAnalyser.getFloatFrequencyData(musicFreqData);

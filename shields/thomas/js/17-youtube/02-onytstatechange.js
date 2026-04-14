@@ -26,6 +26,11 @@ function onYTStateChange(event) {
       }
     } catch(e) {}
     updateNowPlaying();
+    // If YT is playing but tab audio isn't linked, pulse the LINK button as a hint
+    if (!tabAudioStream) {
+      var tabBtn = document.getElementById('tab-audio-btn');
+      if (tabBtn) tabBtn.classList.add('pulse-hint');
+    }
   } else if (event.data === YT.PlayerState.CUED) {
     // Playlist was loaded — sync
     syncPlaylistFromPlayer();

@@ -61,6 +61,7 @@ function captureTabAudio() {
     try { setSpectrogramSource('tab audio'); } catch (e) {}
 
     if (btn) {
+      btn.classList.remove('pulse-hint');
       btn.textContent = '\u25A0 UNLINK TAB AUDIO';
       btn.classList.add('active');
       btn.style.color = '#f84';
@@ -92,6 +93,7 @@ function stopTabAudioCapture() {
   if (!localMediaEl || localMediaEl.paused) {
     musicMode = false;
     if (musicOrb) musicOrb.visible = false;
+    try { setSpectrogramSource('idle — link tab audio to activate'); } catch (e) {}
   }
 
   var btn = document.getElementById('tab-audio-btn');
