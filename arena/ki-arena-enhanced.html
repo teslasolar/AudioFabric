@@ -1,0 +1,492 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Ki Arena Enhanced · Shader Beams × Prime Cosmos</title>
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;overflow:hidden;font:12px Consolas,monospace;color:#eee}
+#c{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:10px;left:10px;z-index:10;pointer-events:none}
+#hud div{margin:2px 0;text-shadow:0 0 4px #000}
+#score{font-size:24px;color:#ff0}
+#combo{font-size:18px;color:#f80}
+#blastType{font-size:14px;color:#0ff}
+#charge{font-size:14px;color:#0f0}
+#nick,#room,#peers,#llmStatus{font-size:11px;color:#888}
+#kanjiHud{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:120px;color:#fff;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:5;text-shadow:0 0 30px currentColor}
+#phonemeBars{position:fixed;bottom:10px;left:10px;display:flex;gap:4px;z-index:10}
+.pbar{width:30px;height:60px;border:1px solid #333;position:relative;display:flex;flex-direction:column;align-items:center}
+.pbar .fill{position:absolute;bottom:0;width:100%;background:#0f0;transition:height 0.1s}
+.pbar .lbl{position:absolute;bottom:-14px;font-size:9px;color:#aaa}
+#dmgLayer{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:15}
+.dmgNum{position:absolute;color:#ff0;font-size:28px;font-weight:bold;animation:dmgFloat 1.2s forwards;pointer-events:none}
+@keyframes dmgFloat{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-80px) scale(0.5)}}
+#commentary{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);padding:8px 16px;border-radius:4px;font-size:13px;color:#ff0;z-index:10;opacity:0;transition:opacity 0.4s;max-width:400px;text-align:center}
+#leaderboard{position:fixed;top:10px;right:10px;background:rgba(0,0,0,0.6);padding:10px;border:1px solid #333;border-radius:4px;z-index:10;min-width:140px}
+#leaderboard h3{font-size:11px;color:#888;margin-bottom:4px}
+#lbList{font-size:11px}
+#rec{position:fixed;top:10px;left:50%;transform:translateX(-50%);color:#f00;font-size:14px;z-index:20;animation:recBlink 1s infinite}
+@keyframes recBlink{0%,100%{opacity:1}50%{opacity:0.3}}
+#overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,5,15,0.95);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer}
+#overlay h1{font-size:28px;color:#fff;margin-bottom:10px}
+#overlay p{color:#888;font-size:13px;margin:4px}
+#overlay.drag{border:3px dashed #0ff}
+#overlay.hidden{display:none}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="score">0</div>
+  <div id="combo"></div>
+  <div id="blastType">—</div>
+  <div id="charge">▓░░░░░░░░░ 0%</div>
+  <div id="nick"></div>
+  <div id="room">room: ki-arena-pub</div>
+  <div id="peers">peers: 0</div>
+  <div id="llmStatus">LLM: standby</div>
+</div>
+<div id="kanjiHud"></div>
+<div id="phonemeBars">
+  <div class="pbar"><div class="fill" id="pb0"></div><div class="lbl">火ah</div></div>
+  <div class="pbar"><div class="fill" id="pb1"></div><div class="lbl">雷ee</div></div>
+  <div class="pbar"><div class="fill" id="pb2"></div><div class="lbl">気oh</div></div>
+  <div class="pbar"><div class="fill" id="pb3"></div><div class="lbl">水oo</div></div>
+  <div class="pbar"><div class="fill" id="pb4"></div><div class="lbl">風eh</div></div>
+  <div class="pbar"><div class="fill" id="pb5"></div><div class="lbl">土mm</div></div>
+</div>
+<div id="dmgLayer"></div>
+<div id="commentary"></div>
+<div id="leaderboard"><h3>LEADERBOARD</h3><div id="lbList">—</div></div>
+<div id="rec" style="display:none">● REC</div>
+<div id="overlay">
+  <h1>Ki Arena Enhanced</h1>
+  <p>Shader Beams × Prime Cosmos</p>
+  <p style="margin-top:20px;color:#0ff">Drop audio file or click to start with mic</p>
+  <p style="color:#666;font-size:11px">Voice → elemental blasts · MQTT multiplayer</p>
+</div>
+<script>
+const $=id=>document.getElementById(id),T=Math.PI*2,F=1.618,P=[2,3,5,7,11,13,17];
+const Me=(g,m)=>new THREE.Mesh(g,m),Cl=x=>new THREE.Color(x);
+const PM=o=>new THREE.MeshPhongMaterial(o),BM=o=>new THREE.MeshBasicMaterial(o);
+
+// === ELEMENTAL SYSTEM ===
+const KANJI={ah:{k:'火',color:'#f44',hue:0},ee:{k:'雷',color:'#ff0',hue:0.15},
+  oh:{k:'気',color:'#0ff',hue:0.5},oo:{k:'水',color:'#44f',hue:0.65},
+  eh:{k:'風',color:'#0f0',hue:0.33},mm:{k:'土',color:'#a60',hue:0.08}};
+const VOWELS=['ah','ee','oh','oo','eh','mm'];
+const BLASTS=['kiball','kamehameha','finalflash','spiritbomb','galickgun','barrage'];
+
+// === BEAM SHADERS ===
+const beamVS=`uniform float uT;uniform float uW;varying vec2 vUv;varying float vD;
+void main(){vUv=uv;vec3 p=position;
+p.y+=sin(p.x*2.+uT*12.)*.15*uW;p.z+=cos(p.x*3.+uT*8.)*.1*uW;
+vD=length(p.xz);gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`;
+const beamFS=`uniform float uT;uniform vec3 uCol;uniform float uInt;varying vec2 vUv;varying float vD;
+void main(){float core=smoothstep(0.5,0.0,abs(vUv.y-0.5));
+core=pow(core,2.0)*uInt;float pulse=0.5+0.5*sin(vUv.x*20.-uT*15.);
+vec3 c=uCol*core*(0.8+0.4*pulse);float a=core*0.9;gl_FragColor=vec4(c,a);}`;
+const chargeVS=`uniform float uT;varying vec3 vN;varying vec3 vP;
+void main(){vN=normal;vP=position;vec3 p=position+normal*sin(uT*5.+position.y*3.)*.05;
+gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`;
+const chargeFS=`uniform float uT;uniform vec3 uCol;varying vec3 vN;varying vec3 vP;
+void main(){float rim=1.0-abs(dot(normalize(vN),vec3(0,0,1)));
+rim=pow(rim,3.0);float pulse=0.7+0.3*sin(uT*8.);
+vec3 c=uCol*rim*pulse+uCol*0.2;gl_FragColor=vec4(c,rim*0.8);}`;
+
+// === STATE ===
+let ctx,analyser,analyserFile,dataArr,freqArr,micStream,audioEl,fileSource;
+let scene,camera,renderer,clock;
+let score=0,combo=0,chargeLevel=0,currentVowel=null,currentElement=null;
+let beamMesh,chargeMesh,targetMesh,primeRings=[],vortexPts,starField;
+let shaking=0,recorder,recording=false,chunks=[];
+let mqttClient=null,rtcPeers={},remotePlayers={},myId=Math.random().toString(36).slice(2,8);
+let nickname='Fighter_'+myId.slice(0,4);
+let leaderboard={};leaderboard[myId]={name:nickname,score:0};
+let started=false,hasFile=false,commentaryTimeout=null;
+
+// === AUDIO INIT ===
+function initAudio(stream,isFile){
+  if(!ctx)ctx=new(window.AudioContext||window.webkitAudioContext)();
+  if(stream&&!isFile){
+    micStream=stream;
+    const src=ctx.createMediaStreamSource(stream);
+    analyser=ctx.createAnalyser();analyser.fftSize=2048;
+    src.connect(analyser);
+  }
+  if(isFile&&audioEl){
+    if(!fileSource){fileSource=ctx.createMediaElementSource(audioEl);
+      analyserFile=ctx.createAnalyser();analyserFile.fftSize=2048;
+      fileSource.connect(analyserFile);fileSource.connect(ctx.destination);}
+  }
+  dataArr=new Float32Array(2048);freqArr=new Uint8Array(1024);
+}
+function ga(){
+  const a=analyserFile||analyser;if(!a)return{b:0,m:0,h:0,p:0};
+  a.getByteFrequencyData(freqArr);
+  let b=0,m=0,h=0,p=0;
+  for(let i=0;i<60;i++)b+=freqArr[i];b/=60*255;
+  for(let i=60;i<200;i++)m+=freqArr[i];m/=140*255;
+  for(let i=200;i<600;i++)h+=freqArr[i];h/=400*255;
+  for(let i=0;i<1024;i++)if(freqArr[i]>p)p=freqArr[i];p/=255;
+  return{b,m,h,p};
+}
+
+// === VOICE ANALYSIS ===
+function detectVowel(){
+  if(!analyser)return null;
+  analyser.getFloatTimeDomainData(dataArr);
+  // Autocorrelation F0
+  let best=0,bestI=20;
+  for(let i=20;i<500;i++){let sum=0;
+    for(let j=0;j<1024;j++)sum+=dataArr[j]*(dataArr[j+i]||0);
+    if(sum>best){best=sum;bestI=i;}}
+  const f0=ctx.sampleRate/bestI;
+  if(best<5)return null;// silence
+  // Simple formant estimation from spectrum
+  analyser.getByteFrequencyData(freqArr);
+  let pk1=0,pk1i=0,pk2=0,pk2i=0;
+  for(let i=2;i<80;i++){if(freqArr[i]>pk1){pk1=freqArr[i];pk1i=i;}}
+  for(let i=80;i<250;i++){if(freqArr[i]>pk2){pk2=freqArr[i];pk2i=i;}}
+  const f1=pk1i*ctx.sampleRate/2048,f2=pk2i*ctx.sampleRate/2048;
+  // Classify
+  if(f1<400&&f2>1800)return'ee';
+  if(f1>600&&f2<1200)return'oo';
+  if(f1>700)return'ah';
+  if(f2>2000)return'eh';
+  if(f1<500&&f2<1500)return'oh';
+  return'mm';
+}
+
+// === THREE.JS SCENE ===
+function initScene(){
+  scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x0a0a1a,0.015);
+  camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,200);
+  camera.position.set(0,4,12);camera.lookAt(0,1,0);
+  renderer=new THREE.WebGLRenderer({canvas:$('c'),antialias:true,alpha:false});
+  renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  clock=new THREE.Clock();
+  // Lights
+  scene.add(new THREE.AmbientLight(0x222244));
+  const dl=new THREE.DirectionalLight(0xffffff,0.5);dl.position.set(5,10,5);scene.add(dl);
+  const pl=new THREE.PointLight(0x0088ff,1,20);pl.position.set(0,3,0);scene.add(pl);
+  // Starfield
+  const sg=new THREE.BufferGeometry();const sp=new Float32Array(3000*3);
+  for(let i=0;i<9000;i++)sp[i]=(Math.random()-0.5)*150;
+  sg.setAttribute('position',new THREE.BufferAttribute(sp,3));
+  starField=new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:0.15}));
+  scene.add(starField);
+  // Arena floor
+  const floor=Me(new THREE.CircleGeometry(15,64),new THREE.MeshPhongMaterial({color:0x111122,transparent:true,opacity:0.6}));
+  floor.rotation.x=-Math.PI/2;scene.add(floor);
+  // Grid
+  const grid=new THREE.GridHelper(30,30,0x222244,0x111133);scene.add(grid);
+  // 7 Prime Rings
+  for(let i=0;i<7;i++){
+    const r=3+i*1.2;const tg=new THREE.TorusGeometry(r,0.02+i*0.005,8,P[i]*8);
+    const tm=new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(i/7,0.8,0.5),transparent:true,opacity:0.4});
+    const torus=Me(tg,tm);
+    torus.rotation.x=Math.PI/2+i*Math.PI/(7*F);
+    torus.rotation.z=i*T/7;
+    scene.add(torus);primeRings.push(torus);
+  }
+  // Target icosahedron
+  const tGeo=new THREE.IcosahedronGeometry(0.8,1);
+  const tMat=new THREE.MeshPhongMaterial({color:0xff4444,emissive:0x440000,wireframe:true});
+  targetMesh=Me(tGeo,tMat);targetMesh.position.set(0,2.5,0);scene.add(targetMesh);
+  // Player aura (charge orb)
+  const cGeo=new THREE.IcosahedronGeometry(0.5,2);
+  const cMat=new THREE.ShaderMaterial({vertexShader:chargeVS,fragmentShader:chargeFS,
+    uniforms:{uT:{value:0},uCol:{value:new THREE.Color(0x00ffff)}},transparent:true,side:THREE.DoubleSide});
+  chargeMesh=Me(cGeo,cMat);chargeMesh.position.set(0,1.5,8);scene.add(chargeMesh);
+  // Beam
+  const bGeo=new THREE.CylinderGeometry(0.15,0.15,8,16,32,true);
+  bGeo.rotateZ(Math.PI/2);
+  const bMat=new THREE.ShaderMaterial({vertexShader:beamVS,fragmentShader:beamFS,
+    uniforms:{uT:{value:0},uW:{value:1},uCol:{value:new THREE.Color(0x00ffff)},uInt:{value:1}},
+    transparent:true,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false});
+  beamMesh=Me(bGeo,bMat);beamMesh.visible=false;scene.add(beamMesh);
+  // Vortex particles
+  const vGeo=new THREE.BufferGeometry();const vPos=new Float32Array(600*3);const vCol=new Float32Array(600*3);
+  for(let i=0;i<600;i++){const a=Math.random()*T,r2=2+Math.random()*6,y2=(Math.random()-0.5)*4;
+    vPos[i*3]=Math.cos(a)*r2;vPos[i*3+1]=y2;vPos[i*3+2]=Math.sin(a)*r2;
+    vCol[i*3]=Math.random()*0.5;vCol[i*3+1]=0.3+Math.random()*0.7;vCol[i*3+2]=0.8+Math.random()*0.2;}
+  vGeo.setAttribute('position',new THREE.BufferAttribute(vPos,3));
+  vGeo.setAttribute('color',new THREE.BufferAttribute(vCol,3));
+  vortexPts=new THREE.Points(vGeo,new THREE.PointsMaterial({size:0.08,vertexColors:true,transparent:true,opacity:0.6,blending:THREE.AdditiveBlending}));
+  scene.add(vortexPts);
+}
+
+// === BLAST SYSTEM ===
+let blasts=[];
+function fireBlast(vowel){
+  const el=KANJI[vowel];if(!el)return;
+  const geo=new THREE.SphereGeometry(0.3,16,16);
+  const mat=new THREE.MeshBasicMaterial({color:new THREE.Color(el.color),transparent:true,opacity:0.9});
+  const blast=Me(geo,mat);blast.position.copy(chargeMesh.position);
+  blast.userData={vel:new THREE.Vector3(0,0.1,-0.5).normalize().multiplyScalar(0.3),life:120,element:vowel};
+  scene.add(blast);blasts.push(blast);
+  // Kanji sprite
+  const cv2=document.createElement('canvas');cv2.width=128;cv2.height=128;
+  const c2=cv2.getContext('2d');c2.font='bold 80px serif';c2.fillStyle=el.color;
+  c2.textAlign='center';c2.textBaseline='middle';c2.fillText(el.k,64,64);
+  const tex=new THREE.CanvasTexture(cv2);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,blending:THREE.AdditiveBlending}));
+  sp.scale.set(0.8,0.8,1);sp.position.copy(blast.position);sp.userData={life:60};
+  scene.add(sp);blasts.push(sp);
+  showKanji(el.k,el.color);
+  addScore(10*(1+combo));combo++;
+  $('combo').textContent=combo>1?`${combo}x COMBO`:'';
+  $('blastType').textContent=`${el.k} ${BLASTS[VOWELS.indexOf(vowel)]}`;
+  $('blastType').style.color=el.color;
+  showDamage(10*(1+Math.min(combo,10)));
+  shaking=8;
+}
+function updateBlasts(){
+  for(let i=blasts.length-1;i>=0;i--){
+    const b=blasts[i];b.userData.life--;
+    if(b.userData.vel)b.position.add(b.userData.vel);
+    if(b.userData.life<=0){scene.remove(b);blasts.splice(i,1);}
+    else if(b.material.opacity!==undefined)b.material.opacity=b.userData.life/120;
+  }
+}
+
+// === SCORING & HUD ===
+function addScore(pts){score+=pts;$('score').textContent=score;leaderboard[myId].score=score;broadcastState();}
+function showKanji(k,c){const el=$('kanjiHud');el.textContent=k;el.style.color=c;el.style.opacity=1;
+  setTimeout(()=>el.style.opacity=0,600);}
+function showDamage(v){const d=document.createElement('div');d.className='dmgNum';
+  d.textContent=v;d.style.left=(innerWidth/2+Math.random()*100-50)+'px';
+  d.style.top=(innerHeight/2-50)+'px';$('dmgLayer').appendChild(d);
+  setTimeout(()=>d.remove(),1200);}
+function updateCharge(){
+  const bars=Math.floor(chargeLevel*10);
+  $('charge').textContent='▓'+'█'.repeat(bars)+'░'.repeat(10-bars)+` ${Math.floor(chargeLevel*100)}%`;}
+function updatePhoneme(vowel,energy){
+  VOWELS.forEach((v,i)=>{$('pb'+i).style.height=(v===vowel?energy*100:Math.max(0,parseFloat($('pb'+i).style.height||0)-2))+'%';
+    $('pb'+i).style.background=KANJI[v].color;});}
+
+// === MQTT NETWORKING ===
+function initMQTT(){
+  const brokers=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt'];
+  let idx=0;
+  function tryConnect(){
+    const url=brokers[idx%brokers.length];idx++;
+    try{mqttClient=mqtt.connect(url,{clientId:'ki_'+myId,clean:true,connectTimeout:5000});
+      mqttClient.on('connect',()=>{mqttClient.subscribe('ki-arena/state');mqttClient.subscribe('ki-arena/blast');
+        $('room').textContent='room: ki-arena-pub [connected]';});
+      mqttClient.on('message',(topic,msg)=>{try{const d=JSON.parse(msg.toString());
+        if(d.id===myId)return;
+        if(topic==='ki-arena/state'){remotePlayers[d.id]=d;updatePeers();}
+        if(topic==='ki-arena/blast')spawnRemoteBlast(d);
+      }catch(e){}});
+      mqttClient.on('error',()=>{mqttClient.end();setTimeout(tryConnect,2000);});
+    }catch(e){setTimeout(tryConnect,2000);}
+  }
+  tryConnect();
+}
+function broadcastState(){
+  if(!mqttClient||!mqttClient.connected)return;
+  mqttClient.publish('ki-arena/state',JSON.stringify({id:myId,name:nickname,score,charge:chargeLevel,element:currentVowel}));}
+function broadcastBlast(vowel){
+  if(!mqttClient||!mqttClient.connected)return;
+  mqttClient.publish('ki-arena/blast',JSON.stringify({id:myId,vowel}));}
+function updatePeers(){
+  const ids=Object.keys(remotePlayers);$('peers').textContent=`peers: ${ids.length}`;
+  // Update leaderboard
+  ids.forEach(id=>{if(remotePlayers[id].score!==undefined)leaderboard[id]=
+    {name:remotePlayers[id].name||id,score:remotePlayers[id].score};});
+  const sorted=Object.values(leaderboard).sort((a,b)=>b.score-a.score).slice(0,5);
+  $('lbList').innerHTML=sorted.map((e,i)=>`<div style="color:${i===0?'#ff0':'#aaa'}">${i+1}. ${e.name}: ${e.score}</div>`).join('');}
+function spawnRemoteBlast(d){
+  const el=KANJI[d.vowel];if(!el)return;
+  const geo=new THREE.SphereGeometry(0.25,12,12);
+  const mat=new THREE.MeshBasicMaterial({color:new THREE.Color(el.color),transparent:true,opacity:0.7});
+  const m=Me(geo,mat);const angle=Math.random()*T;
+  m.position.set(Math.cos(angle)*5,2,Math.sin(angle)*5);
+  m.userData={vel:new THREE.Vector3(-m.position.x,-0.5,-m.position.z).normalize().multiplyScalar(0.2),life:80};
+  scene.add(m);blasts.push(m);}
+
+// === WebRTC P2P (via WebTorrent tracker) ===
+let rtcWs=null;
+function initWebRTC(){
+  try{rtcWs=new WebSocket('wss://tracker.openwebtorrent.com');
+    rtcWs.onopen=()=>{rtcWs.send(JSON.stringify({action:'announce',info_hash:btoa('ki-arena-enhanced').slice(0,20),
+      peer_id:myId,offers:[]}));};
+    rtcWs.onmessage=(e)=>{try{const d=JSON.parse(e.data);
+      if(d.peer_id&&d.peer_id!==myId&&!rtcPeers[d.peer_id])setupRTC(d.peer_id,d);
+    }catch(ex){}};
+    rtcWs.onerror=()=>{};
+  }catch(e){}
+}
+function setupRTC(peerId,offer){
+  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+  const dc=pc.createDataChannel('ki');
+  dc.onmessage=(e)=>{try{const d=JSON.parse(e.data);remotePlayers[peerId]=d;updatePeers();}catch(ex){}};
+  rtcPeers[peerId]={pc,dc};
+}
+
+// === REMOTE PLAYER VISUALS ===
+let remoteAuras={};
+function updateRemoteVisuals(t){
+  const positions=[[5,2,0],[-5,2,0],[0,2,5],[0,2,-5],[3,2,3],[-3,2,-3],[3,2,-3],[-3,2,3]];
+  const ids=Object.keys(remotePlayers);
+  ids.forEach((id,i)=>{
+    if(!remoteAuras[id]){
+      const g=new THREE.SphereGeometry(0.4,16,16);
+      const m=new THREE.MeshBasicMaterial({color:0x8844ff,transparent:true,opacity:0.4});
+      const mesh=Me(g,m);scene.add(mesh);remoteAuras[id]=mesh;}
+    const pos=positions[i%positions.length];
+    remoteAuras[id].position.set(pos[0],pos[1]+Math.sin(t*2+i)*0.3,pos[2]);
+    const rp=remotePlayers[id];
+    if(rp.element&&KANJI[rp.element])remoteAuras[id].material.color.set(KANJI[rp.element].color);
+  });
+}
+
+// === SYNTH FEEDBACK ===
+let chargeOsc=null;
+function startChargeSound(){
+  if(chargeOsc||!ctx)return;chargeOsc=ctx.createOscillator();
+  const g=ctx.createGain();g.gain.value=0.05;chargeOsc.type='sine';chargeOsc.frequency.value=220;
+  chargeOsc.connect(g);g.connect(ctx.destination);chargeOsc.start();}
+function stopChargeSound(){if(chargeOsc){chargeOsc.stop();chargeOsc=null;}}
+function zapSound(){
+  if(!ctx)return;const o=ctx.createOscillator(),g=ctx.createGain();
+  o.type='sawtooth';o.frequency.value=800+Math.random()*400;
+  g.gain.value=0.1;o.connect(g);g.connect(ctx.destination);
+  o.start();g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.15);o.stop(ctx.currentTime+0.15);}
+
+// === COMMENTARY ===
+const PHRASES=['INCREDIBLE POWER!','The ki is surging!','What a combo!','Elemental mastery!',
+  'The arena trembles!','Prime resonance detected!','Beyond mortal limits!','SUGOI!'];
+function showCommentary(text){
+  const el=$('commentary');el.textContent=text||PHRASES[Math.floor(Math.random()*PHRASES.length)];
+  el.style.opacity=1;clearTimeout(commentaryTimeout);
+  commentaryTimeout=setTimeout(()=>el.style.opacity=0,3000);}
+async function tryLLMCommentary(){
+  if(window.ai&&window.ai.languageModel){
+    try{$('llmStatus').textContent='LLM: generating...';
+      const session=await window.ai.languageModel.create();
+      const r=await session.prompt(`You are a DBZ battle commentator. The fighter just hit a ${combo}x combo using ${currentVowel?KANJI[currentVowel].k:'ki'} element. Score: ${score}. Give a 5-word excited commentary.`);
+      showCommentary(r.trim());$('llmStatus').textContent='LLM: active';session.destroy();
+    }catch(e){$('llmStatus').textContent='LLM: fallback';showCommentary();}
+  }else{showCommentary();}}
+
+// === RECORDING ===
+function startRecording(){
+  const stream=renderer.domElement.captureStream(60);
+  try{recorder=new MediaRecorder(stream,{mimeType:'video/webm;codecs=h264,opus',videoBitsPerSecond:8000000});}
+  catch(e){recorder=new MediaRecorder(stream,{mimeType:'video/webm',videoBitsPerSecond:8000000});}
+  chunks=[];recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
+  recorder.onstop=()=>{const blob=new Blob(chunks,{type:'video/webm'});
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');
+    a.href=url;a.download=`ki-arena-${Date.now()}.webm`;a.click();URL.revokeObjectURL(url);};
+  recorder.start(1000);recording=true;$('rec').style.display='block';}
+function stopRecording(){if(recorder&&recording){recorder.stop();recording=false;$('rec').style.display='none';}}
+
+// === MAIN LOOP ===
+let lastBlastTime=0,sustainCount=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const t=clock.getElapsedTime();const dt=clock.getDelta();
+  const au=ga();
+  // Voice detection
+  const vowel=detectVowel();
+  if(vowel){
+    currentVowel=vowel;currentElement=KANJI[vowel];
+    updatePhoneme(vowel,0.5+au.p*0.5);
+    chargeLevel=Math.min(1,chargeLevel+0.008);
+    sustainCount++;
+    if(sustainCount>30&&Date.now()-lastBlastTime>400){
+      fireBlast(vowel);broadcastBlast(vowel);zapSound();lastBlastTime=Date.now();sustainCount=0;
+      if(combo>3&&combo%5===0)tryLLMCommentary();
+    }
+    startChargeSound();
+    if(chargeOsc)chargeOsc.frequency.value=220+chargeLevel*440;
+  }else{
+    chargeLevel=Math.max(0,chargeLevel-0.003);sustainCount=0;
+    if(chargeLevel<0.1){combo=0;$('combo').textContent='';stopChargeSound();}
+  }
+  updateCharge();
+  // Beam (fires when charge > 60%)
+  if(chargeLevel>0.6&&currentElement){
+    beamMesh.visible=true;
+    const bDir=new THREE.Vector3().subVectors(targetMesh.position,chargeMesh.position);
+    beamMesh.position.copy(chargeMesh.position).add(bDir.clone().multiplyScalar(0.5));
+    beamMesh.lookAt(targetMesh.position);beamMesh.rotateY(Math.PI/2);
+    beamMesh.scale.set(1,0.5+au.b*2,0.5+au.b*2);
+    const bu=beamMesh.material.uniforms;
+    bu.uT.value=t;bu.uW.value=0.5+au.b*1.5;
+    bu.uCol.value.set(currentElement.color);bu.uInt.value=0.8+au.p*0.5;
+    // Score for sustained beam
+    if(Math.random()<0.05)addScore(5);
+  }else{beamMesh.visible=false;}
+  // Charge orb
+  chargeMesh.material.uniforms.uT.value=t;
+  if(currentElement)chargeMesh.material.uniforms.uCol.value.set(currentElement.color);
+  chargeMesh.scale.setScalar(0.8+chargeLevel*0.5+au.b*0.3);
+  // Target
+  targetMesh.rotation.x=t*0.5;targetMesh.rotation.y=t*0.7;
+  targetMesh.position.y=2.5+Math.sin(t)*0.3;
+  targetMesh.material.emissive.setHSL(t*0.1%1,0.8,0.1+au.p*0.2);
+  // Prime rings
+  primeRings.forEach((ring,i)=>{
+    ring.rotation.z+=0.003*(i+1)*(1+au.b*2);
+    ring.rotation.x+=0.001*(i+1)*F;
+    ring.material.opacity=0.2+([au.b,au.b,au.m,au.m,au.h,au.h,au.p][i])*0.6;
+  });
+  // Vortex particles
+  const vp=vortexPts.geometry.attributes.position.array;
+  for(let i=0;i<600;i++){
+    const idx=i*3;const x=vp[idx],z=vp[idx+2];
+    const a=Math.atan2(z,x)+0.01*(1+au.m*3);
+    const r=Math.sqrt(x*x+z*z);
+    vp[idx]=Math.cos(a)*r;vp[idx+2]=Math.sin(a)*r;
+    vp[idx+1]+=Math.sin(t+i)*0.005*au.p;
+    if(vp[idx+1]>4)vp[idx+1]=-4;
+  }
+  vortexPts.geometry.attributes.position.needsUpdate=true;
+  // Starfield rotation
+  starField.rotation.y=t*0.003;starField.rotation.x=Math.sin(t*0.01)*0.1;
+  // Blasts
+  updateBlasts();
+  // Remote players
+  updateRemoteVisuals(t);
+  // Screen shake
+  if(shaking>0){camera.position.x=Math.sin(t*50)*shaking*0.01;
+    camera.position.y=4+Math.cos(t*60)*shaking*0.008;shaking--;}
+  else{camera.position.x=Math.sin(t*0.2)*0.5;camera.position.y=4+Math.sin(t*0.3)*0.2;}
+  camera.lookAt(0,1.5,0);
+  renderer.render(scene,camera);
+}
+
+// === FILE DROP ===
+const ov=$('overlay');
+ov.addEventListener('dragover',e=>{e.preventDefault();ov.classList.add('drag');});
+ov.addEventListener('dragleave',()=>ov.classList.remove('drag'));
+ov.addEventListener('drop',e=>{e.preventDefault();ov.classList.remove('drag');
+  const file=e.dataTransfer.files[0];if(!file)return;
+  audioEl=new Audio();audioEl.src=URL.createObjectURL(file);audioEl.crossOrigin='anonymous';
+  audioEl.oncanplaythrough=()=>{hasFile=true;startAll();audioEl.play();};audioEl.load();
+  audioEl.onended=()=>stopRecording();
+});
+ov.addEventListener('click',()=>{if(!hasFile)startAll();});
+
+function startAll(){
+  if(started)return;started=true;ov.classList.add('hidden');
+  navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{
+    initAudio(s,false);if(hasFile)initAudio(null,true);
+    initScene();initMQTT();initWebRTC();startRecording();
+    $('nick').textContent='player: '+nickname;
+    animate();
+  }).catch(()=>{
+    initAudio(null,hasFile);if(hasFile)initAudio(null,true);
+    initScene();initMQTT();initWebRTC();startRecording();
+    $('nick').textContent='player: '+nickname;
+    animate();
+  });
+}
+
+// Resize
+window.addEventListener('resize',()=>{if(!renderer)return;
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);});
+</script></body></html>

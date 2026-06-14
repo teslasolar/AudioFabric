@@ -1,0 +1,911 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ki Arena Chat Enhanced · Elemental Voice Combat × Kotoba</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a12;--fg:#e0e0e0;--ac:#00ffaa;--pp:#a040ff;--ok:#40ff40;--rd:#ff4040;--gd:#ffd700;
+--fire:#ff4400;--thunder:#ffee00;--ki:#00ffaa;--water:#0088ff;--wind:#88ffcc;--earth:#aa6600}
+body{background:var(--bg);color:var(--fg);font:12px Consolas,'JetBrains Mono',monospace;overflow:hidden;height:100vh}
+canvas{position:absolute;top:0;left:0;width:100%;height:100%}
+#cv3d{z-index:0}
+#hud{position:fixed;top:8px;right:8px;z-index:10;text-align:right;font-size:11px;pointer-events:none}
+#hud .score{font-size:24px;color:var(--gd);text-shadow:0 0 8px var(--gd)}
+#hud .combo{font-size:16px;color:var(--ac)}
+#hud .element{font-size:14px}
+#kanjiHUD{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:120px;opacity:0;
+z-index:5;pointer-events:none;transition:opacity 0.3s;text-shadow:0 0 40px currentColor}
+#phonemes{position:fixed;bottom:8px;right:8px;z-index:10;display:flex;gap:4px;align-items:flex-end}
+.pbar{width:18px;background:#222;border:1px solid #333;border-radius:3px;position:relative;height:60px;overflow:hidden}
+.pbar .fill{position:absolute;bottom:0;width:100%;transition:height 0.1s;border-radius:2px}
+.pbar .lbl{position:absolute;bottom:-16px;width:100%;text-align:center;font-size:9px;color:#888}
+#dmgLayer{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:6}
+.dmg-num{position:absolute;animation:dmgFloat 1.5s forwards;font-size:28px;font-weight:bold;text-shadow:0 0 10px currentColor}
+@keyframes dmgFloat{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-80px) scale(1.5)}}
+#commentary{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:10;font-size:14px;
+color:var(--ac);text-align:center;pointer-events:none;opacity:0;transition:opacity 0.5s;max-width:400px}
+#leaderboard{position:fixed;top:8px;left:320px;z-index:10;font-size:10px;background:rgba(0,0,0,0.6);
+padding:6px 10px;border-radius:6px;border:1px solid #333;min-width:120px}
+#leaderboard h4{color:var(--gd);margin-bottom:4px}
+.lb-entry{display:flex;justify-content:space-between;gap:12px;padding:1px 0}
+/* Chat Panel */
+#chatPanel{position:fixed;top:8px;left:8px;width:300px;z-index:10;background:rgba(5,5,15,0.85);
+border:1px solid #333;border-radius:8px;display:flex;flex-direction:column;max-height:380px;backdrop-filter:blur(4px)}
+#chatPanel h4{padding:6px 10px;border-bottom:1px solid #333;color:var(--ac);font-size:11px}
+#chatMessages{flex:1;overflow-y:auto;padding:6px 10px;max-height:200px;min-height:200px;font-size:11px}
+#chatMessages::-webkit-scrollbar{width:4px}
+#chatMessages::-webkit-scrollbar-thumb{background:#444;border-radius:2px}
+.msg{padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.msg .nick{font-weight:bold;margin-right:4px}
+.msg.system{color:#888;font-style:italic;font-size:10px}
+#chatInput{display:flex;border-top:1px solid #333;padding:4px}
+#chatInput input{flex:1;background:#111;border:1px solid #333;color:var(--fg);padding:4px 8px;
+border-radius:4px;font:11px Consolas,monospace;outline:none}
+#chatInput input:focus{border-color:var(--ac)}
+#chatInput button{background:var(--ac);color:#000;border:none;padding:4px 8px;border-radius:4px;
+cursor:pointer;font-weight:bold;margin-left:4px;font-size:11px}
+#emojiBar{display:flex;border-top:1px solid #222;padding:4px 6px;gap:4px}
+#emojiBar button{background:none;border:1px solid #333;border-radius:4px;padding:2px 6px;
+cursor:pointer;font-size:14px;transition:all 0.2s}
+#emojiBar button:hover{background:rgba(255,255,255,0.1);border-color:var(--ac);transform:scale(1.2)}
+#typingInd{padding:2px 10px;font-size:9px;color:#666;height:14px}
+/* Drop overlay */
+#dropOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);
+z-index:100;display:none;align-items:center;justify-content:center;font-size:24px;color:var(--ac);
+border:3px dashed var(--ac)}
+/* REC indicator */
+#rec{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10;display:none;
+align-items:center;gap:6px;font-size:11px;color:var(--rd)}
+#rec .dot{width:8px;height:8px;border-radius:50%;background:var(--rd);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+/* 3D chat bubble */
+@keyframes bubbleRise{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-60px)}}
+.chat3d{position:absolute;background:rgba(0,0,0,0.7);border:1px solid var(--ac);border-radius:8px;
+padding:3px 8px;font-size:10px;pointer-events:none;animation:bubbleRise 4s forwards;white-space:nowrap}
+</style></head><body>
+<canvas id="cv3d"></canvas>
+<div id="hud"><div class="score" id="scoreDisp">0</div><div class="combo" id="comboDisp"></div><div class="element" id="elemDisp"></div></div>
+<div id="kanjiHUD"></div>
+<div id="phonemes"></div>
+<div id="dmgLayer"></div>
+<div id="commentary"></div>
+<div id="leaderboard"><h4>LEADERBOARD</h4><div id="lbList"></div></div>
+<div id="chatPanel">
+<h4>KI ARENA CHAT v2</h4>
+<div id="chatMessages"></div>
+<div id="typingInd"></div>
+<div id="chatInput"><input id="chatIn" placeholder="Type or /command..." autocomplete="off"><button id="chatSend">></button></div>
+<div id="emojiBar"></div>
+</div>
+<div id="dropOverlay">DROP AUDIO FILE HERE</div>
+<div id="rec"><span class="dot"></span>REC</div>
+
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id),T=Math.PI*2,F=1.618,P=[2,3,5,7,11,13,17];
+const Me=(g,m)=>new THREE.Mesh(g,m),Cl=x=>new THREE.Color(x);
+const PM=o=>new THREE.MeshPhongMaterial(o),BM=o=>new THREE.MeshBasicMaterial(o);
+
+// === CONSTANTS ===
+const KANJI={fire:'火',thunder:'雷',ki:'気',water:'水',wind:'風',earth:'土'};
+const ELEMENTS=['fire','thunder','ki','water','wind','earth'];
+const ELEM_COLORS={fire:'#ff4400',thunder:'#ffee00',ki:'#00ffaa',water:'#0088ff',wind:'#88ffcc',earth:'#aa6600'};
+const VOWELS='aiueo';
+const PHONEMES=['a','i','u','e','o'];
+const BLAST_TYPES=['kiball','kamehameha','finalflash','spiritbomb','galickgun','barrage'];
+const EMOJIS=['🔥','⚡','💀','💪','👑','✨'];
+
+// === KOTOBA STATE ===
+const K={};
+'● 〜 ┃ ♡ △ ◐ ◯'.split(' ').forEach(g=>{K[g]=new Float32Array(7)});
+const LAYERS=['●','〜','┃','♡','△','◐','◯'];
+const LAYER_COLORS=['#993366','#00aadd','#ffaa00','#ff4444','#44aa44','#aa44ff','#ffffff'];
+const LAYER_PRIMES=[2,3,5,7,11,13,17];
+
+function kotobaRoute(audio){
+  const{b,m,h,p}=audio;
+  K['●'][0]=b;K['●'][1]=m*0.3;K['●'][2]=h*0.1;
+  K['〜'][0]=b*0.6;K['〜'][1]=m*0.5;K['〜'][2]=h*0.2;
+  K['┃'][0]=b*0.3;K['┃'][1]=m*0.7;K['┃'][2]=h*0.4;
+  K['♡'][0]=b*0.2;K['♡'][1]=m;K['♡'][2]=h*0.5;
+  K['△'][0]=b*0.1;K['△'][1]=m*0.8;K['△'][2]=h*0.7;
+  K['◐'][0]=b*0.05;K['◐'][1]=m*0.4;K['◐'][2]=h*0.9;
+  K['◯'][0]=p*0.5;K['◯'][1]=p*0.3;K['◯'][2]=p;
+  // Dampening cascade
+  for(let i=1;i<7;i++){
+    const prev=K[LAYERS[i-1]],cur=K[LAYERS[i]];
+    const gain=1/(1+i*0.3);const decay=0.85+i*0.02;
+    for(let j=0;j<7;j++) cur[j]+=(prev[j]*gain-cur[j])*(1-decay);
+  }
+}
+function kotobaCoherence(){
+  let sum=0,n=0;
+  for(let i=0;i<6;i++){
+    const a=K[LAYERS[i]][0],b=K[LAYERS[i+1]][0];
+    if(a>0.01&&b>0.01){const r=Math.min(a,b)/Math.max(a,b);sum+=1-Math.abs(r-1/F);n++;}
+  }
+  return n>0?sum/n:0;
+}
+
+// === BEAM SHADERS ===
+const beamVS=`
+varying vec2 vUv;varying float vDist;
+uniform float uTime;uniform float uIntensity;
+void main(){
+  vUv=uv;
+  vec3 pos=position;
+  float wave=sin(pos.y*6.0+uTime*12.0)*0.15*uIntensity;
+  float wave2=cos(pos.y*3.0-uTime*8.0)*0.08*uIntensity;
+  pos.x+=wave+wave2;
+  pos.z+=cos(pos.y*4.0+uTime*10.0)*0.1*uIntensity;
+  vDist=length(pos.xz);
+  gl_Position=projectionMatrix*modelViewMatrix*vec4(pos,1.0);
+}`;
+const beamFS=`
+varying vec2 vUv;varying float vDist;
+uniform vec3 uColor;uniform float uTime;uniform float uIntensity;
+void main(){
+  float core=1.0-abs(vUv.x-0.5)*2.0;
+  core=pow(core,2.0);
+  float glow=exp(-vDist*3.0)*0.5;
+  float pulse=0.8+0.2*sin(uTime*20.0+vUv.y*10.0);
+  vec3 col=uColor*core*pulse*uIntensity+uColor*glow*0.3;
+  float alpha=core*0.9*uIntensity+glow*0.4;
+  gl_FragColor=vec4(col,alpha);
+}`;
+
+// === NEBULA BACKGROUND SHADER ===
+const nebulaVS=`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
+const nebulaFS=`
+uniform float uTime;uniform float uBass;uniform float uMid;uniform float uHigh;
+varying vec2 vUv;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
+float fbm(vec2 p){float v=0.0,a=0.5;for(int i=0;i<5;i++){v+=a*noise(p);p*=2.0;a*=0.5;}return v;}
+void main(){
+  vec2 uv=vUv*2.0-1.0;
+  float t=uTime*0.05;
+  float n1=fbm(uv*3.0+vec2(t,t*0.7));
+  float n2=fbm(uv*2.0-vec2(t*0.5,t*0.3));
+  float n3=fbm(uv*4.0+vec2(n1,n2)*0.5);
+  float hue=n1*0.3+uBass*0.2+t*0.1;
+  float sat=0.6+uMid*0.3;
+  float val=n3*0.3+uHigh*0.15+0.05;
+  // HSV to RGB
+  vec3 c=vec3(hue,sat,val);
+  vec4 K2=vec4(1.0,2.0/3.0,1.0/3.0,3.0);
+  vec3 p2=abs(fract(c.xxx+K2.xyz)*6.0-K2.www);
+  vec3 rgb=c.z*mix(K2.xxx,clamp(p2-K2.xxx,0.0,1.0),c.y);
+  gl_FragColor=vec4(rgb*0.4,1.0);
+}`;
+
+// === GLOBAL STATE ===
+const S={
+  score:0,combo:0,maxCombo:0,element:'ki',vowel:'',charge:0,
+  pn:'',nick:'Fighter_'+Math.random().toString(36).slice(2,6),
+  mastery:{fire:0,thunder:0,ki:0,water:0,wind:0,earth:0},
+  blastCooldown:0,lastBlast:0,hp:100
+};
+let audioCtx,analyser,micStream,fileAnalyser,fileSource;
+let fData=new Uint8Array(256),fDataFile=new Uint8Array(256);
+let scene,camera,renderer,clock;
+let nebulaMesh,floorMesh,kotobaRings=[],starField,targetMesh,auraMesh,vortexParticles;
+let activeBeams=[],explosions=[],chatBubbles3D=[];
+let remotePlayers={};
+let mqttClient=null;
+let mediaRecorder=null,recChunks=[];
+let audioElement=null,audioFileCtx=null;
+
+// === AUDIO SYSTEM ===
+function ga(){
+  if(!analyser)return{b:0,m:0,h:0,p:0};
+  analyser.getByteFrequencyData(fData);
+  let b=0,m=0,h=0,p=0;
+  for(let i=0;i<20;i++)b+=fData[i];b/=20*255;
+  for(let i=20;i<80;i++)m+=fData[i];m/=60*255;
+  for(let i=80;i<200;i++)h+=fData[i];h/=120*255;
+  for(let i=0;i<256;i++)if(fData[i]/255>p)p=fData[i]/255;
+  // Mix in file audio if present
+  if(fileAnalyser){
+    fileAnalyser.getByteFrequencyData(fDataFile);
+    let fb=0,fm=0,fh=0,fp=0;
+    for(let i=0;i<20;i++)fb+=fDataFile[i];fb/=20*255;
+    for(let i=20;i<80;i++)fm+=fDataFile[i];fm/=60*255;
+    for(let i=80;i<200;i++)fh+=fDataFile[i];fh/=120*255;
+    for(let i=0;i<256;i++)if(fDataFile[i]/255>fp)fp=fDataFile[i]/255;
+    b=Math.max(b,fb);m=Math.max(m,fm);h=Math.max(h,fh);p=Math.max(p,fp);
+  }
+  return{b,m,h,p};
+}
+
+async function initAudio(){
+  try{
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    micStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const src=audioCtx.createMediaStreamSource(micStream);
+    analyser=audioCtx.createAnalyser();analyser.fftSize=512;analyser.smoothingTimeConstant=0.8;
+    src.connect(analyser);
+    fData=new Uint8Array(analyser.frequencyBinCount);
+    addSystemMsg('Microphone active');
+  }catch(e){addSystemMsg('Mic error: '+e.message);}
+}
+
+function initFileAudio(file){
+  if(audioElement){audioElement.pause();audioElement.remove();}
+  audioElement=document.createElement('audio');
+  audioElement.src=URL.createObjectURL(file);
+  audioElement.crossOrigin='anonymous';
+  if(!audioFileCtx)audioFileCtx=audioCtx||new AudioContext();
+  audioElement.oncanplaythrough=()=>{
+    try{
+      fileSource=audioFileCtx.createMediaElementSource(audioElement);
+      fileAnalyser=audioFileCtx.createAnalyser();fileAnalyser.fftSize=512;fileAnalyser.smoothingTimeConstant=0.8;
+      fDataFile=new Uint8Array(fileAnalyser.frequencyBinCount);
+      fileSource.connect(fileAnalyser);
+      fileSource.connect(audioFileCtx.destination);
+      audioElement.play();
+      addSystemMsg('Playing: '+file.name);
+      startRecording();
+    }catch(e){
+      audioElement.play();
+      addSystemMsg('Playing (no analysis): '+file.name);
+    }
+  };
+  audioElement.onended=()=>{stopRecording();addSystemMsg('Track ended');};
+}
+
+// === VOICE ANALYSIS ===
+function analyzeVoice(){
+  if(!analyser)return;
+  analyser.getByteFrequencyData(fData);
+  // Simple formant-based vowel detection
+  let bands=[0,0,0,0,0];
+  // F1 region (250-900Hz) → bins ~3-12 at 48kHz/512
+  for(let i=3;i<7;i++)bands[0]+=fData[i];  // low F1 → u/o
+  for(let i=7;i<12;i++)bands[1]+=fData[i]; // high F1 → a
+  // F2 region (900-2500Hz) → bins ~12-33
+  for(let i=12;i<20;i++)bands[2]+=fData[i]; // low F2 → o/u
+  for(let i=20;i<33;i++)bands[3]+=fData[i]; // high F2 → i/e
+  for(let i=33;i<50;i++)bands[4]+=fData[i]; // very high → i
+
+  const total=bands.reduce((a,b)=>a+b,0);
+  if(total<500)return; // silence threshold
+
+  // Normalize
+  const n=bands.map(b=>b/total);
+  let vowel='';
+  if(n[1]>0.3&&n[2]>0.15)vowel='a';
+  else if(n[4]>0.2&&n[3]>0.25)vowel='i';
+  else if(n[0]>0.3&&n[2]>0.25)vowel='u';
+  else if(n[3]>0.3&&n[1]>0.15)vowel='e';
+  else if(n[0]>0.25&&n[2]>0.3)vowel='o';
+
+  if(vowel&&vowel!==S.vowel){
+    S.vowel=vowel;
+    const elemIdx=VOWELS.indexOf(vowel);
+    if(elemIdx>=0&&elemIdx<5){
+      S.element=ELEMENTS[elemIdx];
+      updateElementDisplay();
+    }
+    S.charge=Math.min(S.charge+0.15,1);
+  }
+
+  // Update phoneme bars
+  updatePhonemeDisplay(bands,total);
+}
+
+function updatePhonemeDisplay(bands,total){
+  const bars=document.querySelectorAll('.pbar .fill');
+  if(bars.length===0)return;
+  PHONEMES.forEach((p,i)=>{
+    const h=total>0?(bands[i]/total)*100:0;
+    bars[i].style.height=h+'%';
+    bars[i].style.background=ELEM_COLORS[ELEMENTS[i]]||'#666';
+  });
+}
+
+function updateElementDisplay(){
+  const el=$('elemDisp');
+  el.textContent=KANJI[S.element]+' '+S.element.toUpperCase();
+  el.style.color=ELEM_COLORS[S.element];
+  const kh=$('kanjiHUD');
+  kh.textContent=KANJI[S.element];
+  kh.style.color=ELEM_COLORS[S.element];
+  kh.style.opacity='0.8';
+  setTimeout(()=>kh.style.opacity='0',800);
+}
+
+// === THREE.JS SCENE ===
+function initScene(){
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,1000);
+  camera.position.set(0,8,18);camera.lookAt(0,2,0);
+  renderer=new THREE.WebGLRenderer({canvas:$('cv3d'),antialias:true,alpha:false});
+  renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  clock=new THREE.Clock();
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x222233,0.5));
+  const dl=new THREE.DirectionalLight(0xffffff,0.8);dl.position.set(5,10,5);scene.add(dl);
+  const pl=new THREE.PointLight(0x00ffaa,1,30);pl.position.set(0,5,0);scene.add(pl);
+
+  // Nebula background sphere
+  const nebGeo=new THREE.SphereGeometry(200,32,32);
+  const nebMat=new THREE.ShaderMaterial({
+    uniforms:{uTime:{value:0},uBass:{value:0},uMid:{value:0},uHigh:{value:0}},
+    vertexShader:nebulaVS,fragmentShader:nebulaFS,side:THREE.BackSide
+  });
+  nebulaMesh=Me(nebGeo,nebMat);scene.add(nebulaMesh);
+
+  // Arena floor with prime-spiral pattern
+  const floorGeo=new THREE.CircleGeometry(15,64);
+  const floorMat=PM({color:0x111122,transparent:true,opacity:0.7,shininess:80});
+  floorMesh=Me(floorGeo,floorMat);
+  floorMesh.rotation.x=-Math.PI/2;floorMesh.position.y=-0.1;
+  scene.add(floorMesh);
+
+  // Prime spiral dots on floor
+  const spiralGeo=new THREE.BufferGeometry();
+  const spiralPts=[];
+  for(let i=0;i<500;i++){
+    const angle=i*T*F; // golden angle
+    const r=Math.sqrt(i)*0.5;
+    spiralPts.push(Math.cos(angle)*r,0.01,Math.sin(angle)*r);
+  }
+  spiralGeo.setAttribute('position',new THREE.Float32BufferAttribute(spiralPts,3));
+  const spiralMat=new THREE.PointsMaterial({color:0x336666,size:0.08});
+  scene.add(new THREE.Points(spiralGeo,spiralMat));
+
+  // 7 Kotoba rings
+  for(let i=0;i<7;i++){
+    const ringGeo=new THREE.TorusGeometry(2+i*1.5,0.03,8,P[i]*8);
+    const ringMat=BM({color:new THREE.Color(LAYER_COLORS[i]),transparent:true,opacity:0.4});
+    const ring=Me(ringGeo,ringMat);
+    ring.rotation.x=-Math.PI/2;ring.position.y=0.1+i*0.05;
+    scene.add(ring);kotobaRings.push({mesh:ring,mat:ringMat,baseScale:1});
+  }
+
+  // Starfield particles
+  const starGeo=new THREE.BufferGeometry();
+  const starPts=[];
+  for(let i=0;i<2000;i++){
+    starPts.push((Math.random()-0.5)*150,(Math.random()-0.5)*80+20,(Math.random()-0.5)*150);
+  }
+  starGeo.setAttribute('position',new THREE.Float32BufferAttribute(starPts,3));
+  starField=new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xffffff,size:0.15,transparent:true,opacity:0.6}));
+  scene.add(starField);
+
+  // Target dummy
+  const tGeo=new THREE.CylinderGeometry(0.5,0.5,2,8);
+  targetMesh=Me(tGeo,PM({color:0x884444,emissive:0x220000}));
+  targetMesh.position.set(0,1,-8);scene.add(targetMesh);
+
+  // Player aura
+  const aGeo=new THREE.SphereGeometry(1.2,16,16);
+  const aMat=BM({color:0x00ffaa,transparent:true,opacity:0.15,wireframe:true});
+  auraMesh=Me(aGeo,aMat);auraMesh.position.set(0,1.5,8);scene.add(auraMesh);
+
+  // Vortex particles
+  const vGeo=new THREE.BufferGeometry();
+  const vPts=[],vCols=[];
+  for(let i=0;i<600;i++){
+    const a=Math.random()*T,r=2+Math.random()*6,y=Math.random()*4;
+    vPts.push(Math.cos(a)*r,y,Math.sin(a)*r);
+    const c=new THREE.Color(ELEM_COLORS[ELEMENTS[i%6]]);
+    vCols.push(c.r,c.g,c.b);
+  }
+  vGeo.setAttribute('position',new THREE.Float32BufferAttribute(vPts,3));
+  vGeo.setAttribute('color',new THREE.Float32BufferAttribute(vCols,3));
+  vortexParticles=new THREE.Points(vGeo,new THREE.PointsMaterial({size:0.12,vertexColors:true,transparent:true,opacity:0.6}));
+  scene.add(vortexParticles);
+}
+
+// === BEAM SYSTEM ===
+function createBeam(type,element){
+  const color=new THREE.Color(ELEM_COLORS[element]);
+  const len=type==='kamehameha'?12:type==='spiritbomb'?3:type==='finalflash'?10:6;
+  const rad=type==='spiritbomb'?1.5:type==='kamehameha'?0.4:0.3;
+
+  const geo=new THREE.CylinderGeometry(rad,rad*0.6,len,12,20,true);
+  const mat=new THREE.ShaderMaterial({
+    uniforms:{uTime:{value:0},uColor:{value:color},uIntensity:{value:1}},
+    vertexShader:beamVS,fragmentShader:beamFS,
+    transparent:true,blending:THREE.AdditiveBlending,side:THREE.DoubleSide
+  });
+  const beam=Me(geo,mat);
+  beam.position.set(0,1.5,8-len/2);
+  beam.rotation.x=Math.PI/2;
+  scene.add(beam);
+
+  // Charge orb at origin
+  const orbGeo=new THREE.IcosahedronGeometry(0.6,2);
+  const orbMat=BM({color:color,transparent:true,opacity:0.8,wireframe:true});
+  const orb=Me(orbGeo,orbMat);orb.position.copy(beam.position);orb.position.z=8;
+  scene.add(orb);
+
+  activeBeams.push({mesh:beam,orb,mat,life:2,maxLife:2,type,element,speed:type==='spiritbomb'?3:8});
+  return beam;
+}
+
+function createExplosion(pos,element){
+  const color=new THREE.Color(ELEM_COLORS[element]);
+  // Ring shockwave
+  const ringGeo=new THREE.TorusGeometry(0.5,0.1,8,32);
+  const ringMat=BM({color:color,transparent:true,opacity:0.9});
+  const ring=Me(ringGeo,ringMat);ring.position.copy(pos);
+  scene.add(ring);
+  // Sphere flash
+  const sGeo=new THREE.SphereGeometry(0.8,12,12);
+  const sMat=BM({color:0xffffff,transparent:true,opacity:1});
+  const sphere=Me(sGeo,sMat);sphere.position.copy(pos);
+  scene.add(sphere);
+  explosions.push({ring,sphere,ringMat,sMat,life:1,maxLife:1});
+}
+
+// === BLAST/COMBAT ===
+function fireBlast(){
+  if(S.charge<0.3||Date.now()-S.lastBlast<500)return;
+  const typeIdx=Math.min(Math.floor(S.charge*6),5);
+  const type=BLAST_TYPES[typeIdx];
+  S.lastBlast=Date.now();
+
+  createBeam(type,S.element);
+
+  // Damage calc
+  const baseDmg=10+typeIdx*8+S.combo*2;
+  const coherenceBonus=kotobaCoherence()>0.5?1.5:1;
+  const masteryBonus=1+S.mastery[S.element]*0.02;
+  const dmg=Math.floor(baseDmg*coherenceBonus*masteryBonus);
+
+  S.score+=dmg;S.combo++;
+  if(S.combo>S.maxCombo)S.maxCombo=S.combo;
+  S.mastery[S.element]++;
+  S.charge=0;
+
+  // Display
+  showDamage(dmg);
+  $('scoreDisp').textContent=S.score;
+  $('comboDisp').textContent=S.combo>1?S.combo+'x COMBO':'';
+
+  // Milestones
+  if(S.combo===5)addSystemMsg('5x COMBO! Particles forming kanji!');
+  if(S.combo===10)addSystemMsg('10x COMBO!! UNSTOPPABLE!');
+  if(S.mastery[S.element]===10)addSystemMsg(KANJI[S.element]+' MASTERY LEVEL UP!');
+
+  // Play blast sound
+  playBlastSound(type,S.element);
+
+  // Broadcast
+  mqttPublish('blasts',{nick:S.nick,type,element:S.element,dmg,combo:S.combo});
+
+  // Commentary
+  if(S.combo%5===0&&S.combo>0)showCommentary(getCommentary());
+}
+
+function showDamage(dmg){
+  const d=document.createElement('div');d.className='dmg-num';
+  d.textContent=dmg;d.style.color=ELEM_COLORS[S.element];
+  d.style.left=(innerWidth/2+Math.random()*100-50)+'px';
+  d.style.top=(innerHeight/2-50)+'px';
+  $('dmgLayer').appendChild(d);
+  setTimeout(()=>d.remove(),1500);
+}
+
+function showCommentary(text){
+  const c=$('commentary');c.textContent=text;c.style.opacity='1';
+  setTimeout(()=>c.style.opacity='0',3000);
+}
+
+function getCommentary(){
+  const lines=[
+    'INCREDIBLE POWER!','The arena shakes!','Kotoba resonance detected!',
+    'Prime convergence!','φ-coherence maximum!','Element mastery rising!',
+    'The 7 layers align!','Primorial fold activating!','UNSTOPPABLE FORCE!',
+    S.combo+'x! Keep it going!','510510 approaches!','Mersenne shield cracking!'
+  ];
+  return lines[Math.floor(Math.random()*lines.length)];
+}
+
+// === CHAT SYSTEM ===
+function initChat(){
+  const input=$('chatIn');const btn=$('chatSend');
+  btn.onclick=()=>sendChat();
+  input.onkeydown=e=>{if(e.key==='Enter')sendChat();};
+
+  // Emoji bar
+  const bar=$('emojiBar');
+  EMOJIS.forEach(em=>{
+    const b=document.createElement('button');b.textContent=em;
+    b.onclick=()=>{addChatMsg(S.nick,em,S.element);mqttPublish('chat',{nick:S.nick,msg:em,element:S.element});};
+    bar.appendChild(b);
+  });
+
+  addSystemMsg('Welcome to Ki Arena Chat v2');
+  addSystemMsg('Commands: /name <nick>, /element, /combo');
+}
+
+function sendChat(){
+  const input=$('chatIn');const msg=input.value.trim();
+  if(!msg)return;input.value='';
+
+  // Commands
+  if(msg.startsWith('/')){
+    const parts=msg.split(' ');const cmd=parts[0].toLowerCase();
+    if(cmd==='/name'&&parts[1]){
+      const oldNick=S.nick;S.nick=parts.slice(1).join(' ');
+      addSystemMsg(oldNick+' → '+S.nick);
+      mqttPublish('chat',{nick:'SYSTEM',msg:oldNick+' is now '+S.nick,element:'ki'});
+    }else if(cmd==='/element'){
+      addSystemMsg('Current: '+KANJI[S.element]+' '+S.element+' (mastery: '+S.mastery[S.element]+')');
+    }else if(cmd==='/combo'){
+      addSystemMsg('Combo: '+S.combo+' | Max: '+S.maxCombo+' | Score: '+S.score);
+    }else{
+      addSystemMsg('Unknown command: '+cmd);
+    }
+    return;
+  }
+
+  addChatMsg(S.nick,msg,S.element);
+  mqttPublish('chat',{nick:S.nick,msg,element:S.element});
+  spawn3DChatBubble(msg);
+}
+
+function addChatMsg(nick,msg,element){
+  const div=document.createElement('div');div.className='msg';
+  const span=document.createElement('span');span.className='nick';
+  span.textContent=nick+':';span.style.color=ELEM_COLORS[element]||'#aaa';
+  div.appendChild(span);div.appendChild(document.createTextNode(' '+msg));
+  $('chatMessages').appendChild(div);
+  $('chatMessages').scrollTop=$('chatMessages').scrollHeight;
+}
+
+function addSystemMsg(msg){
+  const div=document.createElement('div');div.className='msg system';
+  div.textContent='[SYSTEM] '+msg;
+  $('chatMessages').appendChild(div);
+  $('chatMessages').scrollTop=$('chatMessages').scrollHeight;
+}
+
+function spawn3DChatBubble(msg){
+  // Create CSS bubble that floats
+  const bubble=document.createElement('div');bubble.className='chat3d';
+  bubble.textContent=msg.slice(0,30);
+  bubble.style.left=(innerWidth/2+Math.random()*200-100)+'px';
+  bubble.style.top=(innerHeight/2+Math.random()*100)+'px';
+  bubble.style.borderColor=ELEM_COLORS[S.element];
+  document.body.appendChild(bubble);
+  setTimeout(()=>bubble.remove(),4000);
+
+  // Also in 3D space
+  if(scene){
+    const canvas2=document.createElement('canvas');canvas2.width=256;canvas2.height=64;
+    const ctx2=canvas2.getContext('2d');
+    ctx2.fillStyle='rgba(0,0,0,0.7)';ctx2.fillRect(0,0,256,64);
+    ctx2.strokeStyle=ELEM_COLORS[S.element];ctx2.strokeRect(1,1,254,62);
+    ctx2.fillStyle='#fff';ctx2.font='14px Consolas';
+    ctx2.fillText(msg.slice(0,25),8,38);
+    const tex=new THREE.CanvasTexture(canvas2);
+    const spriteMat=new THREE.SpriteMaterial({map:tex,transparent:true,opacity:1});
+    const sprite=new THREE.Sprite(spriteMat);
+    sprite.scale.set(3,0.75,1);
+    sprite.position.set(Math.random()*4-2,3+Math.random()*2,Math.random()*4-2);
+    scene.add(sprite);
+    chatBubbles3D.push({sprite,life:4,maxLife:4});
+  }
+}
+
+// === NETWORKING (MQTT) ===
+function initMQTT(){
+  try{
+    const broker='wss://broker.hivemq.com:8884/mqtt';
+    mqttClient=mqtt.connect(broker,{clientId:'ki-arena-'+Math.random().toString(36).slice(2,8)});
+    const topic='ki-arena-chat-v2/THOMAS/';
+
+    mqttClient.on('connect',()=>{
+      addSystemMsg('Connected to arena network');
+      mqttClient.subscribe(topic+'scores/#');
+      mqttClient.subscribe(topic+'live/#');
+      mqttClient.subscribe(topic+'blasts/#');
+      mqttClient.subscribe(topic+'chat');
+      mqttPublish('live',{nick:S.nick,action:'join'});
+    });
+
+    mqttClient.on('message',(t,payload)=>{
+      try{
+        const data=JSON.parse(payload.toString());
+        const sub=t.replace(topic,'');
+        if(sub==='chat'&&data.nick!==S.nick){
+          addChatMsg(data.nick,data.msg,data.element||'ki');
+          spawn3DChatBubble(data.msg);
+        }else if(sub.startsWith('blasts')&&data.nick!==S.nick){
+          addSystemMsg(data.nick+' fired '+data.type+'! ('+data.dmg+' dmg)');
+          // Show remote blast
+          createBeam(data.type,data.element||'ki');
+        }else if(sub.startsWith('live')){
+          if(data.action==='join'&&data.nick!==S.nick)addSystemMsg(data.nick+' joined the arena!');
+          if(data.action==='leave'&&data.nick!==S.nick)addSystemMsg(data.nick+' left the arena');
+        }else if(sub.startsWith('scores')&&data.nick!==S.nick){
+          updateLeaderboard(data.nick,data.score);
+        }
+      }catch(e){}
+    });
+
+    mqttClient.on('error',()=>addSystemMsg('Network: connection error'));
+  }catch(e){addSystemMsg('MQTT unavailable (offline mode)');}
+}
+
+function mqttPublish(channel,data){
+  if(!mqttClient||!mqttClient.connected)return;
+  const topic='ki-arena-chat-v2/THOMAS/'+channel;
+  mqttClient.publish(topic,JSON.stringify(data));
+}
+
+// === LEADERBOARD ===
+const leaderboard={};
+function updateLeaderboard(nick,score){
+  leaderboard[nick]=score;
+  leaderboard[S.nick]=S.score;
+  const sorted=Object.entries(leaderboard).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  $('lbList').innerHTML=sorted.map(([n,s])=>
+    `<div class="lb-entry"><span>${n}</span><span style="color:var(--gd)">${s}</span></div>`
+  ).join('');
+}
+
+// === SYNTH SOUNDS ===
+function playBlastSound(type,element){
+  if(!audioCtx)return;
+  const osc=audioCtx.createOscillator();
+  const gain=audioCtx.createGain();
+  osc.connect(gain);gain.connect(audioCtx.destination);
+  const freqBase={fire:150,thunder:800,ki:440,water:220,wind:600,earth:80}[element]||300;
+  osc.frequency.setValueAtTime(freqBase,audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(freqBase*3,audioCtx.currentTime+0.1);
+  osc.frequency.exponentialRampToValueAtTime(50,audioCtx.currentTime+0.4);
+  osc.type=type==='kamehameha'?'sawtooth':type==='spiritbomb'?'sine':'square';
+  gain.gain.setValueAtTime(0.3,audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.5);
+  osc.start();osc.stop(audioCtx.currentTime+0.5);
+}
+
+// === RECORDING ===
+function startRecording(){
+  if(mediaRecorder)return;
+  try{
+    const stream=renderer.domElement.captureStream(60);
+    if(audioCtx&&audioCtx.state==='running'){
+      const dest=audioCtx.createMediaStreamDestination();
+      if(analyser)analyser.connect(dest);
+      if(fileSource)fileSource.connect(dest);
+      dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+    }
+    mediaRecorder=new MediaRecorder(stream,{
+      mimeType:'video/webm;codecs=h264,opus',videoBitsPerSecond:8000000
+    });
+    recChunks=[];
+    mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data);};
+    mediaRecorder.onstop=()=>{
+      const blob=new Blob(recChunks,{type:'video/webm'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;
+      a.download='ki-arena-'+Date.now()+'.webm';a.click();
+    };
+    mediaRecorder.start(1000);
+    $('rec').style.display='flex';
+    addSystemMsg('Recording started (60fps h264+opus 8Mbps)');
+  }catch(e){addSystemMsg('Recording failed: '+e.message);}
+}
+
+function stopRecording(){
+  if(mediaRecorder&&mediaRecorder.state==='recording'){
+    mediaRecorder.stop();mediaRecorder=null;
+    $('rec').style.display='none';
+    addSystemMsg('Recording saved');
+  }
+}
+
+// === DRAG & DROP ===
+function initDrop(){
+  const overlay=$('dropOverlay');
+  document.addEventListener('dragover',e=>{e.preventDefault();overlay.style.display='flex';});
+  document.addEventListener('dragleave',e=>{if(e.target===overlay)overlay.style.display='none';});
+  document.addEventListener('drop',e=>{
+    e.preventDefault();overlay.style.display='none';
+    const file=e.dataTransfer.files[0];
+    if(file&&file.type.startsWith('audio/'))initFileAudio(file);
+    else addSystemMsg('Drop an audio file (mp3/wav/ogg)');
+  });
+}
+
+// === PHONEME BARS UI ===
+function initPhonemeUI(){
+  const container=$('phonemes');
+  PHONEMES.forEach((p,i)=>{
+    const bar=document.createElement('div');bar.className='pbar';
+    const fill=document.createElement('div');fill.className='fill';
+    const lbl=document.createElement('div');lbl.className='lbl';lbl.textContent=p;
+    bar.appendChild(fill);bar.appendChild(lbl);container.appendChild(bar);
+  });
+}
+
+// === MAIN LOOP ===
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=clock.getDelta();const t=clock.getElapsedTime();
+  const audio=ga();
+
+  // Kotoba routing
+  kotobaRoute(audio);
+
+  // Voice analysis
+  analyzeVoice();
+
+  // Auto-charge from audio energy
+  const energy=audio.b*0.5+audio.m*0.3+audio.h*0.2;
+  if(energy>0.3)S.charge=Math.min(S.charge+energy*dt*0.5,1);
+
+  // Auto-fire on high charge + peak
+  if(S.charge>0.8&&audio.p>0.7)fireBlast();
+
+  // Combo decay
+  if(Date.now()-S.lastBlast>3000&&S.combo>0){S.combo=0;$('comboDisp').textContent='';}
+
+  // Update nebula
+  if(nebulaMesh){
+    nebulaMesh.material.uniforms.uTime.value=t;
+    nebulaMesh.material.uniforms.uBass.value=audio.b;
+    nebulaMesh.material.uniforms.uMid.value=audio.m;
+    nebulaMesh.material.uniforms.uHigh.value=audio.h;
+  }
+
+  // Update kotoba rings
+  kotobaRings.forEach((r,i)=>{
+    const intensity=K[LAYERS[i]][0]+K[LAYERS[i]][1]*0.5;
+    const s=1+intensity*0.3;
+    r.mesh.scale.set(s,s,s);
+    r.mat.opacity=0.2+intensity*0.6;
+    r.mesh.rotation.z+=dt*(0.1+intensity*0.5)*(i%2?1:-1);
+  });
+
+  // Starfield rotation
+  if(starField)starField.rotation.y+=dt*0.01;
+
+  // Aura pulse
+  if(auraMesh){
+    const s=1+S.charge*0.5+audio.b*0.3;
+    auraMesh.scale.set(s,s,s);
+    auraMesh.material.color.set(ELEM_COLORS[S.element]);
+    auraMesh.material.opacity=0.1+S.charge*0.3;
+    auraMesh.rotation.y+=dt*2;
+  }
+
+  // Target bob
+  if(targetMesh){
+    targetMesh.position.y=1+Math.sin(t*2)*0.3;
+    targetMesh.rotation.y+=dt;
+  }
+
+  // Vortex particles
+  if(vortexParticles){
+    const pos=vortexParticles.geometry.attributes.position;
+    const elemIdx=ELEMENTS.indexOf(S.element);
+    for(let i=0;i<pos.count;i++){
+      const ix=i*3;
+      let x=pos.array[ix],y=pos.array[ix+1],z=pos.array[ix+2];
+      const a=Math.atan2(z,x)+dt*(0.5+audio.b);
+      const r=Math.sqrt(x*x+z*z);
+      // Formation based on element
+      let targetR=3+Math.sin(i*0.1+t)*2;
+      if(S.combo>5){
+        // Kanji formation hint
+        targetR=2+Math.abs(Math.sin(i*T/60+t*0.5))*5;
+      }
+      const newR=r+(targetR-r)*dt*0.5;
+      pos.array[ix]=Math.cos(a)*newR;
+      pos.array[ix+1]=y+(2-y)*dt*0.1+Math.sin(t+i)*dt*0.2;
+      pos.array[ix+2]=Math.sin(a)*newR;
+      if(pos.array[ix+1]>6)pos.array[ix+1]=0;
+    }
+    pos.needsUpdate=true;
+  }
+
+  // Update beams
+  for(let i=activeBeams.length-1;i>=0;i--){
+    const b=activeBeams[i];
+    b.life-=dt;
+    b.mat.uniforms.uTime.value=t;
+    b.mat.uniforms.uIntensity.value=b.life/b.maxLife;
+    b.mesh.position.z-=b.speed*dt;
+    b.orb.scale.multiplyScalar(0.95);
+
+    if(b.life<=0||b.mesh.position.z<-10){
+      // Explosion at impact
+      createExplosion(b.mesh.position.clone(),b.element);
+      scene.remove(b.mesh);scene.remove(b.orb);
+      b.mesh.geometry.dispose();b.mat.dispose();
+      b.orb.geometry.dispose();b.orb.material.dispose();
+      activeBeams.splice(i,1);
+    }
+  }
+
+  // Update explosions
+  for(let i=explosions.length-1;i>=0;i--){
+    const e=explosions[i];
+    e.life-=dt;
+    const p=1-e.life/e.maxLife;
+    e.ring.scale.set(1+p*8,1+p*8,1+p*8);
+    e.ringMat.opacity=1-p;
+    e.sphere.scale.set(1+p*3,1+p*3,1+p*3);
+    e.sMat.opacity=1-p;
+    if(e.life<=0){
+      scene.remove(e.ring);scene.remove(e.sphere);
+      e.ring.geometry.dispose();e.ringMat.dispose();
+      e.sphere.geometry.dispose();e.sMat.dispose();
+      explosions.splice(i,1);
+    }
+  }
+
+  // Update 3D chat bubbles
+  for(let i=chatBubbles3D.length-1;i>=0;i--){
+    const b=chatBubbles3D[i];
+    b.life-=dt;
+    b.sprite.position.y+=dt*0.8;
+    b.sprite.material.opacity=b.life/b.maxLife;
+    if(b.life<=0){
+      scene.remove(b.sprite);b.sprite.material.map.dispose();b.sprite.material.dispose();
+      chatBubbles3D.splice(i,1);
+    }
+  }
+
+  // Typing indicator
+  $('typingInd').textContent=S.vowel?KANJI[S.element]+' '+S.vowel.toUpperCase()+' detected':'';
+
+  // Broadcast state periodically
+  if(Math.floor(t*2)%4===0&&Math.floor(t*2)!==S._lastBroadcast){
+    S._lastBroadcast=Math.floor(t*2);
+    mqttPublish('scores',{nick:S.nick,score:S.score});
+    updateLeaderboard(S.nick,S.score);
+  }
+
+  renderer.render(scene,camera);
+}
+
+// === RESIZE ===
+function onResize(){
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+}
+
+// === INIT ===
+async function init(){
+  initPhonemeUI();
+  initScene();
+  initChat();
+  initDrop();
+  await initAudio();
+  initMQTT();
+  window.addEventListener('resize',onResize);
+
+  // Click/space to fire
+  document.addEventListener('keydown',e=>{
+    if(e.target.tagName==='INPUT')return;
+    if(e.code==='Space'){e.preventDefault();fireBlast();}
+  });
+  document.addEventListener('click',e=>{
+    if(e.target.tagName==='BUTTON'||e.target.tagName==='INPUT')return;
+    if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+    fireBlast();
+  });
+
+  // Unload
+  window.addEventListener('beforeunload',()=>{
+    mqttPublish('live',{nick:S.nick,action:'leave'});
+    stopRecording();
+  });
+
+  addSystemMsg('Click/Space to fire | Drop audio file for reactive visuals');
+  addSystemMsg('Speak vowels: A=火 I=雷 U=気 E=水 O=風');
+  animate();
+}
+
+init();
+</script></body></html>
