@@ -1,0 +1,452 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ki Arena Beam Clash · Voice Duel × Shader Beams</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>*{margin:0;padding:0;overflow:hidden;box-sizing:border-box}
+body{background:#0a0a12;font-family:Consolas,monospace;color:#eee}
+canvas{position:fixed;inset:0;z-index:0}
+#chat{position:fixed;left:0;top:0;bottom:0;width:280px;z-index:10;display:flex;flex-direction:column;background:rgba(5,5,15,.88);border-right:1px solid #222}
+#chat-log{flex:1;overflow-y:auto;padding:8px;font-size:11px;line-height:1.5}
+#chat-log::-webkit-scrollbar{width:4px}#chat-log::-webkit-scrollbar-thumb{background:#333}
+.msg{margin-bottom:4px;word-wrap:break-word}.msg .nm{font-weight:bold}.msg .sys{color:#888;font-style:italic}
+#chat-input{display:flex;border-top:1px solid #222}
+#chat-input input{flex:1;background:#111;border:none;color:#eee;padding:6px 8px;font:11px Consolas;outline:none}
+#chat-input input::placeholder{color:#555}
+#emoji-bar{display:flex;padding:4px 8px;gap:4px;background:#0a0a14;border-top:1px solid #1a1a2a;font-size:16px;cursor:pointer}
+#emoji-bar span:hover{transform:scale(1.3)}
+#hud{position:fixed;top:8px;right:12px;z-index:10;font:10px/1.5 Consolas;color:#ccc;text-align:right;pointer-events:none;text-shadow:0 0 4px #000}
+#power-bar{position:fixed;bottom:12px;left:290px;right:12px;height:18px;z-index:10;background:rgba(0,0,0,.5);border:1px solid #333;border-radius:3px;overflow:hidden}
+#power-fill{height:100%;width:0%;transition:width .1s;background:linear-gradient(90deg,#2af,#f4a,#ff4)}
+#clash-ind{position:fixed;bottom:34px;left:290px;right:12px;z-index:10;font:9px Consolas;color:#aaa;text-align:center;pointer-events:none}
+#phonemes{position:fixed;bottom:56px;right:12px;z-index:10;display:flex;gap:2px;align-items:flex-end}
+.ph-bar{width:6px;background:#4af;border-radius:1px;transition:height .05s}
+#drop{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:rgba(5,5,15,.95);cursor:pointer}
+#drop.h{display:none}
+#drop h1{font:22px Consolas;color:#fff}#drop small{color:#888;font:10px Consolas}
+#players{position:fixed;top:8px;left:290px;z-index:10;font:9px Consolas;color:#aaa;pointer-events:none}
+</style></head><body>
+<div id="chat"><div id="chat-log"></div><div id="emoji-bar"></div><div id="chat-input"><input id="msg" placeholder="chat or /name /power"></div></div>
+<div id="hud"></div>
+<div id="power-bar"><div id="power-fill"></div></div>
+<div id="clash-ind"></div>
+<div id="phonemes"></div>
+<div id="players"></div>
+<div id="drop"><h1>Ki Arena Beam Clash</h1><small>drop audio or click to start mic · voice = beam power</small></div>
+<audio id="ad" crossorigin="anonymous"></audio>
+<script>
+const $=id=>document.getElementById(id),T=Math.PI*2,F=1.618,P=[2,3,5,7,11,13,17]
+const Me=(g,m)=>new THREE.Mesh(g,m),Cl=x=>new THREE.Color(x),PM=o=>new THREE.MeshPhongMaterial(o),BM=o=>new THREE.MeshBasicMaterial(o)
+const Rn=Math.random,FL=Math.floor,MN=Math.min,MX=Math.max,LRP=(a,b,t)=>a+(b-a)*t
+
+// --- STATE ---
+let sc,cm,RE,ax,an,fd,src,micAn,micFd,micSrc,aOn=0
+const ad=$('ad')
+const ELEMENTS=[
+  {name:'Thunder',kanji:'雷',hue:.15,color:0xffcc00},
+  {name:'Fire',kanji:'火',hue:.0,color:0xff4422},
+  {name:'Water',kanji:'水',hue:.6,color:0x2288ff},
+  {name:'Wind',kanji:'空',hue:.35,color:0x22ff88},
+  {name:'Void',kanji:'影',hue:.75,color:0xaa44ff},
+  {name:'Bloom',kanji:'華',hue:.85,color:0xff44aa},
+  {name:'Earth',kanji:'響',hue:.08,color:0xcc8844},
+  {name:'Ice',kanji:'数',hue:.55,color:0x44ddff}
+]
+const S={e:0,bt:0,shk:0,clash:new THREE.Vector3(0,3,0),t:0}
+let myName='Player'+FL(Rn()*999),myElement=FL(Rn()*8),myPower=0,myCharge=0,myScore=0
+let players={},localPN=FL(Rn()*8)
+
+// --- AUDIO ---
+function iA(){if(!ax)ax=new(AudioContext||webkitAudioContext)();if(ax.state==='suspended')ax.resume()
+if(!an){an=ax.createAnalyser();an.fftSize=2048;an.smoothingTimeConstant=.78;fd=new Uint8Array(1024)}}
+function startMic(){
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    iA();micSrc=ax.createMediaStreamSource(stream)
+    micAn=ax.createAnalyser();micAn.fftSize=512;micAn.smoothingTimeConstant=.7;micFd=new Uint8Array(256)
+    micSrc.connect(micAn);aOn=1;$('drop').classList.add('h')
+    sysMsg('Mic active - your voice powers the beam')
+  }).catch(()=>sysMsg('Mic denied - drop audio file instead'))
+}
+function ga(){if(!an||!fd)return{b:0,m:0,h:0,p:0};an.getByteFrequencyData(fd)
+let b=0,m=0,h=0,p=0;const n=fd.length,lo=n*.12|0,mi=n*.4|0
+for(let i=0;i<n;i++){const v=fd[i]/255;if(v>p)p=v;if(i<lo)b+=v;else if(i<mi)m+=v;else h+=v}
+return{b:b/MX(1,lo),m:m/MX(1,mi-lo),h:h/MX(1,n-mi),p}}
+function micEnergy(){if(!micAn||!micFd)return 0;micAn.getByteFrequencyData(micFd)
+let s=0;for(let i=0;i<micFd.length;i++)s+=micFd[i];return s/(micFd.length*255)}
+
+$('drop').onclick=()=>{iA();startMic()}
+document.addEventListener('dragover',e=>e.preventDefault())
+document.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(!f)return
+iA();ad.src=URL.createObjectURL(f);ad.oncanplaythrough=()=>{
+if(!src){src=ax.createMediaElementSource(ad);src.connect(an);an.connect(ax.destination)}
+ad.play();aOn=1;$('drop').classList.add('h');startMic()};ad.load()})
+
+// --- BEAM SHADERS ---
+const beamVS=`varying vec2 vUv;uniform float uT,uLen,uWid;
+void main(){vUv=uv;vec3 p=position;p.x*=max(.01,uLen);
+float taper=smoothstep(0.,.05,abs(p.x)/max(.1,uLen))*smoothstep(1.,.9,abs(p.x)/max(.1,uLen));
+p.y*=uWid*taper;p.z*=uWid*taper;
+p.y+=sin(p.x*2.+uT*12.)*.15*uWid*taper;p.z+=cos(p.x*2.5+uT*10.)*.1*uWid*taper;
+gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`
+const beamFS=`varying vec2 vUv;uniform float uT,uPow,uHue;
+vec3 hs(float h,float s,float l){vec3 k=clamp(abs(mod(h*6.+vec3(0,4,2),6.)-3.)-1.,0.,1.);return l+s*(k-.5)*min(l,1.-l)*2.;}
+void main(){float core=1.-length(vec2(0,vUv.y-.5))*2.;float wave=sin(vUv.x*25.+uT*15.)*.5+.5;
+vec3 c=hs(uHue,.6,.15+core*.25)+vec3(.3,.35,.4)*pow(max(0.,core),4.)+hs(uHue+.05,.4,.04)*wave;
+float a=uPow*max(0.,core)*(.4+wave*.1);gl_FragColor=vec4(c,clamp(a,0.,.75));}`
+
+function mkBeam(hue){const g=new THREE.CylinderGeometry(1,1,1,8,48,true);g.rotateZ(-Math.PI/2)
+return Me(g,new THREE.ShaderMaterial({transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,
+uniforms:{uT:{value:0},uPow:{value:0},uLen:{value:0},uWid:{value:.2},uHue:{value:hue}},vertexShader:beamVS,fragmentShader:beamFS}))}
+
+function mkChargeOrb(hue){const g=new THREE.Group()
+const core=Me(new THREE.IcosahedronGeometry(.4,2),new THREE.ShaderMaterial({transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,
+uniforms:{uT:{value:0},uChg:{value:0},uHue:{value:hue}},
+vertexShader:'varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+fragmentShader:`varying vec3 vN;uniform float uT,uChg,uHue;
+vec3 hs(float h,float s,float l){vec3 k=clamp(abs(mod(h*6.+vec3(0,4,2),6.)-3.)-1.,0.,1.);return l+s*(k-.5)*min(l,1.-l)*2.;}
+void main(){float rim=1.-abs(dot(vN,vec3(0,0,1)));float pulse=sin(uT*10.)*.5+.5;
+vec3 c=hs(uHue,.7,.12+uChg*.25)+hs(uHue,.5,.06)*pow(rim,2.)+vec3(.3)*pow(rim,4.)*uChg+hs(.08,.4,.04)*pulse*uChg;
+gl_FragColor=vec4(c,uChg*(.5+rim*.3));}`}))
+g.add(core)
+for(let i=0;i<3;i++){const r=Me(new THREE.TorusGeometry(.5+i*.12,.015,6,24),BM({color:0xffffff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}))
+r.rotation.set(i*1.2,i*.8,0);g.add(r)}
+g.userData={core};return g}
+
+// --- ARENA SCENE ---
+const ARENA_R=10,CENTER=new THREE.Vector3(0,3,0)
+let arenaFloor,starField,clashOrb,clashRing,clashShock=0
+const beamObjects={},playerGroups={}
+
+function init(){
+sc=new THREE.Scene();sc.fog=new THREE.FogExp2(0x080812,.012)
+cm=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,400)
+RE=new THREE.WebGLRenderer({antialias:true});RE.setSize(innerWidth,innerHeight)
+RE.setPixelRatio(MN(devicePixelRatio,2));document.body.appendChild(RE.domElement)
+sc.add(new THREE.AmbientLight(0x222244,.4))
+const sun=new THREE.DirectionalLight(0xeeddcc,.5);sun.position.set(5,20,8);sc.add(sun)
+
+// Starfield
+const stN=1500,stG=new THREE.BufferGeometry(),stP=new Float32Array(stN*3)
+for(let i=0;i<stN;i++){const a=Rn()*T,el=(Rn()-.3)*Math.PI*.8,r=80+Rn()*150
+stP[i*3]=r*Math.cos(el)*Math.cos(a);stP[i*3+1]=r*Math.sin(el)+20;stP[i*3+2]=r*Math.cos(el)*Math.sin(a)}
+stG.setAttribute('position',new THREE.Float32BufferAttribute(stP,3))
+sc.add(new THREE.Points(stG,new THREE.PointsMaterial({color:0xffffff,size:.15,transparent:true,opacity:.6})))
+
+// Arena floor
+const floorG=new THREE.RingGeometry(0,ARENA_R+2,64,1)
+arenaFloor=Me(floorG,new THREE.ShaderMaterial({transparent:true,side:THREE.DoubleSide,depthWrite:false,
+uniforms:{uT:{value:0}},
+vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+fragmentShader:`varying vec2 vUv;uniform float uT;
+void main(){float r=length(vUv-.5)*2.;float ring=smoothstep(.92,.95,r)*smoothstep(1.,.97,r);
+float grid=max(0.,sin(vUv.x*60.)*sin(vUv.y*60.))*.04;
+float pulse=sin(r*20.-uT*3.)*.5+.5;
+vec3 c=vec3(.02,.02,.06)+vec3(.1,.2,.5)*ring+vec3(.02)*grid+vec3(.05,.1,.2)*pulse*ring;
+float a=.3+ring*.6;gl_FragColor=vec4(c,a);}`}))
+arenaFloor.rotation.x=-Math.PI/2;arenaFloor.position.y=0;arenaFloor.scale.setScalar(1.5);sc.add(arenaFloor)
+
+// Edge glow ring
+const edgeR=Me(new THREE.TorusGeometry(ARENA_R+1,.08,6,64),BM({color:0x2266ff,transparent:true,opacity:.4,blending:THREE.AdditiveBlending,depthWrite:false}))
+edgeR.rotation.x=Math.PI/2;edgeR.position.y=.1;sc.add(edgeR)
+
+// Clash sphere
+clashOrb=Me(new THREE.SphereGeometry(.4,16,12),new THREE.ShaderMaterial({transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,
+uniforms:{uT:{value:0},uPow:{value:0}},
+vertexShader:'varying vec3 vN,vP;void main(){vN=normalize(normalMatrix*normal);vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+fragmentShader:`varying vec3 vN,vP;uniform float uT,uPow;
+void main(){float rim=1.-abs(dot(vN,vec3(0,0,1)));float pulse=sin(uT*20.)*.5+.5;
+float core=pow(1.-rim,.5);vec3 c=vec3(1)+vec3(.3,.5,1.)*rim*2.+vec3(1,.8,.4)*pulse*.3;
+float a=uPow*(.6+core*.3+rim*.2);gl_FragColor=vec4(c,clamp(a,0.,.85));}`}))
+clashOrb.position.copy(CENTER);sc.add(clashOrb)
+
+// Clash ring (shockwave)
+clashRing=Me(new THREE.TorusGeometry(1,.04,6,32),BM({color:0xffffff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}))
+clashRing.position.copy(CENTER);sc.add(clashRing)
+
+// Spark particles at clash
+const spkN=1200,spkG=new THREE.BufferGeometry(),spkP=new Float32Array(spkN*3),spkC=new Float32Array(spkN*3),spkS=new Float32Array(spkN)
+spkG.setAttribute('position',new THREE.Float32BufferAttribute(spkP,3))
+spkG.setAttribute('color',new THREE.Float32BufferAttribute(spkC,3))
+spkG.setAttribute('size',new THREE.Float32BufferAttribute(spkS,1))
+sc.add(new THREE.Points(spkG,new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexColors:true,
+vertexShader:'attribute float size;varying vec3 vC;void main(){vC=color;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_PointSize=size*(100./gl_Position.w);}',
+fragmentShader:'varying vec3 vC;void main(){float d=length(gl_PointCoord-.5)*2.;if(d>1.)discard;gl_FragColor=vec4(vC,(1.-d*d)*.7);}'})))
+window._spk={geo:spkG,p:spkP,c:spkC,s:spkS,idx:0}
+
+// Trail particles along beams
+const trlN=600,trlG=new THREE.BufferGeometry(),trlP=new Float32Array(trlN*3),trlC=new Float32Array(trlN*3),trlS=new Float32Array(trlN)
+trlG.setAttribute('position',new THREE.Float32BufferAttribute(trlP,3))
+trlG.setAttribute('color',new THREE.Float32BufferAttribute(trlC,3))
+trlG.setAttribute('size',new THREE.Float32BufferAttribute(trlS,1))
+sc.add(new THREE.Points(trlG,new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexColors:true,
+vertexShader:'attribute float size;varying vec3 vC;void main(){vC=color;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_PointSize=size*(60./gl_Position.w);}',
+fragmentShader:'varying vec3 vC;void main(){float d=length(gl_PointCoord-.5)*2.;if(d>1.)discard;gl_FragColor=vec4(vC,(1.-d*d)*.4);}'})))
+window._trl={geo:trlG,p:trlP,c:trlC,s:trlS,idx:0}
+
+// Create local player
+createPlayerVisual('__local__',myName,myElement,0)
+cm.position.set(0,8,18);cm.lookAt(0,3,0)
+
+addEventListener('resize',()=>{cm.aspect=innerWidth/innerHeight;cm.updateProjectionMatrix();RE.setSize(innerWidth,innerHeight)})
+}
+
+function playerAngle(pn,total){return(pn/(total||8))*T-Math.PI/2}
+function playerPos(pn,total){const a=playerAngle(pn,total||8);return new THREE.Vector3(Math.cos(a)*ARENA_R,1.5,Math.sin(a)*ARENA_R)}
+
+function createPlayerVisual(id,name,elemIdx,pn){
+const el=ELEMENTS[elemIdx%8]
+const g=new THREE.Group()
+const pos=playerPos(pn,8)
+g.position.copy(pos)
+g.lookAt(CENTER.x,pos.y,CENTER.z)
+
+// Body
+const body=Me(new THREE.CylinderGeometry(.25,.2,1.4,6),PM({color:Cl(0).setHSL(el.hue,.5,.35),emissive:Cl(0).setHSL(el.hue,.3,.06)}))
+g.add(body)
+const head=Me(new THREE.SphereGeometry(.3,8,6),PM({color:Cl(0).setHSL(el.hue,.4,.45),emissive:Cl(0).setHSL(el.hue,.2,.08)}))
+head.position.y=.95;g.add(head)
+
+// Name sprite
+const cv=document.createElement('canvas');cv.width=128;cv.height=32;const cx=cv.getContext('2d')
+cx.font='14px Consolas';cx.fillStyle='#fff';cx.textAlign='center';cx.fillText(name.slice(0,12),64,20)
+const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true}))
+sp.position.y=1.8;sp.scale.set(2,.5,1);g.add(sp)
+
+// Charge orb
+const orb=mkChargeOrb(el.hue)
+orb.position.set(0,1.5,-.8);g.add(orb)
+
+// Beam
+const beam=mkBeam(el.hue)
+beam.position.set(0,1.5,-.8);g.add(beam)
+
+// Aura ring
+const aura=Me(new THREE.TorusGeometry(.8,.03,6,24),BM({color:el.color,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}))
+aura.position.y=.7;aura.rotation.x=Math.PI/2;g.add(aura)
+
+sc.add(g)
+playerGroups[id]={group:g,beam,orb,aura,pn,element:elemIdx,power:0,name}
+beamObjects[id]={beam,orb}
+}
+
+function removePlayerVisual(id){
+if(playerGroups[id]){sc.remove(playerGroups[id].group);delete playerGroups[id];delete beamObjects[id]}
+}
+
+// --- CHAT ---
+const emojis=['⚡','🔥','💀','👊','🌀','✨','💪','🏆']
+const emojiBar=$('emoji-bar')
+emojis.forEach(e=>{const s=document.createElement('span');s.textContent=e;s.onclick=()=>sendChat(e);emojiBar.appendChild(s)})
+
+const chatLog=$('chat-log')
+function addMsg(name,text,color){
+const d=document.createElement('div');d.className='msg'
+d.innerHTML=`<span class="nm" style="color:${color||'#aaa'}">${name}:</span> ${text}`
+chatLog.appendChild(d);chatLog.scrollTop=chatLog.scrollHeight}
+function sysMsg(text){
+const d=document.createElement('div');d.className='msg';d.innerHTML=`<span class="sys">${text}</span>`
+chatLog.appendChild(d);chatLog.scrollTop=chatLog.scrollHeight}
+
+$('msg').addEventListener('keydown',e=>{if(e.key==='Enter'){const v=e.target.value.trim();if(!v)return;e.target.value=''
+if(v.startsWith('/name ')){myName=v.slice(6).trim()||myName;sysMsg('Name set to '+myName);broadcastPresence()}
+else if(v==='/power'){sysMsg(`Power:${myPower.toFixed(2)} Charge:${myCharge.toFixed(2)} Element:${ELEMENTS[myElement].name}`)}
+else{sendChat(v)}}})
+function sendChat(text){addMsg(myName,text,hslStr(ELEMENTS[myElement].hue));mqttSend({type:'chat',name:myName,text,hue:ELEMENTS[myElement].hue})}
+function hslStr(h){return `hsl(${FL(h*360)},70%,60%)`}
+
+// --- MQTT ---
+const TOPIC='ki-arena-beamclash/THOMAS/'
+let mq=null
+try{
+mq=mqtt.connect('wss://broker.hivemq.com:8884/mqtt',{clientId:'ki-'+FL(Rn()*1e9),connectTimeout:5000,reconnectPeriod:3000})
+mq.on('connect',()=>{mq.subscribe(TOPIC+'#');sysMsg('Connected to arena');broadcastPresence()})
+mq.on('message',(topic,msg)=>{try{const d=JSON.parse(msg.toString());handleNet(d)}catch(e){}})
+mq.on('error',()=>sysMsg('Network error'))
+}catch(e){sysMsg('MQTT unavailable - solo mode')}
+
+function mqttSend(data){if(mq&&mq.connected)mq.publish(TOPIC+'state',JSON.stringify({...data,id:myName+localPN}))}
+function broadcastPresence(){mqttSend({type:'join',name:myName,element:myElement,pn:localPN})}
+
+let lastBeamBroadcast=0
+function broadcastBeam(){const now=Date.now();if(now-lastBeamBroadcast<100)return;lastBeamBroadcast=now
+mqttSend({type:'beam',name:myName,power:myPower,element:myElement,pn:localPN})}
+
+function handleNet(d){
+if(d.id===myName+localPN)return
+const pid=d.id||d.name
+if(d.type==='join'){
+if(!playerGroups[pid]){const pn=(Object.keys(playerGroups).length)%8
+createPlayerVisual(pid,d.name,d.element,pn);sysMsg(d.name+' joined the arena')}
+players[pid]={name:d.name,element:d.element,power:0,lastSeen:Date.now()}}
+else if(d.type==='beam'){
+if(!playerGroups[pid]){const pn=(Object.keys(playerGroups).length)%8
+createPlayerVisual(pid,d.name,d.element,pn);players[pid]={name:d.name,element:d.element,power:0,lastSeen:Date.now()}}
+if(players[pid])players[pid].power=d.power;if(players[pid])players[pid].lastSeen=Date.now()}
+else if(d.type==='chat'){addMsg(d.name,d.text,hslStr(d.hue||0))}
+else if(d.type==='leave'){sysMsg(d.name+' left');removePlayerVisual(pid);delete players[pid]}
+}
+
+// Cleanup stale players
+setInterval(()=>{const now=Date.now();Object.keys(players).forEach(pid=>{
+if(now-players[pid].lastSeen>8000){sysMsg(players[pid].name+' timed out');removePlayerVisual(pid);delete players[pid]}})},3000)
+
+// --- PHONEME BARS ---
+const phDiv=$('phonemes')
+for(let i=0;i<8;i++){const b=document.createElement('div');b.className='ph-bar';b.style.height='2px';phDiv.appendChild(b)}
+
+// --- MAIN LOOP ---
+function frame(){requestAnimationFrame(frame)
+const t=Date.now()*.001;S.t=t
+const a=ga(),mic=micEnergy()
+const e=a.b+a.m+a.h+a.p;S.e+=(e-S.e)*.12
+if(a.b>.25)S.bt=MX(S.bt,.8);S.bt*=.85
+
+// Element from vowel energy patterns
+if(mic>.08){
+const bands=[a.b,a.m,a.h,a.p,mic,a.b*a.m,a.h*mic,a.m*a.h]
+let maxI=0,maxV=0;bands.forEach((v,i)=>{if(v>maxV){maxV=v;maxI=i}})
+myElement=maxI%8}
+
+// Charge builds while mic active
+myCharge=LRP(myCharge,mic>.05?MN(1,myCharge+.02):MX(0,myCharge-.03),.2)
+myPower=mic*myCharge*(1+S.e*.3)
+if(myPower>.01)broadcastBeam()
+
+// Clash position: weighted average of all beam directions
+let totalPower=myPower,weightedPos=playerPos(localPN,8).clone().multiplyScalar(myPower>0.01?(1-myPower):1)
+let activeBeams=myPower>0.01?1:0
+Object.keys(players).forEach(pid=>{
+const pp=players[pid];if(pp.power>0.01){
+const pos=playerGroups[pid]?playerGroups[pid].group.position.clone():new THREE.Vector3()
+weightedPos.add(pos.multiplyScalar(1-pp.power));totalPower+=pp.power;activeBeams++}})
+
+if(activeBeams>0&&totalPower>0.01){
+const target=weightedPos.divideScalar(activeBeams)
+target.y=3+Math.sin(t*3)*.3
+S.clash.lerp(target,.04)
+}else{S.clash.lerp(CENTER,.02)}
+
+// Update local player beam
+const lp=playerGroups['__local__']
+if(lp){
+const orbU=lp.orb.userData.core.material.uniforms
+orbU.uT.value=t;orbU.uChg.value=myCharge
+lp.orb.scale.setScalar(.4+myCharge*1.2+S.bt*.2)
+lp.orb.children.forEach((ch,i)=>{if(i>0){ch.material.opacity=myCharge*.15;ch.rotation.x+=.02+myCharge*.04;ch.rotation.y+=.03}})
+
+const beamU=lp.beam.material.uniforms
+const myPos=lp.group.position.clone()
+const toClash=S.clash.clone().sub(myPos)
+const dist=toClash.length()
+beamU.uT.value=t;beamU.uPow.value=myPower;beamU.uLen.value=myPower>.02?dist*.5:0
+beamU.uWid.value=.1+myPower*.5+S.bt*.1;beamU.uHue.value=ELEMENTS[myElement].hue
+lp.beam.visible=myPower>.02;lp.beam.lookAt(S.clash)
+
+lp.aura.material.opacity=myCharge*.2;lp.aura.material.color.setHSL(ELEMENTS[myElement].hue,.7,.5)
+lp.group.position.y=1.5+Math.sin(t*.8)*.2+myPower*.4
+}
+
+// Update remote player beams
+Object.keys(players).forEach(pid=>{
+const pp=players[pid],pg=playerGroups[pid]
+if(!pg)return
+const orbU=pg.orb.userData.core.material.uniforms
+orbU.uT.value=t;orbU.uChg.value=pp.power
+pg.orb.scale.setScalar(.4+pp.power*1.2)
+pg.orb.children.forEach((ch,i)=>{if(i>0){ch.material.opacity=pp.power*.12;ch.rotation.x+=.02+pp.power*.03;ch.rotation.y+=.03}})
+
+const beamU=pg.beam.material.uniforms
+const pos=pg.group.position.clone()
+const toClash=S.clash.clone().sub(pos)
+const dist=toClash.length()
+beamU.uT.value=t;beamU.uPow.value=pp.power;beamU.uLen.value=pp.power>.02?dist*.5:0
+beamU.uWid.value=.1+pp.power*.4;beamU.uHue.value=ELEMENTS[pp.element%8].hue
+pg.beam.visible=pp.power>.02
+pg.aura.material.opacity=pp.power*.15
+pp.power*=.95 // decay remote power between updates
+})
+
+// Clash visuals
+const clashPow=MN(1,totalPower*.5+S.bt*.3)
+clashOrb.position.copy(S.clash)
+clashOrb.material.uniforms.uT.value=t;clashOrb.material.uniforms.uPow.value=clashPow
+clashOrb.scale.setScalar(.4+clashPow*1.5+S.bt*1.2)
+
+clashRing.position.copy(S.clash)
+clashShock+=(S.bt*2-clashShock)*.15
+clashRing.material.opacity=MN(.6,clashShock*.3)
+clashRing.scale.setScalar(1+clashShock*3)
+clashRing.rotation.z+=.04;clashRing.rotation.x=Math.sin(t)*.8
+
+// Spark particles at clash
+const spk=window._spk
+if(clashPow>.1||S.bt>.2){
+const count=FL(3+clashPow*12+S.bt*20)
+for(let i=0;i<count;i++){const idx=(spk.idx++)%1200
+const ang=Rn()*T,el=(Rn()-.5)*Math.PI,spd=1+Rn()*5+S.bt*3
+spk.p[idx*3]=S.clash.x+Math.cos(ang)*Math.cos(el)*spd
+spk.p[idx*3+1]=S.clash.y+Math.sin(el)*spd
+spk.p[idx*3+2]=S.clash.z+Math.sin(ang)*Math.cos(el)*spd
+const h=ELEMENTS[myElement].hue+Rn()*.2-.1
+const c=Cl(0).setHSL(h,.8,.5+Rn()*.3)
+spk.c[idx*3]=c.r;spk.c[idx*3+1]=c.g;spk.c[idx*3+2]=c.b
+spk.s[idx]=.03+Rn()*.08+S.bt*.04}}
+for(let i=0;i<1200;i++){spk.s[i]*=.94;spk.p[i*3]+=(Rn()-.5)*.15;spk.p[i*3+1]+=(Rn()-.5)*.12;spk.p[i*3+2]+=(Rn()-.5)*.15}
+spk.geo.attributes.position.needsUpdate=true;spk.geo.attributes.color.needsUpdate=true;spk.geo.attributes.size.needsUpdate=true
+
+// Trail particles along beams
+const trl=window._trl
+if(myPower>.03&&lp){
+const pos=lp.group.position.clone()
+const dir=S.clash.clone().sub(pos).normalize()
+for(let i=0;i<3;i++){const idx=(trl.idx++)%600
+const along=Rn()*pos.distanceTo(S.clash)
+const p=pos.clone().add(dir.clone().multiplyScalar(along))
+p.x+=(Rn()-.5)*.5;p.y+=(Rn()-.5)*.5;p.z+=(Rn()-.5)*.5
+trl.p[idx*3]=p.x;trl.p[idx*3+1]=p.y;trl.p[idx*3+2]=p.z
+const c=Cl(0).setHSL(ELEMENTS[myElement].hue,.6,.4)
+trl.c[idx*3]=c.r;trl.c[idx*3+1]=c.g;trl.c[idx*3+2]=c.b
+trl.s[idx]=.02+Rn()*.03}}
+for(let i=0;i<600;i++)trl.s[i]*=.92
+trl.geo.attributes.position.needsUpdate=true;trl.geo.attributes.color.needsUpdate=true;trl.geo.attributes.size.needsUpdate=true
+
+// Arena floor pulse
+arenaFloor.material.uniforms.uT.value=t
+
+// Camera
+S.shk+=(S.bt*4+clashPow*2-S.shk)*.12
+const shk=S.shk*.06
+const camAngle=t*.05
+const camR=22-clashPow*3
+cm.position.set(
+  camR*Math.sin(camAngle)+Math.sin(t*18)*shk,
+  10+Math.cos(t*1.2)*1.5+Math.cos(t*14)*shk,
+  camR*Math.cos(camAngle)+Math.sin(t*16)*shk)
+cm.lookAt(S.clash.x*.3,3,S.clash.z*.3)
+
+// Phoneme bars
+const phBars=phDiv.children
+if(micFd){for(let i=0;i<8;i++){const v=micFd[i*4]/255;phBars[i].style.height=(2+v*30)+'px';phBars[i].style.background=hslStr(ELEMENTS[i].hue)}}
+
+// HUD
+const el=ELEMENTS[myElement]
+const pCount=Object.keys(players).length+1
+$('hud').innerHTML=`SCORE: ${myScore} | ${el.kanji} ${el.name}\nPlayers: ${pCount}/8\nCharge: ${(myCharge*100|0)}%\nClash shift: ${S.clash.x>1?'RIGHT':S.clash.x<-1?'LEFT':'CENTER'}`
+$('power-fill').style.width=(myPower*100)+'%'
+$('power-fill').style.background=`linear-gradient(90deg,${hslStr(el.hue)},#fff)`
+$('clash-ind').textContent=`clash ${S.clash.x.toFixed(1)},${S.clash.z.toFixed(1)} | power ${myPower.toFixed(2)} | ${activeBeams} beams active`
+$('players').textContent=Object.values(players).map(p=>p.name).join(' · ')||'waiting for opponents...'
+
+RE.render(sc,cm)}
+
+// --- INIT ---
+init()
+sysMsg('Ki Arena Beam Clash v1.0')
+sysMsg('Drop audio or click to activate mic')
+sysMsg('Your voice powers your beam - louder = stronger')
+sysMsg('Commands: /name <name> | /power')
+frame()
+
+// Presence heartbeat
+setInterval(()=>{if(mq&&mq.connected)broadcastPresence()},4000)
+// Unload
+addEventListener('beforeunload',()=>{if(mq&&mq.connected)mqttSend({type:'leave',name:myName})})
+</script></body></html>

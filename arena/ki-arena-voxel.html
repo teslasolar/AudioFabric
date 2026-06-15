@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ki Arena Voxel - Voice-Built Worlds x Combat</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080a12;color:#fff;font-family:Consolas,monospace;overflow:hidden}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%}
+#hud{position:fixed;top:10px;right:12px;z-index:50;text-align:right;pointer-events:none}
+#score{font-size:24px;color:#ff0;text-shadow:0 0 8px #f80}
+#voxCount{font-size:11px;color:#0ff;margin-top:2px}
+#element{font-size:13px;margin-top:4px}
+#buildRate{font-size:10px;color:#0f0;margin-top:2px}
+#comboDisp{font-size:14px;color:#f80;margin-top:4px;opacity:0;transition:opacity .3s}
+#comboDisp.on{opacity:1}
+#nick{font-size:11px;color:#0f0;cursor:pointer;pointer-events:auto;text-decoration:underline dotted #0f04;margin-top:6px}
+#peers{font-size:10px;color:#088;margin-top:2px}
+#chat{position:fixed;left:10px;bottom:10px;z-index:56;width:280px;
+  background:rgba(0,0,0,0.78);border:1px solid #333;border-radius:8px;overflow:hidden;
+  display:flex;flex-direction:column}
+#chatMsgs{height:180px;overflow-y:auto;padding:6px;font-size:11px;scrollbar-width:thin;
+  scrollbar-color:#333 transparent}
+#chatMsgs::-webkit-scrollbar{width:4px}
+#chatMsgs::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+.chat-msg{padding:1px 0;word-break:break-word;line-height:1.3}
+.chat-msg .cn{font-weight:bold}
+.chat-sys{color:#555;font-style:italic}
+#chatInput{width:100%;background:#0a0a0a;border:none;border-top:1px solid #333;
+  color:#fff;padding:6px 8px;font-size:11px;font-family:inherit;outline:none}
+#chatInput::placeholder{color:#444}
+#chatInput:focus{background:#111;border-top-color:#4af}
+#emojis{display:flex;gap:4px;padding:4px 6px;border-top:1px solid #222;background:#0a0a0a;cursor:pointer}
+#emojis span{font-size:16px;opacity:.6;transition:opacity .15s}
+#emojis span:hover{opacity:1}
+#R{position:fixed;top:6px;left:50%;transform:translateX(-50%);color:#f44;font:10px monospace;z-index:60;pointer-events:none;display:none;animation:b 1.5s infinite}
+@keyframes b{50%{opacity:.15}}
+#cmt{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:70;
+  font-size:18px;color:#ff0;text-shadow:0 0 12px #f80;opacity:0;transition:opacity .3s;pointer-events:none}
+#cmt.show{opacity:1}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="score">0</div>
+  <div id="voxCount">0 / 0 voxels</div>
+  <div id="element">-- --</div>
+  <div id="buildRate"></div>
+  <div id="comboDisp"></div>
+  <div id="nick" onclick="changeNick()"></div>
+  <div id="peers"></div>
+</div>
+<div id="chat">
+  <div id="chatMsgs"></div>
+  <div id="emojis"><span>&#x1F9F1;</span><span>&#x1F4A5;</span><span>&#x1F3D7;</span><span>&#x1F528;</span><span>&#x26A1;</span><span>&#x1F300;</span></div>
+  <input id="chatInput" placeholder="Chat or /name /score /clear" autocomplete="off">
+</div>
+<div id="R">REC</div>
+<div id="cmt"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script>
+const $=id=>document.getElementById(id),T=Math.PI*2,F=1.618,P=[2,3,5,7,11,13,17]
+const R=Math.random,FL=Math.floor,MN=Math.min,MX=Math.max,AB=Math.abs
+
+// === ELEMENTS (6 types from ki-arena-plus) ===
+const ELEMENTS={
+  ah:{char:'火',name:'Fire',color:'#ff4444',hex:0xff4444,blast:'kamehameha',radius:3},
+  ee:{char:'雷',name:'Lightning',color:'#ffdd00',hex:0xffdd00,blast:'finalflash',radius:2},
+  oh:{char:'気',name:'Spirit',color:'#00ddff',hex:0x00ddff,blast:'spiritbomb',radius:5},
+  oo:{char:'水',name:'Water',color:'#4488ff',hex:0x4488ff,blast:'galickgun',radius:3},
+  eh:{char:'風',name:'Wind',color:'#44ff88',hex:0x44ff88,blast:'barrage',radius:2},
+  mm:{char:'土',name:'Earth',color:'#cc8844',hex:0xcc8844,blast:'kiball',radius:4}
+}
+const EL_KEYS=Object.keys(ELEMENTS)
+
+// === GLOBALS ===
+let W,H,scene,camera,renderer,clock
+let audioCtx,analyser,micAnalyser,freqData,micFreqData,micStream
+let voice={rms:0,f0:0,sounding:false,energy:0,vowel:'',chargeLevel:0}
+let playerName='',myScore=0,combo=0,comboTimer=0
+let currentElement='oh',buildCursorX=16,buildCursorZ=16,buildCursorY=0,spiralStep=0,spiralDir=0,spiralLen=1,spiralCount=0
+let mqttClient=null,mqttConnected=false,peerCount=0
+let rc=null,rch=[]
+const GRID={x:32,y:16,z:32},MAX_VOXELS=500
+const VOX={} // key "x,y,z" -> {color,owner,hp,idx}
+let voxMesh,voxCount=0,myVoxCount=0
+let voxColors,voxDummy=null
+let blasts=[],particles=[]
+let remotePlayers={}
+let camAngle=0,camDrag=false,camDragStart=0
+let fileAudioSrc=null,ad=null
+
+// === AUDIO ===
+function initAudio(){
+  audioCtx=new(AudioContext||webkitAudioContext)()
+  analyser=audioCtx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=.82
+  freqData=new Uint8Array(analyser.frequencyBinCount)
+  micAnalyser=audioCtx.createAnalyser();micAnalyser.fftSize=2048;micAnalyser.smoothingTimeConstant=.75
+  micFreqData=new Uint8Array(micAnalyser.frequencyBinCount)
+  navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{
+    micStream=s
+    const src=audioCtx.createMediaStreamSource(s)
+    src.connect(micAnalyser)
+  }).catch(()=>{})
+}
+function ga(){
+  if(!analyser)return{b:0,m:0,h:0,p:0}
+  analyser.getByteFrequencyData(freqData)
+  let b=0,m=0,h=0,p=0;const n=freqData.length,lo=MX(1,n*.08|0),mi=MX(lo+1,n*.35|0)
+  for(let i=0;i<n;i++){const v=freqData[i]/255;if(v>p)p=v;if(i<lo)b+=v;else if(i<mi)m+=v;else h+=v}
+  return{b:(b/lo)||0,m:(m/(mi-lo))||0,h:(h/(n-mi))||0,p}
+}
+function micGA(){
+  if(!micAnalyser)return{b:0,m:0,h:0,p:0,rms:0}
+  micAnalyser.getByteFrequencyData(micFreqData)
+  let b=0,m=0,h=0,p=0,sum=0;const n=micFreqData.length,lo=MX(1,n*.08|0),mi=MX(lo+1,n*.35|0)
+  for(let i=0;i<n;i++){const v=micFreqData[i]/255;sum+=v*v;if(v>p)p=v;if(i<lo)b+=v;else if(i<mi)m+=v;else h+=v}
+  return{b:(b/lo)||0,m:(m/(mi-lo))||0,h:(h/(n-mi))||0,p,rms:Math.sqrt(sum/n)}
+}
+function detectVowel(mg){
+  // Simple ratio-based vowel detection
+  const {b,m,h}=mg
+  if(b>.4&&m<.3) return 'mm'  // Earth
+  if(b>.3&&m>.3&&h<.2) return 'ah' // Fire
+  if(m>.4&&h>.3) return 'ee'  // Lightning
+  if(b>.2&&m>.2&&h>.2) return 'oh' // Spirit
+  if(h>.4&&m>.2) return 'eh'  // Wind
+  if(b>.3&&h>.3&&m<.3) return 'oo' // Water
+  return ''
+}
+
+// === FILE DROP AUDIO ===
+document.addEventListener('dragover',e=>e.preventDefault())
+document.addEventListener('drop',e=>{
+  e.preventDefault();const f=e.dataTransfer.files[0];if(!f)return
+  if(!ad){ad=document.createElement('audio');ad.crossOrigin='anonymous';document.body.appendChild(ad)}
+  ad.src=URL.createObjectURL(f)
+  ad.oncanplaythrough=()=>{
+    if(!fileAudioSrc){fileAudioSrc=audioCtx.createMediaElementSource(ad);fileAudioSrc.connect(analyser);analyser.connect(audioCtx.destination)}
+    ad.play();startRecord()
+  };ad.onended=()=>{if(rc&&rc.state==='recording')rc.stop()}
+  ad.load()
+})
+
+// === THREE.JS SCENE ===
+function initScene(){
+  W=innerWidth;H=innerHeight
+  scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x080a12,.008)
+  camera=new THREE.PerspectiveCamera(60,W/H,.1,500)
+  camera.position.set(16,20,40)
+  camera.lookAt(16,4,16)
+  renderer=new THREE.WebGLRenderer({canvas:$('c'),antialias:true})
+  renderer.setSize(W,H);renderer.setPixelRatio(MN(devicePixelRatio,2))
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1
+  clock=new THREE.Clock()
+  window.onresize=()=>{W=innerWidth;H=innerHeight;camera.aspect=W/H;camera.updateProjectionMatrix();renderer.setSize(W,H)}
+
+  // Starfield
+  const sg=new THREE.BufferGeometry(),sp=new Float32Array(2000*3)
+  for(let i=0;i<2000;i++){sp[i*3]=(R()-.5)*200;sp[i*3+1]=R()*100+10;sp[i*3+2]=(R()-.5)*200}
+  sg.setAttribute('position',new THREE.BufferAttribute(sp,3))
+  scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:.3,transparent:true,opacity:.6})))
+
+  // Ground plane
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),
+    new THREE.MeshBasicMaterial({color:0x0a0e1a,transparent:true,opacity:.8}))
+  ground.rotation.x=-Math.PI/2;ground.position.set(16,-.01,16);scene.add(ground)
+  // Grid
+  const grid=new THREE.GridHelper(32,32,0x1a2a4a,0x0a1a2a)
+  grid.position.set(16,0,16);scene.add(grid)
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x334466,.5))
+  const dl=new THREE.DirectionalLight(0xffeedd,.4);dl.position.set(20,30,10);scene.add(dl)
+  const pl=new THREE.PointLight(0x4488ff,.6,50);pl.position.set(16,10,16);scene.add(pl)
+
+  // Voxel InstancedMesh (max 500)
+  const voxGeo=new THREE.BoxGeometry(.9,.9,.9)
+  const voxMat=new THREE.MeshPhongMaterial({vertexColors:true,transparent:true,opacity:.85,
+    shininess:40,specular:0x222244})
+  voxMesh=new THREE.InstancedMesh(voxGeo,voxMat,MAX_VOXELS)
+  voxMesh.count=0
+  voxMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+  // Instance colors
+  voxColors=new Float32Array(MAX_VOXELS*3)
+  voxMesh.instanceColor=new THREE.InstancedBufferAttribute(voxColors,3)
+  scene.add(voxMesh)
+  voxDummy=new THREE.Object3D()
+
+  // Wireframe overlay
+  const wireGeo=new THREE.BoxGeometry(.92,.92,.92)
+  const wireMat=new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,transparent:true,opacity:.08})
+  const wireMesh=new THREE.InstancedMesh(wireGeo,wireMat,MAX_VOXELS)
+  wireMesh.count=0;wireMesh.instanceMatrix=voxMesh.instanceMatrix
+  scene.add(wireMesh)
+  window._wireMesh=wireMesh
+
+  // Player aura
+  const aurGeo=new THREE.SphereGeometry(.6,16,16)
+  const aurMat=new THREE.MeshBasicMaterial({color:ELEMENTS[currentElement].hex,transparent:true,opacity:.3,
+    blending:THREE.AdditiveBlending,depthWrite:false})
+  const aura=new THREE.Mesh(aurGeo,aurMat)
+  aura.position.set(buildCursorX,.5,buildCursorZ);scene.add(aura)
+  window._aura=aura;window._aurMat=aurMat
+}
+
+// === VOXEL MANAGEMENT ===
+function rebuildInstances(){
+  const keys=Object.keys(VOX)
+  voxMesh.count=keys.length
+  if(window._wireMesh)window._wireMesh.count=keys.length
+  keys.forEach((k,i)=>{
+    const v=VOX[k],p=k.split(',').map(Number)
+    voxDummy.position.set(p[0],p[1]+.5,p[2])
+    // Fake AO: if surrounded, scale slightly smaller
+    let neighbors=0
+    ;[[-1,0,0],[1,0,0],[0,-1,0],[0,1,0],[0,0,-1],[0,0,1]].forEach(d=>{
+      if(VOX[`${p[0]+d[0]},${p[1]+d[1]},${p[2]+d[2]}`])neighbors++
+    })
+    const s=1-neighbors*.02
+    voxDummy.scale.set(s,s,s)
+    voxDummy.updateMatrix()
+    voxMesh.setMatrixAt(i,voxDummy.matrix)
+    const c=new THREE.Color(v.color)
+    // Darken if surrounded (fake AO)
+    if(neighbors>2)c.multiplyScalar(.7+.3*(1-neighbors/6))
+    voxColors[i*3]=c.r;voxColors[i*3+1]=c.g;voxColors[i*3+2]=c.b
+    v.idx=i
+  })
+  voxMesh.instanceMatrix.needsUpdate=true
+  voxMesh.instanceColor.needsUpdate=true
+}
+
+function placeVoxel(x,y,z,color,owner){
+  const k=`${x},${y},${z}`
+  if(VOX[k])return false
+  if(x<0||x>=GRID.x||y<0||y>=GRID.y||z<0||z>=GRID.z)return false
+  // Enforce max voxels
+  const keys=Object.keys(VOX)
+  if(keys.length>=MAX_VOXELS){
+    // Remove oldest
+    const oldest=keys[0]
+    const ov=VOX[oldest]
+    if(ov.owner===playerName)myVoxCount--
+    delete VOX[oldest]
+  }
+  VOX[k]={color,owner,hp:3}
+  if(owner===playerName)myVoxCount++
+  voxCount=Object.keys(VOX).length
+  rebuildInstances()
+  // Score
+  if(owner===playerName){myScore+=1;updateHUD()}
+  // Milestones
+  if(myVoxCount===10)sysMsg('\u{1F9F1} 10 voxels placed!')
+  if(myVoxCount===50)sysMsg('\u{1F3D7} 50 voxels! Builder!')
+  if(myVoxCount===100)sysMsg('\u{1F3C6} 100 voxels! Architect!')
+  return true
+}
+
+function destroyVoxel(x,y,z,blasterName){
+  const k=`${x},${y},${z}`
+  if(!VOX[k])return false
+  const v=VOX[k]
+  // Can't destroy own voxels with blasts
+  if(v.owner===blasterName)return false
+  // Spawn particles
+  spawnVoxelParticles(x,y,z,v.color)
+  if(v.owner===playerName)myVoxCount--
+  delete VOX[k]
+  voxCount=Object.keys(VOX).length
+  rebuildInstances()
+  // Score for destroyer
+  if(blasterName===playerName){
+    myScore+=10;combo++;comboTimer=2
+    $('comboDisp').textContent=`${combo}x COMBO`;$('comboDisp').classList.add('on')
+    updateHUD()
+  }
+  return true
+}
+
+function destroyRadius(cx,cy,cz,radius,blasterName){
+  let destroyed=0
+  for(let dx=-radius;dx<=radius;dx++)
+    for(let dy=-radius;dy<=radius;dy++)
+      for(let dz=-radius;dz<=radius;dz++){
+        if(dx*dx+dy*dy+dz*dz>radius*radius)continue
+        if(destroyVoxel(cx+dx,cy+dy,cz+dz,blasterName))destroyed++
+      }
+  if(destroyed>0)sysMsg(`\u{1F4A5} ${blasterName} destroyed ${destroyed} voxels!`)
+  return destroyed
+}
+
+// === PARTICLES ===
+function spawnVoxelParticles(x,y,z,color){
+  for(let i=0;i<8;i++){
+    particles.push({
+      pos:new THREE.Vector3(x,y+.5,z),
+      vel:new THREE.Vector3((R()-.5)*8,(R()-.5)*8+4,(R()-.5)*8),
+      color,life:1,mesh:null
+    })
+  }
+}
+function initParticlePool(){
+  const geo=new THREE.BoxGeometry(.2,.2,.2)
+  window._particlePool=[]
+  for(let i=0;i<64;i++){
+    const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:1,blending:THREE.AdditiveBlending}))
+    m.visible=false;scene.add(m)
+    window._particlePool.push(m)
+  }
+}
+function updateParticles(dt){
+  particles.forEach((p,i)=>{
+    p.life-=dt*1.5
+    p.pos.add(p.vel.clone().multiplyScalar(dt))
+    p.vel.y-=15*dt // gravity
+    if(!p.mesh){
+      const m=window._particlePool.find(x=>!x.visible)
+      if(m){p.mesh=m;m.visible=true;m.material.color.set(p.color)}
+    }
+    if(p.mesh){
+      p.mesh.position.copy(p.pos)
+      p.mesh.material.opacity=MX(0,p.life)
+      p.mesh.scale.setScalar(p.life*.5+.2)
+      if(p.life<=0){p.mesh.visible=false;p.mesh=null}
+    }
+  })
+  particles=particles.filter(p=>p.life>0)
+}
+
+// === BLASTS ===
+function fireBlast(){
+  const el=ELEMENTS[currentElement]
+  const start=new THREE.Vector3(buildCursorX,2,buildCursorZ)
+  // Target: center of world or nearest opponent voxel
+  let target=new THREE.Vector3(16,4,16)
+  const opponentVoxels=Object.entries(VOX).filter(([k,v])=>v.owner!==playerName)
+  if(opponentVoxels.length>0){
+    const rv=opponentVoxels[FL(R()*opponentVoxels.length)]
+    const pos=rv[0].split(',').map(Number)
+    target.set(pos[0],pos[1]+.5,pos[2])
+  }
+  const dir=target.clone().sub(start).normalize()
+  const geo=new THREE.SphereGeometry(.3+el.radius*.05,12,12)
+  const mat=new THREE.MeshBasicMaterial({color:el.hex,transparent:true,opacity:.9,blending:THREE.AdditiveBlending})
+  const mesh=new THREE.Mesh(geo,mat)
+  mesh.position.copy(start);scene.add(mesh)
+  // Glow
+  const gGeo=new THREE.SphereGeometry(.5+el.radius*.08,8,8)
+  const gMat=new THREE.MeshBasicMaterial({color:el.hex,transparent:true,opacity:.3,blending:THREE.AdditiveBlending})
+  const glow=new THREE.Mesh(gGeo,gMat);mesh.add(glow)
+  blasts.push({mesh,dir,speed:18,radius:el.radius,owner:playerName,target,life:3,el:currentElement})
+  // Broadcast
+  if(mqttClient&&mqttConnected){
+    mqttClient.publish('ki-arena-voxel/BUILD/'+playerName,JSON.stringify({
+      type:'blast',pos:[start.x,start.y,start.z],target:[target.x,target.y,target.z],
+      el:currentElement,owner:playerName
+    }))
+  }
+}
+function updateBlasts(dt){
+  blasts.forEach((bl,i)=>{
+    bl.mesh.position.add(bl.dir.clone().multiplyScalar(bl.speed*dt))
+    bl.life-=dt
+    bl.mesh.scale.setScalar(1+Math.sin(bl.life*10)*.1)
+    // Check if reached target area
+    if(bl.mesh.position.distanceTo(bl.target)<2||bl.life<=0){
+      // Explode
+      const p=bl.mesh.position
+      destroyRadius(FL(p.x),FL(p.y),FL(p.z),bl.radius,bl.owner)
+      scene.remove(bl.mesh)
+      blasts.splice(i,1)
+      // Flash
+      showCmt(`${ELEMENTS[bl.el].char} BLAST!`)
+    }
+  })
+}
+
+// === BUILDING LOGIC ===
+let buildTimer=0
+function updateBuilding(dt,mg){
+  if(!mg.rms||mg.rms<.08){voice.sounding=false;return}
+  voice.sounding=true
+  voice.energy=MN(1,mg.rms*3)
+  // Detect element from vowel
+  const v=detectVowel(mg)
+  if(v&&ELEMENTS[v])currentElement=v
+  // Build rate: proportional to energy
+  buildTimer+=dt*voice.energy*8
+  while(buildTimer>=1){
+    buildTimer-=1
+    // Place voxel at cursor
+    const placed=placeVoxel(buildCursorX,buildCursorY,buildCursorZ,ELEMENTS[currentElement].hex,playerName)
+    if(placed){
+      // Broadcast
+      if(mqttClient&&mqttConnected){
+        mqttClient.publish('ki-arena-voxel/BUILD/'+playerName,JSON.stringify({
+          type:'build',pos:[buildCursorX,buildCursorY,buildCursorZ],color:ELEMENTS[currentElement].hex,owner:playerName
+        }))
+      }
+    }
+    // Advance cursor
+    buildCursorY++
+    if(buildCursorY>=GRID.y){
+      buildCursorY=0
+      advanceSpiral()
+    }
+  }
+  // Charge for blast
+  voice.chargeLevel=MN(1,voice.chargeLevel+dt*voice.energy*.5)
+  if(voice.chargeLevel>=1){
+    fireBlast()
+    voice.chargeLevel=0
+  }
+}
+function advanceSpiral(){
+  // Spiral pattern from cursor center
+  const dirs=[[1,0],[0,1],[-1,0],[0,-1]]
+  const d=dirs[spiralDir]
+  buildCursorX+=d[0];buildCursorZ+=d[1]
+  spiralCount++
+  if(spiralCount>=spiralLen){
+    spiralCount=0;spiralDir=(spiralDir+1)%4
+    spiralStep++
+    if(spiralStep%2===0)spiralLen++
+  }
+  // Clamp
+  buildCursorX=MX(0,MN(GRID.x-1,buildCursorX))
+  buildCursorZ=MX(0,MN(GRID.z-1,buildCursorZ))
+}
+
+// === MQTT ===
+function initMQTT(){
+  try{
+    mqttClient=mqtt.connect('wss://broker.hivemq.com:8884/mqtt',{
+      clientId:'ki-voxel-'+R().toString(36).slice(2,10),
+      clean:true,reconnectPeriod:5000
+    })
+    mqttClient.on('connect',()=>{
+      mqttConnected=true
+      mqttClient.subscribe('ki-arena-voxel/BUILD/#')
+      mqttClient.subscribe('ki-arena-voxel/CHAT')
+      sysMsg('Connected to arena')
+    })
+    mqttClient.on('message',(topic,msg)=>{
+      try{
+        const d=JSON.parse(msg.toString())
+        if(d.owner===playerName)return
+        if(d.type==='build'){
+          placeVoxel(d.pos[0],d.pos[1],d.pos[2],d.color,d.owner)
+          updateRemotePlayer(d.owner,d.pos,d.color)
+        }else if(d.type==='blast'){
+          // Remote blast visual
+          const start=new THREE.Vector3(d.pos[0],d.pos[1],d.pos[2])
+          const target=new THREE.Vector3(d.target[0],d.target[1],d.target[2])
+          const dir=target.clone().sub(start).normalize()
+          const el=ELEMENTS[d.el]||ELEMENTS.oh
+          const geo=new THREE.SphereGeometry(.3,10,10)
+          const mat=new THREE.MeshBasicMaterial({color:el.hex,transparent:true,opacity:.8,blending:THREE.AdditiveBlending})
+          const mesh=new THREE.Mesh(geo,mat);mesh.position.copy(start);scene.add(mesh)
+          blasts.push({mesh,dir,speed:18,radius:el.radius,owner:d.owner,target,life:3,el:d.el})
+        }else if(d.type==='chat'){
+          addChatMsg(d.name,d.text,d.color)
+        }else if(d.type==='join'){
+          sysMsg(`${d.name} joined the arena`)
+          peerCount++
+        }else if(d.type==='leave'){
+          sysMsg(`${d.name} left`)
+          peerCount=MX(0,peerCount-1)
+        }
+      }catch(e){}
+    })
+    mqttClient.on('error',()=>{mqttConnected=false})
+    // Announce join
+    setTimeout(()=>{
+      if(mqttConnected)mqttClient.publish('ki-arena-voxel/BUILD/'+playerName,JSON.stringify({type:'join',name:playerName}))
+    },1000)
+  }catch(e){sysMsg('MQTT unavailable - solo mode')}
+}
+
+// === REMOTE PLAYERS ===
+function updateRemotePlayer(name,pos,color){
+  if(!remotePlayers[name]){
+    const geo=new THREE.SphereGeometry(.4,12,12)
+    const mat=new THREE.MeshBasicMaterial({color,transparent:true,opacity:.4,blending:THREE.AdditiveBlending})
+    const mesh=new THREE.Mesh(geo,mat)
+    scene.add(mesh)
+    remotePlayers[name]={mesh,lastSeen:Date.now()}
+  }
+  const rp=remotePlayers[name]
+  rp.mesh.position.set(pos[0],.8,pos[2])
+  rp.mesh.material.color.set(color)
+  rp.lastSeen=Date.now()
+  peerCount=Object.keys(remotePlayers).length
+}
+
+// === CHAT ===
+function addChatMsg(name,text,color){
+  const d=document.createElement('div');d.className='chat-msg'
+  d.innerHTML=`<span class="cn" style="color:${color||'#0ff'}">${name}:</span> ${text}`
+  $('chatMsgs').appendChild(d)
+  $('chatMsgs').scrollTop=$('chatMsgs').scrollHeight
+  // Limit
+  while($('chatMsgs').children.length>50)$('chatMsgs').removeChild($('chatMsgs').firstChild)
+}
+function sysMsg(text){
+  const d=document.createElement('div');d.className='chat-msg chat-sys';d.textContent=text
+  $('chatMsgs').appendChild(d);$('chatMsgs').scrollTop=$('chatMsgs').scrollHeight
+}
+$('chatInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    const txt=$('chatInput').value.trim()
+    if(!txt){return}
+    // Commands
+    if(txt.startsWith('/name ')){
+      playerName=txt.slice(6).trim().slice(0,16)
+      $('nick').textContent=playerName;sysMsg(`Name set: ${playerName}`)
+    }else if(txt==='/score'){
+      sysMsg(`Score: ${myScore} | Voxels: ${myVoxCount}`)
+    }else if(txt==='/clear'){
+      // Destroy all own voxels
+      let count=0
+      Object.entries(VOX).forEach(([k,v])=>{if(v.owner===playerName){delete VOX[k];count++;myVoxCount--}})
+      voxCount=Object.keys(VOX).length;rebuildInstances()
+      sysMsg(`Cleared ${count} of your voxels`)
+    }else{
+      // Chat message
+      addChatMsg(playerName,txt,ELEMENTS[currentElement].color)
+      if(mqttClient&&mqttConnected){
+        mqttClient.publish('ki-arena-voxel/CHAT',JSON.stringify({type:'chat',name:playerName,text:txt,color:ELEMENTS[currentElement].color}))
+      }
+    }
+    $('chatInput').value=''
+  }
+  e.stopPropagation()
+})
+// Emoji bar
+$('emojis').addEventListener('click',e=>{
+  if(e.target.tagName==='SPAN'){
+    const emoji=e.target.textContent
+    addChatMsg(playerName,emoji,ELEMENTS[currentElement].color)
+    if(mqttClient&&mqttConnected)
+      mqttClient.publish('ki-arena-voxel/CHAT',JSON.stringify({type:'chat',name:playerName,text:emoji,color:ELEMENTS[currentElement].color}))
+  }
+})
+
+// === HUD ===
+function updateHUD(){
+  $('score').textContent=myScore
+  $('voxCount').textContent=`${myVoxCount} / ${voxCount} voxels`
+  const el=ELEMENTS[currentElement]
+  $('element').innerHTML=`<span style="color:${el.color}">${el.char} ${el.name}</span>`
+  $('buildRate').textContent=voice.sounding?`Building ${'|'.repeat(FL(voice.energy*10))}`:'--'
+  $('peers').textContent=peerCount>0?`${peerCount} peer${peerCount>1?'s':''}`:''
+}
+function showCmt(txt){
+  $('cmt').textContent=txt;$('cmt').classList.add('show')
+  setTimeout(()=>$('cmt').classList.remove('show'),1500)
+}
+
+// === CAMERA ===
+function updateCamera(t){
+  if(!camDrag){camAngle+=.003}
+  const r=30,cy=18
+  camera.position.x=16+Math.cos(camAngle)*r
+  camera.position.z=16+Math.sin(camAngle)*r
+  camera.position.y=cy
+  camera.lookAt(16,4,16)
+}
+document.addEventListener('mousedown',e=>{if(e.target.tagName==='CANVAS'){camDrag=true;camDragStart=e.clientX}})
+document.addEventListener('mousemove',e=>{if(camDrag){camAngle+=(e.clientX-camDragStart)*.005;camDragStart=e.clientX}})
+document.addEventListener('mouseup',()=>{camDrag=false})
+
+// === VOXEL PULSE (audio reactive) ===
+function pulseVoxels(t,audio){
+  if(voxMesh.count===0)return
+  const keys=Object.keys(VOX)
+  const pulse=audio.b*.15
+  keys.forEach((k,i)=>{
+    const p=k.split(',').map(Number)
+    voxDummy.position.set(p[0],p[1]+.5+Math.sin(t*3+p[0]+p[2])*.03*audio.p,p[2])
+    const s=1+pulse*Math.sin(t*6+i*.5)*.3
+    voxDummy.scale.set(s,s,s)
+    voxDummy.updateMatrix()
+    voxMesh.setMatrixAt(i,voxDummy.matrix)
+  })
+  voxMesh.instanceMatrix.needsUpdate=true
+}
+
+// === RECORDING ===
+function startRecord(){
+  if(rc)return
+  try{
+    const st=renderer.domElement.captureStream(60)
+    if(audioCtx){const d=audioCtx.createMediaStreamDestination();analyser.connect(d);d.stream.getAudioTracks().forEach(t=>st.addTrack(t))}
+    const mi=MediaRecorder.isTypeSupported('video/webm;codecs=h264,opus')?'video/webm;codecs=h264,opus':'video/webm'
+    rch=[];rc=new MediaRecorder(st,{mimeType:mi,videoBitsPerSecond:8e6})
+    rc.ondataavailable=e=>{if(e.data.size>0)rch.push(e.data)}
+    rc.onstop=()=>{const b=new Blob(rch,{type:mi}),a=document.createElement('a')
+      a.href=URL.createObjectURL(b);a.download='ki-arena-voxel-'+Date.now()+'.webm';a.click();rc=null;$('R').style.display='none'}
+    rc.start(250);$('R').style.display='block'
+  }catch(e){}
+}
+
+// === MAIN LOOP ===
+function animate(){
+  requestAnimationFrame(animate)
+  const dt=MN(clock.getDelta(),.05)
+  const t=clock.getElapsedTime()
+  const audio=ga()
+  const mg=micGA()
+
+  // Voice building
+  updateBuilding(dt,mg)
+
+  // Update camera
+  updateCamera(t)
+
+  // Update blasts
+  updateBlasts(dt)
+
+  // Update particles
+  updateParticles(dt)
+
+  // Pulse voxels with audio
+  pulseVoxels(t,audio)
+
+  // Update aura
+  if(window._aura){
+    window._aura.position.set(buildCursorX,.5+Math.sin(t*2)*.2,buildCursorZ)
+    window._aurMat.color.set(ELEMENTS[currentElement].hex)
+    window._aurMat.opacity=.2+voice.energy*.4
+  }
+
+  // Combo decay
+  if(comboTimer>0){comboTimer-=dt;if(comboTimer<=0){combo=0;$('comboDisp').classList.remove('on')}}
+
+  // Clean remote players
+  const now=Date.now()
+  Object.entries(remotePlayers).forEach(([name,rp])=>{
+    if(now-rp.lastSeen>30000){scene.remove(rp.mesh);delete remotePlayers[name]}
+    else{rp.mesh.scale.setScalar(.8+Math.sin(t*3)*.15)}
+  })
+
+  // HUD
+  updateHUD()
+
+  renderer.render(scene,camera)
+}
+
+// === INIT ===
+function genHash(){return 'V-'+Math.random().toString(36).slice(2,8).toUpperCase()}
+function changeNick(){
+  const n=prompt('Enter nickname (max 16):',playerName)
+  if(n&&n.trim()){playerName=n.trim().slice(0,16);$('nick').textContent=playerName}
+}
+function begin(){
+  playerName=genHash();$('nick').textContent=playerName
+  initScene();initParticlePool();initAudio();initMQTT()
+  sysMsg('Ki Arena Voxel - Voice builds, blasts destroy')
+  sysMsg('Drop audio file or use mic. Vowels select element.')
+  animate()
+}
+window.addEventListener('load',begin)
+</script>
+</body>
+</html>

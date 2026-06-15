@@ -1,0 +1,713 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Ki Arena Jubilee · 7 Prime Folds × Voice Combat</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#eee;font:13px Consolas,monospace;overflow:hidden}
+#cv3d{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+#hud{position:fixed;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:none}
+#overlay{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;background:rgba(5,5,15,0.92);display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;transition:opacity .4s}
+#overlay h1{font-size:28px;color:#ffdd44;text-shadow:0 0 20px #ffdd44}
+#overlay p{margin-top:12px;color:#aaa;font-size:14px}
+#overlay.hide{opacity:0;pointer-events:none}
+#chat{position:fixed;left:0;top:0;width:280px;height:100%;z-index:3;display:flex;flex-direction:column;pointer-events:auto;background:rgba(5,5,15,0.7);border-right:1px solid #333}
+#chat-msgs{flex:1;max-height:180px;overflow-y:auto;padding:6px 8px;font-size:11px;line-height:1.4}
+#chat-msgs .sys{color:#888;font-style:italic}
+#chat-msgs .msg{margin-bottom:3px}
+#emoji-row{padding:4px 8px;display:flex;gap:4px;font-size:18px;cursor:pointer}
+#emoji-row span:hover{transform:scale(1.3)}
+#chat-input{border:none;background:#111;color:#eee;padding:8px;font:12px Consolas,monospace;border-top:1px solid #333}
+#score-hud{position:fixed;top:10px;right:20px;text-align:right;z-index:4;pointer-events:none}
+#score-hud .score{font-size:36px;color:#ffdd00;text-shadow:0 0 10px #ffdd00}
+#score-hud .combo{font-size:18px;color:#ff6644}
+#score-hud .blast-type{font-size:14px;color:#aaf}
+#fold-hud{position:fixed;top:10px;left:290px;z-index:4;pointer-events:none}
+#fold-hud .fold-name{font-size:16px;font-weight:bold}
+#fold-hud .fold-bar{display:flex;gap:2px;margin-top:4px}
+#fold-hud .fold-bar div{width:28px;height:6px;border-radius:3px;opacity:0.3;transition:opacity .3s}
+#fold-hud .fold-bar div.active{opacity:1;box-shadow:0 0 8px currentColor}
+#phoneme-hud{position:fixed;bottom:60px;right:20px;z-index:4;pointer-events:none;display:flex;gap:3px;align-items:flex-end}
+#phoneme-hud .bar{width:18px;background:#444;border-radius:2px;transition:height .1s}
+#info-hud{position:fixed;bottom:10px;left:290px;z-index:4;pointer-events:none;font-size:11px;color:#777}
+#rec{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:5;color:#f44;font-weight:bold;display:none}
+.drag-over{border:3px solid #ffdd00 !important}
+</style></head><body>
+<div id="overlay"><h1>Ki Arena Jubilee · 7 Prime Folds</h1><p>Drop audio or click for mic</p></div>
+<canvas id="cv3d"></canvas>
+<div id="hud"></div>
+<div id="chat">
+  <div id="chat-msgs"></div>
+  <div id="emoji-row"><span>🔥</span><span>⚡</span><span>💀</span><span>💪</span><span>👑</span><span>✨</span><span>🌀</span></div>
+  <input id="chat-input" placeholder="Chat... (/name /fold)">
+</div>
+<div id="score-hud"><div class="score" id="sc">0</div><div class="combo" id="cb"></div><div class="blast-type" id="bt"></div></div>
+<div id="fold-hud"><div class="fold-name" id="fn">Fold 2 · SPACE</div><div class="fold-bar" id="fb"></div></div>
+<div id="phoneme-hud" id="ph"></div>
+<div id="info-hud" id="inf"></div>
+<div id="rec">● REC</div>
+<script>
+const $=id=>document.getElementById(id),T=Math.PI*2,F=1.618,P=[2,3,5,7,11,13,17];
+const FOLDS=[
+  {p:2,name:'SPACE',color:'#2244aa',band:'b'},
+  {p:3,name:'TREE',color:'#22aa44',band:'lm'},
+  {p:5,name:'ARENA',color:'#ff8800',band:'m'},
+  {p:7,name:'RINGS',color:'#ff4444',band:'mh'},
+  {p:11,name:'VERSE',color:'#aa44ff',band:'h'},
+  {p:13,name:'SIEVE',color:'#ffdd00',band:'pk'},
+  {p:17,name:'OBSERVER',color:'#ffffff',band:'co'}
+];
+const BLASTS={
+  fire:{kanji:'火',color:0xff4444,dmg:3,speed:0.5,size:0.4,vowel:'ah',foldBonus:0},
+  thunder:{kanji:'雷',color:0xffdd00,dmg:2.5,speed:0.6,size:0.35,vowel:'ee',foldBonus:3},
+  ki:{kanji:'気',color:0x44ffaa,dmg:5,speed:0.2,size:0.8,vowel:'oh',foldBonus:6},
+  water:{kanji:'水',color:0x4488ff,dmg:2,speed:0.55,size:0.35,vowel:'oo',foldBonus:1},
+  wind:{kanji:'風',color:0x88ffaa,dmg:0.4,speed:1.2,size:0.15,vowel:'eh',foldBonus:4},
+  earth:{kanji:'土',color:0xaa8844,dmg:1,speed:0.8,size:0.25,vowel:'mm',foldBonus:5}
+};
+const VOWELS=['ah','ee','oh','oo','eh','mm'];
+const BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt'];
+const TOPIC='ki-arena-jubilee/THOMAS/';
+const WS_TRACKER='wss://tracker.openwebtorrent.com';
+
+let scene,camera,renderer,clock,ax,an,fd,srcNode;
+let analyserMic,analyserFile,freqMic,freqFile;
+let score=0,combo=0,comboTimer=0,activeFold=0,prevFold=-1;
+let targetHP=100,targetMaxHP=100,targetMesh;
+let blasts=[],dmgNums=[],particles=[];
+let currentBlast='fire',chargeLevel=0,charging=false;
+let nickname='Player'+((Math.random()*999)|0);
+let mqttClient=null,peers=new Map(),peerCount=0;
+let recorder=null,recording=false,rchunks=[];
+let started=false,shakeAmt=0,foldTransT=0;
+let foldGroups=[],foldGeos=[];
+let micStream=null,audioEl=null;
+
+// Three.js setup
+scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x0a0a0f,0.015);
+camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,500);
+camera.position.set(0,3,12);
+renderer=new THREE.WebGLRenderer({canvas:$('cv3d'),antialias:true,alpha:false});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+clock=new THREE.Clock();
+
+// Lights
+scene.add(new THREE.AmbientLight(0x222233,0.5));
+const dLight=new THREE.DirectionalLight(0xffffff,0.8);dLight.position.set(5,10,5);scene.add(dLight);
+const pLight=new THREE.PointLight(0xff4444,1,20);pLight.position.set(0,2,0);scene.add(pLight);
+
+// Build fold geometries
+function buildFolds(){
+  // Fold 0: SPACE - starfield
+  const sg=new THREE.BufferGeometry();
+  const spos=new Float32Array(3000);
+  for(let i=0;i<3000;i++)spos[i]=(Math.random()-0.5)*100;
+  sg.setAttribute('position',new THREE.BufferAttribute(spos,3));
+  const stars=new THREE.Points(sg,new THREE.PointsMaterial({color:0x4466cc,size:0.15,transparent:true}));
+  foldGroups.push(stars);scene.add(stars);
+
+  // Fold 1: TREE - fractal lines
+  const treeG=new THREE.Group();
+  function branch(p,dir,len,depth){
+    if(depth>6||len<0.1)return;
+    const end=p.clone().add(dir.clone().multiplyScalar(len));
+    const g=new THREE.BufferGeometry().setFromPoints([p,end]);
+    const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x22aa44,transparent:true,opacity:0.8}));
+    treeG.add(l);
+    const a1=dir.clone().applyAxisAngle(new THREE.Vector3(0,0,1),0.4+Math.random()*0.3);
+    const a2=dir.clone().applyAxisAngle(new THREE.Vector3(0,0,1),-0.4-Math.random()*0.3);
+    const a3=dir.clone().applyAxisAngle(new THREE.Vector3(1,0,0),0.3);
+    branch(end,a1,len*0.7,depth+1);
+    branch(end,a2,len*0.7,depth+1);
+    if(depth<3)branch(end,a3,len*0.65,depth+1);
+  }
+  branch(new THREE.Vector3(0,-4,0),new THREE.Vector3(0,1,0),2.5,0);
+  foldGroups.push(treeG);scene.add(treeG);
+
+  // Fold 2: ARENA - hex grid + pillars
+  const arenaG=new THREE.Group();
+  for(let q=-4;q<=4;q++)for(let r=-4;r<=4;r++){
+    if(Math.abs(q+r)>4)continue;
+    const x=q*1.5,z=r*1.732+(q%2?0.866:0);
+    const hex=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.1,6),new THREE.MeshPhongMaterial({color:0xff8800,transparent:true,opacity:0.6}));
+    hex.position.set(x,-2,z);arenaG.add(hex);
+    if(Math.random()<0.15){
+      const pillar=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.2,1+Math.random()*2,6),new THREE.MeshPhongMaterial({color:0xcc6600,transparent:true}));
+      pillar.position.set(x,-1,z);arenaG.add(pillar);
+    }
+  }
+  foldGroups.push(arenaG);scene.add(arenaG);
+
+  // Fold 3: RINGS - 7 torus rings
+  const ringsG=new THREE.Group();
+  for(let i=0;i<7;i++){
+    const t=new THREE.Mesh(new THREE.TorusGeometry(1.5+i*0.7,0.04,8,64),new THREE.MeshPhongMaterial({color:new THREE.Color().setHSL(i/7,0.8,0.5),transparent:true,emissive:new THREE.Color().setHSL(i/7,0.5,0.2)}));
+    t.rotation.x=Math.PI/2+i*0.15;
+    ringsG.add(t);
+  }
+  foldGroups.push(ringsG);scene.add(ringsG);
+
+  // Fold 4: VERSE - text sprites
+  const verseG=new THREE.Group();
+  const kanji='空響華影数工水火雷気風土命光闇星月花鳥夢';
+  for(let i=0;i<30;i++){
+    const cv=document.createElement('canvas');cv.width=64;cv.height=64;
+    const cx=cv.getContext('2d');cx.fillStyle='#aa44ff';cx.font='40px serif';
+    cx.textAlign='center';cx.textBaseline='middle';
+    cx.fillText(kanji[i%kanji.length],32,32);
+    const tex=new THREE.CanvasTexture(cv);
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,opacity:0.8}));
+    sp.position.set((Math.random()-0.5)*16,(Math.random()-0.5)*10,(Math.random()-0.5)*16);
+    sp.scale.set(1.2,1.2,1);
+    verseG.add(sp);
+  }
+  foldGroups.push(verseG);scene.add(verseG);
+
+  // Fold 5: SIEVE - prime number particles
+  const sieveG=new THREE.Group();
+  const sGeo=new THREE.BufferGeometry();
+  const sP=new Float32Array(600*3),sC=new Float32Array(600*3);
+  function isPrime(n){if(n<2)return false;for(let i=2;i*i<=n;i++)if(n%i===0)return false;return true;}
+  for(let i=0;i<600;i++){
+    const angle=(i/600)*T*5,r=1+i*0.02;
+    sP[i*3]=Math.cos(angle)*r;sP[i*3+1]=Math.sin(angle)*r;sP[i*3+2]=(Math.random()-0.5)*4;
+    if(isPrime(i)){sC[i*3]=1;sC[i*3+1]=0.87;sC[i*3+2]=0;}
+    else{sC[i*3]=0.2;sC[i*3+1]=0.2;sC[i*3+2]=0.3;}
+  }
+  sGeo.setAttribute('position',new THREE.BufferAttribute(sP,3));
+  sGeo.setAttribute('color',new THREE.BufferAttribute(sC,3));
+  const sieve=new THREE.Points(sGeo,new THREE.PointsMaterial({size:0.12,vertexColors:true,transparent:true}));
+  sieveG.add(sieve);foldGroups.push(sieveG);scene.add(sieveG);
+
+  // Fold 6: OBSERVER - nested spheres
+  const obsG=new THREE.Group();
+  for(let i=0;i<7;i++){
+    const s=new THREE.Mesh(new THREE.SphereGeometry(2+i*1.5,16,12),new THREE.MeshBasicMaterial({color:new THREE.Color(FOLDS[i].color),wireframe:true,transparent:true,opacity:0.3}));
+    obsG.add(s);
+  }
+  foldGroups.push(obsG);scene.add(obsG);
+}
+
+// Target
+function createTarget(){
+  if(targetMesh)scene.remove(targetMesh);
+  const g=new THREE.IcosahedronGeometry(1.2,0);
+  targetMesh=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:0xff4444,wireframe:true,transparent:true,opacity:0.8}));
+  targetMesh.position.set(0,1,-8);
+  scene.add(targetMesh);
+  targetHP=targetMaxHP;
+}
+
+// Audio setup
+function initAudio(stream){
+  ax=new (window.AudioContext||window.webkitAudioContext)();
+  an=ax.createAnalyser();an.fftSize=2048;an.smoothingTimeConstant=0.8;
+  fd=new Uint8Array(an.frequencyBinCount);
+  if(stream){
+    srcNode=ax.createMediaStreamSource(stream);
+    srcNode.connect(an);
+    analyserMic=an;freqMic=fd;
+  }
+}
+function initFileAudio(el){
+  if(!ax)ax=new (window.AudioContext||window.webkitAudioContext)();
+  const src=ax.createMediaElementSource(el);
+  analyserFile=ax.createAnalyser();analyserFile.fftSize=2048;analyserFile.smoothingTimeConstant=0.8;
+  freqFile=new Uint8Array(analyserFile.frequencyBinCount);
+  src.connect(analyserFile);analyserFile.connect(ax.destination);
+  an=analyserFile;fd=freqFile;
+}
+
+function ga(){
+  const a=analyserFile||analyserMic;if(!a)return{b:0,lm:0,m:0,mh:0,h:0,pk:0,co:0,p:0};
+  const f=analyserFile?freqFile:freqMic;
+  a.getByteFrequencyData(f);
+  const n=f.length;
+  let b=0,lm=0,m=0,mh=0,h=0,pk=0,p=0,sum=0;
+  const s1=n*0.04|0,s2=n*0.1|0,s3=n*0.25|0,s4=n*0.45|0,s5=n*0.7|0;
+  for(let i=0;i<n;i++){
+    const v=f[i]/255;if(v>p)p=v;sum+=v;
+    if(i<s1)b+=v;else if(i<s2)lm+=v;else if(i<s3)m+=v;
+    else if(i<s4)mh+=v;else if(i<s5)h+=v;else pk+=v;
+  }
+  b/=Math.max(1,s1);lm/=Math.max(1,s2-s1);m/=Math.max(1,s3-s2);
+  mh/=Math.max(1,s4-s3);h/=Math.max(1,s5-s4);pk/=Math.max(1,n-s5);
+  const co=sum/(n*255);
+  return{b,lm,m,mh,h,pk,co,p};
+}
+
+// Fold selection
+function selectFold(audio){
+  const bands=[audio.b,audio.lm,audio.m,audio.mh,audio.h,audio.pk,audio.co*2];
+  let maxI=0,maxV=0;
+  for(let i=0;i<7;i++)if(bands[i]>maxV){maxV=bands[i];maxI=i;}
+  return maxI;
+}
+
+function setFoldOpacity(activeIdx,dt){
+  for(let i=0;i<foldGroups.length;i++){
+    const target=i===activeIdx?1:0.05;
+    foldGroups[i].traverse(c=>{
+      if(c.material){
+        const cur=c.material.opacity||0;
+        c.material.opacity+=(target-cur)*dt*4;
+        c.material.opacity=Math.max(0.02,Math.min(1,c.material.opacity));
+      }
+    });
+  }
+}
+
+// Fold transition effect
+function foldTransition(newFold){
+  foldTransT=1.0;
+  const col=new THREE.Color(FOLDS[newFold].color);
+  pLight.color.copy(col);
+  // Burst particles
+  for(let i=0;i<30;i++){
+    particles.push({
+      pos:new THREE.Vector3((Math.random()-0.5)*2,1+Math.random()*2,(Math.random()-0.5)*2),
+      vel:new THREE.Vector3((Math.random()-0.5)*8,(Math.random()-0.5)*8,(Math.random()-0.5)*8),
+      life:1,color:col.clone()
+    });
+  }
+  sysMsg(`⟐ Fold ${FOLDS[newFold].p} · ${FOLDS[newFold].name} activated`);
+  pubMQTT('folds/'+nickname,JSON.stringify({fold:newFold,t:Date.now()}));
+}
+
+// Blast system
+function fireBlast(type,power){
+  const B=BLASTS[type];if(!B)return;
+  const g=new THREE.SphereGeometry(B.size,12,8);
+  const m=new THREE.MeshBasicMaterial({color:B.color,transparent:true,opacity:0.9});
+  const mesh=new THREE.Mesh(g,m);
+  mesh.position.set(0,1,8);
+  // Glow
+  const glow=new THREE.Mesh(new THREE.SphereGeometry(B.size*1.6,8,6),new THREE.MeshBasicMaterial({color:B.color,transparent:true,opacity:0.3,side:THREE.BackSide}));
+  mesh.add(glow);
+  scene.add(mesh);
+  // Fold bonus
+  let foldMul=1;
+  if(activeFold===B.foldBonus)foldMul=1.8;
+  const dmg=B.dmg*(0.8+power*0.5)*foldMul*(1+combo*0.1);
+  blasts.push({mesh,vel:new THREE.Vector3(0,0,-B.speed*0.5),life:4,dmg,type,power});
+  $('bt').textContent=B.kanji+' '+type.toUpperCase()+(foldMul>1?' ×FOLD':'');
+  pubMQTT('blasts/'+nickname,JSON.stringify({type,power,fold:activeFold,t:Date.now()}));
+  broadcastRTC({type:'blast',name:nickname,blastType:type,power});
+}
+
+function updateBlasts(dt){
+  for(let i=blasts.length-1;i>=0;i--){
+    const bl=blasts[i];
+    bl.mesh.position.add(bl.vel.clone().multiplyScalar(dt*30));
+    bl.mesh.rotation.x+=dt*5;bl.mesh.rotation.y+=dt*3;
+    bl.life-=dt;
+    if(targetMesh&&bl.mesh.position.distanceTo(targetMesh.position)<1.5){
+      hitTarget(bl);scene.remove(bl.mesh);blasts.splice(i,1);continue;
+    }
+    if(bl.life<=0){scene.remove(bl.mesh);blasts.splice(i,1);}
+  }
+}
+
+function hitTarget(bl){
+  const dmg=bl.dmg;
+  targetHP-=dmg;
+  score+=Math.round(dmg*10);combo++;comboTimer=2;
+  $('sc').textContent=score;
+  $('cb').textContent=combo>1?combo+'x COMBO':'';
+  shakeAmt=Math.min(0.5,dmg*0.05);
+  // Damage number
+  dmgNums.push({val:Math.round(dmg),pos:targetMesh.position.clone().add(new THREE.Vector3((Math.random()-0.5)*2,2,0)),life:1.5});
+  // Explosion particles
+  const col=new THREE.Color(BLASTS[bl.type].color);
+  for(let i=0;i<10;i++){
+    particles.push({pos:targetMesh.position.clone(),vel:new THREE.Vector3((Math.random()-0.5)*6,Math.random()*4,(Math.random()-0.5)*6),life:0.8,color:col});
+  }
+  if(targetHP<=0){
+    targetMaxHP*=1.3;createTarget();
+    sysMsg('💀 TARGET DESTROYED! HP scales to '+Math.round(targetMaxHP));
+    score+=500;$('sc').textContent=score;
+  }
+  pubMQTT('scores/'+nickname,JSON.stringify({name:nickname,score,combo,t:Date.now()}));
+  broadcastRTC({type:'score',name:nickname,score});
+}
+
+// Voice analysis (F0 + vowel)
+let voiceData={f0:0,vowel:'',energy:0,vowelBins:[0,0,0,0,0,0]};
+function analyzeVoice(){
+  if(!analyserMic)return;
+  analyserMic.getByteFrequencyData(freqMic);
+  let energy=0,peakBin=0,peakVal=0;
+  for(let i=0;i<512;i++){
+    energy+=freqMic[i];
+    if(freqMic[i]>peakVal){peakVal=freqMic[i];peakBin=i;}
+  }
+  energy/=512*255;
+  voiceData.energy=energy;
+  voiceData.f0=peakBin*(ax.sampleRate/an.fftSize);
+  // Simple vowel classification by spectral shape
+  const lo=avg(freqMic,2,8),mid=avg(freqMic,8,20),hi=avg(freqMic,20,60);
+  const uhi=avg(freqMic,60,150);
+  if(energy>0.05){
+    if(lo>mid&&lo>hi)voiceData.vowel='oh';
+    else if(mid>lo&&mid>hi)voiceData.vowel='ah';
+    else if(hi>lo&&hi>mid&&uhi>hi*0.5)voiceData.vowel='ee';
+    else if(hi>mid)voiceData.vowel='eh';
+    else if(lo>hi&&mid<lo*0.7)voiceData.vowel='oo';
+    else voiceData.vowel='mm';
+  }
+  // Bins for HUD
+  voiceData.vowelBins=[lo/255,mid/255,hi/255,uhi/255,energy,peakVal/255];
+  // Auto-fire on sustained vowel
+  if(energy>0.08){
+    chargeLevel=Math.min(1,chargeLevel+energy*0.02);
+    if(chargeLevel>=0.8){
+      const btype=Object.keys(BLASTS).find(k=>BLASTS[k].vowel===voiceData.vowel)||'fire';
+      fireBlast(btype,chargeLevel);chargeLevel=0;
+    }
+  }else{chargeLevel*=0.95;}
+}
+function avg(arr,s,e){let v=0;for(let i=s;i<e;i++)v+=arr[i];return v/(e-s);}
+
+// Particles
+let particleMeshes=[];
+function updateParticles(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.pos.add(p.vel.clone().multiplyScalar(dt));
+    p.vel.y-=9.8*dt;
+    p.life-=dt;
+    if(p.life<=0)particles.splice(i,1);
+  }
+}
+
+// MQTT
+function initMQTT(idx){
+  if(idx>=BROKERS.length)return;
+  const cid='kaj_'+nickname+'_'+Math.random().toString(36).slice(2,8);
+  mqttClient=mqtt.connect(BROKERS[idx],{clientId:cid,clean:true,connectTimeout:8000,reconnectPeriod:5000});
+  mqttClient.on('connect',()=>{
+    mqttClient.subscribe(TOPIC+'scores/#');
+    mqttClient.subscribe(TOPIC+'live/#');
+    mqttClient.subscribe(TOPIC+'blasts/#');
+    mqttClient.subscribe(TOPIC+'chat');
+    mqttClient.subscribe(TOPIC+'folds/#');
+    sysMsg('MQTT connected');
+  });
+  mqttClient.on('message',(topic,msg)=>{
+    try{
+      const d=JSON.parse(msg.toString());
+      if(topic.includes('/chat'))addMsg(d.name||'?',d.text,d.color||'#aaa');
+      else if(topic.includes('/scores/')&&d.name!==nickname)updatePeer(d.name,d);
+      else if(topic.includes('/folds/')&&!topic.endsWith(nickname)){}
+      else if(topic.includes('/blasts/')&&!topic.endsWith(nickname)){
+        sysMsg(`${d.name||'?'} fired ${d.type}`);
+      }
+    }catch(e){}
+  });
+  mqttClient.on('error',()=>{mqttClient.end(true);initMQTT(idx+1);});
+}
+function pubMQTT(sub,msg){if(mqttClient&&mqttClient.connected)mqttClient.publish(TOPIC+sub,msg,{qos:0});}
+
+// WebRTC
+let rtcWs=null,rtcHash=null,rtcPeerId='',rtcDCs=new Map(),rtcPending=new Map();
+const ICE={iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
+function initWebRTC(){
+  rtcPeerId='-KJ0001-'+Array.from(crypto.getRandomValues(new Uint8Array(6))).map(b=>b.toString(16).padStart(2,'0')).join('');
+  crypto.subtle.digest('SHA-1',new TextEncoder().encode('ki-arena-jubilee:THOMAS')).then(buf=>{
+    rtcHash=Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    joinTracker();
+  });
+}
+function joinTracker(){
+  genOffers(5).then(offers=>{
+    rtcWs=new WebSocket(WS_TRACKER);
+    rtcWs.onopen=()=>rtcWs.send(JSON.stringify({action:'announce',info_hash:rtcHash,peer_id:rtcPeerId,numwant:10,uploaded:0,downloaded:0,left:1,offers}));
+    rtcWs.onmessage=ev=>{
+      const m=JSON.parse(ev.data);
+      if(m.offer&&m.peer_id!==rtcPeerId)handleOffer(m);
+      if(m.answer&&m.offer_id)handleAnswer(m);
+      if(m.interval)setTimeout(reann,m.interval*1000);
+    };
+    rtcWs.onclose=()=>setTimeout(joinTracker,8000);
+  });
+}
+function reann(){if(rtcWs&&rtcWs.readyState===1)genOffers(3).then(offers=>rtcWs.send(JSON.stringify({action:'announce',info_hash:rtcHash,peer_id:rtcPeerId,numwant:10,uploaded:0,downloaded:0,left:1,offers})));}
+async function genOffers(n){
+  const offers=[];
+  for(let i=0;i<n;i++){
+    const pc=new RTCPeerConnection(ICE);
+    const dc=pc.createDataChannel('ki',{ordered:false});
+    setupDC(dc);
+    const id=crypto.randomUUID?crypto.randomUUID():(Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2));
+    rtcPending.set(id,pc);
+    pc.onicecandidate=e=>{if(!e.candidate){}};
+    const offer=await pc.createOffer();await pc.setLocalDescription(offer);
+    await new Promise(r=>setTimeout(r,500));
+    offers.push({offer:{type:pc.localDescription.type,sdp:pc.localDescription.sdp},offer_id:id});
+  }
+  return offers;
+}
+async function handleOffer(msg){
+  const pc=new RTCPeerConnection(ICE);
+  pc.ondatachannel=e=>setupDC(e.channel);
+  await pc.setRemoteDescription(msg.offer);
+  const ans=await pc.createAnswer();await pc.setLocalDescription(ans);
+  await new Promise(r=>setTimeout(r,500));
+  rtcWs.send(JSON.stringify({action:'announce',info_hash:rtcHash,peer_id:rtcPeerId,to_peer_id:msg.peer_id,answer:{type:pc.localDescription.type,sdp:pc.localDescription.sdp},offer_id:msg.offer_id}));
+}
+async function handleAnswer(msg){
+  const pc=rtcPending.get(msg.offer_id);
+  if(pc){await pc.setRemoteDescription(msg.answer);rtcPending.delete(msg.offer_id);}
+}
+function setupDC(dc){
+  dc.onopen=()=>{rtcDCs.set(dc.label+Math.random(),dc);peerCount=rtcDCs.size;updateInfo();};
+  dc.onmessage=ev=>{try{const d=JSON.parse(ev.data);handleRTCMsg(d);}catch(e){}};
+  dc.onclose=()=>{peerCount=rtcDCs.size;updateInfo();};
+}
+function broadcastRTC(msg){rtcDCs.forEach(dc=>{if(dc.readyState==='open')try{dc.send(JSON.stringify(msg));}catch(e){}});}
+function handleRTCMsg(d){
+  if(d.type==='score')updatePeer(d.name,d);
+  else if(d.type==='blast')sysMsg(`${d.name} fired ${d.blastType}`);
+  else if(d.type==='chat')addMsg(d.name,d.text,'#aaf');
+}
+
+// Peer display
+let peerMeshes=new Map();
+function updatePeer(name,data){
+  if(!peerMeshes.has(name)){
+    const m=new THREE.Mesh(new THREE.SphereGeometry(0.4,12,8),new THREE.MeshBasicMaterial({color:Math.random()*0xffffff,transparent:true,opacity:0.6}));
+    m.position.set(-4+peerMeshes.size*2,2,-3);
+    scene.add(m);peerMeshes.set(name,m);
+  }
+  peers.set(name,data);
+}
+
+// Chat
+function addMsg(name,text,color){
+  const d=document.createElement('div');d.className='msg';
+  d.innerHTML=`<span style="color:${color||'#aaa'}">${name}:</span> ${text}`;
+  $('chat-msgs').appendChild(d);
+  $('chat-msgs').scrollTop=$('chat-msgs').scrollHeight;
+}
+function sysMsg(text){
+  const d=document.createElement('div');d.className='sys';d.textContent=text;
+  $('chat-msgs').appendChild(d);
+  $('chat-msgs').scrollTop=$('chat-msgs').scrollHeight;
+}
+
+// Chat input
+$('chat-input').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const txt=$('chat-input').value.trim();if(!txt)return;
+    $('chat-input').value='';
+    if(txt.startsWith('/name ')){nickname=txt.slice(6).trim();sysMsg('Nick: '+nickname);return;}
+    if(txt==='/fold'){sysMsg(`Fold ${FOLDS[activeFold].p} · ${FOLDS[activeFold].name} | HP:${Math.round(targetHP)}/${Math.round(targetMaxHP)}`);return;}
+    addMsg(nickname,txt,FOLDS[activeFold].color);
+    pubMQTT('chat',JSON.stringify({name:nickname,text:txt,color:FOLDS[activeFold].color}));
+    broadcastRTC({type:'chat',name:nickname,text:txt});
+  }
+});
+$('chat-input').style.pointerEvents='auto';
+
+// Emoji row
+document.querySelectorAll('#emoji-row span').forEach(sp=>{
+  sp.addEventListener('click',()=>{
+    const em=sp.textContent;
+    addMsg(nickname,em,FOLDS[activeFold].color);
+    pubMQTT('chat',JSON.stringify({name:nickname,text:em,color:FOLDS[activeFold].color}));
+  });
+});
+
+// Recording
+function startRec(){
+  const st=renderer.domElement.captureStream(60);
+  if(ax){try{const d=ax.createMediaStreamDestination();an.connect(d);d.stream.getAudioTracks().forEach(t=>st.addTrack(t));}catch(e){}}
+  const mi=MediaRecorder.isTypeSupported('video/webm;codecs=h264,opus')?'video/webm;codecs=h264,opus':'video/webm';
+  rchunks=[];recorder=new MediaRecorder(st,{mimeType:mi,videoBitsPerSecond:8e6});
+  recorder.ondataavailable=e=>{if(e.data.size>0)rchunks.push(e.data);};
+  recorder.onstop=()=>{const b=new Blob(rchunks,{type:mi}),a=document.createElement('a');
+    a.href=URL.createObjectURL(b);a.download='ki-arena-jubilee-'+Date.now()+'.webm';a.click();};
+  recorder.start(1000);recording=true;$('rec').style.display='block';
+}
+function stopRec(){if(recorder&&recording){recorder.stop();recording=false;$('rec').style.display='none';}}
+
+// HUD updates
+function updateHUD(){
+  const f=FOLDS[activeFold];
+  $('fn').textContent=`Fold ${f.p} · ${f.name}`;
+  $('fn').style.color=f.color;
+}
+function buildFoldBar(){
+  const fb=$('fb');fb.innerHTML='';
+  FOLDS.forEach((f,i)=>{const d=document.createElement('div');d.style.background=f.color;fb.appendChild(d);});
+}
+function updateFoldBar(){
+  const bars=$('fb').children;
+  for(let i=0;i<bars.length;i++){
+    bars[i].className=i===activeFold?'active':'';
+  }
+}
+function updateInfo(){
+  $('inf').textContent=`${nickname} | Peers: ${peerCount} | HP: ${Math.round(targetHP)}/${Math.round(targetMaxHP)}`;
+}
+function buildPhonemeHUD(){
+  const ph=$('phoneme-hud');ph.innerHTML='';
+  const labels=['火','雷','気','水','風','土'];
+  labels.forEach((l,i)=>{
+    const d=document.createElement('div');d.className='bar';d.id='pb'+i;
+    d.style.height='4px';d.style.background=Object.values(BLASTS)[i]?'#'+Object.values(BLASTS)[i].color.toString(16).padStart(6,'0'):'#888';
+    ph.appendChild(d);
+  });
+}
+function updatePhonemeHUD(){
+  voiceData.vowelBins.forEach((v,i)=>{
+    const el=$('pb'+i);if(el)el.style.height=Math.max(4,v*60)+'px';
+  });
+}
+
+// Drag-drop
+document.addEventListener('dragover',e=>{e.preventDefault();document.body.classList.add('drag-over');});
+document.addEventListener('dragleave',()=>document.body.classList.remove('drag-over'));
+document.addEventListener('drop',e=>{
+  e.preventDefault();document.body.classList.remove('drag-over');
+  const file=e.dataTransfer.files[0];if(!file)return;
+  audioEl=document.createElement('audio');audioEl.src=URL.createObjectURL(file);
+  audioEl.crossOrigin='anonymous';
+  audioEl.oncanplaythrough=()=>{
+    initFileAudio(audioEl);audioEl.play();startRec();
+    sysMsg('Playing: '+file.name);
+  };
+  audioEl.onended=()=>stopRec();
+  start();
+});
+
+// Start
+$('overlay').addEventListener('click',async()=>{
+  try{
+    micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});
+    initAudio(micStream);
+    sysMsg('Mic active');
+  }catch(e){sysMsg('No mic - drop audio file');}
+  start();
+});
+
+function start(){
+  if(started)return;started=true;
+  $('overlay').classList.add('hide');
+  buildFolds();createTarget();buildFoldBar();buildPhonemeHUD();
+  initMQTT(0);initWebRTC();
+  updateInfo();
+  animate();
+}
+
+// Main loop
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.05);
+  const t=clock.getElapsedTime();
+  const audio=ga();
+
+  // Fold selection
+  const newFold=selectFold(audio);
+  if(newFold!==activeFold){
+    prevFold=activeFold;activeFold=newFold;
+    foldTransition(newFold);updateHUD();updateFoldBar();
+  }
+  setFoldOpacity(activeFold,dt);
+
+  // Fold transition camera effect
+  if(foldTransT>0){
+    foldTransT-=dt*2;
+    camera.fov=70+foldTransT*15;
+    camera.updateProjectionMatrix();
+  }
+
+  // Animate folds
+  if(foldGroups[3]){// RINGS
+    foldGroups[3].children.forEach((ring,i)=>{
+      ring.rotation.z+=dt*P[i]*0.05;
+      ring.rotation.x+=dt*0.02*(i+1);
+    });
+  }
+  if(foldGroups[4]){// VERSE
+    foldGroups[4].children.forEach((sp,i)=>{
+      sp.position.y+=Math.sin(t+i)*dt*0.3;
+      sp.position.x+=Math.cos(t*0.5+i*0.7)*dt*0.1;
+    });
+  }
+  if(foldGroups[6]){// OBSERVER
+    foldGroups[6].children.forEach((s,i)=>{
+      s.rotation.y+=dt*0.1*(i+1)*0.3;
+      s.rotation.x+=dt*0.05*((i%2)?1:-1);
+    });
+  }
+  if(foldGroups[0]){// SPACE stars drift
+    foldGroups[0].rotation.y+=dt*0.01;
+  }
+
+  // Target animation
+  if(targetMesh){
+    targetMesh.rotation.x+=dt*0.5;targetMesh.rotation.y+=dt*0.7;
+    const hpRatio=targetHP/targetMaxHP;
+    targetMesh.material.color.setHSL(hpRatio*0.3,1,0.5);
+    targetMesh.scale.setScalar(0.8+hpRatio*0.4+audio.p*0.3);
+  }
+
+  // Voice
+  if(analyserMic)analyzeVoice();
+  updatePhonemeHUD();
+
+  // Blasts
+  updateBlasts(dt);
+
+  // Particles (rendered as screen-space in HUD later, or as point flashes)
+  updateParticles(dt);
+
+  // Combo timer
+  if(comboTimer>0){comboTimer-=dt;if(comboTimer<=0){combo=0;$('cb').textContent='';}}
+
+  // Screen shake
+  if(shakeAmt>0){
+    camera.position.x=Math.sin(t*50)*shakeAmt;
+    camera.position.y=3+Math.cos(t*70)*shakeAmt;
+    shakeAmt*=0.9;if(shakeAmt<0.005)shakeAmt=0;
+  }else{
+    camera.position.x=0;camera.position.y=3;
+  }
+
+  // Camera breathe
+  camera.position.z=12+Math.sin(t*0.3)*0.5;
+  if(activeFold===6)camera.position.z=30;// OBSERVER pulls back
+  camera.lookAt(0,1,-2);
+
+  // Point light pulse
+  pLight.intensity=1+audio.p*2;
+
+  // Render damage numbers as sprites (simplified: just fade existing ones)
+  for(let i=dmgNums.length-1;i>=0;i--){
+    dmgNums[i].life-=dt;dmgNums[i].pos.y+=dt*2;
+    if(dmgNums[i].life<=0)dmgNums.splice(i,1);
+  }
+
+  updateInfo();
+  renderer.render(scene,camera);
+}
+
+// Keyboard blast fire
+document.addEventListener('keydown',e=>{
+  if(e.target.id==='chat-input')return;
+  const map={1:'fire',2:'thunder',3:'ki',4:'water',5:'wind',6:'earth'};
+  if(map[e.key]){currentBlast=map[e.key];$('bt').textContent=BLASTS[currentBlast].kanji+' '+currentBlast.toUpperCase();}
+  if(e.key===' '){fireBlast(currentBlast,0.5+Math.random()*0.5);}
+  if(e.key==='r'||e.key==='R'){if(!recording)startRec();else stopRec();}
+});
+
+// Resize
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script></body></html>
