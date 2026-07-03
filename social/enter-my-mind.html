@@ -2,114 +2,121 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Enter My Mind — Vagal Sync P2P</title>
+<title>Enter My Mind — Global Vagal Sync</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#030108;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
 canvas#cv{position:fixed;top:0;left:0;width:100%;height:100%}
 
-#hud{position:fixed;top:0;left:0;right:0;z-index:50;padding:12px 20px;
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;padding:10px 16px;
   background:linear-gradient(180deg,rgba(3,1,8,.85),transparent);pointer-events:none;
   display:flex;justify-content:space-between;align-items:flex-start}
-.hud-col{display:flex;flex-direction:column;gap:3px}
+.hud-col{display:flex;flex-direction:column;gap:2px}
 .hud-col.right{align-items:flex-end}
-#title{font-family:Georgia,serif;font-size:1.1rem;color:#d4a94a;letter-spacing:3px}
-#subtitle{font-size:.55rem;color:#556;letter-spacing:2px}
-#syncMeter{font-size:2rem;color:#0f0;text-shadow:0 0 20px #0f0;transition:color .3s}
-#syncLabel{font-size:.55rem;color:#0af;letter-spacing:2px}
-#phase{font-size:.6rem;color:#d4a94a;letter-spacing:1.5px}
-#room{font-size:.5rem;color:#556}
-#peer{font-size:.55rem;color:#0af}
-#status{font-size:.5rem;color:#444}
+#title{font-family:Georgia,serif;font-size:1rem;color:#d4a94a;letter-spacing:3px}
+#subtitle{font-size:.5rem;color:#556;letter-spacing:2px}
+#myName{font-size:.55rem;color:#0af}
+#roomInfo{font-size:.5rem;color:#556}
+#peerCount{font-size:.6rem;color:#0af}
+#subRoom{font-size:.5rem;color:#d4a94a;cursor:pointer;pointer-events:auto}
+#subRoom:hover{color:#fff}
 
-#lobby{position:fixed;inset:0;z-index:200;background:radial-gradient(ellipse at center,#0a0520,#030108);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
-#lobby h1{font-family:Georgia,serif;color:#d4a94a;font-size:1.8rem;letter-spacing:5px}
-#lobby .sub{color:#556;font-size:.65rem;letter-spacing:2px;margin-bottom:20px}
-#lobby input{background:#0001;border:1px solid #d4a94a44;color:#d4a94a;padding:10px 16px;
-  font-family:inherit;font-size:.8rem;text-align:center;border-radius:4px;width:240px;letter-spacing:2px}
-#lobby input::placeholder{color:#d4a94a44}
-#lobby button{background:#d4a94a22;border:1px solid #d4a94a;color:#d4a94a;padding:10px 28px;
-  font-family:inherit;font-size:.7rem;letter-spacing:3px;cursor:pointer;border-radius:4px;
-  transition:all .2s}
-#lobby button:hover{background:#d4a94a44}
-#lobby .info{color:#445;font-size:.5rem;max-width:300px;text-align:center;line-height:1.6}
+#players{position:fixed;top:70px;right:12px;z-index:55;width:200px;pointer-events:auto}
+.player{display:flex;align-items:center;gap:6px;padding:5px 8px;margin:2px 0;
+  background:#0001;border:1px solid #ffffff08;border-radius:4px;cursor:pointer;transition:all .2s;font-size:10px}
+.player:hover{border-color:#0af44;background:#0af08}
+.player .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.player .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.player .sync{color:#0f0;font-size:9px;min-width:28px;text-align:right}
+.player.in-sub{border-color:#d4a94a44}
+.player.me{opacity:.5;cursor:default}
 
-#bands{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:55;
-  display:flex;gap:8px;pointer-events:none}
-.band{display:flex;flex-direction:column;align-items:center;gap:2px;width:36px}
-.band-label{font-size:8px;color:#556;letter-spacing:1px}
-.band-bars{display:flex;gap:2px;height:50px;align-items:flex-end}
-.band-bar{width:8px;border-radius:2px;transition:height .08s;min-height:2px}
-.band-bar.local{background:#0af}
-.band-bar.remote{background:#f48}
-.band-match{font-size:7px;color:#0f0;opacity:0}
-.band.synced .band-match{opacity:1}
-.band-glyph{font-size:12px;opacity:.3;transition:opacity .2s}
+#subPanel{position:fixed;top:70px;left:12px;z-index:55;width:180px;display:none;pointer-events:auto}
+#subPanel.on{display:block}
+#subTitle{font-size:.55rem;color:#d4a94a;letter-spacing:2px;margin-bottom:6px}
+#subMembers{font-size:10px;color:#0af}
+#subLeave{font-size:9px;color:#f44;cursor:pointer;margin-top:8px;letter-spacing:1px}
+#subLeave:hover{color:#fff}
+#subSync{font-size:1.4rem;color:#0f0;text-shadow:0 0 15px #0f0;margin:6px 0}
+#subPhase{font-size:.5rem;color:#d4a94a;letter-spacing:1.5px}
+
+#bands{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);z-index:55;
+  display:flex;gap:6px;pointer-events:none}
+.band{display:flex;flex-direction:column;align-items:center;gap:1px;width:32px}
+.band-glyph{font-size:11px;opacity:.3;transition:opacity .2s}
 .band.synced .band-glyph{opacity:1}
+.band-bars{display:flex;gap:1px;height:40px;align-items:flex-end}
+.band-bar{width:6px;border-radius:2px;transition:height .08s;min-height:1px}
+.band-bar.me{background:#0af}
+.band-label{font-size:7px;color:#445;letter-spacing:.5px}
 
-#chat{position:fixed;bottom:80px;right:12px;z-index:60;width:260px}
-#chatLog{height:120px;overflow-y:auto;background:#0008;border:1px solid #0af22;border-radius:6px;
-  padding:6px;font-size:10px;margin-bottom:4px}
-#chatLog::-webkit-scrollbar{width:3px}
+#chat{position:fixed;bottom:60px;right:12px;z-index:60;width:200px;pointer-events:auto}
+#chatLog{height:100px;overflow-y:auto;background:#0008;border:1px solid #0af15;border-radius:4px;
+  padding:4px;font-size:9px;margin-bottom:3px}
+#chatLog::-webkit-scrollbar{width:2px}
 #chatLog::-webkit-scrollbar-thumb{background:#0af4;border-radius:2px}
-.msg{margin:2px 0;word-wrap:break-word}
-.msg .n{color:#0af;font-weight:bold}.msg .n.remote{color:#f48}
-.msg .t{color:#999}
-.msg.sys{color:#d4a94a;font-style:italic}
+.msg{margin:1px 0;word-wrap:break-word}
+.msg .n{font-weight:bold}.msg .t{color:#999}
+.msg.sys{color:#d4a94a;font-style:italic;font-size:8px}
 #chatRow{display:flex}
-#chatIn{flex:1;background:#0002;border:1px solid #0af22;color:#fff;padding:6px;
-  font-size:10px;font-family:inherit;border-radius:4px 0 0 4px;outline:none}
-#chatSend{background:#0af22;border:1px solid #0af22;color:#0af;padding:6px 10px;
-  font-size:10px;cursor:pointer;border-radius:0 4px 4px 0}
+#chatIn{flex:1;background:#0002;border:1px solid #0af15;color:#fff;padding:4px 6px;
+  font-size:9px;font-family:inherit;border-radius:3px 0 0 3px;outline:none}
+#chatSend{background:#0af15;border:1px solid #0af15;color:#0af;padding:4px 8px;
+  font-size:9px;cursor:pointer;border-radius:0 3px 3px 0}
 
-#breathGuide{position:fixed;left:50%;top:55%;transform:translate(-50%,-50%);z-index:45;
-  pointer-events:none;text-align:center;opacity:0;transition:opacity .5s}
-#breathGuide.on{opacity:1}
-#breathText{font-family:Georgia,serif;font-size:1.2rem;color:#d4a94a88;letter-spacing:4px}
-#breathSub{font-size:.5rem;color:#44688a;margin-top:6px;letter-spacing:2px}
+#nameModal{position:fixed;inset:0;z-index:300;background:rgba(3,1,8,.95);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+#nameModal h1{font-family:Georgia,serif;color:#d4a94a;font-size:1.4rem;letter-spacing:4px}
+#nameModal .sub{color:#556;font-size:.55rem;letter-spacing:2px;margin-bottom:10px}
+#nameModal input{background:#0001;border:1px solid #d4a94a44;color:#d4a94a;padding:8px 14px;
+  font-family:inherit;font-size:.75rem;text-align:center;border-radius:3px;width:200px;letter-spacing:2px}
+#nameModal input::placeholder{color:#d4a94a33}
+#nameModal button{background:#d4a94a22;border:1px solid #d4a94a;color:#d4a94a;padding:8px 24px;
+  font-family:inherit;font-size:.6rem;letter-spacing:3px;cursor:pointer;border-radius:3px}
+#nameModal .info{color:#445;font-size:.45rem;max-width:280px;text-align:center;line-height:1.5}
 </style>
 </head>
 <body>
 <canvas id="cv"></canvas>
 
-<div id="lobby">
+<div id="nameModal">
   <h1>ENTER MY MIND</h1>
-  <div class="sub">VAGAL SYNCHRONIZATION · P2P</div>
+  <div class="sub">GLOBAL VAGAL SYNC</div>
   <input id="nameIn" placeholder="your name" maxlength="16" autocomplete="off">
-  <input id="roomIn" placeholder="room code" value="MIND" maxlength="20" autocomplete="off">
-  <button id="goBtn" onclick="enterRoom()">CONNECT</button>
-  <div class="info">Two players. Voice in, vagal signature out.<br>
-  Sing, hum, breathe, talk — synchronize your 7 rings.<br>
-  When your bloom vectors align, you enter each other's mind.</div>
+  <button onclick="go()">ENTER</button>
+  <div class="info">Global room. Everyone syncs with everyone.<br>
+  Click a player to create a private sub-room.<br>
+  Sing, hum, breathe — synchronize your 7 rings.</div>
 </div>
 
 <div id="hud" style="display:none">
   <div class="hud-col">
     <div id="title">ENTER MY MIND</div>
-    <div id="subtitle">VAGAL SYNC · P2P</div>
-    <div id="phase">PHASE: ATTUNE</div>
-    <div id="room"></div>
+    <div id="subtitle">GLOBAL ROOM</div>
+    <div id="myName"></div>
+    <div id="roomInfo">room: MIND-GLOBAL</div>
+    <div id="subRoom" onclick="leaveSub()"></div>
   </div>
   <div class="hud-col right">
-    <div id="syncMeter">0%</div>
-    <div id="syncLabel">COHERENCE</div>
-    <div id="peer">waiting for partner...</div>
-    <div id="status"></div>
+    <div id="peerCount">0 minds</div>
   </div>
 </div>
 
-<div id="bands" style="display:none"></div>
+<div id="players"></div>
+<div id="bands"></div>
 
-<div id="breathGuide">
-  <div id="breathText"></div>
-  <div id="breathSub"></div>
+<div id="subPanel">
+  <div id="subTitle">SUB-ROOM</div>
+  <div id="subSync">0%</div>
+  <div id="subPhase">ATTUNE</div>
+  <div id="subMembers"></div>
+  <div id="subLeave" onclick="leaveSub()">✕ LEAVE SUB</div>
 </div>
 
 <div id="chat" style="display:none">
   <div id="chatLog"></div>
   <div id="chatRow">
-    <input id="chatIn" placeholder="message..." maxlength="200" autocomplete="off">
+    <input id="chatIn" placeholder="..." maxlength="200" autocomplete="off">
     <button id="chatSend" onclick="sendChat()">↵</button>
   </div>
 </div>
@@ -118,235 +125,228 @@ canvas#cv{position:fixed;top:0;left:0;width:100%;height:100%}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 const P=[2,3,5,7,11,13,17], RCOL=['#993366','#00aadd','#ffaa00','#ff4444','#44aa44','#aa44ff','#cccccc'];
-const GLYPHS=['●','〜','┃','♡','△','◐','◯'];
-const LAYERS=['gut','vagus','gate','limbic','exec','insula','witness'];
+const GLYPHS=['●','〜','┃','♡','△','◐','◯'], LAYERS=['gut','vagus','gate','limbic','exec','insula','witness'];
 const BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt'];
-const T2=Math.PI*2, PHI=1.618033988749;
+const GLOBAL_ROOM='MIND-GLOBAL', T2=Math.PI*2;
+const PHASES=[
+  {name:'ATTUNE',threshold:.15},{name:'RESONATE',threshold:.35},
+  {name:'HARMONIZE',threshold:.55},{name:'MERGE',threshold:.75},{name:'ENTANGLED',threshold:.9}
+];
 
-let myName='', roomCode='', mqttClient=null, connected=false;
-let peerName='', peerConnected=false;
-let localStream=null, remoteStream=null;
-let localAnalyser=null, remoteAnalyser=null;
-let localBands=new Float32Array(7), remoteBands=new Float32Array(7);
-let syncHistory=[], syncScore=0, peakSync=0;
-let phase='ATTUNE', phaseTimer=0;
-let pc=null, dc=null; // WebRTC
+let myName='', mqttClient=null, connected=false;
+let localStream=null, localAnalyser=null, localBands=new Float32Array(7);
+let actx=null;
 
-// ═══ THREE.JS SCENE ═══
+// peers: {name: {bands:[7], lastSeen, color, ringGroup, rings[], orb}}
+const peers={};
+let currentSub=null; // null=global, or {id,members:[names]}
+const PEER_COLORS=['#0af','#f48','#4f8','#fa4','#a4f','#4ff','#ff4','#f4a','#8af','#af8'];
+let colorIdx=0;
+
+// ═══ THREE.JS ═══
 const scene=new THREE.Scene(), camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,100);
-camera.position.set(0,0,12);
+camera.position.set(0,0,14);
 const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('cv'),antialias:true,alpha:true});
 renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-scene.fog=new THREE.FogExp2(0x030108,.02);
-
-const localRings=[], remoteRings=[], syncParticles=[];
-const localGroup=new THREE.Group(), remoteGroup=new THREE.Group(), syncGroup=new THREE.Group();
-scene.add(localGroup); scene.add(remoteGroup); scene.add(syncGroup);
-localGroup.position.x=-3; remoteGroup.position.x=3;
-
-for(let i=0;i<7;i++){
-  const r=1+i*.55, col=new THREE.Color(RCOL[i]);
-  // local ring
-  const lg=new THREE.Mesh(
-    new THREE.TorusGeometry(r,.04,8,P[i]*6),
-    new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.3,blending:THREE.AdditiveBlending})
-  );
-  localGroup.add(lg); localRings.push(lg);
-  // remote ring
-  const rg=new THREE.Mesh(
-    new THREE.TorusGeometry(r,.04,8,P[i]*6),
-    new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.3,blending:THREE.AdditiveBlending})
-  );
-  remoteGroup.add(rg); remoteRings.push(rg);
-  // sync particles on the ring
-  const pCount=P[i]*4;
-  const pGeo=new THREE.BufferGeometry();
-  const pPos=new Float32Array(pCount*3);
-  for(let j=0;j<pCount;j++){
-    const a=j/pCount*T2;
-    pPos[j*3]=Math.cos(a)*r; pPos[j*3+1]=Math.sin(a)*r; pPos[j*3+2]=0;
-  }
-  pGeo.setAttribute('position',new THREE.BufferAttribute(pPos,3));
-  const pMat=new THREE.PointsMaterial({color:col,size:.08,transparent:true,opacity:0,blending:THREE.AdditiveBlending});
-  const pts=new THREE.Points(pGeo,pMat);
-  syncGroup.add(pts); syncParticles.push(pts);
-}
-
-// center orbs
-const localOrb=new THREE.Mesh(
-  new THREE.IcosahedronGeometry(.4,2),
-  new THREE.MeshBasicMaterial({color:0x00aaff,transparent:true,opacity:.4,blending:THREE.AdditiveBlending})
-);
-localGroup.add(localOrb);
-const remoteOrb=new THREE.Mesh(
-  new THREE.IcosahedronGeometry(.4,2),
-  new THREE.MeshBasicMaterial({color:0xff4488,transparent:true,opacity:.4,blending:THREE.AdditiveBlending})
-);
-remoteGroup.add(remoteOrb);
-
-// bridge beam (appears during sync)
-const bridgeGeo=new THREE.CylinderGeometry(.03,.03,6,6);
-bridgeGeo.rotateZ(Math.PI/2);
-const bridgeMat=new THREE.MeshBasicMaterial({color:0xd4a94a,transparent:true,opacity:0,blending:THREE.AdditiveBlending});
-const bridge=new THREE.Mesh(bridgeGeo,bridgeMat);
-scene.add(bridge);
-
-// ambient light
+scene.fog=new THREE.FogExp2(0x030108,.015);
 scene.add(new THREE.AmbientLight(0x334455,.5));
 
-// ═══ AUDIO ANALYSIS ═══
-const actx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:44100});
+// my rings (center)
+const myGroup=new THREE.Group();
+scene.add(myGroup);
+const myRings=[], myOrb;
+for(let i=0;i<7;i++){
+  const r=1+i*.5, col=new THREE.Color(RCOL[i]);
+  const ring=new THREE.Mesh(
+    new THREE.TorusGeometry(r,.035,8,P[i]*6),
+    new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.25,blending:THREE.AdditiveBlending}));
+  myGroup.add(ring); myRings.push(ring);
+}
+const _myOrb=new THREE.Mesh(
+  new THREE.IcosahedronGeometry(.35,2),
+  new THREE.MeshBasicMaterial({color:0x00aaff,transparent:true,opacity:.35,blending:THREE.AdditiveBlending}));
+myGroup.add(_myOrb);
 
-function createAnalyser(source){
-  const a=actx.createAnalyser();
-  a.fftSize=2048; a.smoothingTimeConstant=.82;
-  source.connect(a);
-  return a;
+function addPeerVisuals(name){
+  const col=new THREE.Color(PEER_COLORS[colorIdx%PEER_COLORS.length]);
+  colorIdx++;
+  const group=new THREE.Group();
+  const rings=[];
+  for(let i=0;i<7;i++){
+    const r=.6+i*.35;
+    const ring=new THREE.Mesh(
+      new THREE.TorusGeometry(r,.025,6,P[i]*4),
+      new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.2,blending:THREE.AdditiveBlending}));
+    group.add(ring); rings.push(ring);
+  }
+  const orb=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(.25,1),
+    new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.3,blending:THREE.AdditiveBlending}));
+  group.add(orb);
+  scene.add(group);
+  return {group,rings,orb,color:'#'+col.getHexString()};
 }
 
+function removePeerVisuals(p){
+  if(p.group) scene.remove(p.group);
+}
+
+// ═══ AUDIO ═══
 function extractBands(analyser,out){
   if(!analyser)return;
   const buf=new Uint8Array(analyser.frequencyBinCount);
   analyser.getByteFrequencyData(buf);
   const n=buf.length, step=Math.floor(n/7);
   for(let i=0;i<7;i++){
-    let sum=0;
-    const lo=i*step, hi=Math.min(lo+step,n);
+    let sum=0; const lo=i*step, hi=Math.min(lo+step,n);
     for(let j=lo;j<hi;j++) sum+=buf[j];
     out[i]=(sum/(hi-lo))/255;
   }
 }
 
-// ═══ MQTT ═══
-const TOPIC_PREFIX='entermymind/';
-function mqttTopic(sub){ return TOPIC_PREFIX+roomCode+'/'+sub; }
+// ═══ SYNC ═══
+function calcPairSync(a,b){
+  let total=0;
+  for(let i=0;i<7;i++) total+=Math.max(0,1-Math.abs(a[i]-b[i])*3);
+  return total/7;
+}
 
-function connectMQTT(brokerIdx){
-  if(brokerIdx>=BROKERS.length){ document.getElementById('status').textContent='all brokers failed'; return; }
-  const url=BROKERS[brokerIdx];
-  document.getElementById('status').textContent='connecting to broker...';
-  mqttClient=mqtt.connect(url,{clientId:'emm-'+Math.random().toString(36).substr(2,8),
+function getPhase(sync){
+  for(let i=PHASES.length-1;i>=0;i--) if(sync>=PHASES[i].threshold) return PHASES[i].name;
+  return 'ATTUNE';
+}
+
+// ═══ MQTT ═══
+function topic(sub){ return 'entermymind/'+GLOBAL_ROOM+'/'+sub; }
+
+function connectMQTT(idx){
+  if(idx>=BROKERS.length) return;
+  mqttClient=mqtt.connect(BROKERS[idx],{
+    clientId:'emm-'+Math.random().toString(36).substr(2,8),
     connectTimeout:5000,keepalive:30,clean:true});
   mqttClient.on('connect',()=>{
     connected=true;
-    document.getElementById('status').textContent='connected';
-    mqttClient.subscribe(mqttTopic('presence'));
-    mqttClient.subscribe(mqttTopic('bands'));
-    mqttClient.subscribe(mqttTopic('chat'));
-    mqttClient.subscribe(mqttTopic('signal'));
-    sendPresence();
-    setInterval(sendPresence,3000);
+    mqttClient.subscribe(topic('presence'));
+    mqttClient.subscribe(topic('bands'));
+    mqttClient.subscribe(topic('chat'));
+    mqttClient.subscribe(topic('sub'));
+    sendPresence(); setInterval(sendPresence,3000);
+    setInterval(pruneStale,5000);
   });
-  mqttClient.on('error',()=>{ mqttClient.end(); connectMQTT(brokerIdx+1); });
-  mqttClient.on('message',(topic,msg)=>{
-    const d=JSON.parse(msg.toString());
-    if(d.from===myName) return;
-    if(topic===mqttTopic('presence')) onPresence(d);
-    else if(topic===mqttTopic('bands')) onRemoteBands(d);
-    else if(topic===mqttTopic('chat')) onRemoteChat(d);
-    else if(topic===mqttTopic('signal')) onSignal(d);
+  mqttClient.on('error',()=>{ mqttClient.end(); connectMQTT(idx+1); });
+  mqttClient.on('message',(t,msg)=>{
+    try{
+      const d=JSON.parse(msg.toString());
+      if(d.from===myName) return;
+      const kind=t.split('/').pop();
+      if(kind==='presence') onPresence(d);
+      else if(kind==='bands') onBands(d);
+      else if(kind==='chat') onChat(d);
+      else if(kind==='sub') onSub(d);
+    }catch(e){}
   });
 }
 
 function sendPresence(){
   if(!connected) return;
-  mqttClient.publish(mqttTopic('presence'),JSON.stringify({from:myName,t:Date.now()}));
+  mqttClient.publish(topic('presence'),JSON.stringify({
+    from:myName,t:Date.now(),sub:currentSub?currentSub.id:null}));
 }
 
 function onPresence(d){
-  if(!peerConnected){
-    peerName=d.from;
-    peerConnected=true;
-    document.getElementById('peer').textContent=peerName+' is here';
-    document.getElementById('peer').style.color='#f48';
-    addMsg('sys',peerName+' entered the room');
-    startWebRTC(true);
+  if(!peers[d.from]){
+    const vis=addPeerVisuals(d.from);
+    peers[d.from]={bands:new Float32Array(7),lastSeen:Date.now(),sub:d.sub||null,...vis};
+    addMsg('sys',d.from+' entered');
+  }
+  peers[d.from].lastSeen=Date.now();
+  peers[d.from].sub=d.sub||null;
+  updatePlayerList();
+}
+
+function onBands(d){
+  if(!peers[d.from]) return;
+  const b=d.b||[];
+  for(let i=0;i<7;i++) peers[d.from].bands[i]=b[i]||0;
+}
+
+function onChat(d){ addMsg('remote',d.text,d.from,peers[d.from]?peers[d.from].color:'#888'); }
+
+function onSub(d){
+  if(d.action==='invite' && d.target===myName){
+    // auto-join sub invites
+    currentSub={id:d.subId,members:[d.from,myName]};
+    mqttClient.publish(topic('sub'),JSON.stringify({from:myName,action:'join',subId:d.subId}));
+    showSub();
+    addMsg('sys','joined sub-room with '+d.from);
+  } else if(d.action==='join' && currentSub && d.subId===currentSub.id){
+    if(!currentSub.members.includes(d.from)) currentSub.members.push(d.from);
+    showSub();
+  } else if(d.action==='leave' && currentSub && d.subId===currentSub.id){
+    currentSub.members=currentSub.members.filter(n=>n!==d.from);
+    if(currentSub.members.length<=1) leaveSub();
+    else showSub();
   }
 }
 
-// ═══ WebRTC ═══
-async function startWebRTC(initiator){
-  pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
-  pc.onicecandidate=e=>{
-    if(e.candidate) mqttClient.publish(mqttTopic('signal'),
-      JSON.stringify({from:myName,type:'ice',data:e.candidate}));
-  };
-  pc.ontrack=e=>{
-    remoteStream=e.streams[0];
-    const src=actx.createMediaStreamSource(remoteStream);
-    remoteAnalyser=createAnalyser(src);
-    document.getElementById('status').textContent='voice linked';
-  };
-  if(localStream) localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-  if(initiator){
-    dc=pc.createDataChannel('sync');
-    const offer=await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    mqttClient.publish(mqttTopic('signal'),JSON.stringify({from:myName,type:'offer',data:offer}));
-  }
+function pruneStale(){
+  const now=Date.now();
+  Object.keys(peers).forEach(name=>{
+    if(now-peers[name].lastSeen>10000){
+      removePeerVisuals(peers[name]);
+      delete peers[name];
+      addMsg('sys',name+' left');
+      updatePlayerList();
+    }
+  });
 }
 
-async function onSignal(d){
-  if(d.type==='offer'){
-    if(!pc) await startWebRTC(false);
-    await pc.setRemoteDescription(d.data);
-    const answer=await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    mqttClient.publish(mqttTopic('signal'),JSON.stringify({from:myName,type:'answer',data:answer}));
-  } else if(d.type==='answer'){
-    await pc.setRemoteDescription(d.data);
-  } else if(d.type==='ice'){
-    try{await pc.addIceCandidate(d.data);}catch(e){}
-  }
+// ═══ SUB-ROOMS ═══
+function inviteToSub(name){
+  if(name===myName) return;
+  const subId=myName+'-'+name+'-'+Date.now().toString(36);
+  currentSub={id:subId,members:[myName,name]};
+  mqttClient.publish(topic('sub'),JSON.stringify({
+    from:myName,action:'invite',target:name,subId:subId}));
+  showSub();
+  addMsg('sys','created sub-room, invited '+name);
 }
 
-// ═══ CHAT ═══
-function addMsg(type,text,name){
-  const log=document.getElementById('chatLog');
-  const div=document.createElement('div');
-  div.className='msg'+(type==='sys'?' sys':'');
-  if(type==='sys') div.textContent=text;
-  else div.innerHTML='<span class="n'+(type==='remote'?' remote':'')+'">'+name+'</span> <span class="t">'+text+'</span>';
-  log.appendChild(div);
-  log.scrollTop=log.scrollHeight;
+function leaveSub(){
+  if(!currentSub) return;
+  mqttClient.publish(topic('sub'),JSON.stringify({from:myName,action:'leave',subId:currentSub.id}));
+  currentSub=null;
+  document.getElementById('subPanel').classList.remove('on');
+  document.getElementById('subRoom').textContent='';
+  updatePlayerList();
 }
 
-function sendChat(){
-  const inp=document.getElementById('chatIn');
-  const text=inp.value.trim();
-  if(!text||!connected) return;
-  mqttClient.publish(mqttTopic('chat'),JSON.stringify({from:myName,text:text}));
-  addMsg('local',text,myName);
-  inp.value='';
+function showSub(){
+  const sp=document.getElementById('subPanel');
+  sp.classList.add('on');
+  document.getElementById('subMembers').textContent=currentSub.members.join(', ');
+  document.getElementById('subRoom').textContent='in sub-room ('+currentSub.members.length+')';
 }
-function onRemoteChat(d){ addMsg('remote',d.text,d.from); }
-document.getElementById('chatIn').addEventListener('keydown',e=>{
-  e.stopPropagation();
-  if(e.key==='Enter') sendChat();
-});
 
-// ═══ GAME PHASES ═══
-const PHASES=[
-  {name:'ATTUNE',dur:30,breath:'breathe together',sub:'match your rhythm',threshold:.15},
-  {name:'RESONATE',dur:45,breath:'hum a tone',sub:'find a shared frequency',threshold:.35},
-  {name:'HARMONIZE',dur:45,breath:'sing or speak',sub:'let your rings interlock',threshold:.55},
-  {name:'MERGE',dur:60,breath:'enter',sub:'become one signal',threshold:.75},
-  {name:'ENTANGLED',dur:Infinity,breath:'∞',sub:'minds synchronized',threshold:.9}
-];
-let phaseIdx=0, phaseStart=0;
-
-function updatePhase(){
-  const p=PHASES[phaseIdx];
-  if(syncScore>=p.threshold && phaseIdx<PHASES.length-1){
-    phaseIdx++;
-    phaseStart=performance.now();
-    const np=PHASES[phaseIdx];
-    document.getElementById('phase').textContent='PHASE: '+np.name;
-    addMsg('sys','▸ '+np.name+' — '+np.sub);
-  }
-  const bp=PHASES[phaseIdx];
-  document.getElementById('breathText').textContent=bp.breath;
-  document.getElementById('breathSub').textContent=bp.sub;
+// ═══ PLAYER LIST ═══
+function updatePlayerList(){
+  const container=document.getElementById('players');
+  const names=Object.keys(peers);
+  document.getElementById('peerCount').textContent=(names.length+1)+' minds';
+  let html='';
+  // me first
+  html+='<div class="player me"><span class="dot" style="background:#0af"></span><span class="name">'+myName+' (you)</span></div>';
+  names.forEach(name=>{
+    const p=peers[name];
+    const sync=calcPairSync(localBands,p.bands);
+    const pct=Math.round(sync*100);
+    const inSub=currentSub&&currentSub.members.includes(name);
+    html+='<div class="player'+(inSub?' in-sub':'')+'" onclick="inviteToSub(\''+name+'\')">';
+    html+='<span class="dot" style="background:'+p.color+'"></span>';
+    html+='<span class="name">'+name+'</span>';
+    html+='<span class="sync" style="color:hsl('+sync*120+',100%,50%)">'+pct+'%</span></div>';
+  });
+  container.innerHTML=html;
 }
 
 // ═══ BAND UI ═══
@@ -356,165 +356,154 @@ function buildBandUI(){
   for(let i=0;i<7;i++){
     const d=document.createElement('div');
     d.className='band';d.id='band-'+i;
-    d.innerHTML=`<span class="band-glyph" style="color:${RCOL[i]}">${GLYPHS[i]}</span>
-      <div class="band-bars">
-        <div class="band-bar local" id="bl-${i}"></div>
-        <div class="band-bar remote" id="br-${i}"></div>
-      </div>
-      <span class="band-match">✦</span>
-      <span class="band-label">${LAYERS[i]}</span>`;
+    d.innerHTML='<span class="band-glyph" style="color:'+RCOL[i]+'">'+GLYPHS[i]+'</span>'+
+      '<div class="band-bars"><div class="band-bar me" id="bl-'+i+'"></div></div>'+
+      '<span class="band-label">'+LAYERS[i]+'</span>';
     container.appendChild(d);
   }
 }
 
-// ═══ SYNC CALCULATION ═══
-function calcSync(){
-  if(!peerConnected) return 0;
-  let total=0;
-  for(let i=0;i<7;i++){
-    const diff=Math.abs(localBands[i]-remoteBands[i]);
-    const match=Math.max(0,1-diff*3);
-    total+=match;
-    const band=document.getElementById('band-'+i);
-    if(band){
-      band.classList.toggle('synced',match>.6);
-      document.getElementById('bl-'+i).style.height=(localBands[i]*48+2)+'px';
-      document.getElementById('br-'+i).style.height=(remoteBands[i]*48+2)+'px';
-    }
-  }
-  const raw=total/7;
-  syncHistory.push(raw);
-  if(syncHistory.length>30) syncHistory.shift();
-  const smooth=syncHistory.reduce((a,b)=>a+b,0)/syncHistory.length;
-  return smooth;
+// ═══ CHAT ═══
+function addMsg(type,text,name,color){
+  const log=document.getElementById('chatLog');
+  const div=document.createElement('div');
+  div.className='msg'+(type==='sys'?' sys':'');
+  if(type==='sys') div.textContent=text;
+  else div.innerHTML='<span class="n" style="color:'+(color||'#0af')+'">'+name+'</span> <span class="t">'+text+'</span>';
+  log.appendChild(div);
+  if(log.children.length>100) log.removeChild(log.firstChild);
+  log.scrollTop=log.scrollHeight;
 }
+function sendChat(){
+  const inp=document.getElementById('chatIn'), text=inp.value.trim();
+  if(!text||!connected) return;
+  mqttClient.publish(topic('chat'),JSON.stringify({from:myName,text:text}));
+  addMsg('local',text,myName,'#0af');
+  inp.value='';
+}
+document.getElementById('chatIn').addEventListener('keydown',e=>{
+  e.stopPropagation(); if(e.key==='Enter') sendChat();
+});
 
-// ═══ MAIN LOOP ═══
+// ═══ 3D LOOP ═══
 let lastBandSend=0;
 function loop(t){
   requestAnimationFrame(loop);
   extractBands(localAnalyser,localBands);
-  extractBands(remoteAnalyser,remoteBands);
 
-  // send bands to peer
   if(connected && t-lastBandSend>100){
-    mqttClient.publish(mqttTopic('bands'),JSON.stringify({from:myName,b:Array.from(localBands)}));
+    mqttClient.publish(topic('bands'),JSON.stringify({from:myName,b:Array.from(localBands)}));
     lastBandSend=t;
   }
 
-  syncScore=calcSync();
-  if(syncScore>peakSync) peakSync=syncScore;
-  const pct=Math.round(syncScore*100);
-
-  // HUD
-  const meter=document.getElementById('syncMeter');
-  meter.textContent=pct+'%';
-  const hue=syncScore*120;
-  meter.style.color=`hsl(${hue},100%,50%)`;
-  meter.style.textShadow=`0 0 20px hsl(${hue},100%,50%)`;
-
-  updatePhase();
-
-  // 3D
-  const s=syncScore;
-  // rings pulse with their band energy
+  // my rings
   for(let i=0;i<7;i++){
-    const lr=localRings[i], rr=remoteRings[i], sp=syncParticles[i];
-    lr.material.opacity=.15+localBands[i]*.6;
-    lr.rotation.z+=(.002+localBands[i]*.01)*(i%2?1:-1);
-    lr.scale.setScalar(1+localBands[i]*.15);
+    myRings[i].material.opacity=.15+localBands[i]*.5;
+    myRings[i].rotation.z+=(.002+localBands[i]*.008)*(i%2?1:-1);
+    myRings[i].scale.setScalar(1+localBands[i]*.12);
+    const el=document.getElementById('bl-'+i);
+    if(el) el.style.height=(localBands[i]*38+1)+'px';
+  }
+  _myOrb.material.opacity=.25+localBands[3]*.4;
+  _myOrb.scale.setScalar(1+localBands[0]*.25);
+  myGroup.rotation.y=Math.sin(t*.0003)*.2;
+  myGroup.rotation.x=Math.cos(t*.0002)*.08;
 
-    rr.material.opacity=.15+remoteBands[i]*.6;
-    rr.rotation.z+=(.002+remoteBands[i]*.01)*(i%2?-1:1);
-    rr.scale.setScalar(1+remoteBands[i]*.15);
+  // peer rings — arrange in circle around center
+  const names=Object.keys(peers);
+  const n=names.length;
+  const radius=5+n*.5;
+  names.forEach((name,idx)=>{
+    const p=peers[name];
+    const ang=(idx/Math.max(n,1))*T2 - Math.PI/2;
+    const tx=Math.cos(ang)*radius, tz=Math.sin(ang)*radius;
 
-    // sync particles glow when bands match
-    const match=1-Math.abs(localBands[i]-remoteBands[i])*3;
-    sp.material.opacity=Math.max(0,match)*.8;
-    sp.material.size=.04+Math.max(0,match)*.12;
-    sp.rotation.z+=.003*(i%2?1:-1);
+    // if in same sub-room, pull closer
+    const inSub=currentSub&&currentSub.members.includes(name);
+    const pull=inSub?0.4:1;
+    p.group.position.x+=(tx*pull-p.group.position.x)*.05;
+    p.group.position.z+=(tz*pull-p.group.position.z)*.05;
+    p.group.position.y=Math.sin(t*.001+idx)*.3;
+
+    // look at center
+    p.group.lookAt(0,p.group.position.y,0);
+
+    for(let i=0;i<7;i++){
+      p.rings[i].material.opacity=.1+p.bands[i]*.4;
+      p.rings[i].rotation.z+=(.002+p.bands[i]*.006)*(i%2?-1:1);
+      p.rings[i].scale.setScalar(1+p.bands[i]*.1);
+    }
+    p.orb.material.opacity=.2+p.bands[3]*.4;
+    p.orb.scale.setScalar(1+p.bands[0]*.2);
+  });
+
+  // sub-room sync display
+  if(currentSub&&currentSub.members.length>1){
+    let totalSync=0, count=0;
+    currentSub.members.forEach(name=>{
+      if(name===myName) return;
+      if(peers[name]){
+        totalSync+=calcPairSync(localBands,peers[name].bands);
+        count++;
+      }
+    });
+    const avg=count?totalSync/count:0;
+    const pct=Math.round(avg*100);
+    document.getElementById('subSync').textContent=pct+'%';
+    document.getElementById('subSync').style.color='hsl('+avg*120+',100%,50%)';
+    document.getElementById('subPhase').textContent=getPhase(avg);
   }
 
-  // groups converge as sync increases
-  const sep=3-s*2.5;
-  localGroup.position.x=-sep;
-  remoteGroup.position.x=sep;
-  localGroup.rotation.y=Math.sin(t*.0003)*.3;
-  remoteGroup.rotation.y=-Math.sin(t*.0003)*.3;
-  localGroup.rotation.x=Math.cos(t*.0002)*.1;
-  remoteGroup.rotation.x=-Math.cos(t*.0002)*.1;
+  // update player list every 500ms
+  if(Math.floor(t/500)!==Math.floor((t-16)/500)) updatePlayerList();
 
-  // orbs pulse
-  localOrb.material.opacity=.3+localBands[3]*.5;
-  localOrb.scale.setScalar(1+localBands[0]*.3);
-  remoteOrb.material.opacity=.3+remoteBands[3]*.5;
-  remoteOrb.scale.setScalar(1+remoteBands[0]*.3);
-
-  // bridge beam
-  bridgeMat.opacity=Math.max(0,(s-.3)/.7)*.6;
-  bridge.position.x=(localGroup.position.x+remoteGroup.position.x)/2;
-  const bLen=Math.abs(localGroup.position.x-remoteGroup.position.x);
-  bridge.scale.x=bLen/6;
-
-  // breath guide
-  document.getElementById('breathGuide').classList.toggle('on',peerConnected);
-
-  // camera subtle drift
-  camera.position.x=Math.sin(t*.0001)*1.5*Math.max(.2,1-s);
-  camera.position.y=Math.cos(t*.00015)*.5;
+  // camera
+  camera.position.x=Math.sin(t*.00008)*2;
+  camera.position.y=1+Math.cos(t*.0001)*.5;
+  camera.position.z=14-n*.3;
   camera.lookAt(0,0,0);
 
-  // background color shift with sync
-  const bg=new THREE.Color().setHSL(.75-.1*s,.3+s*.4,.02+s*.03);
+  const bg=new THREE.Color().setHSL(.75,.2,.02);
   renderer.setClearColor(bg);
-
   renderer.render(scene,camera);
 }
 
-function onRemoteBands(d){
-  for(let i=0;i<7;i++) remoteBands[i]=d.b[i]||0;
-}
+// ═══ GO ═══
+async function go(){
+  myName=document.getElementById('nameIn').value.trim();
+  if(!myName) myName='mind-'+Math.random().toString(36).substr(2,4);
+  try{localStorage.setItem('emm-name',myName);}catch(e){}
 
-// ═══ ENTER ═══
-async function enterRoom(){
-  myName=document.getElementById('nameIn').value.trim()||'mind-'+Math.random().toString(36).substr(2,4);
-  roomCode=document.getElementById('roomIn').value.trim()||'MIND';
-  document.getElementById('lobby').style.display='none';
+  document.getElementById('nameModal').style.display='none';
   document.getElementById('hud').style.display='flex';
-  document.getElementById('bands').style.display='flex';
   document.getElementById('chat').style.display='block';
-  document.getElementById('room').textContent='room: '+roomCode;
+  document.getElementById('myName').textContent=myName;
 
-  // mic
+  actx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:44100});
   try{
     localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
     const src=actx.createMediaStreamSource(localStream);
-    localAnalyser=createAnalyser(src);
+    localAnalyser=actx.createAnalyser();
+    localAnalyser.fftSize=2048; localAnalyser.smoothingTimeConstant=.82;
+    src.connect(localAnalyser);
     if(actx.state==='suspended') await actx.resume();
-  }catch(e){
-    document.getElementById('status').textContent='mic denied';
-  }
+  }catch(e){}
 
   buildBandUI();
   connectMQTT(0);
   requestAnimationFrame(loop);
 }
 
-// resize
 window.addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
 });
 
-// load saved name
 try{
   const s=localStorage.getItem('emm-name');
   if(s) document.getElementById('nameIn').value=s;
 }catch(e){}
-document.getElementById('nameIn').addEventListener('change',function(){
-  try{localStorage.setItem('emm-name',this.value);}catch(e){}
-});
 </script>
 </body>
 </html>
