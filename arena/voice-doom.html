@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VOICE DOOM — Sing to Slay</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#fff;font-family:'Courier New',monospace;overflow:hidden}
+canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;image-rendering:pixelated}
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;padding:8px 16px;
+  display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
+.hud-col{display:flex;flex-direction:column;gap:2px}
+.hud-col.right{align-items:flex-end}
+#title{font-size:.7rem;color:#f44;letter-spacing:3px;text-shadow:0 0 10px #f00}
+#controls{font-size:.45rem;color:#888;letter-spacing:1px;line-height:1.4}
+#health{font-size:1.4rem;color:#0f0;text-shadow:0 0 10px #0f0}
+#healthLabel{font-size:.45rem;color:#0a0;letter-spacing:2px}
+#ammo{font-size:1rem;color:#ff0;text-shadow:0 0 8px #ff0}
+#ammoLabel{font-size:.45rem;color:#aa0;letter-spacing:2px}
+#kills{font-size:.7rem;color:#f80}
+#score{font-size:.5rem;color:#888}
+
+#voiceHud{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);z-index:55;
+  display:flex;gap:12px;align-items:flex-end;pointer-events:none}
+#pitchBar{width:120px;height:6px;background:#222;border-radius:3px;position:relative;overflow:visible}
+#pitchDot{position:absolute;width:10px;height:10px;border-radius:50%;background:#0af;
+  top:-2px;left:50%;transform:translateX(-50%);transition:left .05s;box-shadow:0 0 8px #0af}
+#pitchLabel{font-size:8px;color:#556;text-align:center;margin-top:2px}
+#volBar{width:8px;height:50px;background:#222;border-radius:3px;overflow:hidden;position:relative}
+#volFill{position:absolute;bottom:0;left:0;right:0;background:#0f0;border-radius:3px;transition:height .05s}
+#volLabel{font-size:8px;color:#556}
+#action{font-size:10px;color:#f44;min-width:60px;text-align:center;text-shadow:0 0 8px #f00}
+
+#crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:45;
+  font-size:20px;color:#f008;text-shadow:0 0 5px #f00;pointer-events:none}
+
+#startScreen{position:fixed;inset:0;z-index:200;background:#000;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+#startScreen h1{font-size:2rem;color:#f44;letter-spacing:6px;text-shadow:0 0 30px #f00}
+#startScreen .sub{color:#888;font-size:.6rem;letter-spacing:2px}
+#startScreen .controls{color:#556;font-size:.5rem;line-height:1.8;margin:16px 0;text-align:center}
+#startScreen .controls span{color:#0af}
+#startScreen button{background:#f4422;border:1px solid #f44;color:#f44;padding:10px 30px;
+  font-family:inherit;font-size:.7rem;letter-spacing:3px;cursor:pointer;border-radius:3px}
+#startScreen button:hover{background:#f4444}
+
+#dmgFlash{position:fixed;inset:0;z-index:40;background:red;opacity:0;pointer-events:none;transition:opacity .1s}
+#killFlash{position:fixed;inset:0;z-index:40;background:#ff0;opacity:0;pointer-events:none;transition:opacity .1s}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="crosshair">+</div>
+<div id="dmgFlash"></div>
+<div id="killFlash"></div>
+
+<div id="startScreen">
+  <h1>VOICE DOOM</h1>
+  <div class="sub">SING TO SLAY</div>
+  <div class="controls">
+    <span>PITCH</span> controls turning (low=left, high=right)<br>
+    <span>VOLUME</span> controls movement (louder=faster)<br>
+    <span>SHOUT</span> to shoot<br>
+    <span>SILENCE</span> to stop
+  </div>
+  <button onclick="startGame()">ENTER HELL</button>
+</div>
+
+<div id="hud" style="display:none">
+  <div class="hud-col">
+    <div id="title">VOICE DOOM</div>
+    <div id="controls">pitch=turn · volume=move · shout=shoot</div>
+    <div id="kills">KILLS: 0</div>
+    <div id="score">SCORE: 0</div>
+  </div>
+  <div class="hud-col right">
+    <div id="health">100</div>
+    <div id="healthLabel">HEALTH</div>
+    <div id="ammo">50</div>
+    <div id="ammoLabel">AMMO</div>
+  </div>
+</div>
+
+<div id="voiceHud" style="display:none">
+  <div>
+    <div id="pitchBar"><div id="pitchDot"></div></div>
+    <div id="pitchLabel">PITCH</div>
+  </div>
+  <div>
+    <div id="volBar"><div id="volFill"></div></div>
+    <div id="volLabel">VOL</div>
+  </div>
+  <div id="action"></div>
+</div>
+
+<script>
+// ═══ MAP ═══
+const MAP_W=24, MAP_H=24;
+const MAP=[
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,1,1,0,0,0,0,0,2,2,2,0,0,0,0,0,1,1,0,0,0,1,
+  1,0,0,1,0,0,0,0,0,0,2,0,2,0,0,0,0,0,0,1,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,3,3,0,0,0,0,0,0,0,3,3,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,4,4,0,0,4,4,0,0,0,0,0,0,0,0,1,
+  1,0,0,2,0,0,0,0,0,4,0,0,0,0,4,0,0,0,0,2,0,0,0,1,
+  1,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,1,
+  1,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,1,
+  1,0,0,2,0,0,0,0,0,4,0,0,0,0,4,0,0,0,0,2,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,4,4,0,0,4,4,0,0,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,3,3,0,0,0,0,0,0,0,3,3,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,1,0,0,0,0,0,0,2,0,2,0,0,0,0,0,0,1,0,0,0,1,
+  1,0,0,1,1,0,0,0,0,0,2,2,2,0,0,0,0,0,1,1,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+];
+const WALL_COLORS={1:'#8B0000',2:'#4a0080',3:'#006644',4:'#664400'};
+const WALL_DARK={1:'#550000',2:'#2a0050',3:'#003322',4:'#332200'};
+
+function mapAt(x,y){ return (x>=0&&x<MAP_W&&y>=0&&y<MAP_H)?MAP[y*MAP_W+x]:1; }
+
+// ═══ PLAYER ═══
+let px=12, py=12, pAngle=0, health=100, ammo=50, kills=0, score=0;
+const MOVE_SPEED=0.04, TURN_SPEED=0.03;
+
+// ═══ ENEMIES ═══
+let enemies=[];
+function spawnEnemies(){
+  enemies=[];
+  const spots=[[4,4],[20,4],[4,20],[20,20],[12,6],[12,18],[6,12],[18,12],
+    [8,8],[16,8],[8,16],[16,16],[3,12],[21,12],[12,3],[12,21]];
+  spots.forEach(([ex,ey])=>{
+    enemies.push({x:ex+.5,y:ey+.5,hp:30,speed:.012,lastAtk:0,flash:0,type:Math.random()>.5?'imp':'demon'});
+  });
+}
+
+// ═══ CANVAS ═══
+const cv=document.getElementById('game');
+const ctx=cv.getContext('2d');
+const RES_W=320, RES_H=200;
+cv.width=RES_W; cv.height=RES_H;
+
+// ═══ RAYCASTER ═══
+const FOV=Math.PI/3;
+const zBuffer=new Float32Array(RES_W);
+
+function castRays(){
+  for(let x=0;x<RES_W;x++){
+    const rayAngle=pAngle-(FOV/2)+(x/RES_W)*FOV;
+    const sin=Math.sin(rayAngle), cos=Math.cos(rayAngle);
+    let dist=0;
+    const step=.02;
+    let hitWall=0;
+    let hitX=0,hitY=0;
+    while(dist<20){
+      dist+=step;
+      const tx=px+cos*dist, ty=py+sin*dist;
+      const mx=Math.floor(tx), my=Math.floor(ty);
+      const wall=mapAt(mx,my);
+      if(wall>0){
+        hitWall=wall;
+        hitX=tx; hitY=ty;
+        break;
+      }
+    }
+    zBuffer[x]=dist;
+
+    // fix fisheye
+    const corrDist=dist*Math.cos(rayAngle-pAngle);
+    const wallH=Math.min(RES_H,Math.floor(RES_H/corrDist));
+    const wallTop=(RES_H-wallH)/2;
+
+    // ceiling
+    ctx.fillStyle='#111';
+    ctx.fillRect(x,0,1,wallTop);
+
+    // wall
+    const shade=1-Math.min(dist/16,1);
+    const side=(Math.abs(hitX-Math.round(hitX))<.05);
+    const baseCol=side?WALL_DARK[hitWall]||'#333':WALL_COLORS[hitWall]||'#666';
+    const r=parseInt(baseCol.slice(1,3),16)*shade;
+    const g=parseInt(baseCol.slice(3,5),16)*shade;
+    const b=parseInt(baseCol.slice(5,7),16)*shade;
+    ctx.fillStyle=`rgb(${r|0},${g|0},${b|0})`;
+    ctx.fillRect(x,wallTop,1,wallH);
+
+    // floor
+    ctx.fillStyle='#1a1a1a';
+    ctx.fillRect(x,wallTop+wallH,1,RES_H-wallTop-wallH);
+  }
+}
+
+// ═══ SPRITES (enemies) ═══
+function drawEnemies(){
+  const visible=enemies.map(e=>{
+    const dx=e.x-px, dy=e.y-py;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    let angle=Math.atan2(dy,dx)-pAngle;
+    while(angle<-Math.PI) angle+=Math.PI*2;
+    while(angle>Math.PI) angle-=Math.PI*2;
+    return {...e,dist,angle};
+  }).filter(e=>e.dist<18&&Math.abs(e.angle)<FOV*.6)
+    .sort((a,b)=>b.dist-a.dist);
+
+  visible.forEach(e=>{
+    const screenX=RES_W/2+Math.tan(e.angle)*(RES_W/2)/Math.tan(FOV/2);
+    const corrDist=e.dist*Math.cos(e.angle);
+    const sprH=Math.min(RES_H,Math.floor(RES_H/corrDist*.8));
+    const sprW=sprH*.6;
+    const sprTop=(RES_H-sprH)/2;
+    const sprLeft=screenX-sprW/2;
+
+    // check z-buffer
+    const cx=Math.floor(screenX);
+    if(cx>=0&&cx<RES_W&&zBuffer[cx]>e.dist){
+      const shade=Math.max(.1,1-e.dist/14);
+      const flash=e.flash>0?1:0;
+
+      if(e.type==='imp'){
+        // imp: red humanoid
+        ctx.fillStyle=flash?'#fff':`rgb(${180*shade|0},${30*shade|0},${30*shade|0})`;
+        ctx.fillRect(sprLeft+sprW*.2,sprTop,sprW*.6,sprH*.3); // head
+        ctx.fillStyle=flash?'#ff0':`rgb(${150*shade|0},${20*shade|0},${20*shade|0})`;
+        ctx.fillRect(sprLeft+sprW*.1,sprTop+sprH*.3,sprW*.8,sprH*.4); // body
+        ctx.fillRect(sprLeft,sprTop+sprH*.35,sprW*.2,sprH*.3); // arm L
+        ctx.fillRect(sprLeft+sprW*.8,sprTop+sprH*.35,sprW*.2,sprH*.3); // arm R
+        ctx.fillRect(sprLeft+sprW*.2,sprTop+sprH*.7,sprW*.25,sprH*.3); // leg L
+        ctx.fillRect(sprLeft+sprW*.55,sprTop+sprH*.7,sprW*.25,sprH*.3); // leg R
+        // eyes
+        ctx.fillStyle=`rgb(255,${flash?255:0},0)`;
+        ctx.fillRect(sprLeft+sprW*.3,sprTop+sprH*.1,sprW*.12,sprW*.08);
+        ctx.fillRect(sprLeft+sprW*.55,sprTop+sprH*.1,sprW*.12,sprW*.08);
+      } else {
+        // demon: larger, darker
+        ctx.fillStyle=flash?'#fff':`rgb(${100*shade|0},${20*shade|0},${60*shade|0})`;
+        ctx.fillRect(sprLeft,sprTop+sprH*.1,sprW,sprH*.5); // body
+        ctx.fillStyle=flash?'#ff0':`rgb(${140*shade|0},${30*shade|0},${80*shade|0})`;
+        ctx.fillRect(sprLeft+sprW*.15,sprTop,sprW*.7,sprH*.25); // head
+        ctx.fillRect(sprLeft-sprW*.1,sprTop+sprH*.5,sprW*1.2,sprH*.2); // arms wide
+        ctx.fillRect(sprLeft+sprW*.1,sprTop+sprH*.6,sprW*.35,sprH*.4); // leg
+        ctx.fillRect(sprLeft+sprW*.55,sprTop+sprH*.6,sprW*.35,sprH*.4);
+        // eyes
+        ctx.fillStyle=`rgb(${flash?255:200},${flash?255:200},0)`;
+        ctx.fillRect(sprLeft+sprW*.25,sprTop+sprH*.05,sprW*.15,sprW*.1);
+        ctx.fillRect(sprLeft+sprW*.55,sprTop+sprH*.05,sprW*.15,sprW*.1);
+      }
+    }
+  });
+}
+
+// ═══ VOICE ═══
+let actx, analyser, pitchBuf, voiceReady=false;
+let currentPitch=0, currentVol=0, prevVol=0;
+let basePitch=200, shootCooldown=0;
+
+async function initVoice(){
+  actx=new (window.AudioContext||window.webkitAudioContext)();
+  const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});
+  const src=actx.createMediaStreamSource(stream);
+  analyser=actx.createAnalyser();
+  analyser.fftSize=2048;
+  src.connect(analyser);
+  pitchBuf=new Float32Array(analyser.fftSize);
+  if(actx.state==='suspended') await actx.resume();
+
+  // calibrate base pitch over 2 seconds
+  setTimeout(()=>{
+    const p=detectPitch();
+    if(p>50) basePitch=p;
+    voiceReady=true;
+  },2000);
+}
+
+function detectPitch(){
+  analyser.getFloatTimeDomainData(pitchBuf);
+  const n=pitchBuf.length;
+  // autocorrelation
+  let best=0, bestR=-1;
+  for(let lag=20;lag<n/2;lag++){
+    let sum=0;
+    for(let i=0;i<n-lag;i++) sum+=pitchBuf[i]*pitchBuf[i+lag];
+    if(sum>bestR){ bestR=sum; best=lag; }
+  }
+  if(best===0||bestR<.01) return 0;
+  return actx.sampleRate/best;
+}
+
+function getVolume(){
+  const buf=new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(buf);
+  let sum=0;
+  for(let i=0;i<buf.length;i++) sum+=buf[i];
+  return sum/buf.length/255;
+}
+
+// ═══ ENEMY AI ═══
+function updateEnemies(dt){
+  const now=performance.now();
+  enemies.forEach(e=>{
+    if(e.hp<=0) return;
+    e.flash=Math.max(0,e.flash-dt*5);
+
+    const dx=px-e.x, dy=py-e.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+
+    if(dist<12){
+      // move toward player
+      const nx=dx/dist*e.speed, ny=dy/dist*e.speed;
+      const newX=e.x+nx, newY=e.y+ny;
+      if(mapAt(Math.floor(newX),Math.floor(e.y))===0) e.x=newX;
+      if(mapAt(Math.floor(e.x),Math.floor(newY))===0) e.y=newY;
+    }
+
+    // attack if close
+    if(dist<1.5&&now-e.lastAtk>1500){
+      e.lastAtk=now;
+      const dmg=e.type==='demon'?15:8;
+      health-=dmg;
+      document.getElementById('dmgFlash').style.opacity='.3';
+      setTimeout(()=>document.getElementById('dmgFlash').style.opacity='0',100);
+      updateHUD();
+    }
+  });
+}
+
+// ═══ SHOOTING ═══
+function shoot(){
+  if(ammo<=0||shootCooldown>0) return;
+  ammo--;
+  shootCooldown=15;
+
+  // check center column for enemy hit
+  const sin=Math.sin(pAngle), cos=Math.cos(pAngle);
+  let closest=null, closestDist=20;
+  enemies.forEach(e=>{
+    if(e.hp<=0) return;
+    const dx=e.x-px, dy=e.y-py;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    // angle to enemy
+    let angle=Math.atan2(dy,dx)-pAngle;
+    while(angle<-Math.PI) angle+=Math.PI*2;
+    while(angle>Math.PI) angle-=Math.PI*2;
+    if(Math.abs(angle)<.15&&dist<closestDist){
+      closestDist=dist;
+      closest=e;
+    }
+  });
+
+  if(closest){
+    const dmg=Math.max(5,Math.floor(40/closestDist));
+    closest.hp-=dmg;
+    closest.flash=1;
+    if(closest.hp<=0){
+      kills++;
+      score+=closest.type==='demon'?200:100;
+      document.getElementById('killFlash').style.opacity='.15';
+      setTimeout(()=>document.getElementById('killFlash').style.opacity='0',80);
+      // respawn after delay
+      setTimeout(()=>{
+        closest.hp=30+kills*2;
+        closest.x=2+Math.random()*(MAP_W-4);
+        closest.y=2+Math.random()*(MAP_H-4);
+        while(mapAt(Math.floor(closest.x),Math.floor(closest.y))!==0){
+          closest.x=2+Math.random()*(MAP_W-4);
+          closest.y=2+Math.random()*(MAP_H-4);
+        }
+      },3000);
+    }
+  }
+
+  // muzzle flash
+  ctx.fillStyle='rgba(255,200,50,.3)';
+  ctx.fillRect(0,0,RES_W,RES_H);
+
+  updateHUD();
+}
+
+function updateHUD(){
+  document.getElementById('health').textContent=Math.max(0,health);
+  document.getElementById('health').style.color=health>50?'#0f0':health>25?'#ff0':'#f00';
+  document.getElementById('ammo').textContent=ammo;
+  document.getElementById('kills').textContent='KILLS: '+kills;
+  document.getElementById('score').textContent='SCORE: '+score;
+}
+
+// ═══ GAME LOOP ═══
+let running=false, lastTime=0;
+
+function gameLoop(t){
+  if(!running) return;
+  requestAnimationFrame(gameLoop);
+  const dt=Math.min((t-lastTime)/16,3);
+  lastTime=t;
+
+  // voice input
+  if(voiceReady){
+    prevVol=currentVol;
+    currentPitch=detectPitch();
+    currentVol=getVolume();
+
+    // pitch → turning
+    let turnInput=0;
+    if(currentPitch>50&&currentVol>.05){
+      const pitchDelta=(currentPitch-basePitch)/basePitch;
+      turnInput=Math.max(-1,Math.min(1,pitchDelta*2));
+      pAngle+=turnInput*TURN_SPEED*dt;
+    }
+
+    // volume → movement
+    if(currentVol>.08){
+      const speed=Math.min(currentVol*2,1)*MOVE_SPEED*dt;
+      const nx=px+Math.cos(pAngle)*speed;
+      const ny=py+Math.sin(pAngle)*speed;
+      if(mapAt(Math.floor(nx),Math.floor(py))===0) px=nx;
+      if(mapAt(Math.floor(px),Math.floor(ny))===0) py=ny;
+    }
+
+    // volume spike → shoot
+    const spike=currentVol-prevVol;
+    if(spike>.15&&currentVol>.3) shoot();
+
+    // ammo regen
+    if(t%3000<20&&ammo<50) ammo++;
+
+    // voice HUD
+    const pitchPct=currentPitch>50?Math.max(0,Math.min(100,50+(currentPitch-basePitch)/basePitch*50)):50;
+    document.getElementById('pitchDot').style.left=pitchPct+'%';
+    document.getElementById('volFill').style.height=(currentVol*100)+'%';
+    const action=document.getElementById('action');
+    if(currentVol<.05) action.textContent='';
+    else if(spike>.15&&currentVol>.3) action.textContent='FIRE!';
+    else if(currentVol>.08) action.textContent='MOVE';
+    else action.textContent='';
+  }
+
+  shootCooldown=Math.max(0,shootCooldown-1);
+  updateEnemies(dt);
+
+  // health regen
+  if(health<100&&t%5000<20) health++;
+
+  // render
+  castRays();
+  drawEnemies();
+
+  // weapon at bottom
+  ctx.fillStyle='#444';
+  ctx.fillRect(RES_W/2-12,RES_H-35,24,35);
+  ctx.fillStyle='#666';
+  ctx.fillRect(RES_W/2-4,RES_H-50,8,20);
+  if(shootCooldown>10){
+    ctx.fillStyle='rgba(255,150,0,.5)';
+    ctx.fillRect(RES_W/2-3,RES_H-55,6,8);
+  }
+
+  // death
+  if(health<=0){
+    ctx.fillStyle='rgba(255,0,0,.5)';
+    ctx.fillRect(0,0,RES_W,RES_H);
+    ctx.fillStyle='#fff';
+    ctx.font='bold 16px monospace';
+    ctx.textAlign='center';
+    ctx.fillText('YOU DIED',RES_W/2,RES_H/2-10);
+    ctx.font='10px monospace';
+    ctx.fillText('Score: '+score+'  Kills: '+kills,RES_W/2,RES_H/2+10);
+    ctx.fillText('click to respawn',RES_W/2,RES_H/2+25);
+    running=false;
+    cv.onclick=()=>{
+      health=100;ammo=50;px=12;py=12;pAngle=0;
+      spawnEnemies();
+      running=true;
+      cv.onclick=null;
+      updateHUD();
+      requestAnimationFrame(gameLoop);
+    };
+  }
+
+  updateHUD();
+}
+
+async function startGame(){
+  document.getElementById('startScreen').style.display='none';
+  document.getElementById('hud').style.display='flex';
+  document.getElementById('voiceHud').style.display='flex';
+  await initVoice();
+  spawnEnemies();
+  running=true;
+  lastTime=performance.now();
+  requestAnimationFrame(gameLoop);
+}
+
+window.addEventListener('resize',()=>{});
+</script>
+</body>
+</html>
