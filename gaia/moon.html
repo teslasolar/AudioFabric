@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MOON LIVE — Ir···Xe Orbital Monitor</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+body{background:#08060e}
+#title h1{color:#d4a94a;text-shadow:0 0 10px rgba(212,169,74,.3)}
+#info em{color:#d4a94a}
+#bond-panel{position:absolute;top:12px;right:12px;width:170px;background:rgba(0,0,0,.4);border:1px solid rgba(212,169,74,.15);border-radius:6px;padding:8px;backdrop-filter:blur(4px)}
+#bond-display{font-size:22px;font-weight:300;text-align:center;font-family:'JetBrains Mono',monospace;color:#aa77dd}
+#bond-label{font-size:6px;text-align:center;color:rgba(255,255,255,.3);letter-spacing:2px;margin-bottom:4px}
+#bond-status{font-size:8px;text-align:center;color:rgba(212,169,74,.5);margin-top:4px}
+#sins{position:absolute;top:140px;right:12px;width:170px}
+#sins h3{font-family:'JetBrains Mono',monospace;font-size:6px;color:rgba(255,255,255,.2);letter-spacing:2px;margin-bottom:6px}
+.sin-row{display:flex;align-items:center;gap:4px;margin:2px 0;font-size:8px}
+.sin-name{min-width:55px;color:#ff444488}
+.sin-bar{flex:1;height:3px;background:rgba(255,255,255,.05);border-radius:2px}
+.sin-fill{height:100%;border-radius:2px;transition:width .5s}
+.sin-pct{min-width:24px;text-align:right;font-size:7px}
+#watch{position:absolute;bottom:80px;right:12px;width:170px}
+#watch h3{font-family:'JetBrains Mono',monospace;font-size:6px;color:rgba(255,255,255,.2);letter-spacing:2px;margin-bottom:6px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="title">
+    <h1><span class="dot-live" style="background:#d4a94a"></span>MOON LIVE</h1>
+    <h2>Ir···Xe ORBITAL CONSCIOUSNESS</h2>
+  </div>
+  <div id="bond-panel">
+    <div id="bond-label">▸ Ir···Xe BOND</div>
+    <div id="bond-display">···</div>
+    <div id="bond-status">connecting...</div>
+  </div>
+  <div id="sins"><h3>▸ STRESS GEOMETRIES</h3><div id="sin-list"></div></div>
+  <div id="watch"><h3>▸ WATCH DATA</h3>
+    <div class="metric-row"><span class="k">HR</span><span class="v" id="w-hr">--</span></div>
+    <div class="metric-row"><span class="k">HRV</span><span class="v" id="w-hrv">--</span></div>
+    <div class="metric-row"><span class="k">Stress</span><span class="v" id="w-stress">--</span></div>
+    <div class="metric-row"><span class="k">κ</span><span class="v" id="w-kappa">--</span></div>
+    <div class="metric-row"><span class="k">φ·κ</span><span class="v" id="w-phik">--</span></div>
+    <div class="metric-row"><span class="k">K+</span><span class="v" id="w-k">--</span></div>
+    <div class="metric-row"><span class="k">Mg</span><span class="v" id="w-mg">--</span></div>
+    <div class="metric-row"><span class="k">Cor</span><span class="v" id="w-cor">--</span></div>
+    <div class="metric-row"><span class="k">Inf</span><span class="v" id="w-inf">--</span></div>
+    <div class="metric-row"><span class="k">Hyd</span><span class="v" id="w-hyd">--</span></div>
+    <div class="metric-row"><span class="k">Mode</span><span class="v" id="w-mode">--</span></div>
+  </div>
+  <div id="metrics"><h3>▸ LUNAR METRICS</h3>
+    <div class="metric-row"><span class="k">Phase</span><span class="v" id="m-phase">--</span></div>
+    <div class="metric-row"><span class="k">Illumination</span><span class="v" id="m-illum">--</span></div>
+    <div class="metric-row"><span class="k">Distance</span><span class="v" id="m-dist">--</span></div>
+    <div class="metric-row"><span class="k">Rise / Set</span><span class="v" id="m-riseset">--</span></div>
+    <div class="metric-row"><span class="k">Tidal Force</span><span class="v" id="m-tidal">--</span></div>
+    <div class="metric-row"><span class="k">Earth-Moon κ</span><span class="v" id="m-emk">--</span></div>
+    <div class="metric-row"><span class="k">Orbital ω</span><span class="v" id="m-omega">--</span></div>
+    <div class="metric-row"><span class="k">Synodic Day</span><span class="v" id="m-synodic">--</span></div>
+  </div>
+  <div id="info"><p><em>Ir=77 · Xe=54 · 131=prime</em></p><p>the moon orbits · the earth holds · the tides connect</p></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2,KS=1/PHI,KS2=KS*KS
+const USER=new URLSearchParams(location.search).get('user')||'thomas'
+const GW=new URLSearchParams(location.search).get('gw')||'http://localhost:5540'
+
+// ═══ THREE.JS ═══
+const cv=document.getElementById('c'),R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+R.toneMapping=THREE.ACESFilmicToneMapping
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x08060e)
+const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,5000)
+cam.position.set(0,30,120)
+scene.add(new THREE.AmbientLight(0x1a1830,.4))
+const sunLight=new THREE.DirectionalLight(0xffeedd,.8);sunLight.position.set(200,50,100);scene.add(sunLight)
+const moonGlow=new THREE.PointLight(0xd4a94a,.2,200);scene.add(moonGlow)
+
+// ═══ EARTH (Xe = her) ═══
+const earthR=30
+const earthGeo=new THREE.IcosahedronGeometry(earthR,4)
+const earthMat=new THREE.MeshPhongMaterial({color:0x1a4a8a,emissive:0x0a2040,emissiveIntensity:.2,transparent:true,opacity:.85})
+const earth=new THREE.Mesh(earthGeo,earthMat);scene.add(earth)
+const earthWire=new THREE.Mesh(new THREE.IcosahedronGeometry(earthR*1.002,3),
+  new THREE.MeshBasicMaterial({color:0x4488cc,wireframe:true,transparent:true,opacity:.06}))
+scene.add(earthWire)
+// atmosphere
+const atmosGeo=new THREE.SphereGeometry(earthR*1.05,32,32)
+const atmosMat=new THREE.MeshBasicMaterial({color:0x4488cc,transparent:true,opacity:.08,blending:THREE.AdditiveBlending,side:THREE.BackSide})
+scene.add(new THREE.Mesh(atmosGeo,atmosMat))
+
+// 7 bloom rings on Earth (her shield)
+const earthRings=[]
+for(let i=0;i<7;i++){
+  const r=earthR*(1.1+i*.08)
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.15,4,[2,3,5,7,11,13,17][i]*4),
+    new THREE.MeshBasicMaterial({color:[0x993366,0x00aadd,0xffaa00,0xff4444,0x44aa44,0xaa44ff,0xcccccc][i],
+      transparent:true,opacity:.06,blending:THREE.AdditiveBlending}))
+  ring.rotation.x=Math.PI/2+(i*.1-.35)
+  scene.add(ring);earthRings.push(ring)
+}
+
+// ═══ MOON (Ir = you) ═══
+const moonR=8
+const moonOrbitR=65
+const moonGeo=new THREE.IcosahedronGeometry(moonR,2)
+const moonMat=new THREE.MeshPhongMaterial({color:0xd4a94a,emissive:0x221100,emissiveIntensity:.15,transparent:true,opacity:.7})
+const moon=new THREE.Mesh(moonGeo,moonMat)
+scene.add(moon)
+const moonWire=new THREE.Mesh(new THREE.IcosahedronGeometry(moonR*1.01,1),
+  new THREE.MeshBasicMaterial({color:0xd4a94a,wireframe:true,transparent:true,opacity:.1}))
+moon.add(moonWire)
+
+// moon's 7 rings (your shield — driven by watch data)
+const moonRings=[]
+for(let i=0;i<7;i++){
+  const r=moonR*(.6+i*.12)
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.06,4,[2,3,5,7,11,13,17][i]*3),
+    new THREE.MeshBasicMaterial({color:[0x993366,0x00aadd,0xffaa00,0xff4444,0x44aa44,0xaa44ff,0xcccccc][i],
+      transparent:true,opacity:.08,blending:THREE.AdditiveBlending}))
+  moon.add(ring);moonRings.push(ring)
+}
+
+// ═══ ORBIT PATH ═══
+const orbitGeo=new THREE.BufferGeometry()
+const orbitPts=[]
+for(let i=0;i<=128;i++){const a=i/128*TAU;orbitPts.push(new THREE.Vector3(Math.cos(a)*moonOrbitR,0,Math.sin(a)*moonOrbitR))}
+orbitGeo.setFromPoints(orbitPts)
+scene.add(new THREE.Line(orbitGeo,new THREE.LineBasicMaterial({color:0xd4a94a,transparent:true,opacity:.06})))
+
+// ═══ TIDAL BRIDGE ═══
+const bridgeMat=new THREE.MeshBasicMaterial({color:0xaa77dd,transparent:true,opacity:0,blending:THREE.AdditiveBlending})
+const bridgeGeo=new THREE.CylinderGeometry(.15,.15,1,4)
+const bridge=new THREE.Mesh(bridgeGeo,bridgeMat);scene.add(bridge)
+
+// three dots between
+const dots=[]
+for(let i=0;i<3;i++){
+  const dot=new THREE.Mesh(new THREE.SphereGeometry(.5,6,6),
+    new THREE.MeshBasicMaterial({color:0xaa77dd,transparent:true,opacity:0,blending:THREE.AdditiveBlending}))
+  scene.add(dot);dots.push(dot)
+}
+
+// sin geometry particles on moon
+const sinParticles=new THREE.Group();moon.add(sinParticles)
+
+// stars
+const sG=new THREE.BufferGeometry(),sP=new Float32Array(3000*3)
+for(let i=0;i<9000;i++)sP[i]=(Math.random()-.5)*2000
+sG.setAttribute('position',new THREE.BufferAttribute(sP,3))
+scene.add(new THREE.Points(sG,new THREE.PointsMaterial({color:0xffffff,size:.3,transparent:true,opacity:.3})))
+
+// ═══ STATE ═══
+let S={hr:0,hrv:0,stress:0,kappa:.5,biomarkers:{},bloom:[1,1,1,1,1,1,1],online:false,mode:''}
+function bv(k){return S.biomarkers[k]?.v||0}
+
+// ═══ LUNAR CALCULATIONS ═══
+function lunarPhase(){
+  const now=new Date()
+  const refNew=new Date('2024-01-11T11:57:00Z')
+  const synodic=29.53059
+  const daysSinceNew=(now-refNew)/(1000*60*60*24)
+  const phase=(daysSinceNew%synodic)/synodic
+  const illum=.5*(1-Math.cos(phase*TAU))
+  const names=['New Moon','Waxing Crescent','First Quarter','Waxing Gibbous','Full Moon','Waning Gibbous','Last Quarter','Waning Crescent']
+  const name=names[Math.floor(phase*8)%8]
+  const emoji=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'][Math.floor(phase*8)%8]
+  const dist=356500+27200*Math.cos(phase*TAU+.5)
+  return{phase,illum,name,emoji,dist,daysSinceNew}
+}
+
+// ═══ POLL ═══
+async function poll(){
+  try{
+    const r=await fetch(`${GW}/wearer/${USER}`,{signal:AbortSignal.timeout(5000)})
+    const d=await r.json()
+    S.hr=d.hr||S.hr;S.hrv=d.hrv||S.hrv;S.stress=d.stress||0
+    S.biomarkers=d.biomarkers||{};S.online=d.online
+    S.kappa=bv('ENT')||S.kappa
+  }catch(e){}
+  try{
+    const br=await fetch(`${GW}/blossom/call?method=bloomwatch.state&params=${encodeURIComponent(JSON.stringify({user_id:USER}))}`,{method:'POST',signal:AbortSignal.timeout(3000)})
+    const bd=await br.json();const sub=bd.payload?.result?.subject
+    if(sub?.bloom)S.bloom=sub.bloom
+    if(sub?.kappa?.length)S.kappa=sub.kappa[sub.kappa.length-1]
+    S.mode=bd.payload?.result?.mode||S.mode
+  }catch(e){}
+  updateHUD()
+}
+
+function updateHUD(){
+  const kd=Math.abs(S.kappa-KS);const bondStr=Math.max(0,1-kd/KS2)
+  document.getElementById('bond-display').textContent=(bondStr*100).toFixed(0)+'%'
+  document.getElementById('bond-display').style.color=bondStr>.5?'#aa77dd':bondStr>.2?'#ffaa00':'#ff4444'
+  document.getElementById('bond-status').textContent=bondStr>.5?'coordinate bond stable':bondStr>.2?'bond forming':'thermal risk'
+
+  const el=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v}
+  el('w-hr',(S.hr||0).toFixed(0)+' bpm')
+  el('w-hrv',(S.hrv||0).toFixed(1)+' ms')
+  el('w-stress',(S.stress*100).toFixed(0)+'%')
+  el('w-kappa',S.kappa.toFixed(4))
+  el('w-phik',(PHI*S.kappa).toFixed(4))
+  el('w-k',bv('K').toFixed(2));el('w-mg',bv('Mg').toFixed(2))
+  el('w-cor',bv('Cor').toFixed(2));el('w-inf',bv('Inf').toFixed(2))
+  el('w-hyd',bv('Hyd').toFixed(2));el('w-mode',S.mode||'--')
+
+  const lp=lunarPhase()
+  el('m-phase',lp.emoji+' '+lp.name)
+  el('m-illum',(lp.illum*100).toFixed(1)+'%')
+  el('m-dist',Math.round(lp.dist).toLocaleString()+' km')
+  el('m-tidal',(1/Math.pow(lp.dist/356500,3)).toFixed(3))
+  el('m-emk',(KS*lp.illum).toFixed(4))
+  el('m-omega',(TAU/29.53/24).toFixed(6)+' rad/h')
+  el('m-synodic','day '+(lp.daysSinceNew%29.53).toFixed(1)+'/29.53')
+
+  // sins
+  const sins=calcSins()
+  let sinH=''
+  Object.entries(sins).forEach(([sn,lv])=>{
+    const col=lv>.5?'#ff4444':lv>.2?'#ffaa00':'#44aa44'
+    sinH+=`<div class="sin-row"><span class="sin-name">${sn}</span><span class="sin-bar"><span class="sin-fill" style="width:${lv*100}%;background:${col}"></span></span><span class="sin-pct" style="color:${col}">${(lv*100).toFixed(0)}%</span></div>`
+  })
+  document.getElementById('sin-list').innerHTML=sinH
+}
+
+function calcSins(){
+  const kd=Math.abs(S.kappa-KS);const cor=bv('Cor');const inf=bv('Inf');const hyd=bv('Hyd');const k_=bv('K');const ans=bv('ANS');const ins=bv('Ins');const glc=bv('Glc')
+  return{
+    WRATH:Math.min(1,Math.max(0,(S.hr-80)/40*.5+S.stress*.5+(cor>.6?(cor-.6)/.4*.3:0))),
+    LUST:kd>.03&&kd<.2?Math.min(1,kd/.2):0,
+    GLUTTONY:Math.min(1,Math.max(0,(cor>.6?(cor-.6)/.4*.5:0)+(glc>140?(glc-140)/60*.5:0))),
+    SLOTH:Math.min(1,Math.max(0,(15-S.hrv)/15*.7+(ans<.3?(.3-ans)/.3*.3:0))),
+    GREED:Math.min(1,Math.max(0,Math.max(0,(KS-.05-S.kappa)/.2)*.4+Math.max(0,(.5-hyd)/.5)*.3+(k_>0&&k_<3.5?(3.5-k_)/1.5*.3:0))),
+    ENVY:Math.min(1,Math.max(0,inf*.7+(ins>.5?(ins-.5)/.5*.3:0))),
+    PRIDE:Math.min(1,Math.max(0,(S.hr<55?(55-S.hr)/30*.3:0)+(S.hrv>50?(S.hrv-50)/50*.3:0)))
+  }
+}
+
+// ═══ CAMERA ═══
+let cTh=0,cPh=.3,cR=150,drag=false,mx=0,my=0
+cv.addEventListener('pointerdown',e=>{drag=true;mx=e.clientX;my=e.clientY})
+addEventListener('pointerup',()=>drag=false)
+addEventListener('pointermove',e=>{if(!drag)return;cTh-=(e.clientX-mx)*.003;cPh+=(e.clientY-my)*.002;cPh=Math.max(-.5,Math.min(.8,cPh));mx=e.clientX;my=e.clientY})
+cv.addEventListener('wheel',e=>{cR=Math.max(50,Math.min(400,cR+e.deltaY*.1))},{passive:true})
+
+// ═══ ANIMATE ═══
+let lt=0,pollT=0
+function animate(ts){
+  requestAnimationFrame(animate)
+  const t=ts*.001
+  if(t-pollT>8){pollT=t;poll()}
+
+  const lp=lunarPhase()
+  const kd=Math.abs(S.kappa-KS)
+  const bondStr=Math.max(0,1-kd/KS2)
+  const sins=calcSins()
+
+  // moon orbit
+  const moonAngle=lp.phase*TAU
+  const orbitScale=moonOrbitR*(1+Math.sin(t*.01)*.02)
+  moon.position.x=Math.cos(moonAngle+t*.02)*orbitScale
+  moon.position.z=Math.sin(moonAngle+t*.02)*orbitScale
+  moon.position.y=Math.sin(t*.03)*3
+  moonGlow.position.copy(moon.position)
+
+  // moon pulsates with HR
+  if(S.hr>0){
+    const heartPhase=Math.sin(t*S.hr/60*TAU)
+    const sc=1+heartPhase*.02
+    moon.scale.setScalar(sc)
+    moonMat.emissiveIntensity=.1+heartPhase*.05
+  }
+
+  // moon rings driven by bloom
+  moonRings.forEach((ring,i)=>{
+    const bloomE=(S.bloom[i]||1)/5
+    ring.material.opacity=.05+bloomE*.15
+    ring.rotation.z+=(.002+bloomE*.005)*(i%2?1:-1)
+  })
+
+  // moon color shifts with sin load
+  const totalSin=Object.values(sins).reduce((a,b)=>a+b,0)/7
+  moonMat.color.setHSL(.1-.05*totalSin,.6,.4+totalSin*.1)
+
+  // earth breathes slowly
+  earth.rotation.y+=.001
+  earthWire.rotation.y+=.0012
+  earthRings.forEach((ring,i)=>{ring.rotation.z+=.0003*(i%2?1:-1)})
+
+  // tidal bridge between moon and earth
+  const moonPos=moon.position.clone()
+  const earthPos=new THREE.Vector3(0,0,0)
+  const midPoint=moonPos.clone().add(earthPos).multiplyScalar(.5)
+  bridge.position.copy(midPoint)
+  bridge.lookAt(moonPos)
+  bridge.rotateX(Math.PI/2)
+  const dist=moonPos.distanceTo(earthPos)
+  bridge.scale.set(1,dist,1)
+  bridgeMat.opacity=bondStr*.15
+
+  // three dots along the bridge
+  dots.forEach((dot,i)=>{
+    const t_pos=(i+1)/4
+    dot.position.lerpVectors(earthPos,moonPos,t_pos)
+    dot.material.opacity=bondStr*.3+Math.sin(t*3+i)*.1
+    dot.scale.setScalar(.8+bondStr*.5)
+  })
+
+  // illuminate based on bond
+  moonGlow.intensity=bondStr*.3
+  moonGlow.color.setHSL(.1+bondStr*.05,.5,.5)
+
+  // camera
+  cam.position.x=Math.cos(cTh)*Math.cos(cPh)*cR
+  cam.position.y=Math.sin(cPh)*cR+20
+  cam.position.z=Math.sin(cTh)*Math.cos(cPh)*cR
+  cam.lookAt(0,0,0)
+
+  R.render(scene,cam)
+}
+
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+poll();animate(0)
+</script>
+</body></html>
