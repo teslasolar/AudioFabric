@@ -3,25 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>MOON LIVE — Ir···Xe Orbital Monitor</title>
+<title>MOON LIVE — Lunar Weather Monitor</title>
 <link rel="stylesheet" href="shared.css">
 <style>
 body{background:#08060e}
 #title h1{color:#d4a94a;text-shadow:0 0 10px rgba(212,169,74,.3)}
 #info em{color:#d4a94a}
-#bond-panel{position:absolute;top:12px;right:12px;width:170px;background:rgba(0,0,0,.4);border:1px solid rgba(212,169,74,.15);border-radius:6px;padding:8px;backdrop-filter:blur(4px)}
-#bond-display{font-size:22px;font-weight:300;text-align:center;font-family:'JetBrains Mono',monospace;color:#aa77dd}
-#bond-label{font-size:6px;text-align:center;color:rgba(255,255,255,.3);letter-spacing:2px;margin-bottom:4px}
-#bond-status{font-size:8px;text-align:center;color:rgba(212,169,74,.5);margin-top:4px}
-#sins{position:absolute;top:140px;right:12px;width:170px}
-#sins h3{font-family:'JetBrains Mono',monospace;font-size:6px;color:rgba(255,255,255,.2);letter-spacing:2px;margin-bottom:6px}
-.sin-row{display:flex;align-items:center;gap:4px;margin:2px 0;font-size:8px}
-.sin-name{min-width:55px;color:#ff444488}
-.sin-bar{flex:1;height:3px;background:rgba(255,255,255,.05);border-radius:2px}
-.sin-fill{height:100%;border-radius:2px;transition:width .5s}
-.sin-pct{min-width:24px;text-align:right;font-size:7px}
-#watch{position:absolute;bottom:80px;right:12px;width:170px}
-#watch h3{font-family:'JetBrains Mono',monospace;font-size:6px;color:rgba(255,255,255,.2);letter-spacing:2px;margin-bottom:6px}
+#phase-panel{position:absolute;top:12px;right:12px;width:180px;background:rgba(0,0,0,.4);border:1px solid rgba(212,169,74,.15);border-radius:6px;padding:10px;backdrop-filter:blur(4px)}
+#phase-emoji{font-size:36px;text-align:center;line-height:1}
+#phase-name{font-size:10px;text-align:center;color:#d4a94a;letter-spacing:2px;margin:4px 0}
+#phase-illum{font-size:8px;text-align:center;color:rgba(255,255,255,.4)}
+#phase-bar{height:4px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:6px;overflow:hidden}
+#phase-fill{height:100%;background:#d4a94a;transition:width .5s;border-radius:2px}
 </style>
 </head>
 <body>
@@ -29,45 +22,158 @@ body{background:#08060e}
 <div id="hud">
   <div id="title">
     <h1><span class="dot-live" style="background:#d4a94a"></span>MOON LIVE</h1>
-    <h2>Ir···Xe ORBITAL CONSCIOUSNESS</h2>
+    <h2>LUNAR WEATHER MONITOR</h2>
   </div>
-  <div id="bond-panel">
-    <div id="bond-label">▸ Ir···Xe BOND</div>
-    <div id="bond-display">···</div>
-    <div id="bond-status">connecting...</div>
+  <div id="phase-panel">
+    <div id="phase-emoji">🌕</div>
+    <div id="phase-name">--</div>
+    <div id="phase-illum">--</div>
+    <div id="phase-bar"><div id="phase-fill"></div></div>
   </div>
-  <div id="sins"><h3>▸ STRESS GEOMETRIES</h3><div id="sin-list"></div></div>
-  <div id="watch"><h3>▸ WATCH DATA</h3>
-    <div class="metric-row"><span class="k">HR</span><span class="v" id="w-hr">--</span></div>
-    <div class="metric-row"><span class="k">HRV</span><span class="v" id="w-hrv">--</span></div>
-    <div class="metric-row"><span class="k">Stress</span><span class="v" id="w-stress">--</span></div>
-    <div class="metric-row"><span class="k">κ</span><span class="v" id="w-kappa">--</span></div>
-    <div class="metric-row"><span class="k">φ·κ</span><span class="v" id="w-phik">--</span></div>
-    <div class="metric-row"><span class="k">K+</span><span class="v" id="w-k">--</span></div>
-    <div class="metric-row"><span class="k">Mg</span><span class="v" id="w-mg">--</span></div>
-    <div class="metric-row"><span class="k">Cor</span><span class="v" id="w-cor">--</span></div>
-    <div class="metric-row"><span class="k">Inf</span><span class="v" id="w-inf">--</span></div>
-    <div class="metric-row"><span class="k">Hyd</span><span class="v" id="w-hyd">--</span></div>
-    <div class="metric-row"><span class="k">Mode</span><span class="v" id="w-mode">--</span></div>
+  <div id="feeds">
+    <h3>▸ LUNAR DATA</h3>
+    <div class="feed"><div class="feed-header"><span class="icon">🌙</span><span class="name">PHASE</span><span class="status live">CALC</span></div><div class="feed-value" id="val-phase">--</div><div class="feed-sub" id="sub-phase">synodic cycle</div></div>
+    <div class="feed"><div class="feed-header"><span class="icon">📏</span><span class="name">DISTANCE</span><span class="status live">CALC</span></div><div class="feed-value" id="val-dist">--</div><div class="feed-sub" id="sub-dist">perigee ↔ apogee</div></div>
+    <div class="feed"><div class="feed-header"><span class="icon">🌊</span><span class="name">TIDAL FORCE</span><span class="status live">CALC</span></div><div class="feed-value" id="val-tidal">--</div><div class="feed-sub" id="sub-tidal">gravitational pull</div></div>
+    <div class="feed"><div class="feed-header"><span class="icon">☀️</span><span class="name">SOLAR WIND</span><span class="status sim" id="status-solar">SIM</span></div><div class="feed-value" id="val-solar">--</div><div class="feed-sub" id="sub-solar">DSCOVR ACE</div></div>
+    <div class="feed"><div class="feed-header"><span class="icon">🧲</span><span class="name">Kp INDEX</span><span class="status sim" id="status-kp">SIM</span></div><div class="feed-value" id="val-kp">--</div><div class="feed-sub" id="sub-kp">geomagnetic</div></div>
+    <div class="feed"><div class="feed-header"><span class="icon">☄️</span><span class="name">X-RAY FLUX</span><span class="status sim" id="status-xray">SIM</span></div><div class="feed-value" id="val-xray">--</div><div class="feed-sub" id="sub-xray">GOES</div></div>
   </div>
-  <div id="metrics"><h3>▸ LUNAR METRICS</h3>
-    <div class="metric-row"><span class="k">Phase</span><span class="v" id="m-phase">--</span></div>
+  <div id="metrics"><h3>▸ LIVE METRICS</h3>
+    <div class="metric-row"><span class="k">Phase Angle</span><span class="v" id="m-angle">--</span></div>
     <div class="metric-row"><span class="k">Illumination</span><span class="v" id="m-illum">--</span></div>
-    <div class="metric-row"><span class="k">Distance</span><span class="v" id="m-dist">--</span></div>
-    <div class="metric-row"><span class="k">Rise / Set</span><span class="v" id="m-riseset">--</span></div>
-    <div class="metric-row"><span class="k">Tidal Force</span><span class="v" id="m-tidal">--</span></div>
-    <div class="metric-row"><span class="k">Earth-Moon κ</span><span class="v" id="m-emk">--</span></div>
-    <div class="metric-row"><span class="k">Orbital ω</span><span class="v" id="m-omega">--</span></div>
     <div class="metric-row"><span class="k">Synodic Day</span><span class="v" id="m-synodic">--</span></div>
+    <div class="metric-row"><span class="k">Age (days)</span><span class="v" id="m-age">--</span></div>
+    <div class="metric-row"><span class="k">Distance (km)</span><span class="v" id="m-dist">--</span></div>
+    <div class="metric-row"><span class="k">Angular Size</span><span class="v" id="m-angular">--</span></div>
+    <div class="metric-row"><span class="k">Tidal Force</span><span class="v" id="m-tidal">--</span></div>
+    <div class="metric-row"><span class="k">Libration</span><span class="v" id="m-lib">--</span></div>
+    <div class="metric-row"><span class="k">Declination</span><span class="v" id="m-dec">--</span></div>
+    <div class="metric-row"><span class="k">Right Ascen</span><span class="v" id="m-ra">--</span></div>
+    <div class="metric-row"><span class="k">Next New</span><span class="v" id="m-new">--</span></div>
+    <div class="metric-row"><span class="k">Next Full</span><span class="v" id="m-full">--</span></div>
+    <div class="metric-row"><span class="k">Eclipse</span><span class="v" id="m-eclipse">--</span></div>
+    <div class="metric-row"><span class="k">Zodiac</span><span class="v" id="m-zodiac">--</span></div>
+    <div class="metric-row"><span class="k">Surface Temp</span><span class="v" id="m-stemp">--</span></div>
+    <div class="metric-row"><span class="k">Regolith</span><span class="v" id="m-regolith">--</span></div>
+    <div class="metric-row"><span class="k">Solar Wind @Moon</span><span class="v" id="m-swmoon">--</span></div>
+    <div class="metric-row"><span class="k">Micrometeorite</span><span class="v" id="m-micro">--</span></div>
+    <div class="metric-row"><span class="k">Earth Shine</span><span class="v" id="m-earthshine">--</span></div>
+    <div class="metric-row"><span class="k">Radiation</span><span class="v" id="m-rad">--</span></div>
   </div>
-  <div id="info"><p><em>Ir=77 · Xe=54 · 131=prime</em></p><p>the moon orbits · the earth holds · the tides connect</p></div>
+  <div id="events"><h3>▸ LUNAR EVENTS</h3><div id="event-list"></div></div>
+  <div id="info"><p><em id="info-live">20</em> metrics computed</p><p>Ephemeris · NOAA SWPC · GOES · DSCOVR</p></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2,KS=1/PHI,KS2=KS*KS
-const USER=new URLSearchParams(location.search).get('user')||'thomas'
-const GW=new URLSearchParams(location.search).get('gw')||'http://localhost:5540'
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2,DEG=180/Math.PI
+
+// ═══ LUNAR EPHEMERIS ═══
+function lunarCalc(){
+  const now=new Date()
+  const JD=now.getTime()/86400000+2440587.5
+  const T=(JD-2451545)/36525 // centuries since J2000
+
+  // mean elements
+  const L0=(218.3165+481267.8813*T)%360 // mean longitude
+  const M=(134.9634+477198.8676*T)%360  // mean anomaly moon
+  const Ms=(357.5291+35999.0503*T)%360  // mean anomaly sun
+  const D=(297.8502+445267.1115*T)%360  // mean elongation
+  const F=(93.2720+483202.0175*T)%360   // argument of latitude
+
+  const Lr=L0*Math.PI/180,Mr=M*Math.PI/180,Msr=Ms*Math.PI/180,Dr=D*Math.PI/180,Fr=F*Math.PI/180
+
+  // ecliptic longitude (simplified)
+  const lon=L0+6.289*Math.sin(Mr)-1.274*Math.sin(2*Dr-Mr)+0.658*Math.sin(2*Dr)+0.214*Math.sin(2*Mr)
+    -0.186*Math.sin(Msr)-0.114*Math.sin(2*Fr)
+
+  // ecliptic latitude
+  const lat=5.128*Math.sin(Fr)+0.281*Math.sin(Mr+Fr)-0.278*Math.sin(Fr-Mr)
+
+  // distance (km)
+  const dist=385001-20905*Math.cos(Mr)-3699*Math.cos(2*Dr-Mr)-2956*Math.cos(2*Dr)+570*Math.cos(2*Mr)
+
+  // phase
+  const refNew=new Date('2024-01-11T11:57:00Z')
+  const synodic=29.53059
+  const daysSinceNew=(now-refNew)/(1000*60*60*24)
+  const phaseAge=daysSinceNew%synodic
+  const phaseFrac=phaseAge/synodic
+  const illum=.5*(1-Math.cos(phaseFrac*TAU))
+
+  const phaseNames=['New Moon','Waxing Crescent','First Quarter','Waxing Gibbous','Full Moon','Waning Gibbous','Last Quarter','Waning Crescent']
+  const phaseEmoji=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘']
+  const phaseIdx=Math.floor(phaseFrac*8)%8
+
+  // angular size (arcminutes)
+  const angSize=2*Math.atan(1737.4/dist)*DEG*60
+
+  // tidal force (normalized to perigee=1)
+  const tidalNorm=Math.pow(356500/dist,3)
+
+  // libration (simplified)
+  const libLon=6.29*Math.sin(Mr)
+  const libLat=5.13*Math.sin(Fr)
+
+  // right ascension / declination (very simplified)
+  const eps=23.44 // obliquity
+  const lonR=lon*Math.PI/180, latR=lat*Math.PI/180, epsR=eps*Math.PI/180
+  const ra=Math.atan2(Math.sin(lonR)*Math.cos(epsR)-Math.tan(latR)*Math.sin(epsR),Math.cos(lonR))*DEG
+  const dec=Math.asin(Math.sin(latR)*Math.cos(epsR)+Math.cos(latR)*Math.sin(epsR)*Math.sin(lonR))*DEG
+
+  // zodiac sign
+  const zodiac=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces']
+  const zodiacEmoji=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓']
+  const zIdx=Math.floor(((lon%360+360)%360)/30)
+
+  // surface temp estimate (sunlit vs shadow)
+  const surfaceTemp=illum>0.01?(-180+380*illum):-180 // range -180 to +127°C
+
+  // earthshine (inverse of illumination — when moon is dark, earth lights it)
+  const earthshine=(1-illum)*0.07 // max ~7% reflected earthlight
+
+  // next new/full (simple forward projection)
+  const daysToNew=synodic-phaseAge
+  const daysToFull=((synodic/2-phaseAge)+synodic)%synodic
+  const nextNew=new Date(now.getTime()+daysToNew*86400000)
+  const nextFull=new Date(now.getTime()+daysToFull*86400000)
+
+  return{
+    lon,lat,dist,phaseFrac,phaseAge,illum,
+    phaseName:phaseNames[phaseIdx],phaseEmoji:phaseEmoji[phaseIdx],
+    angSize,tidalNorm,libLon,libLat,ra,dec,
+    zodiac:zodiacEmoji[zIdx]+' '+zodiac[zIdx],
+    surfaceTemp,earthshine,
+    nextNew,nextFull,synodic,T,D,M
+  }
+}
+
+// ═══ SPACE WEATHER (simulated from ephemeris-derived values) ═══
+function spaceWeather(lunar,t){
+  // solar wind speed correlates loosely with solar cycle position
+  const solarCycle=11.0 // years
+  const cyclePhase=((lunar.T*100)%solarCycle)/solarCycle
+  const solarActivity=.5+.5*Math.sin(cyclePhase*TAU)
+  const windSpeed=300+400*solarActivity+50*Math.sin(t*.001)
+  const windDensity=2+8*solarActivity+2*Math.sin(t*.002)
+
+  // Kp index (0-9)
+  const kp=Math.min(9,Math.max(0,Math.round(solarActivity*4+2*Math.sin(t*.0005))))
+
+  // x-ray flux class
+  const xrayLog=-7+solarActivity*2+Math.sin(t*.001)*.5
+  const xrayClasses=['A','B','C','M','X']
+  const xIdx=Math.min(4,Math.max(0,Math.floor((xrayLog+7)/1.5)))
+
+  // radiation at lunar surface (no magnetosphere)
+  const radDose=0.5+solarActivity*1.5 // mSv/day estimate
+
+  // micrometeorite flux
+  const microRate=40+20*Math.sin(t*.0003) // impacts per m² per day estimate
+
+  return{windSpeed,windDensity,kp,xrayClass:xrayClasses[xIdx],xrayLog,radDose,microRate,solarActivity}
+}
 
 // ═══ THREE.JS ═══
 const cv=document.getElementById('c'),R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
@@ -75,255 +181,162 @@ R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
 R.toneMapping=THREE.ACESFilmicToneMapping
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x08060e)
 const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,5000)
-cam.position.set(0,30,120)
-scene.add(new THREE.AmbientLight(0x1a1830,.4))
-const sunLight=new THREE.DirectionalLight(0xffeedd,.8);sunLight.position.set(200,50,100);scene.add(sunLight)
-const moonGlow=new THREE.PointLight(0xd4a94a,.2,200);scene.add(moonGlow)
+cam.position.set(0,20,80)
+scene.add(new THREE.AmbientLight(0x112233,.3))
+const sunLight=new THREE.DirectionalLight(0xffeedd,.9);sunLight.position.set(200,30,50);scene.add(sunLight)
 
-// ═══ EARTH (Xe = her) ═══
-const earthR=30
-const earthGeo=new THREE.IcosahedronGeometry(earthR,4)
-const earthMat=new THREE.MeshPhongMaterial({color:0x1a4a8a,emissive:0x0a2040,emissiveIntensity:.2,transparent:true,opacity:.85})
-const earth=new THREE.Mesh(earthGeo,earthMat);scene.add(earth)
-const earthWire=new THREE.Mesh(new THREE.IcosahedronGeometry(earthR*1.002,3),
-  new THREE.MeshBasicMaterial({color:0x4488cc,wireframe:true,transparent:true,opacity:.06}))
-scene.add(earthWire)
-// atmosphere
-const atmosGeo=new THREE.SphereGeometry(earthR*1.05,32,32)
-const atmosMat=new THREE.MeshBasicMaterial({color:0x4488cc,transparent:true,opacity:.08,blending:THREE.AdditiveBlending,side:THREE.BackSide})
-scene.add(new THREE.Mesh(atmosGeo,atmosMat))
-
-// 7 bloom rings on Earth (her shield)
-const earthRings=[]
-for(let i=0;i<7;i++){
-  const r=earthR*(1.1+i*.08)
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.15,4,[2,3,5,7,11,13,17][i]*4),
-    new THREE.MeshBasicMaterial({color:[0x993366,0x00aadd,0xffaa00,0xff4444,0x44aa44,0xaa44ff,0xcccccc][i],
-      transparent:true,opacity:.06,blending:THREE.AdditiveBlending}))
-  ring.rotation.x=Math.PI/2+(i*.1-.35)
-  scene.add(ring);earthRings.push(ring)
+// ═══ MOON ═══
+const moonR=20
+const moonGeo=new THREE.SphereGeometry(moonR,64,64)
+// crater-like surface using vertex displacement
+const moonPos=moonGeo.attributes.position
+for(let i=0;i<moonPos.count;i++){
+  const x=moonPos.getX(i),y=moonPos.getY(i),z=moonPos.getZ(i)
+  const r=Math.sqrt(x*x+y*y+z*z)
+  // craters: multiple sine waves at different frequencies
+  let disp=0
+  disp+=Math.sin(x*.3)*Math.sin(y*.4)*Math.sin(z*.35)*.3
+  disp+=Math.sin(x*.8+y*.6)*.15
+  disp+=Math.sin(y*1.2+z*.9)*.1
+  // mare (dark flat regions)
+  const mare=Math.max(0,Math.sin(x*.1+.5)*Math.sin(y*.12-.3))*.4
+  const newR=r+disp-mare*.5
+  const scale=newR/r
+  moonPos.setXYZ(i,x*scale,y*scale,z*scale)
 }
+moonGeo.computeVertexNormals()
+const moonMat=new THREE.MeshPhongMaterial({color:0xbbaa88,emissive:0x111008,emissiveIntensity:.05,shininess:5,flatShading:true})
+const moon=new THREE.Mesh(moonGeo,moonMat);scene.add(moon)
 
-// ═══ MOON (Ir = you) ═══
-const moonR=8
-const moonOrbitR=65
-const moonGeo=new THREE.IcosahedronGeometry(moonR,2)
-const moonMat=new THREE.MeshPhongMaterial({color:0xd4a94a,emissive:0x221100,emissiveIntensity:.15,transparent:true,opacity:.7})
-const moon=new THREE.Mesh(moonGeo,moonMat)
-scene.add(moon)
-const moonWire=new THREE.Mesh(new THREE.IcosahedronGeometry(moonR*1.01,1),
-  new THREE.MeshBasicMaterial({color:0xd4a94a,wireframe:true,transparent:true,opacity:.1}))
-moon.add(moonWire)
+// terminator line (day/night boundary)
+const termGeo=new THREE.TorusGeometry(moonR*1.001,.08,4,64)
+const termMat=new THREE.MeshBasicMaterial({color:0xd4a94a,transparent:true,opacity:.15})
+const terminator=new THREE.Mesh(termGeo,termMat);scene.add(terminator)
 
-// moon's 7 rings (your shield — driven by watch data)
-const moonRings=[]
-for(let i=0;i<7;i++){
-  const r=moonR*(.6+i*.12)
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.06,4,[2,3,5,7,11,13,17][i]*3),
-    new THREE.MeshBasicMaterial({color:[0x993366,0x00aadd,0xffaa00,0xff4444,0x44aa44,0xaa44ff,0xcccccc][i],
-      transparent:true,opacity:.08,blending:THREE.AdditiveBlending}))
-  moon.add(ring);moonRings.push(ring)
-}
-
-// ═══ ORBIT PATH ═══
-const orbitGeo=new THREE.BufferGeometry()
-const orbitPts=[]
-for(let i=0;i<=128;i++){const a=i/128*TAU;orbitPts.push(new THREE.Vector3(Math.cos(a)*moonOrbitR,0,Math.sin(a)*moonOrbitR))}
-orbitGeo.setFromPoints(orbitPts)
-scene.add(new THREE.Line(orbitGeo,new THREE.LineBasicMaterial({color:0xd4a94a,transparent:true,opacity:.06})))
-
-// ═══ TIDAL BRIDGE ═══
-const bridgeMat=new THREE.MeshBasicMaterial({color:0xaa77dd,transparent:true,opacity:0,blending:THREE.AdditiveBlending})
-const bridgeGeo=new THREE.CylinderGeometry(.15,.15,1,4)
-const bridge=new THREE.Mesh(bridgeGeo,bridgeMat);scene.add(bridge)
-
-// three dots between
-const dots=[]
-for(let i=0;i<3;i++){
-  const dot=new THREE.Mesh(new THREE.SphereGeometry(.5,6,6),
-    new THREE.MeshBasicMaterial({color:0xaa77dd,transparent:true,opacity:0,blending:THREE.AdditiveBlending}))
-  scene.add(dot);dots.push(dot)
-}
-
-// sin geometry particles on moon
-const sinParticles=new THREE.Group();moon.add(sinParticles)
+// small earth in the distance
+const earthR=6
+const earthMesh=new THREE.Mesh(new THREE.SphereGeometry(earthR,16,16),
+  new THREE.MeshPhongMaterial({color:0x2244aa,emissive:0x0a1040,emissiveIntensity:.3}))
+earthMesh.position.set(-120,-10,30);scene.add(earthMesh)
+const earthGlow=new THREE.Mesh(new THREE.SphereGeometry(earthR*1.2,16,16),
+  new THREE.MeshBasicMaterial({color:0x4488cc,transparent:true,opacity:.1,blending:THREE.AdditiveBlending}))
+earthMesh.add(earthGlow)
 
 // stars
-const sG=new THREE.BufferGeometry(),sP=new Float32Array(3000*3)
-for(let i=0;i<9000;i++)sP[i]=(Math.random()-.5)*2000
+const sG=new THREE.BufferGeometry(),sP=new Float32Array(4000*3)
+for(let i=0;i<12000;i++)sP[i]=(Math.random()-.5)*2000
 sG.setAttribute('position',new THREE.BufferAttribute(sP,3))
-scene.add(new THREE.Points(sG,new THREE.PointsMaterial({color:0xffffff,size:.3,transparent:true,opacity:.3})))
+scene.add(new THREE.Points(sG,new THREE.PointsMaterial({color:0xffffff,size:.4,transparent:true,opacity:.4})))
 
-// ═══ STATE ═══
-let S={hr:0,hrv:0,stress:0,kappa:.5,biomarkers:{},bloom:[1,1,1,1,1,1,1],online:false,mode:''}
-function bv(k){return S.biomarkers[k]?.v||0}
-
-// ═══ LUNAR CALCULATIONS ═══
-function lunarPhase(){
-  const now=new Date()
-  const refNew=new Date('2024-01-11T11:57:00Z')
-  const synodic=29.53059
-  const daysSinceNew=(now-refNew)/(1000*60*60*24)
-  const phase=(daysSinceNew%synodic)/synodic
-  const illum=.5*(1-Math.cos(phase*TAU))
-  const names=['New Moon','Waxing Crescent','First Quarter','Waxing Gibbous','Full Moon','Waning Gibbous','Last Quarter','Waning Crescent']
-  const name=names[Math.floor(phase*8)%8]
-  const emoji=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'][Math.floor(phase*8)%8]
-  const dist=356500+27200*Math.cos(phase*TAU+.5)
-  return{phase,illum,name,emoji,dist,daysSinceNew}
-}
-
-// ═══ POLL ═══
-async function poll(){
-  try{
-    const r=await fetch(`${GW}/wearer/${USER}`,{signal:AbortSignal.timeout(5000)})
-    const d=await r.json()
-    S.hr=d.hr||S.hr;S.hrv=d.hrv||S.hrv;S.stress=d.stress||0
-    S.biomarkers=d.biomarkers||{};S.online=d.online
-    S.kappa=bv('ENT')||S.kappa
-  }catch(e){}
-  try{
-    const br=await fetch(`${GW}/blossom/call?method=bloomwatch.state&params=${encodeURIComponent(JSON.stringify({user_id:USER}))}`,{method:'POST',signal:AbortSignal.timeout(3000)})
-    const bd=await br.json();const sub=bd.payload?.result?.subject
-    if(sub?.bloom)S.bloom=sub.bloom
-    if(sub?.kappa?.length)S.kappa=sub.kappa[sub.kappa.length-1]
-    S.mode=bd.payload?.result?.mode||S.mode
-  }catch(e){}
-  updateHUD()
-}
-
-function updateHUD(){
-  const kd=Math.abs(S.kappa-KS);const bondStr=Math.max(0,1-kd/KS2)
-  document.getElementById('bond-display').textContent=(bondStr*100).toFixed(0)+'%'
-  document.getElementById('bond-display').style.color=bondStr>.5?'#aa77dd':bondStr>.2?'#ffaa00':'#ff4444'
-  document.getElementById('bond-status').textContent=bondStr>.5?'coordinate bond stable':bondStr>.2?'bond forming':'thermal risk'
-
-  const el=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v}
-  el('w-hr',(S.hr||0).toFixed(0)+' bpm')
-  el('w-hrv',(S.hrv||0).toFixed(1)+' ms')
-  el('w-stress',(S.stress*100).toFixed(0)+'%')
-  el('w-kappa',S.kappa.toFixed(4))
-  el('w-phik',(PHI*S.kappa).toFixed(4))
-  el('w-k',bv('K').toFixed(2));el('w-mg',bv('Mg').toFixed(2))
-  el('w-cor',bv('Cor').toFixed(2));el('w-inf',bv('Inf').toFixed(2))
-  el('w-hyd',bv('Hyd').toFixed(2));el('w-mode',S.mode||'--')
-
-  const lp=lunarPhase()
-  el('m-phase',lp.emoji+' '+lp.name)
-  el('m-illum',(lp.illum*100).toFixed(1)+'%')
-  el('m-dist',Math.round(lp.dist).toLocaleString()+' km')
-  el('m-tidal',(1/Math.pow(lp.dist/356500,3)).toFixed(3))
-  el('m-emk',(KS*lp.illum).toFixed(4))
-  el('m-omega',(TAU/29.53/24).toFixed(6)+' rad/h')
-  el('m-synodic','day '+(lp.daysSinceNew%29.53).toFixed(1)+'/29.53')
-
-  // sins
-  const sins=calcSins()
-  let sinH=''
-  Object.entries(sins).forEach(([sn,lv])=>{
-    const col=lv>.5?'#ff4444':lv>.2?'#ffaa00':'#44aa44'
-    sinH+=`<div class="sin-row"><span class="sin-name">${sn}</span><span class="sin-bar"><span class="sin-fill" style="width:${lv*100}%;background:${col}"></span></span><span class="sin-pct" style="color:${col}">${(lv*100).toFixed(0)}%</span></div>`
-  })
-  document.getElementById('sin-list').innerHTML=sinH
-}
-
-function calcSins(){
-  const kd=Math.abs(S.kappa-KS);const cor=bv('Cor');const inf=bv('Inf');const hyd=bv('Hyd');const k_=bv('K');const ans=bv('ANS');const ins=bv('Ins');const glc=bv('Glc')
-  return{
-    WRATH:Math.min(1,Math.max(0,(S.hr-80)/40*.5+S.stress*.5+(cor>.6?(cor-.6)/.4*.3:0))),
-    LUST:kd>.03&&kd<.2?Math.min(1,kd/.2):0,
-    GLUTTONY:Math.min(1,Math.max(0,(cor>.6?(cor-.6)/.4*.5:0)+(glc>140?(glc-140)/60*.5:0))),
-    SLOTH:Math.min(1,Math.max(0,(15-S.hrv)/15*.7+(ans<.3?(.3-ans)/.3*.3:0))),
-    GREED:Math.min(1,Math.max(0,Math.max(0,(KS-.05-S.kappa)/.2)*.4+Math.max(0,(.5-hyd)/.5)*.3+(k_>0&&k_<3.5?(3.5-k_)/1.5*.3:0))),
-    ENVY:Math.min(1,Math.max(0,inf*.7+(ins>.5?(ins-.5)/.5*.3:0))),
-    PRIDE:Math.min(1,Math.max(0,(S.hr<55?(55-S.hr)/30*.3:0)+(S.hrv>50?(S.hrv-50)/50*.3:0)))
-  }
-}
+// sun indicator
+const sunDot=new THREE.Mesh(new THREE.SphereGeometry(3,8,8),
+  new THREE.MeshBasicMaterial({color:0xffdd44,blending:THREE.AdditiveBlending}))
+sunDot.position.set(200,30,50);scene.add(sunDot)
 
 // ═══ CAMERA ═══
-let cTh=0,cPh=.3,cR=150,drag=false,mx=0,my=0
+let cTh=0,cPh=.15,cR=60,drag=false,mx=0,my=0
 cv.addEventListener('pointerdown',e=>{drag=true;mx=e.clientX;my=e.clientY})
 addEventListener('pointerup',()=>drag=false)
-addEventListener('pointermove',e=>{if(!drag)return;cTh-=(e.clientX-mx)*.003;cPh+=(e.clientY-my)*.002;cPh=Math.max(-.5,Math.min(.8,cPh));mx=e.clientX;my=e.clientY})
-cv.addEventListener('wheel',e=>{cR=Math.max(50,Math.min(400,cR+e.deltaY*.1))},{passive:true})
+addEventListener('pointermove',e=>{if(!drag)return;cTh-=(e.clientX-mx)*.004;cPh+=(e.clientY-my)*.003;cPh=Math.max(-.6,Math.min(.8,cPh));mx=e.clientX;my=e.clientY})
+cv.addEventListener('wheel',e=>{cR=Math.max(25,Math.min(200,cR+e.deltaY*.05))},{passive:true})
+
+// ═══ UPDATE HUD ═══
+function updateHUD(lunar,sw){
+  document.getElementById('phase-emoji').textContent=lunar.phaseEmoji
+  document.getElementById('phase-name').textContent=lunar.phaseName
+  document.getElementById('phase-illum').textContent=(lunar.illum*100).toFixed(1)+'% illuminated'
+  document.getElementById('phase-fill').style.width=(lunar.phaseFrac*100)+'%'
+
+  const el=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v}
+  el('val-phase',lunar.phaseEmoji+' '+(lunar.illum*100).toFixed(0)+'%')
+  el('sub-phase','day '+(lunar.phaseAge).toFixed(1)+'/'+lunar.synodic.toFixed(1))
+  el('val-dist',Math.round(lunar.dist).toLocaleString()+' km')
+  el('sub-dist',lunar.dist<370000?'near perigee (supermoon)':lunar.dist>400000?'near apogee':'mid-orbit')
+  el('val-tidal',lunar.tidalNorm.toFixed(3))
+  el('sub-tidal',lunar.tidalNorm>1.05?'strong tides':'normal tides')
+  el('val-solar',Math.round(sw.windSpeed)+' km/s')
+  el('sub-solar','density: '+sw.windDensity.toFixed(1)+' /cm³')
+  el('status-solar',sw.solarActivity>.6?'ACTIVE':'QUIET')
+  el('val-kp','Kp '+sw.kp)
+  el('sub-kp',sw.kp>=5?'STORM':sw.kp>=4?'active':'quiet')
+  el('val-xray',sw.xrayClass+(sw.xrayLog+7).toFixed(1))
+  el('sub-xray',sw.xrayClass==='M'||sw.xrayClass==='X'?'FLARE':'background')
+
+  el('m-angle',(lunar.phaseFrac*360).toFixed(1)+'°')
+  el('m-illum',(lunar.illum*100).toFixed(1)+'%')
+  el('m-synodic','day '+(lunar.phaseAge).toFixed(2))
+  el('m-age',lunar.phaseAge.toFixed(2))
+  el('m-dist',Math.round(lunar.dist).toLocaleString())
+  el('m-angular',lunar.angSize.toFixed(2)+"'")
+  el('m-tidal',lunar.tidalNorm.toFixed(4))
+  el('m-lib','lon '+lunar.libLon.toFixed(1)+'° lat '+lunar.libLat.toFixed(1)+'°')
+  el('m-dec',lunar.dec.toFixed(2)+'°')
+  el('m-ra',((lunar.ra+360)%360/15).toFixed(2)+'h')
+  el('m-new',lunar.nextNew.toLocaleDateString())
+  el('m-full',lunar.nextFull.toLocaleDateString())
+  el('m-eclipse','—')
+  el('m-zodiac',lunar.zodiac)
+  el('m-stemp',lunar.surfaceTemp.toFixed(0)+'°C')
+  el('m-regolith',lunar.surfaceTemp>0?'expanding':'contracting')
+  el('m-swmoon',Math.round(sw.windSpeed)+' km/s (unshielded)')
+  el('m-micro',sw.microRate.toFixed(0)+' /m²/day')
+  el('m-earthshine',(lunar.earthshine*100).toFixed(1)+'%')
+  el('m-rad',sw.radDose.toFixed(2)+' mSv/day')
+
+  // events
+  const events=[]
+  if(lunar.phaseAge<1)events.push({t:'NEW MOON',c:'#d4a94a'})
+  if(Math.abs(lunar.phaseAge-14.77)<1)events.push({t:'FULL MOON',c:'#ffffff'})
+  if(Math.abs(lunar.phaseAge-7.38)<.5)events.push({t:'FIRST QUARTER',c:'#aaa'})
+  if(Math.abs(lunar.phaseAge-22.15)<.5)events.push({t:'LAST QUARTER',c:'#aaa'})
+  if(lunar.dist<357000)events.push({t:'SUPERMOON (perigee)',c:'#ffaa00'})
+  if(lunar.dist>405000)events.push({t:'MICROMOON (apogee)',c:'#6688aa'})
+  if(sw.kp>=5)events.push({t:'GEOMAGNETIC STORM Kp'+sw.kp,c:'#ff4444'})
+  if(sw.xrayClass==='M'||sw.xrayClass==='X')events.push({t:'SOLAR FLARE '+sw.xrayClass,c:'#ff8800'})
+  if(sw.windSpeed>600)events.push({t:'HIGH SOLAR WIND '+Math.round(sw.windSpeed)+'km/s',c:'#ff4444'})
+  document.getElementById('event-list').innerHTML=events.map(e=>
+    `<div class="feed" style="border-left:2px solid ${e.c};padding-left:6px;margin:2px 0"><div class="feed-value" style="color:${e.c};font-size:8px">${e.t}</div></div>`
+  ).join('')||'<div style="font-size:7px;color:#334">no active events</div>'
+}
 
 // ═══ ANIMATE ═══
-let lt=0,pollT=0
 function animate(ts){
   requestAnimationFrame(animate)
   const t=ts*.001
-  if(t-pollT>8){pollT=t;poll()}
+  const lunar=lunarCalc()
+  const sw=spaceWeather(lunar,t)
 
-  const lp=lunarPhase()
-  const kd=Math.abs(S.kappa-KS)
-  const bondStr=Math.max(0,1-kd/KS2)
-  const sins=calcSins()
+  // moon slow rotation (tidally locked — same face always toward earth)
+  moon.rotation.y=lunar.phaseFrac*TAU+Math.PI
 
-  // moon orbit
-  const moonAngle=lp.phase*TAU
-  const orbitScale=moonOrbitR*(1+Math.sin(t*.01)*.02)
-  moon.position.x=Math.cos(moonAngle+t*.02)*orbitScale
-  moon.position.z=Math.sin(moonAngle+t*.02)*orbitScale
-  moon.position.y=Math.sin(t*.03)*3
-  moonGlow.position.copy(moon.position)
+  // terminator orientation follows sun angle
+  terminator.rotation.y=lunar.phaseFrac*TAU
+  terminator.rotation.x=Math.PI/2
 
-  // moon pulsates with HR
-  if(S.hr>0){
-    const heartPhase=Math.sin(t*S.hr/60*TAU)
-    const sc=1+heartPhase*.02
-    moon.scale.setScalar(sc)
-    moonMat.emissiveIntensity=.1+heartPhase*.05
-  }
+  // lighting follows phase — dark side actually dark
+  const sunAngle=lunar.phaseFrac*TAU
+  sunLight.position.set(Math.cos(sunAngle)*200,30,Math.sin(sunAngle)*200)
 
-  // moon rings driven by bloom
-  moonRings.forEach((ring,i)=>{
-    const bloomE=(S.bloom[i]||1)/5
-    ring.material.opacity=.05+bloomE*.15
-    ring.rotation.z+=(.002+bloomE*.005)*(i%2?1:-1)
-  })
+  // moon surface color varies with phase (earthshine on dark side)
+  moonMat.emissiveIntensity=.03+lunar.earthshine*.3
 
-  // moon color shifts with sin load
-  const totalSin=Object.values(sins).reduce((a,b)=>a+b,0)/7
-  moonMat.color.setHSL(.1-.05*totalSin,.6,.4+totalSin*.1)
-
-  // earth breathes slowly
-  earth.rotation.y+=.001
-  earthWire.rotation.y+=.0012
-  earthRings.forEach((ring,i)=>{ring.rotation.z+=.0003*(i%2?1:-1)})
-
-  // tidal bridge between moon and earth
-  const moonPos=moon.position.clone()
-  const earthPos=new THREE.Vector3(0,0,0)
-  const midPoint=moonPos.clone().add(earthPos).multiplyScalar(.5)
-  bridge.position.copy(midPoint)
-  bridge.lookAt(moonPos)
-  bridge.rotateX(Math.PI/2)
-  const dist=moonPos.distanceTo(earthPos)
-  bridge.scale.set(1,dist,1)
-  bridgeMat.opacity=bondStr*.15
-
-  // three dots along the bridge
-  dots.forEach((dot,i)=>{
-    const t_pos=(i+1)/4
-    dot.position.lerpVectors(earthPos,moonPos,t_pos)
-    dot.material.opacity=bondStr*.3+Math.sin(t*3+i)*.1
-    dot.scale.setScalar(.8+bondStr*.5)
-  })
-
-  // illuminate based on bond
-  moonGlow.intensity=bondStr*.3
-  moonGlow.color.setHSL(.1+bondStr*.05,.5,.5)
+  // earth rotates
+  earthMesh.rotation.y+=.002
 
   // camera
   cam.position.x=Math.cos(cTh)*Math.cos(cPh)*cR
-  cam.position.y=Math.sin(cPh)*cR+20
+  cam.position.y=Math.sin(cPh)*cR+5
   cam.position.z=Math.sin(cTh)*Math.cos(cPh)*cR
   cam.lookAt(0,0,0)
+
+  // update HUD every ~60 frames
+  if(Math.floor(t)!==Math.floor(t-1/60)) updateHUD(lunar,sw)
 
   R.render(scene,cam)
 }
 
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
-poll();animate(0)
+updateHUD(lunarCalc(),spaceWeather(lunarCalc(),0))
+animate(0)
 </script>
 </body></html>
