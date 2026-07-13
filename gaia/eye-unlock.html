@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>EYE UNLOCK — 7 Gates of Seeing</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Courier New',monospace;color:#dde}
+canvas{display:block}
+#overlay{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+#gate-label{font-size:9px;letter-spacing:5px;color:rgba(255,120,60,.35);margin-bottom:4px;transition:all 1s}
+#gate-name{font-size:22px;color:rgba(255,140,80,.7);text-align:center;max-width:600px;line-height:1.4;transition:all 1s;text-shadow:0 0 25px rgba(255,80,30,.3);margin-bottom:6px}
+#gate-sin{font-size:10px;color:rgba(255,100,60,.4);letter-spacing:3px;margin-bottom:16px;transition:all 1s}
+#instruction{font-size:11px;color:rgba(200,180,220,.4);text-align:center;max-width:500px;line-height:1.7;transition:all 1s}
+#progress{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:10;display:flex;gap:6px;pointer-events:none}
+.pip{width:28px;height:4px;border-radius:2px;background:rgba(255,255,255,.06);transition:all .5s;position:relative}
+.pip.active{box-shadow:0 0 8px rgba(255,80,40,.3)}
+.pip .pip-label{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:6px;color:rgba(255,120,60,.25);white-space:nowrap;letter-spacing:1px}
+#timer{position:fixed;top:14px;right:16px;z-index:10;font-size:10px;color:rgba(255,100,50,.25);pointer-events:none}
+#hud{position:fixed;top:14px;left:16px;z-index:10;font-size:8px;color:rgba(255,100,50,.2);pointer-events:none;line-height:1.8;white-space:pre}
+#start-btn{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.9)}
+#start-btn h1{font-size:16px;letter-spacing:6px;color:rgba(255,100,50,.5);margin-bottom:8px}
+#start-btn p{font-size:9px;color:rgba(255,100,50,.25);max-width:400px;text-align:center;line-height:1.7;margin-bottom:24px}
+#start-btn button{background:rgba(255,80,40,.06);border:2px solid rgba(255,80,40,.25);color:rgba(255,120,80,.6);padding:14px 36px;font:12px/1 monospace;cursor:pointer;border-radius:6px;letter-spacing:4px;transition:all .3s}
+#start-btn button:hover{background:rgba(255,80,40,.12);box-shadow:0 0 25px rgba(255,60,30,.2);color:#f84;border-color:rgba(255,80,40,.5)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="overlay">
+  <div id="gate-label"></div>
+  <div id="gate-name"></div>
+  <div id="gate-sin"></div>
+  <div id="instruction"></div>
+</div>
+<div id="progress"></div>
+<div id="timer"></div>
+<div id="hud"></div>
+<div id="start-btn">
+  <h1>EYE UNLOCK</h1>
+  <p>7 gates of seeing. each gate dissolves a sin that blocks your vision.<br>just watch. just listen. the eye opens itself.<br><br>full screen. lights off. headphones on.</p>
+  <button onclick="begin()">OPEN</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+// ═══ 7 EYE GATES ═══
+const gates=[
+  {name:'RELEASE THE GRIP',sin:'WRATH',spin:'clench',
+   desc:'Your eyes are gripping. Holding on. Staring AT instead of receiving. Anger tightens the extraocular muscles — you literally narrow your vision.',
+   instruction:'let your eyes go soft.\ndon\'t look AT the screen.\nlet the screen come to you.',
+   color:[1,.15,.05],freq:60,irisColor:0xff3311,
+   toneHz:[55,110],beatHz:2,
+   geometry:'sharp',motion:'contract'},
+
+  {name:'DISSOLVE THE CRAVING',sin:'LUST',spin:'fixate',
+   desc:'The eye that wants. Fixating on one thing, unable to release. Desire narrows the focal point to a pinhole — you can\'t see periphery.',
+   instruction:'soften your focus.\nlet the edges exist.\nyou don\'t need to possess what you see.',
+   color:[1,.3,.1],freq:90,irisColor:0xff6622,
+   toneHz:[82.4,164.8],beatHz:4,
+   geometry:'spiral',motion:'pull'},
+
+  {name:'STOP CONSUMING',sin:'GLUTTONY',spin:'devour',
+   desc:'Taking in too much. Information overload. Scrolling. The eye that eats everything and digests nothing. Visual gluttony is the modern default.',
+   instruction:'receive only what\'s here.\nthis light. this shape. this moment.\nnothing else exists right now.',
+   color:[1,.5,.15],freq:130,irisColor:0xffaa00,
+   toneHz:[110,220],beatHz:6,
+   geometry:'bloom',motion:'expand'},
+
+  {name:'WAKE THE GAZE',sin:'SLOTH',spin:'glaze',
+   desc:'The glazed eye. Present but not seeing. The lights are on but nobody\'s looking. The eye on autopilot — receiving but not processing.',
+   instruction:'actually see what\'s in front of you.\ncount the particles.\nnotice the motion.\nyou are here.',
+   color:[.5,1,.2],freq:200,irisColor:0x44ff44,
+   toneHz:[146.8,293.7],beatHz:8,
+   geometry:'pulse',motion:'wake'},
+
+  {name:'RELEASE OWNERSHIP',sin:'GREED',spin:'hoard',
+   desc:'The eye that claims. "I saw it first." Hoarding vision — keeping insights to yourself, refusing to share perspective. The possessive gaze.',
+   instruction:'what you see doesn\'t belong to you.\nlet it pass through.\nyou are a window, not a vault.',
+   color:[.2,.6,1],freq:320,irisColor:0x4488ff,
+   toneHz:[196,392],beatHz:10,
+   geometry:'scatter',motion:'release'},
+
+  {name:'STOP COMPARING',sin:'ENVY',spin:'measure',
+   desc:'The eye that measures everything against everything else. Always comparing, never just seeing. "Is this better or worse?" poisons direct perception.',
+   instruction:'this is the only thing.\nthere is nothing to compare it to.\nit simply is.',
+   color:[.5,.3,1],freq:500,irisColor:0xaa44ff,
+   toneHz:[261.6,523.2],beatHz:12,
+   geometry:'mirror',motion:'still'},
+
+  {name:'SEE WITHOUT SELF',sin:'PRIDE',spin:'project',
+   desc:'The eye that puts itself in everything it sees. Projecting your identity onto the world. "What does this mean about ME?" The final gate: see without the seer.',
+   instruction:'there is no one looking.\nthere is only light entering.\nthe eye is open.\nyou are not behind it.\nyou ARE it.',
+   color:[1,.9,.8],freq:800,irisColor:0xffeedd,
+   toneHz:[329.6,659.3,987.8],beatHz:7.83,
+   geometry:'dissolve',motion:'transcend'}
+]
+
+const gateDuration=40 // seconds per gate
+const totalDuration=gates.length*gateDuration
+
+// ═══ AUDIO ═══
+let actx=null,master=null
+function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.12;master.connect(actx.destination)
+}
+
+let activeTones=[],activeBeat=null
+
+function setGateAudio(g){
+  // cleanup
+  activeTones.forEach(o=>{try{o.g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+1);setTimeout(()=>{o.osc.stop()},1100)}catch(e){}})
+  activeTones=[]
+  if(activeBeat){try{activeBeat.oscL.stop();activeBeat.oscR.stop()}catch(e){}}
+
+  // sustained tones
+  g.toneHz.forEach((hz,i)=>{
+    const osc=actx.createOscillator(),gain=actx.createGain()
+    osc.type=i===0?'sine':'triangle'
+    osc.frequency.value=hz
+    gain.gain.setValueAtTime(0,actx.currentTime)
+    gain.gain.linearRampToValueAtTime(.04,actx.currentTime+3)
+    osc.connect(gain);gain.connect(master)
+    osc.start()
+    activeTones.push({osc,g:gain})
+  })
+
+  // binaural beat
+  const oscL=actx.createOscillator(),oscR=actx.createOscillator()
+  const gL=actx.createGain(),gR=actx.createGain()
+  const merger=actx.createChannelMerger(2)
+  const baseFreq=g.toneHz[0]*2
+  oscL.frequency.value=baseFreq;oscR.frequency.value=baseFreq+g.beatHz
+  oscL.type='sine';oscR.type='sine'
+  gL.gain.value=.025;gR.gain.value=.025
+  oscL.connect(gL);oscR.connect(gR)
+  gL.connect(merger,0,0);gR.connect(merger,0,1)
+  merger.connect(master)
+  oscL.start();oscR.start()
+  activeBeat={oscL,oscR}
+
+  // bell/chime at gate transition
+  const bell=actx.createOscillator(),bellG=actx.createGain()
+  bell.type='sine';bell.frequency.value=g.freq*4
+  bellG.gain.setValueAtTime(.08,actx.currentTime)
+  bellG.gain.exponentialRampToValueAtTime(.001,actx.currentTime+3)
+  bell.connect(bellG);bellG.connect(master)
+  bell.start();bell.stop(actx.currentTime+3)
+}
+
+// ═══ RENDERER ═══
+const cv=document.getElementById('c')
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2))
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x000000)
+const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,500)
+cam.position.set(0,0,15)
+
+// ═══ IRIS GEOMETRY ═══
+// outer ring
+const irisGeo=new THREE.TorusGeometry(4,.08,6,128)
+const irisMat=new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.15,blending:THREE.AdditiveBlending})
+const iris=new THREE.Mesh(irisGeo,irisMat);scene.add(iris)
+
+// iris fibers (radial lines)
+const fiberCount=64,fibers=[]
+for(let i=0;i<fiberCount;i++){
+  const a=i*TAU/fiberCount
+  const geo=new THREE.BufferGeometry()
+  const inner=1.2,outer=4
+  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array([
+    Math.cos(a)*inner,Math.sin(a)*inner,0,
+    Math.cos(a)*outer,Math.sin(a)*outer,0
+  ]),3))
+  const mat=new THREE.LineBasicMaterial({color:0xff4422,transparent:true,opacity:.06,blending:THREE.AdditiveBlending})
+  const line=new THREE.Line(geo,mat)
+  scene.add(line);fibers.push({line,mat,angle:a})
+}
+
+// pupil
+const pupilGeo=new THREE.CircleGeometry(1.2,48)
+const pupilMat=new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.95})
+const pupil=new THREE.Mesh(pupilGeo,pupilMat);pupil.position.z=.1;scene.add(pupil)
+
+// pupil inner glow
+const pupilGlow=new THREE.Mesh(new THREE.CircleGeometry(.8,32),
+  new THREE.MeshBasicMaterial({color:0xff2200,transparent:true,opacity:.02,blending:THREE.AdditiveBlending}))
+pupilGlow.position.z=.15;scene.add(pupilGlow)
+
+// concentric iris rings
+const irisRings=[]
+for(let i=0;i<7;i++){
+  const r=1.3+i*.4
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.015,4,80),
+    new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.04,blending:THREE.AdditiveBlending}))
+  scene.add(ring);irisRings.push(ring)
+}
+
+// sclera (white of eye) - outer glow
+const scleraGeo=new THREE.RingGeometry(4,7,64)
+const scleraMat=new THREE.MeshBasicMaterial({color:0x221111,transparent:true,opacity:.1,side:THREE.DoubleSide})
+const sclera=new THREE.Mesh(scleraGeo,scleraMat);sclera.position.z=-.05;scene.add(sclera)
+
+// particles floating in the eye
+const partCount=500,partGeo=new THREE.BufferGeometry()
+const partPos=new Float32Array(partCount*3),partData=[]
+for(let i=0;i<partCount;i++){
+  const a=Math.random()*TAU,r=.5+Math.random()*4
+  partPos[i*3]=Math.cos(a)*r;partPos[i*3+1]=Math.sin(a)*r;partPos[i*3+2]=(Math.random()-.5)*2
+  partData.push({a,r,speed:.1+Math.random()*.3,phase:Math.random()*TAU})
+}
+partGeo.setAttribute('position',new THREE.BufferAttribute(partPos,3))
+const partMat=new THREE.PointsMaterial({color:0xff6633,size:.08,transparent:true,opacity:.15,blending:THREE.AdditiveBlending})
+const particles=new THREE.Points(partGeo,partMat);scene.add(particles)
+
+// light rays (from pupil outward when gates open)
+const rayCount=14,rays=[]
+for(let i=0;i<rayCount;i++){
+  const a=i*TAU/rayCount
+  const geo=new THREE.BufferGeometry()
+  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array([0,0,.2,Math.cos(a)*8,Math.sin(a)*8,.2]),3))
+  const mat=new THREE.LineBasicMaterial({color:0xff4422,transparent:true,opacity:0,blending:THREE.AdditiveBlending})
+  const line=new THREE.Line(geo,mat)
+  scene.add(line);rays.push({line,mat,angle:a})
+}
+
+// gate ring markers (7 rings at different radii)
+const gateMarkers=[]
+for(let i=0;i<7;i++){
+  const r=1.3+i*.4
+  const segments=16+i*4
+  const dots=[]
+  for(let j=0;j<segments;j++){
+    const a=j*TAU/segments
+    const dot=new THREE.Mesh(new THREE.SphereGeometry(.03,4,4),
+      new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:0,blending:THREE.AdditiveBlending}))
+    dot.position.set(Math.cos(a)*r,Math.sin(a)*r,.1)
+    scene.add(dot);dots.push(dot)
+  }
+  gateMarkers.push(dots)
+}
+
+// ═══ STATE ═══
+let running=false,elapsed=0,currentGate=-1,prevGate=-1
+
+// build progress pips
+const sinNames=['WRATH','LUST','GLUTTONY','SLOTH','GREED','ENVY','PRIDE']
+const progEl=document.getElementById('progress')
+gates.forEach((_,i)=>{
+  const pip=document.createElement('div');pip.className='pip';pip.id='pip'+i
+  const label=document.createElement('div');label.className='pip-label';label.textContent=sinNames[i]
+  pip.appendChild(label);progEl.appendChild(pip)
+})
+
+function begin(){
+  document.getElementById('start-btn').style.display='none'
+  initAudio()
+  running=true;elapsed=0
+  document.documentElement.requestFullscreen?.().catch(()=>{})
+}
+window.begin=begin
+
+// ═══ ANIMATE ═══
+function animate(ts){
+  requestAnimationFrame(animate)
+  const t=ts*.001
+
+  if(running){
+    elapsed+=1/60
+    const gateIdx=Math.min(Math.floor(elapsed/gateDuration),gates.length-1)
+
+    if(gateIdx!==currentGate){
+      currentGate=gateIdx
+      if(actx)setGateAudio(gates[currentGate])
+    }
+
+    const g=gates[currentGate]
+    const gateProgress=(elapsed%gateDuration)/gateDuration
+    const totalProgress=elapsed/totalDuration
+    const openAmount=Math.min(1,(currentGate+gateProgress)/gates.length)
+
+    // UI
+    document.getElementById('gate-label').textContent=`GATE ${currentGate+1} OF 7`
+    document.getElementById('gate-label').style.color=`rgba(${g.color[0]*255},${g.color[1]*255},${g.color[2]*255},.4)`
+    document.getElementById('gate-name').textContent=g.name
+    document.getElementById('gate-name').style.color=`rgba(${g.color[0]*255},${g.color[1]*255},${g.color[2]*255},.7)`
+    document.getElementById('gate-sin').textContent=`dissolving ${g.sin} · the ${g.spin}`
+    document.getElementById('instruction').textContent=gateProgress<.15?g.desc:g.instruction
+
+    // progress pips
+    for(let i=0;i<7;i++){
+      const pip=document.getElementById('pip'+i)
+      if(i<currentGate){pip.style.background=`rgba(${gates[i].color[0]*255},${gates[i].color[1]*255},${gates[i].color[2]*255},.5)`;pip.classList.remove('active')}
+      else if(i===currentGate){
+        pip.style.background=`rgba(${g.color[0]*255},${g.color[1]*255},${g.color[2]*255},${.2+gateProgress*.6})`
+        pip.classList.add('active')
+      } else {pip.style.background='rgba(255,255,255,.06)';pip.classList.remove('active')}
+    }
+
+    // timer
+    const rem=Math.max(0,totalDuration-elapsed)
+    document.getElementById('timer').textContent=`${Math.floor(rem/60)}:${String(Math.floor(rem%60)).padStart(2,'0')}`
+
+    // hud
+    document.getElementById('hud').textContent=
+      `EYE UNLOCK\n`+
+      `gate: ${currentGate+1}/7 · ${g.sin}\n`+
+      `frequency: ${g.freq}Hz\n`+
+      `binaural: ${g.beatHz}Hz\n`+
+      `iris: ${(openAmount*100).toFixed(0)}% open`
+
+    // ═══ 3D EYE UPDATES ═══
+
+    // iris color transition
+    const irisCol=new THREE.Color(g.irisColor)
+    irisMat.color.lerp(irisCol,.02)
+    irisMat.opacity=.1+openAmount*.2+Math.sin(t*2)*.03
+
+    // fibers
+    fibers.forEach((f,i)=>{
+      f.mat.color.lerp(irisCol,.02)
+      f.mat.opacity=.04+openAmount*.06+Math.sin(t*1.5+i*.2)*.02
+      const wobble=Math.sin(t*.8+f.angle*3)*.03*openAmount
+      f.line.rotation.z=wobble
+    })
+
+    // iris rings — spin per gate
+    irisRings.forEach((ring,i)=>{
+      ring.material.color.lerp(irisCol,.02)
+      const unlocked=i<=currentGate
+      ring.material.opacity=unlocked?.06+gateProgress*.04:.02
+      const spinDir=i%2?1:-1
+      const spinSpeed=unlocked?.3+i*.05:.05
+      ring.rotation.z+=spinDir*spinSpeed*.016*(1+openAmount)
+    })
+
+    // pupil — dilates as gates open
+    const pupilSize=1.2-openAmount*.6+Math.sin(t*3)*.05
+    pupil.scale.set(pupilSize,pupilSize,1)
+    pupilGlow.material.opacity=.01+openAmount*.15
+    pupilGlow.material.color.lerp(irisCol,.01)
+    const glowScale=1+openAmount*2+Math.sin(t*2)*.2
+    pupilGlow.scale.set(glowScale,glowScale,1)
+
+    // sclera brightens
+    scleraMat.opacity=.08+openAmount*.1
+    scleraMat.color.lerp(new THREE.Color().setRGB(.1+g.color[0]*.1,.05+g.color[1]*.05,.05+g.color[2]*.05),.01)
+
+    // particles
+    const pp=particles.geometry.attributes.position.array
+    for(let i=0;i<partCount;i++){
+      const d=partData[i]
+      const motionSpeed=g.motion==='contract'?-.5:g.motion==='pull'?-.3:g.motion==='expand'?.3:g.motion==='wake'?.5:g.motion==='release'?.8:g.motion==='still'?0:1
+      d.a+=d.speed*.01*(1+openAmount)
+      const rOsc=Math.sin(t*d.speed+d.phase)*.3
+      const r=d.r+rOsc+motionSpeed*Math.sin(t*.5+d.phase)*.5
+      pp[i*3]=Math.cos(d.a)*r
+      pp[i*3+1]=Math.sin(d.a)*r
+      pp[i*3+2]=Math.sin(t*.3+d.phase)*(1+openAmount)
+    }
+    particles.geometry.attributes.position.needsUpdate=true
+    partMat.color.lerp(irisCol,.02)
+    partMat.opacity=.1+openAmount*.2
+    partMat.size=.06+openAmount*.08
+
+    // light rays — emerge as gates open
+    rays.forEach((r,i)=>{
+      const rayOpen=openAmount>.3?(openAmount-.3)/.7:0
+      r.mat.opacity=rayOpen*.08+Math.sin(t*2+i)*.02*rayOpen
+      r.mat.color.lerp(irisCol,.02)
+      r.line.rotation.z=Math.sin(t*.3+i*.5)*.05
+      const pa=r.line.geometry.attributes.position.array
+      const len=3+rayOpen*10+Math.sin(t+i)
+      pa[3]=Math.cos(r.angle)*len;pa[4]=Math.sin(r.angle)*len
+      r.line.geometry.attributes.position.needsUpdate=true
+    })
+
+    // gate markers — light up as unlocked
+    gateMarkers.forEach((dots,gi)=>{
+      const unlocked=gi<=currentGate
+      const justUnlocked=gi===currentGate
+      dots.forEach((dot,di)=>{
+        dot.material.opacity=unlocked?.1+Math.sin(t*2+di*.3)*.05:0
+        dot.material.color.lerp(new THREE.Color(gates[Math.min(gi,6)].irisColor),.05)
+        if(justUnlocked){
+          const pulse=Math.sin(t*4+di*.2)*.02
+          dot.scale.set(1+pulse,1+pulse,1)
+        }
+        dot.position.z=.1+Math.sin(t+di*.5+gi)*(.1+openAmount*.2)
+      })
+    })
+
+    // scene geometry effects per gate
+    if(g.geometry==='sharp'){
+      scene.rotation.z=Math.sin(t*3)*.02*(1-gateProgress)
+    } else if(g.geometry==='spiral'){
+      scene.rotation.z+=.001*(1-gateProgress*.5)
+    } else if(g.geometry==='bloom'){
+      const bs=1+Math.sin(t)*.02*gateProgress
+      iris.scale.set(bs,bs,1)
+    } else if(g.geometry==='pulse'){
+      const ps=1+Math.sin(t*4)*.03
+      iris.scale.set(ps,ps,1)
+    } else if(g.geometry==='scatter'){
+      particles.rotation.z=t*.1
+    } else if(g.geometry==='mirror'){
+      scene.rotation.z=0
+    } else if(g.geometry==='dissolve'){
+      irisMat.opacity=.1+Math.sin(t)*.1+gateProgress*.2
+      const ds=1+gateProgress*.1
+      iris.scale.set(ds,ds,1)
+    }
+
+    // background color shift
+    scene.background.setRGB(g.color[0]*.03,g.color[1]*.03,g.color[2]*.03)
+
+    // final gate — eye fully open, radiant
+    if(currentGate===6&&gateProgress>.7){
+      const finale=(gateProgress-.7)/.3
+      irisMat.opacity=.3+finale*.3
+      pupilGlow.material.opacity=.15+finale*.3
+      rays.forEach(r=>{r.mat.opacity=finale*.15})
+      partMat.opacity=.3+finale*.3
+      scene.background.setRGB(.03+finale*.04,.02+finale*.03,.015+finale*.025)
+      document.getElementById('instruction').textContent='the eye is open.\nyou are the light entering.'
+      document.getElementById('gate-name').textContent='✦ OPEN ✦'
+    }
+
+    // end state
+    if(elapsed>=totalDuration){
+      document.getElementById('gate-label').textContent='ALL GATES OPEN'
+      document.getElementById('gate-name').textContent='you see'
+      document.getElementById('gate-sin').textContent=''
+      document.getElementById('instruction').textContent='no sin. no spin. no self.\njust light. just seeing. just this.'
+    }
+
+    // camera subtle breathing
+    cam.position.z=15-openAmount*3+Math.sin(t*.5)*.3
+    cam.rotation.z=Math.sin(t*.2)*.01
+  } else {
+    // idle state — dim eye
+    const pulse=Math.sin(t*.5)*.01
+    irisMat.opacity=.05+pulse
+    fibers.forEach(f=>{f.mat.opacity=.03+pulse})
+    cam.position.z=15+Math.sin(t*.3)*.5
+  }
+
+  renderer.render(scene,cam)
+}
+
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)})
+animate(0)
+</script>
+</body></html>
