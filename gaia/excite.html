@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>EXCITE — Human Neon Tube Activation</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Courier New',monospace;color:#dde;user-select:none}
+canvas{display:block}
+#overlay{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+#phase-label{font-size:10px;letter-spacing:5px;color:rgba(255,120,60,.4);margin-bottom:8px;transition:color .5s}
+#instruction{font-size:28px;color:rgba(255,140,80,.8);text-align:center;max-width:600px;line-height:1.5;transition:all .5s;text-shadow:0 0 30px rgba(255,80,30,.4)}
+#sub{font-size:11px;color:rgba(255,120,60,.35);margin-top:12px;text-align:center;max-width:500px;line-height:1.6;transition:color .5s}
+#breathCircle{width:150px;height:150px;border-radius:50%;border:2px solid rgba(255,80,40,.2);margin:30px;transition:all .1s;display:flex;align-items:center;justify-content:center;position:relative}
+#breathInner{width:40px;height:40px;border-radius:50%;background:rgba(255,80,40,.1);transition:all .1s}
+#breathText{position:absolute;font-size:12px;color:rgba(255,120,60,.5);letter-spacing:2px}
+#meter{width:300px;height:4px;background:rgba(255,255,255,.05);border-radius:2px;margin-top:20px;overflow:hidden}
+#meterFill{height:100%;width:0%;border-radius:2px;transition:width .3s;background:linear-gradient(90deg,#ff4422,#ff8844,#ffaa00)}
+#energy-label{font-size:8px;color:rgba(255,120,60,.3);margin-top:6px;letter-spacing:2px}
+#start-btn{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;pointer-events:auto;cursor:pointer}
+#start-btn button{background:rgba(255,80,40,.08);border:2px solid rgba(255,80,40,.3);color:rgba(255,120,80,.7);padding:16px 40px;font:14px/1 monospace;cursor:pointer;border-radius:8px;letter-spacing:4px;transition:all .3s}
+#start-btn button:hover{background:rgba(255,80,40,.15);box-shadow:0 0 30px rgba(255,60,30,.3);color:#f84;border-color:rgba(255,80,40,.6)}
+#hud{position:fixed;top:12px;left:14px;z-index:15;font-size:8px;color:rgba(255,120,60,.3);line-height:1.8;pointer-events:none;white-space:pre}
+#timer{position:fixed;top:12px;right:14px;z-index:15;font-size:24px;color:rgba(255,100,50,.3);pointer-events:none;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="overlay">
+  <div id="phase-label">GROUND STATE</div>
+  <div id="instruction">ready to excite?</div>
+  <div id="breathCircle"><div id="breathInner"></div><div id="breathText"></div></div>
+  <div id="sub">you are a neon atom. currently dark. invisible.<br>we're going to run a current through you.</div>
+  <div id="meter"><div id="meterFill"></div></div>
+  <div id="energy-label">ENERGY LEVEL: 0%</div>
+</div>
+<div id="start-btn"><button onclick="begin()">⚡ BEGIN EXCITATION ⚡</button></div>
+<div id="hud"></div>
+<div id="timer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2
+
+// ═══ AUDIO CONTEXT ═══
+let actx=null,masterGain=null
+function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  masterGain=actx.createGain()
+  masterGain.gain.value=.15
+  masterGain.connect(actx.destination)
+}
+
+function playTone(freq,dur,type,vol){
+  if(!actx)return
+  const osc=actx.createOscillator()
+  const g=actx.createGain()
+  osc.type=type||'sine'
+  osc.frequency.value=freq
+  g.gain.setValueAtTime(vol||.1,actx.currentTime)
+  g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+dur)
+  osc.connect(g);g.connect(masterGain)
+  osc.start();osc.stop(actx.currentTime+dur)
+}
+
+function playChord(freqs,dur,type){
+  freqs.forEach(f=>playTone(f,dur,type,.05))
+}
+
+function playBinauralBeat(base,diff,dur){
+  if(!actx)return
+  const oL=actx.createOscillator(),oR=actx.createOscillator()
+  const gL=actx.createGain(),gR=actx.createGain()
+  const merger=actx.createChannelMerger(2)
+  oL.frequency.value=base;oR.frequency.value=base+diff
+  gL.gain.value=.06;gR.gain.value=.06
+  oL.connect(gL);oR.connect(gR)
+  gL.connect(merger,0,0);gR.connect(merger,0,1)
+  merger.connect(masterGain)
+  gL.gain.exponentialRampToValueAtTime(.001,actx.currentTime+dur)
+  gR.gain.exponentialRampToValueAtTime(.001,actx.currentTime+dur)
+  oL.start();oR.start();oL.stop(actx.currentTime+dur);oR.stop(actx.currentTime+dur)
+}
+
+function playDrum(freq){
+  if(!actx)return
+  const osc=actx.createOscillator(),g=actx.createGain()
+  osc.type='sine';osc.frequency.value=freq
+  osc.frequency.exponentialRampToValueAtTime(20,actx.currentTime+.3)
+  g.gain.setValueAtTime(.2,actx.currentTime)
+  g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.3)
+  osc.connect(g);g.connect(masterGain)
+  osc.start();osc.stop(actx.currentTime+.4)
+}
+
+// ═══ RENDERER ═══
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+const scene=new THREE.Scene()
+scene.background=new THREE.Color(0x020204)
+const cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,2000)
+cam.position.set(0,0,25)
+
+// starfield
+const starGeo=new THREE.BufferGeometry(),starPos=new Float32Array(1500*3)
+for(let i=0;i<1500;i++){const th=Math.random()*TAU,ph=Math.acos(2*Math.random()-1),r=50+Math.random()*300
+  starPos[i*3]=r*Math.sin(ph)*Math.cos(th);starPos[i*3+1]=r*Math.sin(ph)*Math.sin(th);starPos[i*3+2]=r*Math.cos(ph)}
+starGeo.setAttribute('position',new THREE.BufferAttribute(starPos,3))
+const stars=new THREE.Points(starGeo,new THREE.PointsMaterial({color:0x443333,size:.3,transparent:true,opacity:.3}))
+scene.add(stars)
+
+// core sphere
+const coreGeo=new THREE.IcosahedronGeometry(3,3)
+const coreMat=new THREE.MeshBasicMaterial({color:0xff3311,transparent:true,opacity:.03,wireframe:true,blending:THREE.AdditiveBlending})
+const core=new THREE.Mesh(coreGeo,coreMat);scene.add(core)
+
+const innerGlow=new THREE.Mesh(new THREE.SphereGeometry(2.5,24,24),
+  new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.02,blending:THREE.AdditiveBlending}))
+scene.add(innerGlow)
+
+// shell rings
+const rings=[]
+for(let i=0;i<7;i++){
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(4+i*1.5,.015,4,80),
+    new THREE.MeshBasicMaterial({color:0xff3322,transparent:true,opacity:.02,blending:THREE.AdditiveBlending}))
+  ring.rotation.x=Math.PI/2+i*.15;ring.rotation.y=i*.3
+  scene.add(ring);rings.push(ring)
+}
+
+// electron particles
+const elCount=10,electrons=[]
+for(let i=0;i<elCount;i++){
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(.12,6,6),
+    new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(.05+i*.01,.9,.5).getHex(),transparent:true,opacity:.3,blending:THREE.AdditiveBlending}))
+  mesh.userData={r:3+Math.floor(i/2)*2,th:i*TAU/5,ph:Math.PI/3+Math.random()*.5,speed:.3+i*.05}
+  scene.add(mesh);electrons.push(mesh)
+}
+
+// photon burst particles
+const photonCount=200,photonGeo=new THREE.BufferGeometry()
+const photonPos=new Float32Array(photonCount*3),photonVel=[],photonLife=[]
+for(let i=0;i<photonCount;i++){photonPos[i*3]=0;photonPos[i*3+1]=0;photonPos[i*3+2]=0;photonVel.push({x:0,y:0,z:0});photonLife.push(0)}
+photonGeo.setAttribute('position',new THREE.BufferAttribute(photonPos,3))
+const photonMat=new THREE.PointsMaterial({color:0xff6633,size:.2,transparent:true,opacity:0,blending:THREE.AdditiveBlending})
+const photons=new THREE.Points(photonGeo,photonMat);scene.add(photons)
+
+// ═══ EXCITATION PROTOCOL ═══
+const phases=[
+  // Phase 0: GROUND STATE (5s)
+  {name:'GROUND STATE',duration:5,
+    instruction:t=>'close your eyes\ntake one normal breath',
+    sub:'you are dark. no current flowing. every shell complete but dormant.',
+    breathRate:0,energy:0,sound:()=>playBinauralBeat(100,4,5),color:[.02,.01,.01]},
+
+  // Phase 1: CURRENT ON — slow breathing (20s)
+  {name:'CURRENT RISING',duration:20,
+    instruction:t=>{
+      const cycle=4 // 4s per breath
+      const phase=(t%cycle)/cycle
+      if(phase<.4)return 'BREATHE IN'
+      if(phase<.5)return 'HOLD'
+      if(phase<.9)return 'BREATHE OUT'
+      return 'HOLD'
+    },
+    sub:'the current is entering. feel the voltage rise.\nlong slow breaths — charging the ground state.',
+    breathRate:4,energy:.15,
+    sound:()=>{playBinauralBeat(120,6,4);playTone(60,4,'sine',.03)},
+    color:[.05,.02,.01]},
+
+  // Phase 2: VOLTAGE INCREASE — faster breathing (25s)
+  {name:'VOLTAGE RISING',duration:25,
+    instruction:t=>{
+      const cycle=3
+      const phase=(t%cycle)/cycle
+      if(phase<.35)return 'IN'
+      if(phase<.45)return 'HOLD'
+      if(phase<.8)return 'OUT'
+      return 'HOLD'
+    },
+    sub:'electrons are absorbing energy.\nthey want to jump. let them.',
+    breathRate:3,energy:.35,
+    sound:()=>{playBinauralBeat(150,10,3);playTone(80,3,'sine',.04);playTone(120,3,'triangle',.02)},
+    color:[.1,.04,.02]},
+
+  // Phase 3: ELECTRON JUMP — rapid breathing (20s)
+  {name:'ELECTRON JUMP',duration:20,
+    instruction:t=>{
+      const cycle=2
+      const phase=(t%cycle)/cycle
+      if(phase<.4)return '⚡ IN ⚡'
+      if(phase<.5)return '—'
+      return 'OUT'
+    },
+    sub:'SHELLS ARE BREAKING. electrons jumping to higher orbitals.\nfaster. the gap between shells is a quantum leap.',
+    breathRate:2,energy:.6,
+    sound:()=>{playBinauralBeat(200,15,2);playTone(150,1,'sawtooth',.03);playTone(200,1,'sine',.04)},
+    color:[.2,.06,.02]},
+
+  // Phase 4: EXCITATION PEAK — tummo breathing (15s)
+  {name:'⚡ EXCITATION ⚡',duration:15,
+    instruction:t=>{
+      const cycle=1.2
+      const phase=(t%cycle)/cycle
+      return phase<.45?'IN':'OUT'
+    },
+    sub:'MAXIMUM CURRENT. every electron is in an excited state.\nyou are unstable. you are loaded. you are about to EMIT.',
+    breathRate:1.2,energy:.85,
+    sound:()=>{playBinauralBeat(300,20,1.2);playChord([200,300,400,500],1.2,'sine');playDrum(100)},
+    color:[.4,.1,.03]},
+
+  // Phase 5: EMISSION — hold + release (15s)
+  {name:'✦ EMISSION ✦',duration:15,
+    instruction:t=>{
+      if(t<3)return 'HOLD EVERYTHING'
+      if(t<5)return '...'
+      if(t<7)return 'NOW RELEASE'
+      return '✦ GLOW ✦'
+    },
+    sub:'electrons fall back. every drop emits a photon.\nyou are radiating. you ARE the neon sign.',
+    breathRate:0,energy:1,
+    sound:()=>{playChord([261.6,329.6,392,523.2],3,'sine');playBinauralBeat(200,7.83,5);playTone(100,5,'sine',.06)},
+    color:[.6,.15,.04]},
+
+  // Phase 6: GLOW STATE — long slow breathing (20s)
+  {name:'✦ GLOWING ✦',duration:20,
+    instruction:t=>{
+      const cycle=6
+      const phase=(t%cycle)/cycle
+      if(phase<.4)return 'breathe in slowly'
+      if(phase<.5)return '...'
+      if(phase<.9)return 'breathe out slowly'
+      return '...'
+    },
+    sub:'you are in the glow state. neos. the new one.\nevery orbital full. radiating at your natural frequency.',
+    breathRate:6,energy:.8,
+    sound:()=>{playBinauralBeat(150,7.83,6);playChord([130.8,164.8,196],6,'sine')},
+    color:[.35,.12,.04]},
+
+  // Phase 7: AFTERGLOW — return (15s)
+  {name:'AFTERGLOW',duration:15,
+    instruction:t=>'you are neon\nyou chose to glow',
+    sub:'ground state with residual luminescence.\nthe shells remember the excitation. you are changed.',
+    breathRate:0,energy:.4,
+    sound:()=>{playBinauralBeat(100,4,15);playTone(65,10,'sine',.03)},
+    color:[.15,.06,.03]}
+]
+
+let running=false,phaseIdx=0,phaseTime=0,globalTime=0,energy=0,targetEnergy=0
+let breathPhase=0,breathSize=0
+let lastSoundTime=0
+
+function begin(){
+  document.getElementById('start-btn').style.display='none'
+  initAudio()
+  running=true;phaseIdx=0;phaseTime=0;globalTime=0
+  lastSoundTime=-10
+}
+window.begin=begin
+
+function emitPhotons(count){
+  const pp=photons.geometry.attributes.position.array
+  for(let i=0;i<count;i++){
+    const idx=Math.floor(Math.random()*photonCount)
+    pp[idx*3]=0;pp[idx*3+1]=0;pp[idx*3+2]=0
+    const speed=.2+Math.random()*.4
+    const th=Math.random()*TAU,ph=Math.acos(2*Math.random()-1)
+    photonVel[idx]={x:speed*Math.sin(ph)*Math.cos(th),y:speed*Math.sin(ph)*Math.sin(th),z:speed*Math.cos(ph)}
+    photonLife[idx]=60+Math.random()*60
+  }
+}
+
+// ═══ ANIMATE ═══
+function animate(ts){
+  requestAnimationFrame(animate)
+  const t=ts*.001
+  const dt=1/60
+
+  if(running){
+    phaseTime+=dt;globalTime+=dt
+    const phase=phases[phaseIdx]
+
+    // phase transitions
+    if(phaseTime>=phase.duration&&phaseIdx<phases.length-1){
+      phaseIdx++;phaseTime=0
+      if(phaseIdx===5)emitPhotons(100) // big burst at emission
+    }
+
+    const p=phases[phaseIdx]
+    targetEnergy=p.energy
+
+    // sound triggers
+    if(p.breathRate>0&&t-lastSoundTime>=p.breathRate){
+      lastSoundTime=t;p.sound()
+    } else if(p.breathRate===0&&phaseTime<.1){
+      p.sound()
+    }
+
+    // breath circle
+    if(p.breathRate>0){
+      const cycle=p.breathRate
+      const bp=(phaseTime%cycle)/cycle
+      if(bp<.4)breathSize=bp/.4
+      else if(bp<.5)breathSize=1
+      else if(bp<.9)breathSize=1-(bp-.5)/.4
+      else breathSize=0
+    } else {
+      breathSize=phaseIdx>=5?.7+Math.sin(t*1.5)*.15:.3
+    }
+
+    // update UI
+    const inst=typeof p.instruction==='function'?p.instruction(phaseTime):p.instruction
+    document.getElementById('phase-label').textContent=p.name
+    document.getElementById('instruction').textContent=inst
+    document.getElementById('sub').textContent=p.sub
+
+    // instruction color based on breathing
+    const instEl=document.getElementById('instruction')
+    if(inst.includes('IN')){
+      instEl.style.color=`rgba(255,${140+breathSize*80},${80+breathSize*60},${.6+breathSize*.4})`
+      instEl.style.textShadow=`0 0 ${30+breathSize*40}px rgba(255,80,30,${.3+breathSize*.3})`
+    } else if(inst.includes('OUT')){
+      instEl.style.color=`rgba(255,120,60,${.4+breathSize*.3})`
+      instEl.style.textShadow=`0 0 20px rgba(255,80,30,.2)`
+    } else if(inst.includes('GLOW')||inst.includes('✦')){
+      instEl.style.color=`hsl(${20+Math.sin(t*2)*10},90%,${60+Math.sin(t*3)*10}%)`
+      instEl.style.textShadow=`0 0 40px rgba(255,80,30,.5)`
+    }
+
+    // emit photons during emission phase
+    if(phaseIdx>=5&&Math.random()<energy*.3)emitPhotons(2)
+
+    // timer
+    const totalDur=phases.reduce((s,p)=>s+p.duration,0)
+    const elapsed=phases.slice(0,phaseIdx).reduce((s,p)=>s+p.duration,0)+phaseTime
+    document.getElementById('timer').textContent=`${Math.floor(elapsed)}/${totalDur}`
+  }
+
+  // energy smoothing
+  energy+=(targetEnergy-energy)*.02
+
+  // breath circle
+  const bc=document.getElementById('breathCircle')
+  const bi=document.getElementById('breathInner')
+  const bt=document.getElementById('breathText')
+  const circleSize=80+breathSize*70
+  bc.style.width=bc.style.height=circleSize+'px'
+  bc.style.borderColor=`rgba(255,${80+energy*100},${40+energy*60},${.15+energy*.3})`
+  bc.style.boxShadow=energy>.3?`0 0 ${energy*40}px rgba(255,80,40,${energy*.2})`:''
+  const innerSize=20+breathSize*circleSize*.4
+  bi.style.width=bi.style.height=innerSize+'px'
+  bi.style.background=`rgba(255,${60+energy*100},${30+energy*60},${.05+energy*.3+breathSize*.2})`
+  bi.style.boxShadow=energy>.5?`0 0 ${energy*20}px rgba(255,60,30,${energy*.3})`:''
+  bt.textContent=''
+
+  // meter
+  document.getElementById('meterFill').style.width=(energy*100)+'%'
+  document.getElementById('energy-label').textContent=`ENERGY LEVEL: ${(energy*100).toFixed(0)}%`
+  if(energy>.8)document.getElementById('energy-label').style.color='rgba(255,150,60,.6)'
+
+  // HUD
+  document.getElementById('hud').textContent=
+    `Ne · Z=10 · NEON\n`+
+    `1s²2s²2p⁶\n`+
+    `excitation: ${(energy*100).toFixed(0)}%\n`+
+    `state: ${energy<.1?'ground':energy<.3?'charging':energy<.6?'rising':energy<.8?'excited':energy<.95?'EMITTING':'✦ GLOWING ✦'}\n`+
+    `shell integrity: ${energy<.6?'STABLE':'UNSTABLE — electrons jumping'}`
+
+  // ═══ 3D SCENE ═══
+  // core
+  core.rotation.x=t*.3+energy;core.rotation.y=t*.2
+  coreMat.opacity=.02+energy*.25
+  const coreScale=1+energy*.4+breathSize*.15
+  core.scale.set(coreScale,coreScale,coreScale)
+
+  // inner glow
+  const igScale=1+energy*1.5+breathSize*.3+Math.sin(t*3)*energy*.2
+  innerGlow.scale.set(igScale,igScale,igScale)
+  innerGlow.material.opacity=.01+energy*.2
+
+  // rings
+  rings.forEach((ring,i)=>{
+    ring.rotation.z=t*(.1+i*.03)*(1+energy*2)
+    ring.material.opacity=.01+energy*.08
+    const rs=1+energy*.2
+    ring.scale.set(rs,rs,rs)
+  })
+
+  // electrons
+  electrons.forEach((e,i)=>{
+    const u=e.userData
+    const speed=u.speed*(1+energy*5)
+    const r=u.r*(1+energy*.5)
+    const th=u.th+t*speed
+    const ph=u.ph+Math.sin(t*speed*.3)*.4
+    e.position.x=Math.cos(th)*Math.sin(ph)*r
+    e.position.y=Math.cos(ph)*r
+    e.position.z=Math.sin(th)*Math.sin(ph)*r
+    e.material.opacity=.2+energy*.6
+    const s=1+energy*2
+    e.scale.set(s,s,s)
+  })
+
+  // photons
+  const pp=photons.geometry.attributes.position.array
+  let activePhotons=0
+  for(let i=0;i<photonCount;i++){
+    if(photonLife[i]>0){
+      activePhotons++
+      photonLife[i]--
+      pp[i*3]+=photonVel[i].x;pp[i*3+1]+=photonVel[i].y;pp[i*3+2]+=photonVel[i].z
+    }
+  }
+  photons.geometry.attributes.position.needsUpdate=true
+  photonMat.opacity=energy>.5?energy*.4:0
+  photonMat.size=.15+energy*.3
+
+  // background color
+  const phase=phases[phaseIdx]||phases[0]
+  const bgCol=phase?.color||[.02,.01,.01]
+  scene.background.setRGB(bgCol[0]*energy*2,bgCol[1]*energy*2,bgCol[2]*energy*2)
+
+  // camera breathe
+  cam.position.z=25-energy*5-breathSize*2
+  cam.rotation.z=Math.sin(t*.5)*energy*.05
+
+  // stars react
+  stars.material.opacity=.2+energy*.3
+  stars.rotation.y=t*.01+energy*.05
+
+  R.render(scene,cam)
+}
+
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+animate(0)
+
+// keyboard shortcut
+addEventListener('keydown',e=>{
+  if(e.code==='Space'){
+    e.preventDefault()
+    if(!running)begin()
+    else{emitPhotons(20);energy=Math.min(1,energy+.1);playDrum(80)}
+  }
+})
+</script>
+</body></html>
