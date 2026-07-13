@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>LIGHT × WATER — Photonic Fluid Simulator</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+body{background:#020810}
+#title h1{background:linear-gradient(90deg,#0af,#4ff,#0af);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none}
+#mode-bar{position:fixed;top:40px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+.mb{background:rgba(0,170,255,.06);border:1px solid rgba(0,170,255,.15);color:#068;padding:3px 8px;font:8px monospace;cursor:pointer;border-radius:3px;letter-spacing:1px;transition:all .2s}
+.mb:hover,.mb.on{border-color:#0af;color:#0af;background:rgba(0,170,255,.12)}
+#explain{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:15;max-width:500px;text-align:center;font-size:9px;color:rgba(0,170,255,.5);line-height:1.6;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="title"><h1><span class="dot-live" style="background:#0af"></span>LIGHT × WATER</h1><h2>PHOTONIC FLUID PHENOMENA</h2></div>
+  <div id="info"><p><em>counterintuitive optics in H₂O</em></p></div>
+</div>
+<div id="mode-bar">
+  <span class="mb on" onclick="setMode(0)">CAUSTICS</span>
+  <span class="mb" onclick="setMode(1)">TOTAL INTERNAL</span>
+  <span class="mb" onclick="setMode(2)">LIGHT BUBBLES</span>
+  <span class="mb" onclick="setMode(3)">RING REFRACTION</span>
+  <span class="mb" onclick="setMode(4)">SNELL WINDOW</span>
+  <span class="mb" onclick="setMode(5)">DISPERSION</span>
+  <span class="mb" onclick="setMode(6)">GLORY RINGS</span>
+  <span class="mb" onclick="setMode(7)">FRESNEL LENS</span>
+</div>
+<div id="explain"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+const cv=document.getElementById('c'),R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x020810)
+const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,500)
+cam.position.set(0,10,30)
+scene.add(new THREE.AmbientLight(0x112244,.3))
+
+let mode=0
+const MODES=[
+  {name:'CAUSTICS',explain:'light refracts through a wavy water surface → focuses into bright dancing lines on the bottom. the waves ACT AS LENSES. every ripple is a lens. the pool floor is a projection screen for a thousand tiny projectors.'},
+  {name:'TOTAL INTERNAL REFLECTION',explain:'light hitting water surface from BELOW at >48.6° (critical angle) reflects back 100%. the surface becomes a PERFECT MIRROR from underneath. fish see a mirror ceiling. the sky only exists in a cone.'},
+  {name:'LIGHT BUBBLES',explain:'air bubbles in water act as DIVERGING lenses (opposite of glass lenses). they scatter light outward creating bright rings around dark centers. each bubble is a tiny anti-lens projecting its own shadow-ring.'},
+  {name:'RING REFRACTION',explain:'a cylinder of water (a glass) bends light into a LINE FOCUS not a point focus. the curved surface creates a bright vertical caustic band. your finger behind a glass of water looks WIDER and INVERTED.'},
+  {name:'SNELL WINDOW',explain:'from underwater looking up: the entire sky is compressed into a 97° cone (Snell\'s window). outside the cone = total internal reflection = mirror of the bottom. the whole sky fits in a circle above you.'},
+  {name:'DISPERSION',explain:'water splits white light into colors (n varies by wavelength). red bends LESS, violet bends MORE. this is how rainbows form — each raindrop is a prism. the rainbow is not AT a location. it is a DIRECTION.'},
+  {name:'GLORY RINGS',explain:'light scattered BACKWARD by water droplets creates colored rings around the shadow of your head (on clouds/fog). each ring = a different order of diffraction. your shadow gets a HALO.'},
+  {name:'FRESNEL LENS SURFACE',explain:'water surface at very shallow angle is a nearly perfect Fresnel reflector. glancing-angle reflections approach 100% even for light polarizations that normally pass through. the ocean at sunset is a mirror.'}
+]
+
+// ═══ WATER SURFACE ═══
+const waterGeo=new THREE.PlaneGeometry(60,60,128,128)
+const waterMat=new THREE.MeshPhongMaterial({color:0x0a3355,emissive:0x041525,emissiveIntensity:.1,transparent:true,opacity:.7,side:THREE.DoubleSide,shininess:90,specular:0x4488cc})
+const water=new THREE.Mesh(waterGeo,waterMat)
+water.rotation.x=-Math.PI/2;scene.add(water)
+
+// floor
+const floorGeo=new THREE.PlaneGeometry(60,60,1,1)
+const floorMat=new THREE.MeshPhongMaterial({color:0x0a1820,emissive:0x040810,emissiveIntensity:.1})
+const floor=new THREE.Mesh(floorGeo,floorMat)
+floor.rotation.x=-Math.PI/2;floor.position.y=-10;scene.add(floor)
+
+// ═══ MODE-SPECIFIC OBJECTS ═══
+let modeGroup=new THREE.Group();scene.add(modeGroup)
+let rays=[],bubbles=[],ringParts=[]
+
+function clearMode(){
+  while(modeGroup.children.length)modeGroup.remove(modeGroup.children[0])
+  rays=[];bubbles=[];ringParts=[]
+}
+
+// light ray helper
+function makeRay(from,to,col=0x00aaff,w=.03){
+  const dir=new THREE.Vector3().subVectors(to,from)
+  const len=dir.length()
+  const geo=new THREE.CylinderGeometry(w,w,len,4)
+  const mat=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.4,blending:THREE.AdditiveBlending})
+  const mesh=new THREE.Mesh(geo,mat)
+  mesh.position.copy(from).add(to).multiplyScalar(.5)
+  mesh.lookAt(to);mesh.rotateX(Math.PI/2)
+  modeGroup.add(mesh)
+  return{mesh,mat,from,to}
+}
+
+// photon dot
+function makePhoton(pos,col=0x44ddff,r=.1){
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(r,6,6),
+    new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.6,blending:THREE.AdditiveBlending}))
+  mesh.position.copy(pos);modeGroup.add(mesh)
+  return mesh
+}
+
+// bubble
+function makeBubble(pos,r=.5){
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(r,16,16),
+    new THREE.MeshPhongMaterial({color:0xaaddff,transparent:true,opacity:.15,specular:0xffffff,shininess:100}))
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(r*1.5,.02,4,32),
+    new THREE.MeshBasicMaterial({color:0x44ddff,transparent:true,opacity:.2,blending:THREE.AdditiveBlending}))
+  mesh.position.copy(pos);ring.position.copy(pos)
+  modeGroup.add(mesh);modeGroup.add(ring)
+  return{mesh,ring,pos,r}
+}
+
+function buildMode(m){
+  clearMode()
+  const sunPos=new THREE.Vector3(0,25,0)
+
+  if(m===0){ // CAUSTICS
+    const sun=new THREE.PointLight(0x44aaff,.8,60);sun.position.copy(sunPos);modeGroup.add(sun)
+    // caustic pattern on floor (particle grid)
+    for(let i=0;i<2000;i++){
+      const x=(Math.random()-.5)*50,z=(Math.random()-.5)*50
+      const dot=makePhoton(new THREE.Vector3(x,-9.9,z),0x44ddff,.05)
+      rays.push({dot,x,z,phase:Math.random()*TAU})
+    }
+  }
+  else if(m===1){ // TOTAL INTERNAL REFLECTION
+    // rays from below hitting surface at various angles
+    for(let i=0;i<12;i++){
+      const ang=10+i*7 // degrees from vertical
+      const rad=ang*Math.PI/180
+      const critAngle=48.6*Math.PI/180
+      const x=(i-6)*3
+      const from=new THREE.Vector3(x,-8,0)
+      const hitY=0
+      const hitX=x+Math.tan(rad)*8
+      const hit=new THREE.Vector3(hitX,hitY,0)
+
+      // incident ray
+      const r1=makeRay(from,hit,0x44ddff)
+
+      if(rad>critAngle){
+        // total internal reflection — bounces back
+        const reflX=hitX+Math.tan(rad)*5
+        const reflY=-5
+        makeRay(hit,new THREE.Vector3(reflX,reflY,0),0xff4444)
+        makePhoton(hit,0xff4444,.15)
+      } else {
+        // refracted through surface
+        const n1=1.33,n2=1.0
+        const refAng=Math.asin(n1*Math.sin(rad)/n2)
+        const outX=hitX+Math.tan(refAng)*8
+        makeRay(hit,new THREE.Vector3(outX,8,0),0x44ff44)
+        makePhoton(hit,0x44ff44,.15)
+      }
+    }
+    // critical angle marker
+    const crit=new THREE.Mesh(new THREE.TorusGeometry(12,.03,4,64,48.6*Math.PI/180*2),
+      new THREE.MeshBasicMaterial({color:0xffaa00,transparent:true,opacity:.3}))
+    crit.rotation.z=Math.PI/2-(48.6*Math.PI/180)
+    crit.position.set(0,0,0);modeGroup.add(crit)
+  }
+  else if(m===2){ // LIGHT BUBBLES
+    const sun=new THREE.DirectionalLight(0x88ccff,.5);sun.position.set(5,20,5);modeGroup.add(sun)
+    for(let i=0;i<15;i++){
+      const pos=new THREE.Vector3((Math.random()-.5)*20,Math.random()*-6-1,(Math.random()-.5)*20)
+      const r=.3+Math.random()*.8
+      const b=makeBubble(pos,r)
+      bubbles.push({...b,vel:new THREE.Vector3(0,.005+Math.random()*.01,0),wobble:Math.random()*TAU})
+    }
+    // shadow/ring projections on floor
+    bubbles.forEach(b=>{
+      const shadow=new THREE.Mesh(new THREE.RingGeometry(b.r*1.2,b.r*2,.32),
+        new THREE.MeshBasicMaterial({color:0x44ddff,transparent:true,opacity:.1,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}))
+      shadow.rotation.x=-Math.PI/2;shadow.position.set(b.pos.x,-9.9,b.pos.z)
+      modeGroup.add(shadow)
+      b.shadow=shadow
+    })
+  }
+  else if(m===3){ // RING REFRACTION
+    // cylinder of water
+    const cyl=new THREE.Mesh(new THREE.CylinderGeometry(3,3,8,32,1,true),
+      new THREE.MeshPhongMaterial({color:0x1a5588,transparent:true,opacity:.3,specular:0x4488cc,shininess:60,side:THREE.DoubleSide}))
+    cyl.position.y=-3;modeGroup.add(cyl)
+    // rays through cylinder — focus into vertical line
+    for(let i=0;i<24;i++){
+      const ang=i/24*Math.PI-Math.PI/2 // half circle of incoming rays
+      const x=Math.cos(ang)*12,z=Math.sin(ang)*12
+      const from=new THREE.Vector3(x,-3,z)
+      const hit=new THREE.Vector3(Math.cos(ang)*3,-3,Math.sin(ang)*3)
+      // refracted toward center line
+      const focusX=Math.cos(ang)*1.5*Math.cos(ang) // caustic curve
+      const to=new THREE.Vector3(focusX,-3,-Math.sin(ang)*3)
+      makeRay(from,hit,0x44ddff)
+      makeRay(hit,to,0x88eeff)
+    }
+    // caustic line at focus
+    const line=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,8,4),
+      new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.3,blending:THREE.AdditiveBlending}))
+    line.position.set(0,-3,0);modeGroup.add(line)
+  }
+  else if(m===4){ // SNELL WINDOW
+    // view from below: 97° cone = the whole sky
+    const coneAng=48.6*Math.PI/180 // half angle
+    const coneR=Math.tan(coneAng)*10
+    // the cone of sky visibility
+    const coneGeo=new THREE.ConeGeometry(coneR,10,32,1,true)
+    const coneMat=new THREE.MeshBasicMaterial({color:0x4488cc,transparent:true,opacity:.08,blending:THREE.AdditiveBlending,side:THREE.DoubleSide})
+    const cone=new THREE.Mesh(coneGeo,coneMat)
+    cone.position.y=-5;cone.rotation.x=Math.PI;modeGroup.add(cone)
+    // circle on surface = Snell's window boundary
+    const circle=new THREE.Mesh(new THREE.RingGeometry(coneR-.1,coneR+.1,64),
+      new THREE.MeshBasicMaterial({color:0x44ddff,transparent:true,opacity:.4,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}))
+    circle.rotation.x=-Math.PI/2;circle.position.y=.01;modeGroup.add(circle)
+    // outside = mirror (reflection of floor)
+    for(let i=0;i<64;i++){
+      const ang=i/64*TAU,r=coneR+3+Math.random()*10
+      const dot=makePhoton(new THREE.Vector3(Math.cos(ang)*r,.01,Math.sin(ang)*r),0x224466,.08)
+    }
+    // eye position
+    makePhoton(new THREE.Vector3(0,-8,0),0xffffff,.2)
+  }
+  else if(m===5){ // DISPERSION
+    // prism-like water wedge
+    const colors=[0xff0000,0xff4400,0xff8800,0xffdd00,0x44ff00,0x0088ff,0x4400ff]
+    const wavelengths=[700,620,580,570,520,470,420] // nm
+    const nValues=[1.3300,1.3320,1.3330,1.3340,1.3360,1.3385,1.3420] // refractive index per wavelength
+    // white light enters from left
+    const entry=new THREE.Vector3(-15,5,0)
+    const hitSurface=new THREE.Vector3(-5,0,0)
+    makeRay(entry,hitSurface,0xffffff,.06) // white beam
+    makePhoton(hitSurface,0xffffff,.2)
+    // dispersed colors exit at different angles
+    colors.forEach((col,i)=>{
+      const n=nValues[i]
+      const ang=Math.asin(Math.sin(30*Math.PI/180)/n) // Snell's law
+      const spread=(i-3)*.8 // visual spread
+      const exit=new THREE.Vector3(hitSurface.x+15,hitSurface.y-8+spread*2,spread*1.5)
+      makeRay(hitSurface,exit,col,.04)
+      // spectrum dots on floor
+      makePhoton(new THREE.Vector3(exit.x,-9.9,exit.z),col,.15)
+    })
+    // labels would be nice but keeping it visual
+  }
+  else if(m===6){ // GLORY RINGS
+    // rings of diffracted light around center shadow
+    for(let order=1;order<=5;order++){
+      const r=order*2
+      const col=new THREE.Color().setHSL((order*.15+.55)%1,.8,.5)
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.08,4,64),
+        new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.3-order*.04,blending:THREE.AdditiveBlending}))
+      ring.rotation.x=Math.PI/2;ring.position.y=-5;modeGroup.add(ring)
+      ringParts.push(ring)
+    }
+    // center shadow (your head)
+    const shadow=new THREE.Mesh(new THREE.SphereGeometry(1,16,16),
+      new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.5}))
+    shadow.position.y=-5;modeGroup.add(shadow)
+    // fog/cloud particles
+    for(let i=0;i<500;i++){
+      const dot=makePhoton(new THREE.Vector3((Math.random()-.5)*30,-5+(Math.random()-.5)*4,(Math.random()-.5)*30),0x446688,.04)
+    }
+  }
+  else if(m===7){ // FRESNEL LENS
+    // water surface at extreme angle = mirror
+    const sun2=new THREE.DirectionalLight(0xffdd88,.6);sun2.position.set(-20,3,0);modeGroup.add(sun2)
+    // incoming rays at glancing angle
+    for(let i=0;i<16;i++){
+      const z=(i-8)*2
+      const from=new THREE.Vector3(-25,2+i*.1,z)
+      const hit=new THREE.Vector3(-5+i*.5,.01,z)
+      const reflect=new THREE.Vector3(15+i*.5,2+i*.1,z)
+      makeRay(from,hit,0xffdd88,.03)
+      makeRay(hit,reflect,0xffdd88,.03) // nearly 100% reflection at glancing angle
+      // reflectance indicator
+      const reflectance=Math.min(1,Math.pow(1-Math.cos(Math.atan2(2,20+i)),5)) // Fresnel approximation
+      const dot=makePhoton(hit,0xffdd88,.05+reflectance*.1)
+    }
+    // golden hour glow
+    const glow=new THREE.Mesh(new THREE.PlaneGeometry(60,60),
+      new THREE.MeshBasicMaterial({color:0xffaa44,transparent:true,opacity:.02,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}))
+    glow.rotation.x=-Math.PI/2;glow.position.y=.02;modeGroup.add(glow)
+  }
+
+  document.getElementById('explain').textContent=MODES[m].explain
+  document.querySelectorAll('.mb').forEach((b,i)=>b.classList.toggle('on',i===m))
+}
+
+function setMode(m){mode=m;buildMode(m)}
+
+// ═══ CAMERA ═══
+let cTh=0,cPh=.3,cR=30,drag=false,mx=0,my=0
+cv.addEventListener('pointerdown',e=>{drag=true;mx=e.clientX;my=e.clientY})
+addEventListener('pointerup',()=>drag=false)
+addEventListener('pointermove',e=>{if(!drag)return;cTh-=(e.clientX-mx)*.004;cPh+=(e.clientY-my)*.003;cPh=Math.max(-.4,Math.min(.8,cPh));mx=e.clientX;my=e.clientY})
+cv.addEventListener('wheel',e=>{cR=Math.max(8,Math.min(60,cR+e.deltaY*.03))},{passive:true})
+
+// ═══ ANIMATE ═══
+function animate(ts){
+  requestAnimationFrame(animate)
+  const t=ts*.001
+
+  // water wave animation
+  const wp=water.geometry.attributes.position
+  for(let i=0;i<wp.count;i++){
+    const x=wp.getX(i),z=wp.getZ(i)
+    const y=Math.sin(x*.3+t*1.2)*.3*Math.cos(z*.25+t*.8)+Math.sin(x*.5+z*.4+t*1.5)*.15
+    wp.setY(i,y)
+  }
+  wp.needsUpdate=true;water.geometry.computeVertexNormals()
+
+  // mode-specific animation
+  if(mode===0){ // caustics dance
+    rays.forEach(r=>{
+      const wave=Math.sin(r.x*.3+t*1.2)*.3*Math.cos(r.z*.25+t*.8)
+      const focusX=r.x+wave*3 // lens effect of wave
+      const focusZ=r.z+Math.sin(r.z*.5+t*.8)*.5*3
+      r.dot.position.x+=(focusX-r.dot.position.x)*.1
+      r.dot.position.z+=(focusZ-r.dot.position.z)*.1
+      const brightness=Math.max(0,.1+Math.abs(wave)*2)
+      r.dot.material.opacity=Math.min(.8,brightness)
+      r.dot.scale.setScalar(.5+brightness)
+    })
+  }
+  else if(mode===2){ // bubbles rise
+    bubbles.forEach(b=>{
+      b.mesh.position.y+=b.vel.y
+      b.mesh.position.x+=Math.sin(t*2+b.wobble)*.01
+      b.ring.position.copy(b.mesh.position)
+      b.ring.rotation.x=Math.PI/2+Math.sin(t+b.wobble)*.1
+      b.ring.material.opacity=.15+Math.sin(t*3+b.wobble)*.05
+      if(b.shadow){
+        b.shadow.position.x=b.mesh.position.x
+        b.shadow.position.z=b.mesh.position.z
+        b.shadow.material.opacity=.05+(.1/(Math.abs(b.mesh.position.y)+1))
+      }
+      if(b.mesh.position.y>0){
+        b.mesh.position.y=-8
+        b.mesh.position.x=(Math.random()-.5)*20
+        b.mesh.position.z=(Math.random()-.5)*20
+      }
+    })
+  }
+  else if(mode===6){ // glory rings pulse
+    ringParts.forEach((ring,i)=>{
+      ring.material.opacity=(.25-i*.04)+Math.sin(t*2+i*.5)*.05
+      ring.rotation.z=t*.1*(i%2?1:-1)
+    })
+  }
+
+  // camera
+  cam.position.x=Math.cos(cTh)*Math.cos(cPh)*cR
+  cam.position.y=Math.sin(cPh)*cR+5
+  cam.position.z=Math.sin(cTh)*Math.cos(cPh)*cR
+  const lookY=mode===4?-5:mode===1?-3:0
+  cam.lookAt(0,lookY,0)
+
+  R.render(scene,cam)
+}
+
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+buildMode(0)
+animate(0)
+</script>
+</body></html>
