@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OCEAN WORLD — Full Photonic Fluid Dynamics</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Courier New',monospace;color:#c8d0e0}
+canvas{display:block}
+#hud{position:fixed;top:10px;left:12px;z-index:10;font-size:9px;color:rgba(140,200,255,.5);line-height:1.7;pointer-events:none;white-space:pre;text-shadow:0 0 8px rgba(0,80,160,.5)}
+#rhud{position:fixed;top:10px;right:12px;z-index:10;font-size:8px;color:rgba(140,200,255,.4);text-align:right;line-height:1.7;pointer-events:none;white-space:pre;text-shadow:0 0 8px rgba(0,80,160,.4)}
+#depth{position:fixed;left:12px;top:50%;transform:translateY(-50%);z-index:10;pointer-events:none}
+#depth-bar{width:5px;height:220px;background:rgba(255,255,255,.06);border-radius:3px;position:relative;box-shadow:0 0 10px rgba(0,100,200,.1)}
+#depth-fill{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,#001040,#0077cc,#55ccff);border-radius:3px;transition:height .3s;box-shadow:0 0 6px rgba(0,150,255,.3)}
+#depth-label{font-size:8px;color:rgba(100,180,255,.5);text-align:center;margin-top:6px;width:36px;margin-left:-16px}
+#controls{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:4px}
+.cb{background:rgba(0,120,200,.08);border:1px solid rgba(0,150,255,.2);color:rgba(0,150,255,.6);padding:4px 10px;font:8px/1 monospace;cursor:pointer;border-radius:3px;transition:all .2s;text-transform:uppercase;letter-spacing:1px}
+.cb:hover,.cb.on{border-color:rgba(0,180,255,.6);color:#0cf;background:rgba(0,150,255,.15);box-shadow:0 0 8px rgba(0,150,255,.2)}
+#phenom{position:fixed;bottom:38px;left:50%;transform:translateX(-50%);z-index:10;font-size:9px;color:rgba(120,200,255,.6);text-align:center;pointer-events:none;max-width:600px;line-height:1.5;text-shadow:0 0 10px rgba(0,100,200,.4)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<div id="rhud"></div>
+<div id="depth"><div id="depth-bar"><div id="depth-fill"></div></div><div id="depth-label">0m</div></div>
+<div id="controls">
+  <span class="cb on" onclick="setTime('day')">Day</span>
+  <span class="cb" onclick="setTime('sunset')">Sunset</span>
+  <span class="cb" onclick="setTime('night')">Night</span>
+  <span class="cb" onclick="setTime('storm')">Storm</span>
+  <span class="cb" onclick="toggleUnder()">Dive</span>
+</div>
+<div id="phenom"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.4
+const scene=new THREE.Scene()
+const cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,3000)
+cam.position.set(0,8,30)
+
+// ═══ PRESETS ═══
+const presets={
+  day:{sky1:0x4488cc,sky2:0x88bbee,fog:0x5588bb,fogD:.0008,sun:[150,100,80],sunCol:0xffffee,sunInt:1.5,amb:0x5577aa,ambInt:.6,expo:1.4,waterCol:0x0066aa,waterDeep:0x002244},
+  sunset:{sky1:0xff6622,sky2:0x220044,fog:0x553322,fogD:.001,sun:[-120,12,60],sunCol:0xff7722,sunInt:1.2,amb:0x442211,ambInt:.4,expo:1.8,waterCol:0x553311,waterDeep:0x110022},
+  night:{sky1:0x020818,sky2:0x040410,fog:0x030810,fogD:.002,sun:[60,50,-80],sunCol:0x8899bb,sunInt:.2,amb:0x0a1020,ambInt:.25,expo:.7,waterCol:0x0a1830,waterDeep:0x020810},
+  storm:{sky1:0x222830,sky2:0x0a1015,fog:0x1a2025,fogD:.0015,sun:[40,60,30],sunCol:0x99aaaa,sunInt:.5,amb:0x2a3540,ambInt:.35,expo:1.0,waterCol:0x1a3040,waterDeep:0x0a1520}
+}
+let timeMode='day',underwater=false,camDepth=8,targetDepth=8
+
+const ambLight=new THREE.AmbientLight(0x5577aa,.6);scene.add(ambLight)
+const sunLight=new THREE.DirectionalLight(0xffffee,1.5);sunLight.position.set(150,100,80);scene.add(sunLight)
+const hemiLight=new THREE.HemisphereLight(0x88aacc,0x002244,.3);scene.add(hemiLight)
+const underLight=new THREE.PointLight(0x0088cc,0,80);scene.add(underLight)
+scene.fog=new THREE.FogExp2(0x5588bb,.0008)
+
+// ═══ SKY DOME ═══
+const skyGeo=new THREE.SphereGeometry(1500,32,16)
+const skyMat=new THREE.ShaderMaterial({
+  side:THREE.BackSide,
+  uniforms:{
+    col1:{value:new THREE.Color(0x4488cc)},
+    col2:{value:new THREE.Color(0x88bbee)},
+    sunDir:{value:new THREE.Vector3(.5,.6,.3).normalize()},
+    sunCol:{value:new THREE.Color(0xffffdd)},
+    sunSize:{value:.996}
+  },
+  vertexShader:`varying vec3 vPos;void main(){vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader:`
+    varying vec3 vPos;
+    uniform vec3 col1,col2,sunDir,sunCol;
+    uniform float sunSize;
+    void main(){
+      float h=normalize(vPos).y;
+      vec3 sky=mix(col1,col2,clamp(h*.5+.5,0.,1.));
+      float horizon=exp(-abs(h)*8.);
+      sky+=vec3(.4,.3,.2)*horizon*.3;
+      vec3 nd=normalize(vPos);
+      float sun=max(0.,dot(nd,sunDir));
+      sky+=sunCol*pow(sun,500.)*2.;
+      sky+=sunCol*pow(sun,8.)*.15;
+      gl_FragColor=vec4(sky,1.);
+    }`
+})
+const sky=new THREE.Mesh(skyGeo,skyMat);scene.add(sky)
+
+// ═══ OCEAN SURFACE — custom shader ═══
+const oceanSize=500,oceanRes=256
+const oceanGeo=new THREE.PlaneGeometry(oceanSize,oceanSize,oceanRes,oceanRes)
+const oceanVS=`
+  varying vec3 vWorldPos;
+  varying vec3 vNormal;
+  varying vec2 vUv;
+  void main(){
+    vUv=uv;
+    vWorldPos=(modelMatrix*vec4(position,1.)).xyz;
+    vNormal=normalize(normalMatrix*normal);
+    gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);
+  }`
+const oceanFS=`
+  varying vec3 vWorldPos;
+  varying vec3 vNormal;
+  varying vec2 vUv;
+  uniform vec3 camPos,sunDir,sunColor,waterColor,deepColor;
+  uniform float time,sunIntensity;
+  void main(){
+    vec3 N=normalize(vNormal);
+    vec3 V=normalize(camPos-vWorldPos);
+    vec3 L=normalize(sunDir);
+    // Fresnel — Schlick approximation
+    float cosTheta=max(dot(V,N),0.);
+    float fresnel=.02+.98*pow(1.-cosTheta,5.);
+    // Specular — multiple lobes for realism
+    vec3 H=normalize(L+V);
+    float spec1=pow(max(dot(N,H),0.),512.)*sunIntensity*1.5;
+    float spec2=pow(max(dot(N,H),0.),64.)*sunIntensity*.3;
+    // Wave height coloring — peaks are lighter, troughs darker
+    float heightFactor=smoothstep(-2.,2.,vWorldPos.y);
+    vec3 troughCol=deepColor*.7;
+    vec3 peakCol=waterColor*1.3+vec3(.05,.15,.1);
+    vec3 water=mix(troughCol,peakCol,heightFactor);
+    // Diffuse lighting
+    float diff=max(dot(N,L),0.)*.5+.5;
+    water*=diff;
+    // Subsurface scattering — light through wave crests
+    float sss=pow(max(dot(V,-L),0.),4.)*.2;
+    float sssHeight=smoothstep(0.,1.5,vWorldPos.y);
+    vec3 sssCol=vec3(.05,.35,.3)*sss*(1.+sssHeight);
+    // Foam on crests
+    float foam=smoothstep(.6,1.8,vWorldPos.y);
+    foam*=.5+.5*sin(vWorldPos.x*1.2+vWorldPos.z*.8+time*1.5);
+    foam=max(0.,foam)*.7;
+    // Sky reflection
+    vec3 skyRef=vec3(.45,.65,.85);
+    vec3 col=mix(water+sssCol,skyRef,fresnel);
+    col+=sunColor*(spec1+spec2);
+    col=mix(col,vec3(.95,.98,1.),foam);
+    float alpha=mix(.82,.97,fresnel);
+    gl_FragColor=vec4(col,alpha);
+  }`
+const oceanMat=new THREE.ShaderMaterial({
+  transparent:true,side:THREE.DoubleSide,
+  uniforms:{
+    camPos:{value:cam.position},
+    sunDir:{value:new THREE.Vector3(150,100,80).normalize()},
+    sunColor:{value:new THREE.Color(0xffffee)},
+    waterColor:{value:new THREE.Color(0x0066aa)},
+    deepColor:{value:new THREE.Color(0x002244)},
+    time:{value:0},
+    sunIntensity:{value:1.5}
+  },
+  vertexShader:oceanVS,
+  fragmentShader:oceanFS
+})
+const ocean=new THREE.Mesh(oceanGeo,oceanMat);ocean.rotation.x=-Math.PI/2;scene.add(ocean)
+
+// ═══ OCEAN FLOOR ═══
+const floorGeo=new THREE.PlaneGeometry(oceanSize,oceanSize,80,80)
+const fp=floorGeo.attributes.position
+for(let i=0;i<fp.count;i++){
+  const x=fp.getX(i),y=fp.getY(i)
+  fp.setZ(i,Math.sin(x*.03)*Math.cos(y*.025)*5+Math.sin(x*.1+y*.08)*2+Math.cos(x*.02-y*.03)*3)
+}
+floorGeo.computeVertexNormals()
+const floorMat=new THREE.MeshPhongMaterial({color:0x0c2030,emissive:0x040c14,emissiveIntensity:.1,flatShading:true,specular:0x112233,shininess:5})
+const floorMesh=new THREE.Mesh(floorGeo,floorMat);floorMesh.rotation.x=-Math.PI/2;floorMesh.position.y=-35;scene.add(floorMesh)
+
+// ═══ ROCKS ═══
+for(let i=0;i<20;i++){
+  const s=.5+Math.random()*2
+  const rock=new THREE.Mesh(
+    new THREE.DodecahedronGeometry(s,1),
+    new THREE.MeshPhongMaterial({color:0x0c1820,emissive:0x040a10,flatShading:true})
+  )
+  rock.position.set((Math.random()-.5)*120,-34.5+Math.random()*1,(Math.random()-.5)*120)
+  rock.rotation.set(Math.random()*TAU,Math.random()*TAU,0)
+  scene.add(rock)
+}
+
+// ═══ CAUSTICS (animated light pattern on floor) ═══
+const caustCount=5000,caustGeo=new THREE.BufferGeometry()
+const caustPos=new Float32Array(caustCount*3),caustAlpha=new Float32Array(caustCount),caustData=[]
+for(let i=0;i<caustCount;i++){
+  const x=(Math.random()-.5)*200,z=(Math.random()-.5)*200
+  caustPos[i*3]=x;caustPos[i*3+1]=-34;caustPos[i*3+2]=z
+  caustAlpha[i]=.3+Math.random()*.7
+  caustData.push({x,z,phase:Math.random()*TAU,speed:.5+Math.random()})
+}
+caustGeo.setAttribute('position',new THREE.BufferAttribute(caustPos,3))
+const caustMat=new THREE.PointsMaterial({color:0x55ddff,size:.6,transparent:true,opacity:.35,blending:THREE.AdditiveBlending,sizeAttenuation:true})
+const caustics=new THREE.Points(caustGeo,caustMat);scene.add(caustics)
+
+// ═══ FOAM PARTICLES (on wave crests) ═══
+const foamCount=800,foamGeo=new THREE.BufferGeometry()
+const foamPos=new Float32Array(foamCount*3)
+for(let i=0;i<foamCount;i++){
+  foamPos[i*3]=(Math.random()-.5)*200;foamPos[i*3+1]=0;foamPos[i*3+2]=(Math.random()-.5)*200
+}
+foamGeo.setAttribute('position',new THREE.BufferAttribute(foamPos,3))
+const foamMat=new THREE.PointsMaterial({color:0xeeffff,size:.4,transparent:true,opacity:.5,blending:THREE.NormalBlending,sizeAttenuation:true})
+const foamPts=new THREE.Points(foamGeo,foamMat);scene.add(foamPts)
+
+// ═══ BUBBLES ═══
+const bubCount=100,bubbles=[]
+for(let i=0;i<bubCount;i++){
+  const r=.1+Math.random()*.5
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(r,12,12),
+    new THREE.MeshPhongMaterial({color:0xbbddff,transparent:true,opacity:.15,specular:0xffffff,shininess:200,envMapIntensity:.5}))
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(r*1.4,.02,6,20),
+    new THREE.MeshBasicMaterial({color:0x66eeff,transparent:true,opacity:.1,blending:THREE.AdditiveBlending}))
+  const x=(Math.random()-.5)*80,z=(Math.random()-.5)*80,y=-33+Math.random()*30
+  mesh.position.set(x,y,z);ring.position.set(x,y,z)
+  scene.add(mesh);scene.add(ring)
+  bubbles.push({mesh,ring,r,vel:.015+Math.random()*.04,wobble:Math.random()*TAU,x,z})
+}
+
+// ═══ LIGHT SHAFTS (volumetric cones) ═══
+const shaftCount=20,shafts=[]
+for(let i=0;i<shaftCount;i++){
+  const x=(Math.random()-.5)*120,z=(Math.random()-.5)*120
+  const w=.5+Math.random()*2
+  const geo=new THREE.CylinderGeometry(w*.3,w,35,6,1,true)
+  const mat=new THREE.MeshBasicMaterial({color:0x55aadd,transparent:true,opacity:.015,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false})
+  const shaft=new THREE.Mesh(geo,mat)
+  shaft.position.set(x,-17,z)
+  shaft.rotation.z=(Math.random()-.5)*.4;shaft.rotation.x=(Math.random()-.5)*.3
+  scene.add(shaft)
+  shafts.push({mesh:shaft,mat,baseOp:.015,phase:Math.random()*TAU,x,z})
+}
+
+// ═══ SNELL WINDOW ═══
+const snellAngle=48.6*Math.PI/180
+const snellR=Math.tan(snellAngle)*35
+const snellRing=new THREE.Mesh(new THREE.TorusGeometry(snellR,.15,8,80),
+  new THREE.MeshBasicMaterial({color:0xaaeeff,transparent:true,opacity:0,blending:THREE.AdditiveBlending}))
+snellRing.rotation.x=Math.PI/2;snellRing.position.y=-.2;scene.add(snellRing)
+const mirrorGeo=new THREE.RingGeometry(snellR,snellR+80,80)
+const mirrorMat=new THREE.MeshBasicMaterial({color:0x0a2030,transparent:true,opacity:0,side:THREE.DoubleSide})
+const mirror=new THREE.Mesh(mirrorGeo,mirrorMat);mirror.rotation.x=-Math.PI/2;mirror.position.y=-.1;scene.add(mirror)
+
+// ═══ DISPERSION RAINBOW ═══
+const rainbowGeo=new THREE.TorusGeometry(120,.5,4,200,Math.PI*.7)
+const rainbowMat=new THREE.ShaderMaterial({
+  transparent:true,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false,
+  uniforms:{time:{value:0},opacity:{value:0}},
+  vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader:`varying vec2 vUv;uniform float time,opacity;void main(){
+    float h=vUv.x;vec3 c;
+    if(h<.14)c=vec3(1.,.1,.1);else if(h<.28)c=vec3(1.,.5,.05);else if(h<.42)c=vec3(1.,1.,.15);
+    else if(h<.57)c=vec3(.15,.8,.15);else if(h<.71)c=vec3(.1,.5,1.);else if(h<.85)c=vec3(.3,.15,.9);
+    else c=vec3(.5,.1,.7);
+    float edge=1.-abs(vUv.y-.5)*2.;
+    gl_FragColor=vec4(c*edge,opacity*(0.4+sin(time*.5+h*12.)*.1)*edge);}`
+})
+const rainbow=new THREE.Mesh(rainbowGeo,rainbowMat)
+rainbow.position.set(0,40,-100);rainbow.rotation.y=Math.PI*.85;scene.add(rainbow)
+
+// ═══ GLORY RINGS ═══
+const gloryRings=[]
+for(let i=1;i<=5;i++){
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(i*2,.08,6,48),
+    new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(i*.11+.55,.8,.55),transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}))
+  scene.add(ring);gloryRings.push(ring)
+}
+
+// ═══ PARTICLES (plankton / suspended) ═══
+const partCount=2000,partGeo=new THREE.BufferGeometry()
+const partPos=new Float32Array(partCount*3)
+for(let i=0;i<partCount;i++){
+  partPos[i*3]=(Math.random()-.5)*140;partPos[i*3+1]=Math.random()*-33;partPos[i*3+2]=(Math.random()-.5)*140
+}
+partGeo.setAttribute('position',new THREE.BufferAttribute(partPos,3))
+const partMat=new THREE.PointsMaterial({color:0x99ccdd,size:.12,transparent:true,opacity:.15,blending:THREE.AdditiveBlending,sizeAttenuation:true})
+const particles=new THREE.Points(partGeo,partMat);scene.add(particles)
+
+// ═══ SPRAY PARTICLES (above surface, storm) ═══
+const sprayCount=300,sprayGeo=new THREE.BufferGeometry()
+const sprayPos=new Float32Array(sprayCount*3),sprayVel=new Float32Array(sprayCount*3)
+for(let i=0;i<sprayCount;i++){
+  sprayPos[i*3]=(Math.random()-.5)*100;sprayPos[i*3+1]=Math.random()*5;sprayPos[i*3+2]=(Math.random()-.5)*100
+  sprayVel[i*3]=(Math.random()-.5)*.1;sprayVel[i*3+1]=.05+Math.random()*.15;sprayVel[i*3+2]=(Math.random()-.5)*.1
+}
+sprayGeo.setAttribute('position',new THREE.BufferAttribute(sprayPos,3))
+const sprayMat=new THREE.PointsMaterial({color:0xddeeff,size:.2,transparent:true,opacity:0,blending:THREE.NormalBlending,sizeAttenuation:true})
+const spray=new THREE.Points(sprayGeo,sprayMat);scene.add(spray)
+
+// ═══ WAVES ═══
+const waves=[
+  {amp:1.8,freq:.025,speed:.7,dir:0},
+  {amp:1.0,freq:.05,speed:1.1,dir:.8},
+  {amp:.5,freq:.1,speed:1.6,dir:-.6},
+  {amp:.25,freq:.18,speed:2.2,dir:1.3},
+  {amp:.12,freq:.3,speed:3.0,dir:-.3}
+]
+
+function getWaveHeight(x,z,t,amp){
+  let y=0
+  const sa=amp||1
+  waves.forEach(w=>{
+    y+=w.amp*sa*Math.sin(x*w.freq*Math.cos(w.dir)+z*w.freq*Math.sin(w.dir)+t*w.speed)
+  })
+  return y
+}
+function getWaveNormal(x,z,t,amp){
+  const e=.5,sa=amp||1
+  const h=getWaveHeight(x,z,t,sa)
+  const hx=getWaveHeight(x+e,z,t,sa)
+  const hz=getWaveHeight(x,z+e,t,sa)
+  return new THREE.Vector3(-(hx-h)/e,1,-(hz-h)/e).normalize()
+}
+
+// ═══ LIGHTNING ═══
+let lightningTimer=0,lightningFlash=0
+const lightningGeo=new THREE.BufferGeometry()
+const lightningMat=new THREE.LineBasicMaterial({color:0xccddff,transparent:true,opacity:0,blending:THREE.AdditiveBlending})
+const lightning=new THREE.LineSegments(lightningGeo,lightningMat);scene.add(lightning)
+
+function makeBolt(){
+  const pts=[]
+  let x=(Math.random()-.5)*60,y=40,z=(Math.random()-.5)*60
+  for(let i=0;i<15;i++){
+    const nx=x+(Math.random()-.5)*8,ny=y-3-Math.random()*3,nz=z+(Math.random()-.5)*8
+    pts.push(x,y,z,nx,ny,nz)
+    x=nx;y=ny;z=nz
+    if(Math.random()<.3){
+      const bx=x+(Math.random()-.5)*12,by=y-2-Math.random()*4,bz=z+(Math.random()-.5)*12
+      pts.push(x,y,z,bx,by,bz)
+    }
+  }
+  lightning.geometry.dispose()
+  lightning.geometry=new THREE.BufferGeometry()
+  lightning.geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pts),3))
+}
+
+// ═══ CAMERA ═══
+let cTh=.3,cPh=.12,cR=35,drag=false,mx=0,my=0
+cv.addEventListener('pointerdown',e=>{drag=true;mx=e.clientX;my=e.clientY})
+addEventListener('pointerup',()=>drag=false)
+addEventListener('pointermove',e=>{if(!drag)return;cTh-=(e.clientX-mx)*.004;cPh+=(e.clientY-my)*.003;cPh=Math.max(-.5,Math.min(.7,cPh));mx=e.clientX;my=e.clientY})
+cv.addEventListener('wheel',e=>{cR=Math.max(8,Math.min(150,cR+e.deltaY*.06))},{passive:true})
+
+function applyPreset(p){
+  const pr=presets[p]
+  skyMat.uniforms.col1.value.set(pr.sky1)
+  skyMat.uniforms.col2.value.set(pr.sky2)
+  const sd=new THREE.Vector3(...pr.sun).normalize()
+  skyMat.uniforms.sunDir.value.copy(sd)
+  skyMat.uniforms.sunCol.value.set(pr.sunCol)
+  scene.fog.color.set(pr.fog);scene.fog.density=pr.fogD
+  sunLight.position.set(...pr.sun);sunLight.color.set(pr.sunCol);sunLight.intensity=pr.sunInt
+  ambLight.color.set(pr.amb);ambLight.intensity=pr.ambInt
+  hemiLight.color.set(pr.sky2);hemiLight.groundColor.set(pr.waterDeep)
+  R.toneMappingExposure=pr.expo
+  oceanMat.uniforms.sunDir.value.copy(sd)
+  oceanMat.uniforms.sunColor.value.set(pr.sunCol)
+  oceanMat.uniforms.sunIntensity.value=pr.sunInt
+  oceanMat.uniforms.waterColor.value.set(pr.waterCol)
+  oceanMat.uniforms.deepColor.value.set(pr.waterDeep)
+}
+
+function setTime(t){timeMode=t;applyPreset(t);document.querySelectorAll('.cb').forEach(b=>b.classList.toggle('on',b.textContent.toLowerCase()===t))}
+function toggleUnder(){underwater=!underwater;targetDepth=underwater?-18:8;document.querySelector('.cb:last-child').classList.toggle('on',underwater)}
+
+// ═══ PHENOMENA ═══
+function detectPhenomena(camY){
+  const ph=[]
+  if(camY<-.5){
+    ph.push('SNELL WINDOW — entire sky compressed into 97.2° cone directly above')
+    ph.push('TOTAL INTERNAL REFLECTION — water surface becomes a perfect mirror beyond critical angle')
+  }
+  if(camY<-8)ph.push('CREPUSCULAR RAYS — god-rays refracted through wave-lens surface')
+  if(camY<-15)ph.push('CAUSTIC NETWORK — focused light patterns dance on the seafloor')
+  if(camY<-3&&camY>-20)ph.push('LIGHT BUBBLES — each bubble is a diverging lens with a bright ring')
+  if(timeMode==='sunset'){ph.push('FRESNEL EFFECT — ocean mirror-like at glancing angle');ph.push('DISPERSION — rainbow arc from differential refraction')}
+  if(timeMode==='night'&&camY<0)ph.push('BIOLUMINESCENCE — disturbed dinoflagellates emit blue-green photons')
+  if(timeMode==='storm'){ph.push('LIGHTNING — 30,000°C plasma channel');if(camY<0)ph.push('THUNDER REFRACTION — sound bends at the density interface')}
+  if(camY>3&&timeMode==='day')ph.push('GLORY — colored diffraction rings around anti-solar point')
+  if(camY>0&&camY<3)ph.push('SURFACE MENISCUS — capillary waves at the air-water interface')
+  return ph
+}
+
+// ═══ ANIMATE ═══
+let prevT=0
+function animate(ts){
+  requestAnimationFrame(animate)
+  const t=ts*.001,dt=Math.min(t-prevT,.05);prevT=t
+
+  camDepth+=(targetDepth-camDepth)*.04
+  const stormAmp=timeMode==='storm'?2.8:1
+
+  // ocean surface — PlaneGeometry is in XY, rotated -PI/2 on X
+  // so local X→world X, local Y→world Z, local Z→world Y (height)
+  const op=ocean.geometry.attributes.position
+  for(let i=0;i<op.count;i++){
+    const x=op.getX(i),z=op.getY(i)
+    op.setZ(i,getWaveHeight(x,z,t,stormAmp))
+  }
+  op.needsUpdate=true;ocean.geometry.computeVertexNormals()
+  oceanMat.uniforms.time.value=t
+  oceanMat.uniforms.camPos.value.copy(cam.position)
+
+  // foam on crests
+  const fpp=foamPts.geometry.attributes.position.array
+  for(let i=0;i<foamCount;i++){
+    const x=fpp[i*3],z=fpp[i*3+2]
+    const h=getWaveHeight(x,z,t,stormAmp)
+    fpp[i*3+1]=h+.05
+  }
+  foamPts.geometry.attributes.position.needsUpdate=true
+  foamMat.opacity=camDepth>-2?.4:Math.max(0,.4+camDepth*.08)
+
+  // caustics
+  const showCaust=camDepth<5
+  if(showCaust){
+    const cp=caustics.geometry.attributes.position.array
+    for(let i=0;i<caustCount;i++){
+      const cd=caustData[i]
+      const wh=getWaveHeight(cd.x,cd.z,t,1)
+      const focus=1+wh*.5
+      cp[i*3]=cd.x+Math.sin(t*cd.speed+cd.phase)*focus*2
+      cp[i*3+2]=cd.z+Math.cos(t*cd.speed*.7+cd.phase)*focus*1.5
+    }
+    caustics.geometry.attributes.position.needsUpdate=true
+    caustMat.opacity=camDepth<-5?.4:Math.max(0,.4*(1-camDepth/5))
+    caustMat.size=.4+Math.max(0,-camDepth)*.02
+  } else caustMat.opacity=0
+
+  // bubbles
+  bubbles.forEach(b=>{
+    b.mesh.position.y+=b.vel*(1+Math.sin(t+b.wobble)*.3)
+    b.mesh.position.x=b.x+Math.sin(t*1.2+b.wobble)*1.5
+    b.mesh.position.z=b.z+Math.cos(t*.9+b.wobble)*1.2
+    b.ring.position.copy(b.mesh.position)
+    b.ring.rotation.x=Math.PI/2+Math.sin(t*.8+b.wobble)*.2
+    b.ring.rotation.y=t*.4+b.wobble
+    if(b.mesh.position.y>-.3){
+      b.mesh.position.y=-33;b.x=(Math.random()-.5)*80;b.z=(Math.random()-.5)*80
+      b.mesh.position.x=b.x;b.mesh.position.z=b.z
+    }
+    const vis=camDepth<0&&Math.abs(b.mesh.position.y-camDepth)<20
+    b.mesh.material.opacity=vis?.2:.02
+    b.ring.material.opacity=vis?.12:.01
+  })
+
+  // light shafts
+  shafts.forEach(s=>{
+    const vis=camDepth<2
+    s.mat.opacity=vis?s.baseOp*(1+Math.sin(t*.6+s.phase)*.5):.002
+    s.mesh.rotation.z=Math.sin(t*.15+s.phase)*.2
+  })
+
+  // Snell window
+  const snellVis=camDepth<-1
+  snellRing.material.opacity=snellVis?Math.min(.5,(-camDepth-1)/8):0
+  mirrorMat.opacity=snellVis?Math.min(.3,(-camDepth-1)/12):0
+
+  // rainbow
+  rainbowMat.uniforms.time.value=t
+  rainbowMat.uniforms.opacity.value=timeMode==='sunset'?.25:0
+
+  // glory
+  gloryRings.forEach((ring,i)=>{
+    const show=camDepth>3&&(timeMode==='day'||timeMode==='sunset')
+    ring.material.opacity=show?.1+Math.sin(t*1.5+i*.7)*.03:0
+    ring.position.set(cam.position.x*.3,.1,cam.position.z*.3)
+    ring.rotation.x=Math.PI/2
+    ring.rotation.z=t*.03*(i%2?1:-1)
+  })
+
+  // particles
+  const pp=particles.geometry.attributes.position.array
+  for(let i=0;i<partCount;i++){
+    pp[i*3]+=Math.sin(t*.2+i*.1)*.008
+    pp[i*3+1]+=Math.sin(t*.15+i*.3)*.004
+    pp[i*3+2]+=Math.cos(t*.18+i*.2)*.008
+    if(pp[i*3+1]>-.3)pp[i*3+1]=-33
+  }
+  particles.geometry.attributes.position.needsUpdate=true
+  if(timeMode==='night'&&camDepth<0){
+    partMat.color.setHex(0x33ffaa);partMat.opacity=.3;partMat.size=.18
+  } else {
+    partMat.color.setHex(0x88bbcc);partMat.size=.12;partMat.opacity=camDepth<0?.2:.04
+  }
+
+  // spray (storm)
+  const sp=spray.geometry.attributes.position.array
+  if(timeMode==='storm'){
+    sprayMat.opacity=.4
+    for(let i=0;i<sprayCount;i++){
+      sp[i*3]+=sprayVel[i*3]+Math.sin(t+i)*.02
+      sp[i*3+1]+=sprayVel[i*3+1]
+      sp[i*3+2]+=sprayVel[i*3+2]
+      sprayVel[i*3+1]-=.003
+      if(sp[i*3+1]<0){
+        sp[i*3]=(Math.random()-.5)*100;sp[i*3+1]=getWaveHeight(sp[i*3],(Math.random()-.5)*100,t,stormAmp)+.1;sp[i*3+2]=(Math.random()-.5)*100
+        sprayVel[i*3]=(Math.random()-.5)*.1;sprayVel[i*3+1]=.08+Math.random()*.2;sprayVel[i*3+2]=(Math.random()-.5)*.1
+      }
+    }
+    spray.geometry.attributes.position.needsUpdate=true
+  } else sprayMat.opacity=0
+
+  // underwater environment
+  if(camDepth<0){
+    underLight.intensity=.5+Math.sin(t*.7)*.1
+    underLight.position.set(cam.position.x,cam.position.y+5,cam.position.z)
+    const depth01=Math.min(1,Math.abs(camDepth)/35)
+    scene.fog.density=.002+depth01*.008
+    const fc=new THREE.Color().setHSL(.55,.5,Math.max(.01,.08*(1-depth01)))
+    scene.fog.color.copy(fc)
+    scene.background=fc
+    sky.visible=false
+    oceanMat.transparent=true
+  } else {
+    underLight.intensity=0
+    sky.visible=true
+    applyPreset(timeMode)
+  }
+
+  // lightning
+  if(timeMode==='storm'){
+    lightningTimer-=dt
+    if(lightningTimer<=0&&Math.random()<.03){
+      lightningFlash=1;lightningTimer=2+Math.random()*6
+      makeBolt();lightningMat.opacity=.9;sunLight.intensity=4
+    }
+    if(lightningFlash>0){
+      lightningFlash*=.92
+      lightningMat.opacity=lightningFlash
+      sunLight.intensity=presets.storm.sunInt+lightningFlash*4
+      if(lightningFlash>.3)scene.background=new THREE.Color(0x445566)
+      if(lightningFlash<.01)lightningFlash=0
+    }
+  } else {lightningMat.opacity=0;lightningFlash=0}
+
+  // camera
+  cam.position.x=Math.cos(cTh)*Math.cos(cPh)*cR
+  cam.position.y=camDepth+Math.sin(cPh)*cR*.4
+  cam.position.z=Math.sin(cTh)*Math.cos(cPh)*cR
+  const lookY=camDepth<0?camDepth*.3:Math.min(camDepth*.2,3)
+  cam.lookAt(0,lookY,0)
+
+  // depth indicator
+  const depthPct=Math.max(0,Math.min(1,(-camDepth+8)/43))
+  document.getElementById('depth-fill').style.height=(depthPct*100)+'%'
+  document.getElementById('depth-label').textContent=camDepth<0?Math.round(-camDepth)+'m':'AIR'
+
+  // HUD
+  const phenomena=detectPhenomena(camDepth)
+  const waveH=waves[0].amp*stormAmp
+  document.getElementById('hud').textContent=
+    `OCEAN WORLD · ${timeMode.toUpperCase()}\n`+
+    `depth: ${camDepth<0?(-camDepth).toFixed(1)+'m':'surface ('+camDepth.toFixed(1)+'m above)'}\n`+
+    `n(water) = 1.333  n(air) = 1.000\n`+
+    `critical angle: 48.6° (Snell's law)\n`+
+    `Snell window: ${camDepth<-1?'97.2° cone visible':'n/a'}\n`+
+    `wave height: ${waveH.toFixed(1)}m (${waves.length} superposed)\n`+
+    `Fresnel R₀: 2% (normal) → 100% (grazing)\n`+
+    `visibility: ${camDepth<0?Math.max(1,40+camDepth*1.2).toFixed(0)+'m':'∞'}`
+
+  document.getElementById('rhud').textContent=
+    `ACTIVE PHENOMENA\n`+phenomena.map(p=>'▸ '+p).join('\n')
+
+  document.getElementById('phenom').textContent=phenomena.length?phenomena[0]:''
+
+  R.render(scene,cam)
+}
+
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+applyPreset('day')
+animate(0)
+</script>
+</body></html>
