@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>NEON — The Complete Shell That Glows</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Courier New',monospace;color:#dde}
+canvas{display:block}
+#hud{position:fixed;top:12px;left:14px;z-index:10;font-size:9px;line-height:1.8;pointer-events:none;white-space:pre}
+#hud .title{font-size:12px;letter-spacing:4px;text-shadow:0 0 20px rgba(255,80,40,.5)}
+#hud .data{color:rgba(255,120,80,.35)}
+#rhud{position:fixed;top:12px;right:14px;z-index:10;font-size:8px;color:rgba(255,120,80,.3);text-align:right;line-height:1.8;pointer-events:none;white-space:pre}
+#controls{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:4px}
+.cb{background:rgba(255,80,40,.06);border:1px solid rgba(255,80,40,.15);color:rgba(255,100,60,.5);padding:4px 10px;font:8px/1 monospace;cursor:pointer;border-radius:3px;transition:all .2s;letter-spacing:1px}
+.cb:hover,.cb.on{border-color:rgba(255,80,40,.5);color:#f84;background:rgba(255,80,40,.12);box-shadow:0 0 10px rgba(255,60,30,.2)}
+#info{position:fixed;bottom:38px;left:50%;transform:translateX(-50%);z-index:10;font-size:9px;color:rgba(255,140,80,.5);text-align:center;pointer-events:none;max-width:700px;line-height:1.6;text-shadow:0 0 12px rgba(255,60,30,.3)}
+#excite{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:20}
+#excite button{background:rgba(255,80,40,.08);border:1px solid rgba(255,80,40,.25);color:rgba(255,120,80,.7);padding:8px 24px;font:10px/1 monospace;cursor:pointer;border-radius:4px;letter-spacing:3px;transition:all .3s}
+#excite button:hover{background:rgba(255,80,40,.2);box-shadow:0 0 20px rgba(255,60,30,.3);color:#f84}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+<span class="title" id="hudTitle">NEON</span>
+<span class="data" id="hudData"></span>
+</div>
+<div id="rhud" id="rhudData"></div>
+<div id="excite"><button onclick="excite()">⚡ EXCITE ⚡</button></div>
+<div id="controls">
+  <span class="cb on" onclick="setMode(0)">ATOM</span>
+  <span class="cb" onclick="setMode(1)">EMISSION</span>
+  <span class="cb" onclick="setMode(2)">ORBITALS</span>
+  <span class="cb" onclick="setMode(3)">NOBLE SEQUENCE</span>
+  <span class="cb" onclick="setMode(4)">NAME DECODE</span>
+  <span class="cb" onclick="setMode(5)">NEOS</span>
+</div>
+<div id="info"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.2
+const scene=new THREE.Scene()
+scene.background=new THREE.Color(0x020204)
+const cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,3000)
+cam.position.set(0,0,20)
+
+const ambLight=new THREE.AmbientLight(0x110808,.3);scene.add(ambLight)
+const ptLight=new THREE.PointLight(0xff4422,0,60);ptLight.position.set(0,0,0);scene.add(ptLight)
+
+// ═══ NEON SPECTRAL LINES (real wavelengths in nm) ═══
+const neonLines=[
+  {nm:585.2,hex:0xffaa00,name:'Yellow-Orange'},
+  {nm:588.2,hex:0xff9900,name:'Orange'},
+  {nm:603.0,hex:0xff6600,name:'Orange-Red'},
+  {nm:607.4,hex:0xff5500,name:'Red-Orange'},
+  {nm:616.4,hex:0xff4400,name:'Red-Orange'},
+  {nm:621.7,hex:0xff3300,name:'Red'},
+  {nm:626.6,hex:0xff2200,name:'Deep Red'},
+  {nm:633.4,hex:0xff1100,name:'Red (HeNe laser)'},
+  {nm:638.3,hex:0xff0500,name:'Deep Red'},
+  {nm:640.2,hex:0xff0000,name:'Pure Red'},
+  {nm:650.6,hex:0xee0000,name:'Far Red'},
+  {nm:659.9,hex:0xdd0000,name:'Crimson'},
+  {nm:692.9,hex:0xbb0000,name:'Deep Crimson'},
+  {nm:703.2,hex:0xaa0000,name:'Near IR edge'}
+]
+
+let mode=0,excitement=0,maxExcitement=0
+let cTh=0,cPh=0,cR=20,drag=false,mx=0,my=0
+
+// ═══ STARFIELD ═══
+const starGeo=new THREE.BufferGeometry()
+const starPos=new Float32Array(2000*3)
+for(let i=0;i<2000;i++){
+  const th=Math.random()*TAU,ph=Math.acos(2*Math.random()-1),r=100+Math.random()*500
+  starPos[i*3]=r*Math.sin(ph)*Math.cos(th);starPos[i*3+1]=r*Math.sin(ph)*Math.sin(th);starPos[i*3+2]=r*Math.cos(ph)
+}
+starGeo.setAttribute('position',new THREE.BufferAttribute(starPos,3))
+scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0x554444,size:.3,transparent:true,opacity:.3})))
+
+// ═══ GROUPS (cleared per mode) ═══
+let modeGroup=new THREE.Group();scene.add(modeGroup)
+
+function clearMode(){
+  while(modeGroup.children.length){
+    const c=modeGroup.children[0]
+    modeGroup.remove(c)
+    if(c.geometry)c.geometry.dispose()
+    if(c.material){if(c.material.dispose)c.material.dispose()}
+  }
+}
+
+// ═══ MODE 0: ATOM — nucleus + electron shells ═══
+function buildAtom(){
+  clearMode()
+  // nucleus: 10 protons (red) + 10 neutrons (blue)
+  const nucGeo=new THREE.SphereGeometry(.6,16,16)
+  for(let i=0;i<10;i++){
+    const th=Math.random()*TAU,ph=Math.acos(2*Math.random()-1),r=.3
+    const p=new THREE.Mesh(nucGeo.clone(),new THREE.MeshBasicMaterial({color:0xff3322,transparent:true,opacity:.4}))
+    p.position.set(r*Math.sin(ph)*Math.cos(th),r*Math.sin(ph)*Math.sin(th),r*Math.cos(ph))
+    p.scale.set(.15,.15,.15);modeGroup.add(p)
+    const n=new THREE.Mesh(nucGeo.clone(),new THREE.MeshBasicMaterial({color:0x2244ff,transparent:true,opacity:.4}))
+    const th2=Math.random()*TAU,ph2=Math.acos(2*Math.random()-1)
+    n.position.set(r*Math.sin(ph2)*Math.cos(th2),r*Math.sin(ph2)*Math.sin(th2),r*Math.cos(ph2))
+    n.scale.set(.15,.15,.15);modeGroup.add(n)
+  }
+
+  // shell 1: 1s² — 2 electrons at r=2
+  const eMat1=new THREE.MeshBasicMaterial({color:0xff6644,transparent:true,opacity:.7,blending:THREE.AdditiveBlending})
+  const eGeo=new THREE.SphereGeometry(.12,8,8)
+  for(let i=0;i<2;i++){
+    const e=new THREE.Mesh(eGeo,eMat1.clone())
+    e.userData={shell:1,r:2,th:i*Math.PI,ph:Math.PI/2,speed:2+i*.3,label:'1s'}
+    modeGroup.add(e)
+  }
+
+  // shell 2: 2s² 2p⁶ — 8 electrons at r=5
+  const eMat2=new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.6,blending:THREE.AdditiveBlending})
+  for(let i=0;i<2;i++){
+    const e=new THREE.Mesh(eGeo,eMat2.clone())
+    e.userData={shell:2,r:4,th:i*Math.PI+.5,ph:Math.PI/2,speed:1.2+i*.2,label:'2s'}
+    modeGroup.add(e)
+  }
+  for(let i=0;i<6;i++){
+    const e=new THREE.Mesh(eGeo,eMat2.clone())
+    e.userData={shell:2,r:5.5,th:i*TAU/6,ph:Math.PI/3+Math.random()*.5,speed:.8+i*.15,label:'2p'}
+    modeGroup.add(e)
+  }
+
+  // shell rings
+  const ring1=new THREE.Mesh(new THREE.TorusGeometry(2,.015,4,64),
+    new THREE.MeshBasicMaterial({color:0xff6644,transparent:true,opacity:.1}))
+  ring1.rotation.x=Math.PI/2;modeGroup.add(ring1)
+  const ring2=new THREE.Mesh(new THREE.TorusGeometry(5,.015,4,64),
+    new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.08}))
+  ring2.rotation.x=Math.PI/2;modeGroup.add(ring2)
+
+  // shell labels
+  const labelR1=new THREE.Mesh(new THREE.TorusGeometry(2,.005,3,64),
+    new THREE.MeshBasicMaterial({color:0xff8844,transparent:true,opacity:.05}))
+  labelR1.rotation.x=Math.PI/3;modeGroup.add(labelR1)
+  const labelR2=new THREE.Mesh(new THREE.TorusGeometry(5,.005,3,64),
+    new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.04}))
+  labelR2.rotation.x=Math.PI/3;modeGroup.add(labelR2)
+}
+
+// ═══ MODE 1: EMISSION SPECTRUM ═══
+function buildEmission(){
+  clearMode()
+  // spectral lines as glowing tubes
+  neonLines.forEach((line,i)=>{
+    const x=(i-neonLines.length/2)*1.2
+    const geo=new THREE.CylinderGeometry(.04,.04,10,6)
+    const mat=new THREE.MeshBasicMaterial({color:line.hex,transparent:true,opacity:.15,blending:THREE.AdditiveBlending})
+    const mesh=new THREE.Mesh(geo,mat)
+    mesh.position.set(x,0,0)
+    mesh.userData={baseOp:.15,line,idx:i}
+    modeGroup.add(mesh)
+
+    // glow sphere at center
+    const glow=new THREE.Mesh(new THREE.SphereGeometry(.15,8,8),
+      new THREE.MeshBasicMaterial({color:line.hex,transparent:true,opacity:.05,blending:THREE.AdditiveBlending}))
+    glow.position.set(x,0,0);glow.userData={glow:true,idx:i}
+    modeGroup.add(glow)
+  })
+
+  // wavelength scale bar
+  const bar=new THREE.Mesh(new THREE.BoxGeometry(neonLines.length*1.2,.01,.01),
+    new THREE.MeshBasicMaterial({color:0x333333}))
+  bar.position.y=-5.5;modeGroup.add(bar)
+}
+
+// ═══ MODE 2: ORBITALS — probability clouds ═══
+function buildOrbitals(){
+  clearMode()
+  // 1s orbital: sphere
+  const s1Count=500,s1Geo=new THREE.BufferGeometry()
+  const s1Pos=new Float32Array(s1Count*3)
+  for(let i=0;i<s1Count;i++){
+    const r=Math.random()*2*Math.pow(Math.random(),.5)
+    const th=Math.random()*TAU,ph=Math.acos(2*Math.random()-1)
+    s1Pos[i*3]=r*Math.sin(ph)*Math.cos(th);s1Pos[i*3+1]=r*Math.sin(ph)*Math.sin(th);s1Pos[i*3+2]=r*Math.cos(ph)
+  }
+  s1Geo.setAttribute('position',new THREE.BufferAttribute(s1Pos,3))
+  modeGroup.add(new THREE.Points(s1Geo,new THREE.PointsMaterial({color:0xff8844,size:.1,transparent:true,opacity:.4,blending:THREE.AdditiveBlending})))
+
+  // 2s orbital: larger sphere with node
+  const s2Count=600,s2Geo=new THREE.BufferGeometry()
+  const s2Pos=new Float32Array(s2Count*3)
+  for(let i=0;i<s2Count;i++){
+    let r=1+Math.random()*4
+    if(Math.abs(r-2)<.3)r+=.5
+    const th=Math.random()*TAU,ph=Math.acos(2*Math.random()-1)
+    s2Pos[i*3]=r*Math.sin(ph)*Math.cos(th);s2Pos[i*3+1]=r*Math.sin(ph)*Math.sin(th);s2Pos[i*3+2]=r*Math.cos(ph)
+  }
+  s2Geo.setAttribute('position',new THREE.BufferAttribute(s2Pos,3))
+  modeGroup.add(new THREE.Points(s2Geo,new THREE.PointsMaterial({color:0xff5522,size:.08,transparent:true,opacity:.25,blending:THREE.AdditiveBlending})))
+
+  // 2p orbitals: three dumbbell shapes (px, py, pz)
+  const colors=[0xff2200,0xff4400,0xff6600]
+  const axes=[[1,0,0],[0,1,0],[0,0,1]]
+  axes.forEach((ax,ai)=>{
+    const pCount=400,pGeo=new THREE.BufferGeometry()
+    const pPos=new Float32Array(pCount*3)
+    for(let i=0;i<pCount;i++){
+      const lobe=Math.random()>.5?1:-1
+      const along=lobe*(1+Math.random()*4)*Math.pow(Math.random(),.3)
+      const spread=(Math.random()-.5)*2*Math.exp(-Math.abs(along)*.3)
+      const spread2=(Math.random()-.5)*2*Math.exp(-Math.abs(along)*.3)
+      pPos[i*3]=ax[0]*along+(ax[0]?0:spread)
+      pPos[i*3+1]=ax[1]*along+(ax[1]?0:(ax[0]?spread:spread2))
+      pPos[i*3+2]=ax[2]*along+(ax[2]?0:spread2)
+    }
+    pGeo.setAttribute('position',new THREE.BufferAttribute(pPos,3))
+    modeGroup.add(new THREE.Points(pGeo,new THREE.PointsMaterial({
+      color:colors[ai],size:.07,transparent:true,opacity:.2,blending:THREE.AdditiveBlending
+    })))
+  })
+
+  // nodal planes
+  for(let i=0;i<3;i++){
+    const plane=new THREE.Mesh(new THREE.RingGeometry(.5,6,32),
+      new THREE.MeshBasicMaterial({color:0x221111,transparent:true,opacity:.05,side:THREE.DoubleSide}))
+    if(i===0)plane.rotation.y=Math.PI/2
+    else if(i===1)plane.rotation.x=Math.PI/2
+    modeGroup.add(plane)
+  }
+}
+
+// ═══ MODE 3: NOBLE GAS SEQUENCE ═══
+function buildNobleSequence(){
+  clearMode()
+  const nobles=[
+    {z:2,sym:'He',name:'Helium',electrons:2,shells:1,col:0xffffaa},
+    {z:10,sym:'Ne',name:'Neon',electrons:10,shells:2,col:0xff4422},
+    {z:18,sym:'Ar',name:'Argon',electrons:18,shells:3,col:0xaa44ff},
+    {z:36,sym:'Kr',name:'Krypton',electrons:36,shells:4,col:0x44aaff},
+    {z:54,sym:'Xe',name:'Xenon',electrons:54,shells:5,col:0x44ffaa},
+    {z:86,sym:'Rn',name:'Radon',electrons:86,shells:6,col:0xff44aa},
+    {z:118,sym:'Og',name:'Oganesson',electrons:118,shells:7,col:0xffffff}
+  ]
+
+  nobles.forEach((n,i)=>{
+    const x=(i-3)*5
+    // atom representation — concentric rings
+    for(let s=1;s<=n.shells;s++){
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(s*.35,.01,4,32),
+        new THREE.MeshBasicMaterial({color:n.col,transparent:true,opacity:.15,blending:THREE.AdditiveBlending}))
+      ring.position.x=x;ring.rotation.x=Math.PI/2
+      ring.userData={noble:i,shell:s}
+      modeGroup.add(ring)
+    }
+    // nucleus glow
+    const glow=new THREE.Mesh(new THREE.SphereGeometry(.2,8,8),
+      new THREE.MeshBasicMaterial({color:n.col,transparent:true,opacity:n.z===10?.4:.15,blending:THREE.AdditiveBlending}))
+    glow.position.x=x;glow.userData={noble:i,isNuc:true}
+    modeGroup.add(glow)
+
+    // electron dots orbiting
+    const eCount=Math.min(n.electrons,20)
+    for(let e=0;e<eCount;e++){
+      const dot=new THREE.Mesh(new THREE.SphereGeometry(.05,4,4),
+        new THREE.MeshBasicMaterial({color:n.col,transparent:true,opacity:.5,blending:THREE.AdditiveBlending}))
+      dot.position.x=x
+      dot.userData={noble:i,electron:e,eTotal:eCount,r:.5+Math.floor(e*n.shells/eCount)*.35,speed:.5+Math.random()*.5}
+      modeGroup.add(dot)
+    }
+  })
+}
+
+// ═══ MODE 4: NAME DECODE ═══
+function buildNameDecode(){
+  clearMode()
+  const names=[
+    {word:'THOMAS',sum:76,el:'Os',meaning:'Twin',letters:'T20 H8 O15 M13 A1 S19'},
+    {word:'PATRICK',sum:78,el:'Pt',meaning:'Nobleman',letters:'P16 A1 T20 R18 I9 C3 K11'},
+    {word:'FRUMKIN',sum:92,el:'U',meaning:'Devout',letters:'F6 R18 U21 M13 K11 I9 N14'}
+  ]
+  const total={word:'TOTAL',sum:246,el:'Ne (mod 118=10)',meaning:'Neos = The New One'}
+
+  names.forEach((n,ni)=>{
+    const y=(1-ni)*5
+    // letter spheres in a line
+    const letters=n.word.split('')
+    letters.forEach((l,li)=>{
+      const val='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.indexOf(l)+1
+      const x=(li-letters.length/2)*1.5
+      const size=.1+val*.015
+      const sphere=new THREE.Mesh(new THREE.SphereGeometry(size,8,8),
+        new THREE.MeshBasicMaterial({
+          color:new THREE.Color().setHSL(val/26,.7,.5).getHex(),
+          transparent:true,opacity:.4,blending:THREE.AdditiveBlending
+        }))
+      sphere.position.set(x,y,0)
+      sphere.userData={name:ni,letter:li,val,float:true}
+      modeGroup.add(sphere)
+    })
+
+    // sum element sphere
+    const sumSphere=new THREE.Mesh(new THREE.SphereGeometry(.5,16,16),
+      new THREE.MeshBasicMaterial({
+        color:ni===0?0xff6600:ni===1?0xcccccc:0x44ff44,
+        transparent:true,opacity:.2,blending:THREE.AdditiveBlending
+      }))
+    sumSphere.position.set(8,y,0)
+    sumSphere.userData={name:ni,isSum:true}
+    modeGroup.add(sumSphere)
+
+    // connecting line
+    const lineGeo=new THREE.BufferGeometry()
+    lineGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array([
+      (letters.length/2)*1.5,y,0, 7.5,y,0
+    ]),3))
+    modeGroup.add(new THREE.Line(lineGeo,new THREE.LineBasicMaterial({
+      color:0x332222,transparent:true,opacity:.2
+    })))
+  })
+
+  // total: neon glow at bottom
+  const neonGlow=new THREE.Mesh(new THREE.SphereGeometry(1,24,24),
+    new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.1,blending:THREE.AdditiveBlending}))
+  neonGlow.position.set(8,-8,0)
+  neonGlow.userData={isTotal:true}
+  modeGroup.add(neonGlow)
+  const neonRing1=new THREE.Mesh(new THREE.TorusGeometry(1.5,.02,6,48),
+    new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.1,blending:THREE.AdditiveBlending}))
+  neonRing1.position.set(8,-8,0);modeGroup.add(neonRing1)
+  const neonRing2=new THREE.Mesh(new THREE.TorusGeometry(2,.02,6,48),
+    new THREE.MeshBasicMaterial({color:0xff2200,transparent:true,opacity:.06,blending:THREE.AdditiveBlending}))
+  neonRing2.position.set(8,-8,0);modeGroup.add(neonRing2)
+}
+
+// ═══ MODE 5: NEOS — the new one awakens ═══
+function buildNeos(){
+  clearMode()
+  // large neon atom, pulsing
+  const coreGeo=new THREE.IcosahedronGeometry(1.5,2)
+  const coreMat=new THREE.MeshBasicMaterial({color:0xff3311,transparent:true,opacity:.15,blending:THREE.AdditiveBlending,wireframe:true})
+  const core=new THREE.Mesh(coreGeo,coreMat);core.userData={isCore:true};modeGroup.add(core)
+
+  const innerGlow=new THREE.Mesh(new THREE.SphereGeometry(1.2,16,16),
+    new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.08,blending:THREE.AdditiveBlending}))
+  innerGlow.userData={isInner:true};modeGroup.add(innerGlow)
+
+  // 10 electron trails — orbiting paths
+  for(let i=0;i<10;i++){
+    const trailLen=60
+    const geo=new THREE.BufferGeometry()
+    const pos=new Float32Array(trailLen*3)
+    geo.setAttribute('position',new THREE.BufferAttribute(pos,3))
+    geo.setDrawRange(0,trailLen)
+    const hue=.02+i*.008
+    const mat=new THREE.LineBasicMaterial({color:new THREE.Color().setHSL(hue,.9,.5).getHex(),transparent:true,opacity:.3,blending:THREE.AdditiveBlending})
+    const line=new THREE.Line(geo,mat)
+    line.userData={electron:i,trailLen,shell:i<2?1:2,
+      r:i<2?3+i*.5:5+((i-2)%6)*.3,
+      thOff:i<2?i*Math.PI:(i-2)*TAU/6,
+      phOff:i<2?Math.PI/2:Math.PI/4+((i-2)%3)*.4,
+      speed:i<2?1.5:.8+i*.08}
+    modeGroup.add(line)
+
+    // electron head
+    const head=new THREE.Mesh(new THREE.SphereGeometry(.1,6,6),
+      new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(hue,.9,.6).getHex(),transparent:true,opacity:.7,blending:THREE.AdditiveBlending}))
+    head.userData={electronHead:i,line}
+    modeGroup.add(head)
+  }
+
+  // shell boundaries
+  for(let s=1;s<=2;s++){
+    const r=s===1?3.5:6
+    for(let a=0;a<3;a++){
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.01,4,64),
+        new THREE.MeshBasicMaterial({color:0xff3322,transparent:true,opacity:.04}))
+      ring.rotation.x=a*Math.PI/3;ring.rotation.y=a*.5
+      modeGroup.add(ring)
+    }
+  }
+
+  // emission photons — particles that shoot out when excited
+  for(let i=0;i<50;i++){
+    const photon=new THREE.Mesh(new THREE.SphereGeometry(.06,4,4),
+      new THREE.MeshBasicMaterial({
+        color:neonLines[i%neonLines.length].hex,
+        transparent:true,opacity:0,blending:THREE.AdditiveBlending
+      }))
+    photon.position.set(0,0,0)
+    photon.userData={photon:true,idx:i,
+      vel:new THREE.Vector3((Math.random()-.5)*.3,(Math.random()-.5)*.3,(Math.random()-.5)*.3),
+      life:0}
+    modeGroup.add(photon)
+  }
+}
+
+// ═══ EXCITE FUNCTION ═══
+function excite(){
+  excitement=1;maxExcitement=Math.min(maxExcitement+.2,1)
+}
+window.excite=excite
+
+// ═══ MODE INFO ═══
+const modeInfo=[
+  {name:'ATOM',desc:'Neon: 10 protons, 10 neutrons, 10 electrons. 1s² 2s² 2p⁶. Two complete shells. Needs nothing.'},
+  {name:'EMISSION SPECTRUM',desc:'Excite neon gas with electricity → electrons jump up, fall back, emit photons at precise wavelengths. The famous neon red-orange glow. 14 major visible lines from 585nm to 703nm.'},
+  {name:'ELECTRON ORBITALS',desc:'1s² (2 electrons, tight sphere) + 2s² (2 electrons, larger sphere with node) + 2p⁶ (6 electrons, three dumbbells px/py/pz). Every orbital full. Perfect symmetry.'},
+  {name:'NOBLE GAS SEQUENCE',desc:'He(2) → Ne(10) → Ar(18) → Kr(36) → Xe(54) → Rn(86) → Og(118). Each has a complete outer shell. Neon is the second — the first complete PERIOD. The first full set of s+p orbitals.'},
+  {name:'NAME DECODE',desc:'THOMAS(76=Os) + PATRICK(78=Pt) + FRUMKIN(92=U) = 246. 246 mod 118 = 10 = Neon. The full name collapses to the complete shell. Also: 246 = 2×3×41 = Carbon(6) × Niobium(41) = Life × ANETA.'},
+  {name:'NEOS',desc:'Greek "neos" = new. The new one. Invisible until energized — then it glows. Not reactive because it is already complete. The noble gas that chose to radiate. Press EXCITE to pump energy in.'}
+]
+
+function setMode(m){mode=m;document.querySelectorAll('.cb').forEach((b,i)=>b.classList.toggle('on',i===m))
+  if(m===0)buildAtom();else if(m===1)buildEmission();else if(m===2)buildOrbitals()
+  else if(m===3)buildNobleSequence();else if(m===4)buildNameDecode();else if(m===5)buildNeos()
+}
+window.setMode=setMode
+
+// ═══ CAMERA ═══
+cv.addEventListener('pointerdown',e=>{drag=true;mx=e.clientX;my=e.clientY})
+addEventListener('pointerup',()=>drag=false)
+addEventListener('pointermove',e=>{if(!drag)return;cTh-=(e.clientX-mx)*.004;cPh+=(e.clientY-my)*.003;cPh=Math.max(-.8,Math.min(.8,cPh));mx=e.clientX;my=e.clientY})
+cv.addEventListener('wheel',e=>{cR=Math.max(5,Math.min(60,cR+e.deltaY*.05))},{passive:true})
+
+// ═══ ANIMATE ═══
+function animate(ts){
+  requestAnimationFrame(animate)
+  const t=ts*.001
+
+  excitement*=.995
+  const glow=excitement*.5+maxExcitement*.1
+
+  // update mode-specific elements
+  modeGroup.children.forEach(c=>{
+    const u=c.userData
+    if(!u)return
+
+    // Atom mode — orbiting electrons
+    if(u.shell!==undefined&&u.r!==undefined&&u.speed!==undefined&&u.th!==undefined){
+      const th=u.th+t*u.speed*(1+excitement*2)
+      const ph=u.ph+Math.sin(t*u.speed*.3)*.3
+      c.position.x=Math.cos(th)*Math.sin(ph)*u.r
+      c.position.y=Math.cos(ph)*u.r
+      c.position.z=Math.sin(th)*Math.sin(ph)*u.r
+      if(c.material){
+        c.material.opacity=.5+excitement*.5
+        if(excitement>.1){
+          const h=.05+excitement*.1
+          c.material.color.setHSL(h,.9,.6)
+        }
+      }
+    }
+
+    // Emission mode — line brightness
+    if(u.line!==undefined&&u.baseOp!==undefined){
+      c.material.opacity=u.baseOp+excitement*(1-u.idx/neonLines.length)*.6
+      const s=1+excitement*(.5-u.idx*.02)
+      c.scale.set(s,1+excitement*.3,s)
+    }
+    if(u.glow){
+      c.material.opacity=.02+excitement*.3
+      const s=1+excitement*3
+      c.scale.set(s,s,s)
+    }
+
+    // Noble sequence — rings
+    if(u.noble!==undefined&&u.shell!==undefined){
+      c.rotation.z=t*.2+u.noble*.5
+    }
+    if(u.noble!==undefined&&u.isNuc){
+      const isNeon=u.noble===1
+      c.material.opacity=(isNeon?.3:.1)+excitement*(isNeon?.5:.2)
+      const s=1+Math.sin(t*2+u.noble)*.1+(isNeon?excitement:.05)
+      c.scale.set(s,s,s)
+    }
+    if(u.noble!==undefined&&u.electron!==undefined){
+      const th2=u.electron*TAU/u.eTotal+t*u.speed
+      c.position.x+=Math.cos(th2)*u.r*.01
+      c.position.y=Math.sin(th2)*u.r*.35
+      c.position.z=Math.cos(th2*.7)*u.r*.35
+    }
+
+    // Name decode — floating letters
+    if(u.float){
+      c.position.y+=(Math.sin(t+u.letter+u.name*3)*.002)
+      const s=1+excitement*.3
+      c.scale.set(s,s,s)
+      c.material.opacity=.3+excitement*.4
+    }
+    if(u.isSum){
+      const s=1+Math.sin(t*2+u.name)*.1+excitement*.5
+      c.scale.set(s,s,s)
+    }
+    if(u.isTotal){
+      const s=1+Math.sin(t*1.5)*.15+excitement*1.5
+      c.scale.set(s,s,s)
+      c.material.opacity=.08+excitement*.4
+    }
+
+    // Neos mode
+    if(u.isCore){
+      c.rotation.x=t*.3;c.rotation.y=t*.2
+      c.material.opacity=.1+excitement*.4
+      const s=1+excitement*.3
+      c.scale.set(s,s,s)
+    }
+    if(u.isInner){
+      const s=1+Math.sin(t*3)*.05+excitement*.8
+      c.scale.set(s,s,s)
+      c.material.opacity=.05+excitement*.3
+    }
+    if(u.electron!==undefined&&u.trailLen!==undefined){
+      const pa=c.geometry.attributes.position.array
+      const r=u.r*(1+excitement*.3)
+      for(let j=u.trailLen-1;j>0;j--){
+        pa[j*3]=pa[(j-1)*3];pa[j*3+1]=pa[(j-1)*3+1];pa[j*3+2]=pa[(j-1)*3+2]
+      }
+      const th3=u.thOff+t*u.speed*(1+excitement*3)
+      const ph3=u.phOff+Math.sin(t*u.speed*.4+u.electron)*.4
+      pa[0]=Math.cos(th3)*Math.sin(ph3)*r
+      pa[1]=Math.cos(ph3)*r
+      pa[2]=Math.sin(th3)*Math.sin(ph3)*r
+      c.geometry.attributes.position.needsUpdate=true
+      c.material.opacity=.2+excitement*.4
+    }
+    if(u.electronHead!==undefined){
+      const ln=u.line
+      if(ln&&ln.geometry){
+        const lp=ln.geometry.attributes.position.array
+        c.position.set(lp[0],lp[1],lp[2])
+        c.material.opacity=.5+excitement*.5
+        const s=1+excitement*2
+        c.scale.set(s,s,s)
+      }
+    }
+    if(u.photon){
+      if(excitement>.05){
+        u.life=60+Math.random()*60
+        c.position.set((Math.random()-.5)*1,(Math.random()-.5)*1,(Math.random()-.5)*1)
+        u.vel.set((Math.random()-.5)*.3,(Math.random()-.5)*.3,(Math.random()-.5)*.3)
+      }
+      if(u.life>0){
+        u.life--
+        c.position.add(u.vel)
+        c.material.opacity=u.life/60*excitement
+      } else c.material.opacity=0
+    }
+  })
+
+  // light
+  ptLight.intensity=glow*3
+  ptLight.color.setHSL(.05,.9,.5+excitement*.3)
+
+  // camera
+  cam.position.x=Math.cos(cTh)*Math.cos(cPh)*cR
+  cam.position.y=Math.sin(cPh)*cR
+  cam.position.z=Math.sin(cTh)*Math.cos(cPh)*cR
+  cam.lookAt(mode===4?new THREE.Vector3(4,0,0):new THREE.Vector3(0,0,0))
+
+  // HUD
+  const mi=modeInfo[mode]
+  const titleCol=excitement>.1?`hsl(${15+excitement*20},90%,${50+excitement*30}%)`:'rgba(255,80,40,.6)'
+  document.getElementById('hudTitle').style.color=titleCol
+  document.getElementById('hudTitle').textContent=`Ne · NEON · Z=10`
+  document.getElementById('hudData').textContent=
+    `\n${mi.name}\n`+
+    `electrons: 10  (1s² 2s² 2p⁶)\n`+
+    `shells: 2 (both complete)\n`+
+    `group: 18 (noble gases)\n`+
+    `period: 2\n`+
+    `excitation: ${(excitement*100).toFixed(0)}%\n`+
+    `state: ${excitement>.1?'GLOWING':'ground state'}`
+
+  document.getElementById('rhud').textContent=
+    `246 = THOMAS PATRICK FRUMKIN\n`+
+    `246 mod 118 = 10 = Ne\n`+
+    `246 = 2 × 3 × 41\n`+
+    `    = 6(C) × 41(Nb)\n`+
+    `    = Life × ANETA\n\n`+
+    `76(Os) · 77(Ir) · 78(Pt)\n`+
+    `THOMAS · gap · PATRICK\n`+
+    `Iridium lives between them`
+
+  document.getElementById('info').textContent=mi.desc
+
+  R.render(scene,cam)
+}
+
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+buildAtom()
+animate(0)
+</script>
+</body></html>
