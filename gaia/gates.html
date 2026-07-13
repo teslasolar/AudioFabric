@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GATES — Full Body Circuit Breaker Map</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#030308;overflow-y:auto;overflow-x:hidden;font-family:'Courier New',monospace;color:#ccd}
+canvas{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+#ui{position:relative;z-index:10;padding:20px 24px 80px;max-width:1000px;margin:0 auto}
+h1{font-size:14px;letter-spacing:5px;color:rgba(255,100,80,.6);margin-bottom:4px;text-shadow:0 0 20px rgba(255,60,30,.3)}
+.sub{font-size:9px;color:rgba(255,120,80,.3);letter-spacing:2px;margin-bottom:20px}
+.warning{background:rgba(255,50,30,.08);border:1px solid rgba(255,50,30,.2);border-radius:6px;padding:12px 16px;margin-bottom:20px;font-size:9px;color:rgba(255,120,80,.5);line-height:1.8}
+.warning b{color:rgba(255,150,80,.7)}
+.gate{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:16px 20px;margin-bottom:12px;position:relative;overflow:hidden}
+.gate::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:8px 0 0 8px}
+.gate h2{font-size:11px;letter-spacing:3px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.gate h2 .ring{display:inline-block;width:18px;height:18px;border-radius:50%;text-align:center;line-height:18px;font-size:9px;font-weight:bold}
+.gate h2 .prime{font-size:8px;color:rgba(255,255,255,.2);margin-left:auto}
+.row{display:flex;gap:16px;flex-wrap:wrap}
+.col{flex:1;min-width:200px}
+.label{font-size:7px;letter-spacing:2px;color:rgba(255,200,100,.35);margin-bottom:4px;text-transform:uppercase}
+.eq{font-size:9px;color:rgba(200,180,220,.4);line-height:1.8;margin:3px 0}
+.eq b{color:rgba(255,200,100,.55)}
+.lock{background:rgba(255,50,30,.05);border:1px solid rgba(255,50,30,.1);border-radius:4px;padding:8px 12px;margin:6px 0}
+.lock .label{color:rgba(255,100,80,.4)}
+.unlock{background:rgba(50,255,100,.04);border:1px solid rgba(50,255,100,.1);border-radius:4px;padding:8px 12px;margin:6px 0}
+.unlock .label{color:rgba(100,255,150,.4)}
+.damage{background:rgba(255,200,0,.04);border:1px solid rgba(255,200,0,.1);border-radius:4px;padding:8px 12px;margin:6px 0}
+.damage .label{color:rgba(255,200,50,.4)}
+.fix{background:rgba(100,150,255,.04);border:1px solid rgba(100,150,255,.1);border-radius:4px;padding:8px 12px;margin:6px 0}
+.fix .label{color:rgba(100,150,255,.4)}
+.section{background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.04);border-radius:8px;padding:16px 20px;margin-bottom:16px}
+.section h2{font-size:10px;letter-spacing:3px;color:rgba(255,100,80,.5);margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:6px}
+.rule{border-left:2px solid rgba(255,100,80,.2);padding-left:12px;margin:8px 0}
+.rule b{color:rgba(255,150,80,.6)}
+.sequence{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:8px 0}
+.seq-gate{padding:4px 8px;border-radius:4px;font-size:9px;font-weight:bold;border:1px solid rgba(255,255,255,.1)}
+.seq-arrow{color:rgba(255,255,255,.15);font-size:14px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+<h1>ANGEL GATES</h1>
+<div class="sub">FULL BODY CIRCUIT BREAKER MAP — THE SAFE SEQUENCE</div>
+
+<div class="warning">
+<b>WHAT HAPPENED:</b> you excited all shells at once without opening gates in order. That's a short circuit — current bypasses the breakers, energy floods unregulated, the system crashes to protect itself. Jisatsu = the fuse blowing. <b>The fix is not more energy. The fix is opening each gate in sequence so energy flows through, not around.</b>
+<br><br>
+<b>RULE:</b> You cannot open Gate N until Gate N-1 is stable. No skipping. No forcing. Each gate is a one-way valve — energy flows UP only when the gate below is holding.
+</div>
+
+<!-- GATE R0 -->
+<div class="gate" style="border-color:rgba(153,51,0,.2)">
+<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#936"></div>
+<h2><span class="ring" style="background:rgba(153,51,0,.3);color:#c96">R0</span> <span style="color:rgba(153,100,50,.7)">THE ROOT — GUT / ENS</span> <span class="prime">prime 2 · bass · ● · element H</span></h2>
+<div class="eq"><b>Location:</b> pelvic floor → gut → enteric nervous system (500 million neurons)</div>
+<div class="eq"><b>Function:</b> survival, safety, physical grounding. "Am I going to die right now?"</div>
+<div class="eq"><b>Frequency:</b> lowest — subsonic to 60Hz. You feel this, not hear it.</div>
+<div class="row">
+<div class="col">
+<div class="lock">
+<div class="label">🔒 LOCKED WHEN</div>
+<div class="eq">▸ Haven't eaten in 12+ hours (blood sugar crash)</div>
+<div class="eq">▸ Sleep debt > 2 nights</div>
+<div class="eq">▸ Physical danger or perceived danger</div>
+<div class="eq">▸ Dehydration (electrolytes depleted)</div>
+<div class="eq">▸ Cold without preparation</div>
+<div class="eq">▸ Sitting for 6+ hours (pelvic floor disengaged)</div>
+</div>
+</div>
+<div class="col">
+<div class="unlock">
+<div class="label">🔓 UNLOCK PROTOCOL</div>
+<div class="eq">▸ <b>Eat something</b> — real food, not sugar. Protein + fat.</div>
+<div class="eq">▸ <b>Drink water + salt</b> (electrolytes: K, Na, Mg)</div>
+<div class="eq">▸ <b>Feet on ground</b> — stand barefoot for 2 min</div>
+<div class="eq">▸ <b>Kegel squeeze</b> — 10 reps, engage pelvic floor</div>
+<div class="eq">▸ <b>Deep belly breath</b> × 5 — inflate the gut, not chest</div>
+<div class="eq">▸ <b>Body scan</b>: "Am I safe right now?" → yes → gate opens</div>
+</div>
+</div>
+</div>
+<div class="damage">
+<div class="label">⚠ IF FORCED (bypassed)</div>
+<div class="eq">Nausea, dizziness, dissociation, panic attack. Body screams "NOT SAFE" and pulls the plug on everything above.</div>
+</div>
+<div class="fix">
+<div class="label">🔧 REPAIR</div>
+<div class="eq">Lie flat on floor. Eat. Drink. Sleep. Do nothing else until gut settles. 4-24 hours.</div>
+</div>
+</div>
+
+<!-- GATE R1 -->
+<div class="gate">
+<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#0ad"></div>
+<h2><span class="ring" style="background:rgba(0,170,220,.2);color:#0ad">R1</span> <span style="color:rgba(0,170,220,.7)">THE VAGUS — AUTONOMIC BRIDGE</span> <span class="prime">prime 3 · low-mid · 〜 · element Li</span></h2>
+<div class="eq"><b>Location:</b> vagus nerve — brainstem → throat → heart → gut. The longest nerve. Bidirectional highway.</div>
+<div class="eq"><b>Function:</b> parasympathetic regulation. "Am I calm enough to process?" Rest-and-digest vs fight-or-flight.</div>
+<div class="eq"><b>Frequency:</b> 60-150Hz. The hum. Vagal tone.</div>
+<div class="row">
+<div class="col">
+<div class="lock">
+<div class="label">🔒 LOCKED WHEN</div>
+<div class="eq">▸ HRV below personal baseline (sympathetic dominant)</div>
+<div class="eq">▸ Jaw clenched, shoulders up, shallow breathing</div>
+<div class="eq">▸ Cortisol spike (stress, argument, bad news)</div>
+<div class="eq">▸ Caffeine overdose (adrenals hijacking vagus)</div>
+<div class="eq">▸ Screen overstimulation without breaks</div>
+</div>
+</div>
+<div class="col">
+<div class="unlock">
+<div class="label">🔓 UNLOCK PROTOCOL</div>
+<div class="eq">▸ <b>Long exhale</b> — inhale 4s, exhale 8s × 6 rounds</div>
+<div class="eq">▸ <b>Cold water on face</b> (dive reflex activates vagus)</div>
+<div class="eq">▸ <b>Hum / Om / gargle</b> — vibrate the vagus directly</div>
+<div class="eq">▸ <b>Unclench jaw</b> — tongue on roof of mouth, relax</div>
+<div class="eq">▸ <b>Look far away</b> — peripheral vision activates parasympathetic</div>
+<div class="eq">▸ <b>Sing one note</b> for 10 seconds — any note, sustained</div>
+</div>
+</div>
+</div>
+<div class="damage">
+<div class="label">⚠ IF FORCED</div>
+<div class="eq">Heart rate spikes then crashes (vasovagal syncope = fainting). Cold sweats. The body emergency-brakes.</div>
+</div>
+<div class="fix">
+<div class="label">🔧 REPAIR</div>
+<div class="eq">Legs up on wall. Slow breathing. No stimulation. Warm drink. The vagus needs to reset its tone — 30 min to 2 hours.</div>
+</div>
+</div>
+
+<!-- GATE R2 -->
+<div class="gate">
+<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#fa0"></div>
+<h2><span class="ring" style="background:rgba(255,170,0,.2);color:#fa0">R2</span> <span style="color:rgba(255,170,0,.7)">THE GATE — THRESHOLD GUARDIAN</span> <span class="prime">prime 5 · gate · ┃ · element B</span></h2>
+<div class="eq"><b>Location:</b> solar plexus / diaphragm. The literal gate between lower body (survival) and upper body (processing).</div>
+<div class="eq"><b>Function:</b> permission to feel. "Is it safe to open up?" This is the firewall. Most people's default = LOCKED.</div>
+<div class="eq"><b>Frequency:</b> 150-300Hz. Transition band. The checkpoint.</div>
+<div class="row">
+<div class="col">
+<div class="lock">
+<div class="label">🔒 LOCKED WHEN</div>
+<div class="eq">▸ Emotional armor up (protecting from vulnerability)</div>
+<div class="eq">▸ Diaphragm frozen (chest-breathing only)</div>
+<div class="eq">▸ Stomach tight / "knot in stomach"</div>
+<div class="eq">▸ Shame or guilt present (blocks upward flow)</div>
+<div class="eq">▸ Suppressed crying (energy stuck at diaphragm)</div>
+<div class="eq">▸ R0 or R1 still locked (cascade lock)</div>
+</div>
+</div>
+<div class="col">
+<div class="unlock">
+<div class="label">🔓 UNLOCK PROTOCOL</div>
+<div class="eq">▸ <b>Diaphragmatic release</b> — lie down, hands on belly, breathe into hands</div>
+<div class="eq">▸ <b>Twist</b> — seated spinal twist, wring out the solar plexus</div>
+<div class="eq">▸ <b>Laugh or cry</b> — both use the diaphragm. Either works.</div>
+<div class="eq">▸ <b>Scream into pillow</b> — controlled release of blocked energy</div>
+<div class="eq">▸ <b>Say what you're feeling out loud</b> — naming decompresses</div>
+<div class="eq">▸ <b>Hot shower on solar plexus</b> — heat relaxes the gate</div>
+</div>
+</div>
+</div>
+<div class="damage">
+<div class="label">⚠ IF FORCED</div>
+<div class="eq">Emotional flooding. Uncontrolled crying, rage, or panic. The dam breaks instead of opening. Everything above gets hit with raw unfiltered signal.</div>
+</div>
+<div class="fix">
+<div class="label">🔧 REPAIR</div>
+<div class="eq">Fetal position. Weighted blanket. Low stimulus. Let the wave pass — it's not dangerous, it's just unfiltered. 1-4 hours. The gate rebuilds itself.</div>
+</div>
+</div>
+
+<!-- GATE R3 -->
+<div class="gate">
+<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#f44"></div>
+<h2><span class="ring" style="background:rgba(255,68,68,.2);color:#f44">R3</span> <span style="color:rgba(255,68,68,.7)">THE HEART — LIMBIC / AFFECT</span> <span class="prime">prime 7 · mid · ♡ · element N</span></h2>
+<div class="eq"><b>Location:</b> heart center, chest, thymus. Limbic system (amygdala, hippocampus).</div>
+<div class="eq"><b>Function:</b> emotional processing, bonding, love, grief, compassion. "What do I feel about this?"</div>
+<div class="eq"><b>Frequency:</b> 300-500Hz. The feeling band. Heart coherence at 0.1Hz modulation.</div>
+<div class="row">
+<div class="col">
+<div class="lock">
+<div class="label">🔒 LOCKED WHEN</div>
+<div class="eq">▸ Chest tight, breathing only into upper lungs</div>
+<div class="eq">▸ Heartbreak not processed (old grief = permanent lock)</div>
+<div class="eq">▸ "I don't want to feel this" (voluntary shutdown)</div>
+<div class="eq">▸ Isolation > 48 hours (no human contact)</div>
+<div class="eq">▸ Betrayal wound active (trust broken)</div>
+</div>
+</div>
+<div class="col">
+<div class="unlock">
+<div class="label">🔓 UNLOCK PROTOCOL</div>
+<div class="eq">▸ <b>Hand on chest</b> — feel your heartbeat for 60 seconds</div>
+<div class="eq">▸ <b>Think of someone you love</b> — not desire. Love.</div>
+<div class="eq">▸ <b>Heart coherence breathing</b> — 5s in, 5s out, focus on heart</div>
+<div class="eq">▸ <b>Hug someone</b> (20+ seconds activates oxytocin)</div>
+<div class="eq">▸ <b>Listen to music that moves you</b> — let it in</div>
+<div class="eq">▸ <b>Say "I feel ___" without explaining or justifying</b></div>
+</div>
+</div>
+</div>
+<div class="damage">
+<div class="label">⚠ IF FORCED</div>
+<div class="eq">Heart palpitations. Overwhelming emotion with no container. Attachment crisis — love and fear get crossed. Can trigger obsessive bonding or complete emotional shutdown.</div>
+</div>
+<div class="fix">
+<div class="label">🔧 REPAIR</div>
+<div class="eq">Be with someone safe. Physical contact. Don't talk about it — just be present. The heart gate doesn't repair with words, it repairs with presence. 2-48 hours.</div>
+</div>
+</div>
+
+<!-- GATE R4 -->
+<div class="gate">
+<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#4a4"></div>
+<h2><span class="ring" style="background:rgba(68,170,68,.2);color:#4a4">R4</span> <span style="color:rgba(68,170,68,.7)">THE VOICE — PFC / EXPRESSION</span> <span class="prime">prime 11 · mid-high · △ · element Na</span></h2>
+<div class="eq"><b>Location:</b> throat, jaw, prefrontal cortex. The executive + expression center.</div>
+<div class="eq"><b>Function:</b> speaking truth, decision-making, planning, will. "What do I want to say/do about this?"</div>
+<div class="eq"><b>Frequency:</b> 500-2000Hz. Speech band. Where meaning lives.</div>
+<div class="row">
+<div class="col">
+<div class="lock">
+<div class="label">🔒 LOCKED WHEN</div>
+<div class="eq">▸ Throat tight, voice small or hoarse</div>
+<div class="eq">▸ Words stuck — "I can't explain it"</div>
+<div class="eq">▸ Decision paralysis (too many options = freeze)</div>
+<div class="eq">▸ Lying or withholding (creates backpressure)</div>
+<div class="eq">▸ People-pleasing (saying what they want, not what's true)</div>
+</div>
+</div>
+<div class="col">
+<div class="unlock">
+<div class="label">🔓 UNLOCK PROTOCOL</div>
+<div class="eq">▸ <b>Say the unsaid thing</b> — even if only to yourself</div>
+<div class="eq">▸ <b>Sing</b> — doesn't matter what. Open the throat.</div>
+<div class="eq">▸ <b>Write it down</b> — pen on paper, stream of consciousness</div>
+<div class="eq">▸ <b>Make ONE decision</b> — any decision. Small. The muscle needs reps.</div>
+<div class="eq">▸ <b>Neck stretches</b> — tilt, roll, release jaw</div>
+<div class="eq">▸ <b>Read aloud</b> — 2 minutes of anything, feeling the resonance</div>
+</div>
+</div>
+</div>
+<div class="damage">
+<div class="label">⚠ IF FORCED</div>
+<div class="eq">Word vomit. Saying things you can't take back. OR complete mutism — the throat locks solid. PFC goes offline = impulsive decisions with no filter.</div>
+</div>
+<div class="fix">
+<div class="label">🔧 REPAIR</div>
+<div class="eq">Silence. Don't speak for a while. Write instead. The throat gate needs pressure relief, not more output. Hot tea with honey. 1-12 hours.</div>
+</div>
+</div>
+
+<!-- GATE R5 -->
+<div class="gate">
+<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#a4f"></div>
+<h2><span class="ring" style="background:rgba(170,68,255,.2);color:#a4f">R5</span> <span style="color:rgba(170,68,255,.7)">THE LENS — INSULA / PERCEPTION</span> <span class="prime">prime 13 · high · ◐ · element Al</span></h2>
+<div class="eq"><b>Location:</b> between the eyes + insula (deep cortex). Integration center.</div>
+<div class="eq"><b>Function:</b> seeing clearly, interoception, pattern recognition, intuition. "What's actually going on?"</div>
+<div class="eq"><b>Frequency:</b> 2000-8000Hz. Detail band. Where signal separates from noise.</div>
+<div class="row">
+<div class="col">
+<div class="lock">
+<div class="label">🔒 LOCKED WHEN</div>
+<div class="eq">▸ Information overload (too much input, can't parse)</div>
+<div class="eq">▸ Eye strain / screen fatigue</div>
+<div class="eq">▸ Confirmation bias running (seeing only what you expect)</div>
+<div class="eq">▸ Dissociation (disconnected from body signals)</div>
+<div class="eq">▸ Substances that fog perception (alcohol, excess THC)</div>
+</div>
+</div>
+<div class="col">
+<div class="unlock">
+<div class="label">🔓 UNLOCK PROTOCOL</div>
+<div class="eq">▸ <b>Close eyes</b> — 2 min of pure dark. Let the visual system rest.</div>
+<div class="eq">▸ <b>Focus near/far</b> — look at finger, then horizon. 10 reps.</div>
+<div class="eq">▸ <b>Body scan</b> — eyes closed, feel each body part. Reconnects insula.</div>
+<div class="eq">▸ <b>Ask "What am I NOT seeing?"</b> — breaks confirmation bias</div>
+<div class="eq">▸ <b>Nature</b> — fractals in trees/clouds reset visual processing</div>
+<div class="eq">▸ <b>Cold water on closed eyes</b> — shock-resets the lens</div>
+</div>
+</div>
+</div>
+<div class="damage">
+<div class="label">⚠ IF FORCED</div>
+<div class="eq">Hallucination-like pattern matching. Seeing connections that aren't there. Paranoia. OR total flat perception — everything looks meaningless. The insula can't distinguish signal from noise.</div>
+</div>
+<div class="fix">
+<div class="label">🔧 REPAIR</div>
+<div class="eq">Sleep. Seriously — the insula repairs during REM. No screens for 2 hours before bed. Sunlight in the morning resets the circadian gate. 8-24 hours.</div>
+</div>
+</div>
+
+<!-- GATE R6 -->
+<div class="gate">
+<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#fff"></div>
+<h2><span class="ring" style="background:rgba(255,255,255,.15);color:#fff">R6</span> <span style="color:rgba(255,255,255,.6)">THE CROWN — ENTERPRISE / UNITY</span> <span class="prime">prime 17 · peak · ◯ · element Cl</span></h2>
+<div class="eq"><b>Location:</b> crown of head, default mode network, the whole system as one.</div>
+<div class="eq"><b>Function:</b> integration, meaning, connection to something larger, flow state. "What does this all mean?"</div>
+<div class="eq"><b>Frequency:</b> 8000Hz+ and also sub-1Hz. The highest and the lowest meet here.</div>
+<div class="row">
+<div class="col">
+<div class="lock">
+<div class="label">🔒 LOCKED WHEN</div>
+<div class="eq">▸ ANY gate below is locked (cascade rule)</div>
+<div class="eq">▸ Ego inflation ("I am special/chosen/different")</div>
+<div class="eq">▸ Spiritual bypassing (using R6 to skip R0-R5)</div>
+<div class="eq">▸ Forced peak experience (drugs, sleep deprivation, mania)</div>
+<div class="eq">▸ Grandiosity without grounding</div>
+</div>
+</div>
+<div class="col">
+<div class="unlock">
+<div class="label">🔓 UNLOCK PROTOCOL</div>
+<div class="eq">▸ <b>Cannot be directly opened.</b> Only opens when R0-R5 are stable.</div>
+<div class="eq">▸ <b>It opens itself</b> — flow state, deep meditation, creative absorption</div>
+<div class="eq">▸ <b>Surrender</b> — stop trying to open it. That's the lock.</div>
+<div class="eq">▸ <b>Service</b> — do something for someone else. Ego dissolves.</div>
+<div class="eq">▸ <b>Gratitude practice</b> — 3 specific things, felt not listed</div>
+<div class="eq">▸ Verify: are you fed, hydrated, rested, calm, feeling, speaking truth, seeing clearly? Then R6 is probably already open.</div>
+</div>
+</div>
+</div>
+<div class="damage">
+<div class="label">⚠ IF FORCED (THIS IS WHAT HAPPENED)</div>
+<div class="eq"><b>Forced R6 = the jisatsu.</b> You pumped current through the crown while lower gates were locked. Energy had nowhere to go. The system reads this as: "I am everything and nothing, I am dissolving, I don't exist" — and the fuse blows. Depersonalization. Ego death without the container to hold it. The safety mechanism is the crash — your body SAVED you by shutting down.</div>
+</div>
+<div class="fix">
+<div class="label">🔧 REPAIR</div>
+<div class="eq"><b>Ground DOWN, not up.</b> Go to R0. Eat. Drink. Touch the floor. Feel your weight. Then R1 — slow breathing. Then R2 — let yourself feel. One gate at a time. R6 repairs last because it repairs itself once everything below is stable. Days to weeks depending on how hard the blow was.</div>
+</div>
+</div>
+
+<!-- THE RULES -->
+<div class="section">
+<h2>THE RULES — CIRCUIT BREAKER PROTOCOL</h2>
+
+<div class="rule">
+<div class="eq"><b>RULE 1: SEQUENTIAL ONLY</b></div>
+<div class="eq">R0 → R1 → R2 → R3 → R4 → R5 → R6. Always. Every time. No shortcuts.</div>
+</div>
+
+<div class="rule">
+<div class="eq"><b>RULE 2: BOTTOM HOLDS TOP</b></div>
+<div class="eq">If R0 fails, everything above cascades shut. If R3 fails, R4-R6 go dark. The foundation holds the structure.</div>
+</div>
+
+<div class="rule">
+<div class="eq"><b>RULE 3: THE GATE TELLS YOU</b></div>
+<div class="eq">Locked gate = physical symptom. Nausea = R0. Tight throat = R4. Eye strain = R5. The body is the dashboard. Read it.</div>
+</div>
+
+<div class="rule">
+<div class="eq"><b>RULE 4: REPAIR GOES DOWN</b></div>
+<div class="eq">When you crash from R6, don't fix R6. Fix R0. Then R1. Then R2. The crown repairs itself. You repair the foundation.</div>
+</div>
+
+<div class="rule">
+<div class="eq"><b>RULE 5: TIME IS PART OF THE PROTOCOL</b></div>
+<div class="eq">R0 = minutes. R1 = minutes. R2 = hours. R3 = hours-days. R4 = hours. R5 = sleep cycle. R6 = days-weeks. You cannot rush a gate that needs time. Trying to = forcing = damage.</div>
+</div>
+
+<div class="rule">
+<div class="eq"><b>RULE 6: EXCITATION IS SAFE WHEN ALL GATES ARE OPEN</b></div>
+<div class="eq">The excite protocol works perfectly if you run the gate check first. Current flows through open gates harmlessly. It only burns when it hits a closed gate and has nowhere to go.</div>
+</div>
+</div>
+
+<!-- SAFE SEQUENCE -->
+<div class="section">
+<h2>SAFE EXCITATION SEQUENCE — PRE-FLIGHT CHECKLIST</h2>
+
+<div class="eq">Before running the excite protocol or any high-energy practice:</div>
+
+<div class="sequence">
+<div class="seq-gate" style="border-color:#936;color:#c96">R0: Fed? Hydrated? Rested?</div>
+<span class="seq-arrow">→</span>
+<div class="seq-gate" style="border-color:#0ad;color:#0ad">R1: Breathing slow? Jaw unclenched?</div>
+<span class="seq-arrow">→</span>
+<div class="seq-gate" style="border-color:#fa0;color:#fa0">R2: Belly soft? Can I feel?</div>
+<span class="seq-arrow">→</span>
+<div class="seq-gate" style="border-color:#f44;color:#f44">R3: Heart open? Not armored?</div>
+<span class="seq-arrow">→</span>
+<div class="seq-gate" style="border-color:#4a4;color:#4a4">R4: Voice clear? Anything unsaid?</div>
+<span class="seq-arrow">→</span>
+<div class="seq-gate" style="border-color:#a4f;color:#a4f">R5: Eyes rested? Mind clear?</div>
+<span class="seq-arrow">→</span>
+<div class="seq-gate" style="border-color:#fff;color:#fff">R6: All green? → opens itself</div>
+</div>
+
+<div class="eq">If ANY gate answers NO: <b>stop there and fix it</b>. Don't proceed. The current will find the locked gate and blow it.</div>
+<div class="eq" style="margin-top:8px;color:rgba(255,200,100,.5)"><b>You are not broken. The fuse did its job. Now open the gates in order, and the light flows safely.</b></div>
+</div>
+
+<!-- DAILY MAINTENANCE -->
+<div class="section">
+<h2>DAILY GATE MAINTENANCE — 10 MINUTES</h2>
+<div class="eq"><b>R0 (30s):</b> Stand. Feel feet. Drink water.</div>
+<div class="eq"><b>R1 (60s):</b> 4-8 breathing × 6 rounds. Exhale longer than inhale.</div>
+<div class="eq"><b>R2 (60s):</b> Hands on belly. 3 deep belly breaths. Name one feeling.</div>
+<div class="eq"><b>R3 (60s):</b> Hand on heart. Think of someone you love. 5-5 coherence breathing.</div>
+<div class="eq"><b>R4 (60s):</b> Say one true thing out loud. Anything. Just speak truth.</div>
+<div class="eq"><b>R5 (60s):</b> Close eyes. Body scan top to bottom. Notice without judging.</div>
+<div class="eq"><b>R6 (varies):</b> Don't do anything. If R0-R5 are open, R6 handles itself.</div>
+<div class="eq" style="margin-top:8px"><b>Total: ~6 minutes.</b> The remaining 4 minutes is just sitting with whatever came up. That's the whole practice.</div>
+</div>
+
+</div>
+
+<!-- 3D background -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+const scene=new THREE.Scene()
+const cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,500)
+cam.position.set(0,0,20)
+
+// 7 rings representing the gates
+const colors=[0x993300,0x00aadd,0xffaa00,0xff4444,0x44aa44,0xaa44ff,0xffffff]
+const gateRings=[]
+for(let i=0;i<7;i++){
+  const ring=new THREE.Mesh(
+    new THREE.TorusGeometry(2+i*1.2,.03,6,64),
+    new THREE.MeshBasicMaterial({color:colors[i],transparent:true,opacity:.06,blending:THREE.AdditiveBlending})
+  )
+  ring.rotation.x=Math.PI/2
+  ring.position.y=(i-3)*1.5
+  scene.add(ring);gateRings.push(ring)
+}
+
+// spine line
+const spineGeo=new THREE.BufferGeometry()
+spineGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array([0,-6,0,0,6,0]),3))
+scene.add(new THREE.Line(spineGeo,new THREE.LineBasicMaterial({color:0x332222,transparent:true,opacity:.1})))
+
+function animate(ts){
+  requestAnimationFrame(animate)
+  const t=ts*.001
+  gateRings.forEach((ring,i)=>{
+    ring.rotation.z=t*(.05+i*.02)*(i%2?1:-1)
+    ring.material.opacity=.04+Math.sin(t*.5+i*.5)*.02
+  })
+  cam.position.y=-(window.scrollY||0)*.005
+  R.render(scene,cam)
+}
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+animate(0)
+</script>
+</body></html>
