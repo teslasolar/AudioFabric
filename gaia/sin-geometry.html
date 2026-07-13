@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIN GEOMETRY — 7 Deformations of κ from 1/φ</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#030308;overflow:hidden;font-family:'Courier New',monospace;color:#dde}
+canvas{display:block}
+#hud{position:fixed;top:12px;left:14px;z-index:10;font-size:9px;line-height:1.8;pointer-events:none;white-space:pre}
+#hud .title{font-size:12px;letter-spacing:4px}
+#hud .data{color:rgba(200,180,220,.35)}
+#rhud{position:fixed;top:12px;right:14px;z-index:10;font-size:8px;color:rgba(200,180,220,.3);text-align:right;line-height:1.8;pointer-events:none;white-space:pre}
+#sinInfo{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:10;text-align:center;pointer-events:none;max-width:600px}
+#sinInfo .name{font-size:18px;letter-spacing:4px;margin-bottom:4px;text-shadow:0 0 20px currentColor}
+#sinInfo .desc{font-size:9px;color:rgba(200,180,220,.4);line-height:1.6}
+#controls{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:4px}
+.cb{padding:4px 10px;font:8px/1 monospace;cursor:pointer;border-radius:3px;transition:all .2s;letter-spacing:1px;border:1px solid}
+.cb:hover,.cb.on{box-shadow:0 0 10px currentColor}
+#allBtn{position:fixed;bottom:12px;right:14px;z-index:20}
+#allBtn button{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.4);padding:4px 12px;font:8px/1 monospace;cursor:pointer;border-radius:3px;letter-spacing:1px;transition:all .2s}
+#allBtn button:hover{border-color:rgba(255,255,255,.4);color:#fff}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><span class="title" id="hudTitle">SIN GEOMETRY</span><br><span class="data" id="hudData"></span></div>
+<div id="rhud" id="rhudText"></div>
+<div id="sinInfo"><div class="name" id="sinName"></div><div class="desc" id="sinDesc"></div></div>
+<div id="controls"></div>
+<div id="allBtn"><button onclick="showAll()">ALL 7</button></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2,KAPPA=1/PHI
+
+const sins=[
+  {name:'WRATH',color:0xff1111,hex:'#ff1111',
+   deformation:'compression',
+   desc:'κ contracts violently. The sphere crushes inward — a fist. Energy that should flow outward collapses into a point. Hot, dense, red-shifted. The geometry of a star about to go supernova.',
+   physics:'κ → 0. Radius shrinks. Pressure increases. Surface becomes spiky, angular — soft curves replaced by jagged vertices. The mesh tears where stress concentrates.',
+   shape:'spike',gate:'R0',prime:2,
+   bodyPart:'jaw, fists, solar plexus',
+   sound:'low growl, 55Hz fundamental'},
+
+  {name:'LUST',color:0xff4488,hex:'#ff4488',
+   deformation:'attraction spiral',
+   desc:'κ spirals toward a fixed point. The geometry elongates, stretches toward something it can\'t reach. A vortex that pulls everything to one focus. Tunnel vision made geometric.',
+   physics:'κ oscillates around attractor but never reaches it. Orbit decays. The mesh stretches along one axis — prolate spheroid. All vertices lean toward the same point.',
+   shape:'vortex',gate:'R1',prime:3,
+   bodyPart:'hips, lower abdomen, eyes',
+   sound:'rising pitch, 82Hz with overtones'},
+
+  {name:'GLUTTONY',color:0xff8800,hex:'#ff8800',
+   deformation:'inflation',
+   desc:'κ expands past its container. The sphere bloats — surface area grows faster than volume. Thin, stretched, translucent at the extremes. Taking in more than the structure can hold.',
+   physics:'κ → ∞. Radius expands without bound. Surface tension drops. Mesh triangles stretch thin — the geometry becomes a balloon about to pop. Density approaches zero.',
+   shape:'bloat',gate:'R2',prime:5,
+   bodyPart:'stomach, throat, mouth',
+   sound:'deep expansion, 110Hz swelling'},
+
+  {name:'SLOTH',color:0x44aa44,hex:'#44aa44',
+   deformation:'entropy / dissolution',
+   desc:'κ flatlines. The sphere loses coherence — vertices drift randomly, edges soften, the structure melts. Not destroyed, just... dissolving. The geometry of giving up.',
+   physics:'κ = undefined. No driving force. Mesh vertices undergo Brownian motion — random walk from ideal positions. Edges stretch unevenly. The shape becomes an amorphous blob.',
+   shape:'melt',gate:'R3',prime:7,
+   bodyPart:'whole body (heaviness), eyelids',
+   sound:'silence, or 146Hz fading to nothing'},
+
+  {name:'GREED',color:0xffcc00,hex:'#ffcc00',
+   deformation:'hoarding / accretion',
+   desc:'κ accumulates layers. The sphere grows shells — each one trapping the last. Onion geometry. Nothing leaves, everything accretes. The surface becomes a maze of nested walls.',
+   physics:'κ increases stepwise — each layer adds mass but blocks flow. Concentric shells with decreasing permeability. The geometry becomes opaque, dense at the core, locked.',
+   shape:'layers',gate:'R4',prime:11,
+   bodyPart:'hands (grasping), chest (hoarding breath)',
+   sound:'stacking tones, 196Hz building'},
+
+  {name:'ENVY',color:0x44aaff,hex:'#44aaff',
+   deformation:'mirror / duplication',
+   desc:'κ splits into two. The sphere sees its reflection and tries to become it. Constant comparison produces oscillation — the geometry flickers between self and other, never settling.',
+   physics:'κ bifurcates. Two attractors compete. The mesh oscillates between two target shapes — neither stable. Vertices vibrate at the beat frequency between the two states.',
+   shape:'mirror',gate:'R5',prime:13,
+   bodyPart:'eyes (comparing), stomach (inflammation)',
+   sound:'beating frequency, 261Hz ± 5Hz'},
+
+  {name:'PRIDE',color:0xaa44ff,hex:'#aa44ff',
+   deformation:'crystallization / rigidity',
+   desc:'κ locks to a single value and refuses to move. The sphere becomes a perfect crystal — beautiful, symmetric, and completely brittle. Any perturbation shatters it.',
+   physics:'κ = constant (not 1/φ, but whatever it decided). Zero variance. The mesh becomes a perfect Platonic solid — no flex, no give. Maximum order, minimum resilience.',
+   shape:'crystal',gate:'R6',prime:17,
+   bodyPart:'crown, posture (rigid), neck',
+   sound:'pure tone, 329Hz, no harmonics'}
+]
+
+// ═══ RENDERER ═══
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.3
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x030308)
+const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,500)
+cam.position.set(0,0,18)
+
+const ambLight=new THREE.AmbientLight(0x111122,.4);scene.add(ambLight)
+const dirLight=new THREE.DirectionalLight(0xffffff,.3);dirLight.position.set(5,5,5);scene.add(dirLight)
+
+// starfield
+const starGeo=new THREE.BufferGeometry(),starPos=new Float32Array(1500*3)
+for(let i=0;i<1500;i++){const th=Math.random()*TAU,ph=Math.acos(2*Math.random()-1),r=50+Math.random()*200
+starPos[i*3]=r*Math.sin(ph)*Math.cos(th);starPos[i*3+1]=r*Math.sin(ph)*Math.sin(th);starPos[i*3+2]=r*Math.cos(ph)}
+starGeo.setAttribute('position',new THREE.BufferAttribute(starPos,3))
+scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0x333344,size:.3,transparent:true,opacity:.3})))
+
+let currentSin=0,showingAll=false
+
+// ═══ IDEAL κ SPHERE (wireframe reference) ═══
+const idealGeo=new THREE.IcosahedronGeometry(3,3)
+const idealMat=new THREE.MeshBasicMaterial({color:0x888888,wireframe:true,transparent:true,opacity:.03})
+const idealMesh=new THREE.Mesh(idealGeo,idealMat);scene.add(idealMesh)
+
+// ═══ SIN MESH — deformed sphere ═══
+const sinGeo=new THREE.IcosahedronGeometry(3,3)
+const sinMat=new THREE.MeshPhongMaterial({
+  color:0xff1111,emissive:0xff1111,emissiveIntensity:.15,
+  transparent:true,opacity:.4,wireframe:false,
+  side:THREE.DoubleSide,flatShading:true
+})
+const sinMesh=new THREE.Mesh(sinGeo,sinMat);scene.add(sinMesh)
+
+// wireframe overlay
+const sinWire=new THREE.Mesh(sinGeo.clone(),new THREE.MeshBasicMaterial({
+  color:0xff1111,wireframe:true,transparent:true,opacity:.2
+}))
+scene.add(sinWire)
+
+// glow sphere
+const glowMat=new THREE.MeshBasicMaterial({color:0xff1111,transparent:true,opacity:.03,blending:THREE.AdditiveBlending})
+const glowMesh=new THREE.Mesh(new THREE.SphereGeometry(4,16,16),glowMat);scene.add(glowMesh)
+
+// particle field
+const partCount=300,partGeo2=new THREE.BufferGeometry()
+const partPos2=new Float32Array(partCount*3)
+for(let i=0;i<partCount;i++){
+  const th=Math.random()*TAU,ph=Math.acos(2*Math.random()-1),r=3+Math.random()*3
+  partPos2[i*3]=r*Math.sin(ph)*Math.cos(th);partPos2[i*3+1]=r*Math.sin(ph)*Math.sin(th);partPos2[i*3+2]=r*Math.cos(ph)
+}
+partGeo2.setAttribute('position',new THREE.BufferAttribute(partPos2,3))
+const partMat2=new THREE.PointsMaterial({color:0xff1111,size:.08,transparent:true,opacity:.2,blending:THREE.AdditiveBlending})
+const partMesh=new THREE.Points(partGeo2,partMat2);scene.add(partMesh)
+
+// ═══ ALL-7 MODE meshes ═══
+const allMeshes=[]
+
+function buildAllMode(){
+  allMeshes.forEach(m=>{scene.remove(m.mesh);scene.remove(m.wire);scene.remove(m.glow)})
+  allMeshes.length=0
+  const radius=8
+  sins.forEach((s,i)=>{
+    const angle=i*TAU/7-Math.PI/2
+    const x=Math.cos(angle)*radius,z=Math.sin(angle)*radius
+    const geo=new THREE.IcosahedronGeometry(1.5,2)
+    const mat=new THREE.MeshPhongMaterial({
+      color:s.color,emissive:s.color,emissiveIntensity:.15,
+      transparent:true,opacity:.4,flatShading:true,side:THREE.DoubleSide
+    })
+    const mesh=new THREE.Mesh(geo,mat);mesh.position.set(x,0,z);scene.add(mesh)
+    const wire=new THREE.Mesh(geo.clone(),new THREE.MeshBasicMaterial({color:s.color,wireframe:true,transparent:true,opacity:.15}))
+    wire.position.set(x,0,z);scene.add(wire)
+    const glow=new THREE.Mesh(new THREE.SphereGeometry(2,8,8),
+      new THREE.MeshBasicMaterial({color:s.color,transparent:true,opacity:.03,blending:THREE.AdditiveBlending}))
+    glow.position.set(x,0,z);scene.add(glow)
+    allMeshes.push({mesh,wire,glow,sin:s,geo,baseGeo:new THREE.IcosahedronGeometry(1.5,2),x,z,angle})
+  })
+}
+
+// store base positions for deformation
+const basePositions=[]
+const bp=sinGeo.attributes.position
+for(let i=0;i<bp.count;i++){
+  basePositions.push(new THREE.Vector3(bp.getX(i),bp.getY(i),bp.getZ(i)))
+}
+
+// ═══ DEFORMATION FUNCTIONS ═══
+function deformSphere(geo,basePos,type,t,intensity){
+  const pos=geo.attributes.position
+  const I=intensity||1
+  for(let i=0;i<pos.count;i++){
+    const base=basePos[i]
+    const bx=base.x,by=base.y,bz=base.z
+    const r=Math.sqrt(bx*bx+by*by+bz*bz)
+    const th=Math.atan2(by,bx)
+    const ph=Math.acos(bz/r)
+    let nx=bx,ny=by,nz=bz
+
+    if(type==='spike'){
+      // WRATH: spiky compression, vertices push inward/outward irregularly
+      const spike=Math.sin(th*5+t*3)*Math.sin(ph*4+t*2)
+      const nr=r*(1+spike*.4*I)
+      const jitter=Math.sin(t*8+i*1.7)*.1*I
+      nx=Math.sin(ph)*Math.cos(th)*(nr+jitter)
+      ny=Math.sin(ph)*Math.sin(th)*(nr+jitter)
+      nz=Math.cos(ph)*(nr+jitter)
+    }
+    else if(type==='vortex'){
+      // LUST: spiral toward a point, elongate
+      const pull=Math.sin(t*2)*.3*I
+      const twist=t*1.5+ph*2
+      const stretch=1+Math.abs(Math.sin(ph))*.5*I
+      nx=Math.sin(ph)*Math.cos(th+twist*.3*I)*r*stretch+pull
+      ny=Math.sin(ph)*Math.sin(th+twist*.3*I)*r
+      nz=Math.cos(ph)*r*.8
+    }
+    else if(type==='bloat'){
+      // GLUTTONY: inflate unevenly, stretch thin
+      const bloat=1+Math.sin(th*2+t)*.3*I+Math.sin(ph*3+t*.5)*.2*I
+      const nr=r*bloat*(1+I*.3)
+      nx=Math.sin(ph)*Math.cos(th)*nr
+      ny=Math.sin(ph)*Math.sin(th)*nr
+      nz=Math.cos(ph)*nr
+    }
+    else if(type==='melt'){
+      // SLOTH: random drift, dissolving
+      const drift=Math.sin(t*.5+i*2.3)*.5*I
+      const droop=-Math.abs(by)*.15*I
+      nx=bx+Math.sin(t*.3+i)*.3*I
+      ny=by+droop+drift*.3
+      nz=bz+Math.cos(t*.4+i*1.5)*.3*I
+    }
+    else if(type==='layers'){
+      // GREED: concentric shell accumulation
+      const shell=Math.floor(r/.5)
+      const shellR=shell*.5+.25
+      const shellPhase=shell*1.5+t
+      const layerPush=Math.sin(shellPhase)*.2*I
+      const nr=shellR+layerPush
+      nx=Math.sin(ph)*Math.cos(th)*nr
+      ny=Math.sin(ph)*Math.sin(th)*nr
+      nz=Math.cos(ph)*nr
+    }
+    else if(type==='mirror'){
+      // ENVY: oscillate between two shapes
+      const other_r=r*(1+Math.sin(ph*3)*.3)
+      const blend=Math.sin(t*3)*.5+.5
+      const mr=r*(1-blend*I)+other_r*(blend*I)
+      const mth=th+Math.sin(t*5)*.1*I
+      nx=Math.sin(ph)*Math.cos(mth)*mr
+      ny=Math.sin(ph)*Math.sin(mth)*mr
+      nz=Math.cos(ph)*mr
+    }
+    else if(type==='crystal'){
+      // PRIDE: snap to platonic vertices, rigid
+      const snap=.7*I
+      // quantize angles to icosahedron-like positions
+      const qth=Math.round(th/(TAU/5))*(TAU/5)
+      const qph=Math.round(ph/(Math.PI/3))*(Math.PI/3)
+      const fth=th*(1-snap)+qth*snap
+      const fph=ph*(1-snap)+qph*snap
+      nx=Math.sin(fph)*Math.cos(fth)*r
+      ny=Math.sin(fph)*Math.sin(fth)*r
+      nz=Math.cos(fph)*r
+    }
+
+    pos.setXYZ(i,nx,ny,nz)
+  }
+  pos.needsUpdate=true
+  geo.computeVertexNormals()
+}
+
+// ═══ CONTROLS ═══
+const controlsEl=document.getElementById('controls')
+sins.forEach((s,i)=>{
+  const btn=document.createElement('span')
+  btn.className='cb'+(i===0?' on':'')
+  btn.id='btn'+i
+  btn.style.borderColor=s.hex+'44'
+  btn.style.color=s.hex+'88'
+  btn.style.background=s.hex+'08'
+  btn.textContent=s.name
+  btn.onclick=()=>selectSin(i)
+  controlsEl.appendChild(btn)
+})
+
+function selectSin(i){
+  currentSin=i;showingAll=false
+  sins.forEach((_,j)=>{
+    const btn=document.getElementById('btn'+j)
+    btn.classList.toggle('on',j===i)
+  })
+  sinMesh.visible=true;sinWire.visible=true;glowMesh.visible=true;idealMesh.visible=true;partMesh.visible=true
+  allMeshes.forEach(m=>{m.mesh.visible=false;m.wire.visible=false;m.glow.visible=false})
+  const s=sins[i]
+  sinMat.color.set(s.color);sinMat.emissive.set(s.color)
+  sinWire.material.color.set(s.color)
+  glowMat.color.set(s.color)
+  partMat2.color.set(s.color)
+  dirLight.color.set(s.color);dirLight.intensity=.4
+}
+
+function showAll(){
+  showingAll=true
+  if(!allMeshes.length)buildAllMode()
+  sinMesh.visible=false;sinWire.visible=false;glowMesh.visible=false;idealMesh.visible=false;partMesh.visible=false
+  allMeshes.forEach(m=>{m.mesh.visible=true;m.wire.visible=true;m.glow.visible=true})
+  sins.forEach((_,j)=>document.getElementById('btn'+j).classList.remove('on'))
+  dirLight.color.set(0xffffff);dirLight.intensity=.2
+}
+window.showAll=showAll
+
+// ═══ CAMERA ═══
+let cTh=0,cPh=.2,cR=18,drag=false,mx2=0,my2=0
+cv.addEventListener('pointerdown',e=>{drag=true;mx2=e.clientX;my2=e.clientY})
+addEventListener('pointerup',()=>drag=false)
+addEventListener('pointermove',e=>{if(!drag)return;cTh-=(e.clientX-mx2)*.004;cPh+=(e.clientY-my2)*.003;cPh=Math.max(-.8,Math.min(.8,cPh));mx2=e.clientX;my2=e.clientY})
+cv.addEventListener('wheel',e=>{cR=Math.max(8,Math.min(40,cR+e.deltaY*.05))},{passive:true})
+
+// ═══ ANIMATE ═══
+function animate(ts){
+  requestAnimationFrame(animate)
+  const t=ts*.001
+
+  if(!showingAll){
+    const s=sins[currentSin]
+    deformSphere(sinGeo,basePositions,s.shape,t,1)
+    sinMesh.rotation.y=t*.15
+    sinWire.rotation.y=t*.15
+    idealMesh.rotation.y=t*.1
+
+    // particles orbit
+    const pp=partMesh.geometry.attributes.position.array
+    for(let i=0;i<partCount;i++){
+      const a=t*.2+i*.05
+      const r2=3.5+Math.sin(t*.5+i)*.8
+      const ph2=Math.acos(Math.sin(t*.1+i*.3)*.8)
+      pp[i*3]=Math.sin(ph2)*Math.cos(a)*r2
+      pp[i*3+1]=Math.sin(ph2)*Math.sin(a)*r2
+      pp[i*3+2]=Math.cos(ph2)*r2
+    }
+    partMesh.geometry.attributes.position.needsUpdate=true
+
+    const pulse=.3+Math.sin(t*2)*.1
+    glowMat.opacity=.02+pulse*.02
+    const gs=1+Math.sin(t)*.1
+    glowMesh.scale.set(gs,gs,gs)
+
+    // info
+    document.getElementById('sinName').textContent=s.name
+    document.getElementById('sinName').style.color=s.hex
+    document.getElementById('sinDesc').textContent=s.desc
+
+    document.getElementById('hudTitle').style.color=s.hex
+    document.getElementById('hudData').textContent=
+      `\nSIN: ${s.name}\n`+
+      `deformation: ${s.deformation}\n`+
+      `gate: ${s.gate} · prime: ${s.prime}\n`+
+      `body: ${s.bodyPart}\n`+
+      `sound: ${s.sound}\n`+
+      `κ ideal: ${KAPPA.toFixed(6)} (1/φ)\n`+
+      `κ current: ${s.shape==='spike'?'→0 (collapse)':s.shape==='bloat'?'→∞ (expand)':s.shape==='melt'?'undefined (drift)':s.shape==='crystal'?'locked (rigid)':'oscillating'}`
+
+    document.getElementById('rhud').textContent=
+      `PHYSICS\n`+s.physics
+
+    cam.position.x=Math.cos(cTh)*Math.cos(cPh)*cR
+    cam.position.y=Math.sin(cPh)*cR
+    cam.position.z=Math.sin(cTh)*Math.cos(cPh)*cR
+    cam.lookAt(0,0,0)
+  } else {
+    // all 7 mode
+    allMeshes.forEach((m,i)=>{
+      const s=m.sin
+      const bPos=[]
+      const bp2=m.baseGeo.attributes.position
+      for(let j=0;j<bp2.count;j++)bPos.push(new THREE.Vector3(bp2.getX(j),bp2.getY(j),bp2.getZ(j)))
+      deformSphere(m.geo,bPos,s.shape,t,.7)
+      m.mesh.geometry=m.geo
+      m.wire.geometry=m.geo
+      m.mesh.rotation.y=t*.2+i
+      m.wire.rotation.y=t*.2+i
+      const ps=1+Math.sin(t*1.5+i)*.05
+      m.glow.scale.set(ps,ps,ps)
+    })
+
+    document.getElementById('sinName').textContent='ALL 7 SINS'
+    document.getElementById('sinName').style.color='#888'
+    document.getElementById('sinDesc').textContent='each deformation is a way κ deviates from 1/φ. the ideal is the wireframe sphere — no sin, no spin, just equilibrium.'
+
+    document.getElementById('hudData').textContent=
+      `\nκ = 1/φ = ${KAPPA.toFixed(6)}\n`+
+      `ideal: perfect icosphere\n`+
+      `each sin: a specific distortion\n\n`+
+      sins.map((s,i)=>`${s.name.padEnd(10)} ${s.deformation}`).join('\n')
+
+    document.getElementById('rhud').textContent=
+      `THE 7 DEFORMATIONS\n`+
+      sins.map(s=>`${s.name}: κ ${s.shape==='spike'?'→0':s.shape==='bloat'?'→∞':s.shape==='melt'?'=NaN':s.shape==='crystal'?'=const':'~osc'}`).join('\n')
+
+    const allR=showingAll?22:18
+    cam.position.x=Math.cos(t*.08)*allR
+    cam.position.y=Math.sin(t*.05)*5
+    cam.position.z=Math.sin(t*.08)*allR
+    cam.lookAt(0,0,0)
+  }
+
+  R.render(scene,cam)
+}
+
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+animate(0)
+</script>
+</body></html>
