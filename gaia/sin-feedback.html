@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIN FEEDBACK — Live Watch → Corrective Geometry</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Courier New',monospace;color:#dde}
+canvas{display:block}
+#hud{position:fixed;top:10px;left:12px;z-index:10;font-size:8px;line-height:1.7;pointer-events:none;white-space:pre;color:rgba(200,180,220,.35)}
+#hud b{color:rgba(255,200,100,.5)}
+#sins-panel{position:fixed;top:10px;right:12px;z-index:10;pointer-events:none}
+.sin-bar{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:8px;height:14px}
+.sin-label{width:55px;text-align:right;letter-spacing:1px}
+.sin-track{width:100px;height:4px;background:rgba(255,255,255,.04);border-radius:2px;overflow:hidden}
+.sin-fill{height:100%;border-radius:2px;transition:width .5s,background .5s}
+.sin-val{width:28px;font-size:7px;color:rgba(255,255,255,.2)}
+#status{position:fixed;bottom:10px;left:12px;z-index:10;font-size:7px;color:rgba(255,255,255,.15);pointer-events:none}
+#dominant{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);z-index:10;font-size:10px;letter-spacing:3px;pointer-events:none;text-align:center;text-shadow:0 0 15px currentColor}
+#controls{position:fixed;bottom:10px;right:12px;z-index:20;display:flex;gap:4px}
+.cb{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.3);padding:3px 8px;font:7px/1 monospace;cursor:pointer;border-radius:3px;transition:all .2s;letter-spacing:1px}
+.cb:hover,.cb.on{border-color:rgba(255,200,100,.3);color:rgba(255,200,100,.5)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<div id="sins-panel"></div>
+<div id="status"></div>
+<div id="dominant"></div>
+<div id="controls">
+  <span class="cb on" onclick="toggleAudio(this)">AUDIO</span>
+  <span class="cb" onclick="sendHaptic()">HAPTIC</span>
+  <span class="cb" onclick="toggleMode('COHERENCE')">COHERENCE</span>
+  <span class="cb" onclick="toggleMode('CALM')">CALM</span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2,KAPPA=1/PHI
+
+const params=new URLSearchParams(location.search)
+const USER=params.get('user')||'thomas'
+const GW=params.get('gw')||'http://localhost:5540'
+
+// ═══ SIN DEFINITIONS ═══
+const sinDefs=[
+  {key:'wrath',name:'WRATH',color:'#ff1111',correction:'expand',
+   corrTone:[55,110],corrDesc:'gentle opening — releasing the fist'},
+  {key:'lust',name:'LUST',color:'#ff4488',correction:'radiate',
+   corrTone:[82,165],corrDesc:'outward flow — let go of the focal point'},
+  {key:'gluttony',name:'GLUTTONY',color:'#ff8800',correction:'contain',
+   corrTone:[110,220],corrDesc:'gentle boundary — enough is here'},
+  {key:'sloth',name:'SLOTH',color:'#44aa44',correction:'energize',
+   corrTone:[147,294],corrDesc:'wake pulse — coherent activation'},
+  {key:'greed',name:'GREED',color:'#ffcc00',correction:'release',
+   corrTone:[196,392],corrDesc:'open the shells — let it flow through'},
+  {key:'envy',name:'ENVY',color:'#44aaff',correction:'unify',
+   corrTone:[262,524],corrDesc:'merge the mirror — there is only one'},
+  {key:'pride',name:'PRIDE',color:'#aa44ff',correction:'soften',
+   corrTone:[330,660],corrDesc:'melt the crystal — flexibility returns'}
+]
+
+// ═══ STATE ═══
+let watchData=null,connected=false,lastPoll=0
+let sinLevels=[0,0,0,0,0,0,0]
+let audioOn=true,actx=null,master=null,activeDrones=[]
+
+// ═══ BUILD SIN BARS ═══
+const panel=document.getElementById('sins-panel')
+sinDefs.forEach((s,i)=>{
+  const row=document.createElement('div');row.className='sin-bar'
+  row.innerHTML=`<span class="sin-label" style="color:${s.color}88">${s.name}</span><div class="sin-track"><div class="sin-fill" id="sf${i}" style="width:0%;background:${s.color}"></div></div><span class="sin-val" id="sv${i}">0%</span>`
+  panel.appendChild(row)
+})
+
+// ═══ AUDIO ═══
+function initAudio(){
+  if(actx)return
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.08;master.connect(actx.destination)
+}
+
+function updateDrones(){
+  if(!actx||!audioOn)return
+  // kill old
+  activeDrones.forEach(d=>{try{d.g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+1);setTimeout(()=>d.o.stop(),1100)}catch(e){}})
+  activeDrones=[]
+
+  // find dominant sin
+  let maxI=0;sinLevels.forEach((v,i)=>{if(v>sinLevels[maxI])maxI=i})
+  const dom=sinDefs[maxI]
+  const intensity=sinLevels[maxI]
+
+  if(intensity<.05)return // at peace, no correction needed
+
+  // corrective tones — inverse of sin frequency
+  dom.corrTone.forEach((hz,i)=>{
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type=i===0?'sine':'triangle'
+    o.frequency.value=hz
+    g.gain.value=Math.min(.06,intensity*.05)
+    o.connect(g);g.connect(master)
+    o.start()
+    activeDrones.push({o,g})
+  })
+
+  // binaural at coherence frequency (7.83Hz Schumann or HRV-derived)
+  const hrv=watchData?.hrv||30
+  const binauralHz=hrv>40?7.83:hrv>20?10:4 // theta if stressed, alpha if ok
+  const oL=actx.createOscillator(),oR=actx.createOscillator()
+  const gL=actx.createGain(),gR=actx.createGain()
+  const merger=actx.createChannelMerger(2)
+  oL.frequency.value=150;oR.frequency.value=150+binauralHz
+  gL.gain.value=.03;gR.gain.value=.03
+  oL.connect(gL);oR.connect(gR)
+  gL.connect(merger,0,0);gR.connect(merger,0,1)
+  merger.connect(master)
+  oL.start();oR.start()
+  activeDrones.push({o:oL,g:gL},{o:oR,g:gR})
+}
+
+function toggleAudio(el){
+  audioOn=!audioOn;el.classList.toggle('on',audioOn)
+  if(audioOn)initAudio()
+  else{activeDrones.forEach(d=>{try{d.o.stop()}catch(e){}});activeDrones=[]}
+}
+window.toggleAudio=toggleAudio
+
+// ═══ WATCH POLLING ═══
+async function pollWatch(){
+  try{
+    const r=await fetch(`${GW}/wearer/${USER}`,{signal:AbortSignal.timeout(3000)})
+    watchData=await r.json()
+    connected=watchData.online!==false
+    computeSins()
+  }catch(e){
+    connected=false
+  }
+}
+
+function computeSins(){
+  if(!watchData)return
+  const hr=watchData.hr||72,hrv=watchData.hrv||30,stress=watchData.stress||0
+  const bio=watchData.biomarkers||{}
+  const v=k=>bio[k]?.v||0,risk=k=>bio[k]?.risk||0
+
+  // WRATH: HR spike + stress + cortisol
+  sinLevels[0]=Math.min(1,Math.max(0,(hr-85)/40+stress*.5+risk('Cor')*.3))
+  // LUST: kappa distance from 1/phi (orbit instability)
+  const kappa=watchData.cra!==undefined?watchData.cra:.5
+  sinLevels[1]=Math.min(1,Math.abs(kappa-KAPPA)*3)
+  // GLUTTONY: glucose + cortisol
+  sinLevels[2]=Math.min(1,Math.max(0,(v('Glc')-120)/80+risk('Cor')*.2))
+  // SLOTH: low HRV + low activity
+  const steps=watchData.sensors?.StepCount?.value||0
+  sinLevels[3]=Math.min(1,Math.max(0,(40-hrv)/40+(steps<500?.3:0)))
+  // GREED: K+ depletion + dehydration
+  sinLevels[4]=Math.min(1,risk('K')*.5+risk('Hyd')*.5)
+  // ENVY: inflammation
+  sinLevels[5]=Math.min(1,risk('Inf')*.7+risk('Cor')*.3)
+  // PRIDE: over-controlled (low HR + high HRV + low EDA)
+  sinLevels[6]=Math.min(1,Math.max(0,(60-hr)/30+(hrv-50)/50))
+
+  // clamp negatives
+  sinLevels=sinLevels.map(v=>Math.max(0,Math.min(1,v)))
+}
+
+async function sendHaptic(){
+  try{await fetch(`${GW}/wearass/${USER}/haptic/breathe_slow`,{method:'POST'})}catch(e){}
+}
+window.sendHaptic=sendHaptic
+
+async function toggleMode(mode){
+  try{await fetch(`${GW}/blossom/call?method=bloomwatch.set_mode`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:USER,mode})})}catch(e){}
+}
+window.toggleMode=toggleMode
+
+// ═══ RENDERER ═══
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.3
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x020204)
+const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,500)
+cam.position.set(0,0,16)
+
+const ambLight=new THREE.AmbientLight(0x111122,.4);scene.add(ambLight)
+
+// ═══ CORRECTIVE GEOMETRY — the inverse of sin ═══
+// central sphere — represents κ target (1/φ)
+const coreGeo=new THREE.IcosahedronGeometry(2.5,3)
+const coreMat=new THREE.MeshPhongMaterial({
+  color:0x88aacc,emissive:0x224466,emissiveIntensity:.2,
+  transparent:true,opacity:.3,flatShading:true,side:THREE.DoubleSide
+})
+const core=new THREE.Mesh(coreGeo,coreMat);scene.add(core)
+const coreWire=new THREE.Mesh(coreGeo.clone(),new THREE.MeshBasicMaterial({color:0x88aacc,wireframe:true,transparent:true,opacity:.1}))
+scene.add(coreWire)
+
+// store base positions
+const coreBase=[]
+const cbp=coreGeo.attributes.position
+for(let i=0;i<cbp.count;i++)coreBase.push(new THREE.Vector3(cbp.getX(i),cbp.getY(i),cbp.getZ(i)))
+
+// 7 correction rings — one per sin, orbiting the core
+const corrRings=[]
+sinDefs.forEach((s,i)=>{
+  const ringGeo=new THREE.TorusGeometry(3.5+i*.6,.02,6,64)
+  const ringMat=new THREE.MeshBasicMaterial({color:s.color,transparent:true,opacity:.05,blending:THREE.AdditiveBlending})
+  const ring=new THREE.Mesh(ringGeo,ringMat)
+  ring.rotation.x=Math.PI/2+i*.2
+  ring.rotation.y=i*.4
+  scene.add(ring)
+  corrRings.push({mesh:ring,mat:ringMat})
+})
+
+// particle field — responds to dominant sin
+const partCount=800,partGeo=new THREE.BufferGeometry()
+const partPos=new Float32Array(partCount*3),partData=[]
+for(let i=0;i<partCount;i++){
+  const th=Math.random()*TAU,ph=Math.acos(2*Math.random()-1),r=2+Math.random()*5
+  partPos[i*3]=r*Math.sin(ph)*Math.cos(th);partPos[i*3+1]=r*Math.sin(ph)*Math.sin(th);partPos[i*3+2]=r*Math.cos(ph)
+  partData.push({th,ph,r,baseR:r,speed:.1+Math.random()*.3,phase:Math.random()*TAU})
+}
+partGeo.setAttribute('position',new THREE.BufferAttribute(partPos,3))
+const partMat=new THREE.PointsMaterial({color:0x88aacc,size:.1,transparent:true,opacity:.2,blending:THREE.AdditiveBlending})
+const particles=new THREE.Points(partGeo,partMat);scene.add(particles)
+
+// glow
+const glowMesh=new THREE.Mesh(new THREE.SphereGeometry(4,16,16),
+  new THREE.MeshBasicMaterial({color:0x446688,transparent:true,opacity:.02,blending:THREE.AdditiveBlending}))
+scene.add(glowMesh)
+
+// breath guide ring
+const breathRing=new THREE.Mesh(new THREE.TorusGeometry(3,.03,6,64),
+  new THREE.MeshBasicMaterial({color:0x44ffaa,transparent:true,opacity:.06,blending:THREE.AdditiveBlending}))
+breathRing.rotation.x=Math.PI/2;scene.add(breathRing)
+
+// ═══ CORRECTIVE DEFORMATIONS (inverse of sin) ═══
+function applyCorrection(t){
+  let maxI=0;sinLevels.forEach((v,i)=>{if(v>sinLevels[maxI])maxI=i})
+  const intensity=sinLevels[maxI]
+  const correction=sinDefs[maxI].correction
+  const pos=coreGeo.attributes.position
+
+  for(let i=0;i<pos.count;i++){
+    const base=coreBase[i]
+    const bx=base.x,by=base.y,bz=base.z
+    const r=Math.sqrt(bx*bx+by*by+bz*bz)
+    const th=Math.atan2(by,bx)
+    const ph=Math.acos(bz/Math.max(r,.001))
+    let nx=bx,ny=by,nz=bz
+    const I=Math.min(intensity,.8)
+
+    if(correction==='expand'){
+      // inverse of WRATH compression — gentle expansion, smooth
+      const breathe=Math.sin(t*.8)*.15*I
+      const nr=r*(1+breathe)+Math.sin(ph*2+t*.5)*.1*I
+      nx=Math.sin(ph)*Math.cos(th)*nr;ny=Math.sin(ph)*Math.sin(th)*nr;nz=Math.cos(ph)*nr
+    } else if(correction==='radiate'){
+      // inverse of LUST spiral — outward radial flow
+      const wave=Math.sin(th*3-t*1.5)*.1*I
+      const nr=r+wave;nx=Math.sin(ph)*Math.cos(th)*nr;ny=Math.sin(ph)*Math.sin(th)*nr;nz=Math.cos(ph)*nr
+    } else if(correction==='contain'){
+      // inverse of GLUTTONY bloat — gentle containment
+      const contain=1-Math.sin(t*.6)*.08*I
+      nx=bx*contain;ny=by*contain;nz=bz*contain
+    } else if(correction==='energize'){
+      // inverse of SLOTH melt — coherent pulsing
+      const pulse=Math.sin(t*3)*.12*I
+      const nr=r*(1+pulse);nx=Math.sin(ph)*Math.cos(th)*nr;ny=Math.sin(ph)*Math.sin(th)*nr;nz=Math.cos(ph)*nr
+    } else if(correction==='release'){
+      // inverse of GREED layers — opening shells
+      const open=Math.sin(t+ph*2)*.15*I
+      const nr=r+open;nx=Math.sin(ph)*Math.cos(th)*nr;ny=Math.sin(ph)*Math.sin(th)*nr;nz=Math.cos(ph)*nr
+    } else if(correction==='unify'){
+      // inverse of ENVY mirror — converge to single
+      const merge=I*.1
+      nx=bx*(1-merge)+bx*Math.cos(t*.5)*merge;ny=by;nz=bz*(1-merge)+bz*Math.cos(t*.5)*merge
+    } else if(correction==='soften'){
+      // inverse of PRIDE crystal — add organic wobble
+      const flex=Math.sin(th*5+t*2)*.08*I+Math.sin(ph*3+t)*.06*I
+      const nr=r+flex;nx=Math.sin(ph)*Math.cos(th)*nr;ny=Math.sin(ph)*Math.sin(th)*nr;nz=Math.cos(ph)*nr
+    }
+
+    // always blend toward ideal sphere (κ=1/φ)
+    const blend=Math.max(0,1-intensity)
+    const ix=bx,iy=by,iz=bz
+    pos.setXYZ(i,nx*intensity+ix*blend,ny*intensity+iy*blend,nz*intensity+iz*blend)
+  }
+  pos.needsUpdate=true;coreGeo.computeVertexNormals()
+}
+
+// ═══ ANIMATE ═══
+let droneUpdate=0
+function animate(ts){
+  requestAnimationFrame(animate)
+  const t=ts*.001
+
+  // poll watch every 5 seconds
+  if(t-lastPoll>5){lastPoll=t;pollWatch()}
+
+  // find dominant sin
+  let maxI=0,maxV=0,totalSin=0
+  sinLevels.forEach((v,i)=>{totalSin+=v;if(v>maxV){maxV=v;maxI=i}})
+  const dom=sinDefs[maxI]
+  const stability=1-Math.min(1,totalSin/3.5)
+
+  // update audio every 8 seconds
+  if(audioOn&&t-droneUpdate>8){droneUpdate=t;initAudio();updateDrones()}
+
+  // corrective geometry
+  applyCorrection(t)
+  core.rotation.y=t*.1
+  coreWire.rotation.y=t*.1
+  coreWire.geometry=coreGeo
+
+  // color blend based on dominant sin + stability
+  const sinCol=new THREE.Color(dom.color)
+  const idealCol=new THREE.Color(0x88aacc)
+  const blendCol=idealCol.clone().lerp(sinCol,maxV)
+  coreMat.color.lerp(blendCol,.05)
+  coreMat.emissive.lerp(blendCol.clone().multiplyScalar(.3),.05)
+  coreWire.material.color.lerp(blendCol,.05)
+  partMat.color.lerp(blendCol,.03)
+  glowMesh.material.color.lerp(blendCol,.03)
+
+  // correction rings — opacity = sin level
+  corrRings.forEach((cr,i)=>{
+    cr.mat.opacity=sinLevels[i]*.15
+    cr.mesh.rotation.z=t*(.05+sinLevels[i]*.2)*(i%2?1:-1)
+    const s=1+sinLevels[i]*.1
+    cr.mesh.scale.set(s,s,s)
+  })
+
+  // particles — flow pattern based on correction
+  const pp=particles.geometry.attributes.position.array
+  for(let i=0;i<partCount;i++){
+    const d=partData[i]
+    d.th+=d.speed*.015*(1+stability)
+    const motionR=d.baseR+Math.sin(t*.5+d.phase)*(1+maxV)
+    pp[i*3]=Math.sin(d.ph)*Math.cos(d.th)*motionR
+    pp[i*3+1]=Math.sin(d.ph)*Math.sin(d.th)*motionR
+    pp[i*3+2]=Math.cos(d.ph)*motionR
+  }
+  particles.geometry.attributes.position.needsUpdate=true
+  partMat.opacity=.1+stability*.15
+
+  // glow
+  const gs=1+Math.sin(t)*.15+stability*.3
+  glowMesh.scale.set(gs,gs,gs)
+  glowMesh.material.opacity=.01+stability*.03
+
+  // breath guide
+  const hrv=watchData?.hrv||30
+  const breathCycle=hrv>40?5:hrv>20?4:3
+  const breathPhase=(t%breathCycle)/breathCycle
+  const breathScale=1+Math.sin(breathPhase*TAU)*.15
+  breathRing.scale.set(breathScale,breathScale,breathScale)
+  breathRing.material.opacity=.04+stability*.04
+
+  // camera slowly orbits
+  cam.position.x=Math.cos(t*.05)*16
+  cam.position.y=Math.sin(t*.03)*3
+  cam.position.z=Math.sin(t*.05)*16
+  cam.lookAt(0,0,0)
+
+  // background
+  scene.background.setRGB(.01+stability*.02,.01+stability*.015,.02+stability*.02)
+
+  // ═══ UI ═══
+  sinDefs.forEach((s,i)=>{
+    const pct=Math.round(sinLevels[i]*100)
+    document.getElementById('sf'+i).style.width=pct+'%'
+    document.getElementById('sf'+i).style.background=sinLevels[i]>.5?s.color:s.color+'66'
+    document.getElementById('sv'+i).textContent=pct+'%'
+  })
+
+  const hr=watchData?.hr||'--'
+  const hrv2=watchData?.hrv||'--'
+  const stress=watchData?.stress||'--'
+  document.getElementById('hud').innerHTML=
+    `<b>SIN FEEDBACK</b> · live from ${USER}'s watch\n`+
+    `HR: <b>${typeof hr==='number'?hr.toFixed(0):hr}</b> bpm\n`+
+    `HRV: <b>${typeof hrv2==='number'?hrv2.toFixed(1):hrv2}</b> ms\n`+
+    `stress: <b>${typeof stress==='number'?(stress*100).toFixed(0)+'%':stress}</b>\n`+
+    `κ: <b>${watchData?.cra!==undefined?watchData.cra.toFixed(4):'--'}</b> (target: ${KAPPA.toFixed(4)})\n`+
+    `stability: <b>${(stability*100).toFixed(0)}%</b>\n`+
+    `correction: <b>${dom.correction}</b>\n`+
+    `binaural: <b>${hrv2>40?'7.83':'10'}Hz</b> (${hrv2>40?'Schumann α':'θ recovery'})`
+
+  document.getElementById('status').textContent=
+    connected?`● CONNECTED · polling ${GW}/wearer/${USER}`:'○ OFFLINE · using defaults'
+
+  if(maxV>.05){
+    document.getElementById('dominant').textContent=`${dom.name} · ${dom.corrDesc}`
+    document.getElementById('dominant').style.color=dom.color+'88'
+  } else {
+    document.getElementById('dominant').textContent='✦ equilibrium ✦'
+    document.getElementById('dominant').style.color='rgba(100,200,150,.4)'
+  }
+
+  R.render(scene,cam)
+}
+
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+pollWatch()
+animate(0)
+</script>
+</body></html>
