@@ -18,6 +18,12 @@ canvas{display:block}
 .sin-val{width:28px;font-size:7px;color:rgba(255,255,255,.2)}
 #status{position:fixed;bottom:10px;left:12px;z-index:10;font-size:7px;color:rgba(255,255,255,.15);pointer-events:none}
 #dominant{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);z-index:10;font-size:10px;letter-spacing:3px;pointer-events:none;text-align:center;text-shadow:0 0 15px currentColor}
+#voice{position:fixed;top:50%;right:12px;transform:translateY(-50%);z-index:10;pointer-events:none;text-align:right}
+#pitch-arrow{font-size:24px;transition:all .3s}
+#pitch-note{font-size:11px;letter-spacing:2px;margin-top:2px}
+#pitch-target{font-size:8px;color:rgba(100,255,150,.35);margin-top:4px}
+#voice-meter{width:80px;height:3px;background:rgba(255,255,255,.04);border-radius:2px;margin-top:6px;margin-left:auto;overflow:hidden}
+#voice-fill{height:100%;border-radius:2px;background:rgba(100,255,150,.4);transition:width .1s}
 #controls{position:fixed;bottom:10px;right:12px;z-index:20;display:flex;gap:4px}
 .cb{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.3);padding:3px 8px;font:7px/1 monospace;cursor:pointer;border-radius:3px;transition:all .2s;letter-spacing:1px}
 .cb:hover,.cb.on{border-color:rgba(255,200,100,.3);color:rgba(255,200,100,.5)}
@@ -29,8 +35,15 @@ canvas{display:block}
 <div id="sins-panel"></div>
 <div id="status"></div>
 <div id="dominant"></div>
+<div id="voice">
+  <div id="pitch-arrow"></div>
+  <div id="pitch-note"></div>
+  <div id="pitch-target"></div>
+  <div id="voice-meter"><div id="voice-fill"></div></div>
+</div>
 <div id="controls">
   <span class="cb on" onclick="toggleAudio(this)">AUDIO</span>
+  <span class="cb" onclick="toggleMic(this)">MIC</span>
   <span class="cb" onclick="sendHaptic()">HAPTIC</span>
   <span class="cb" onclick="toggleMode('COHERENCE')">COHERENCE</span>
   <span class="cb" onclick="toggleMode('CALM')">CALM</span>
@@ -65,7 +78,47 @@ const sinDefs=[
 // ═══ STATE ═══
 let watchData=null,connected=false,lastPoll=0
 let sinLevels=[0,0,0,0,0,0,0]
-let audioOn=true,actx=null,master=null,activeDrones=[]
+let audioOn=true,micOn=false,actx=null,master=null,activeDrones=[]
+let micStream=null,micAnalyser=null,micData=null
+let voicePitch=0,voiceVol=0,targetNote='',targetHz=0,pitchDirection=''
+
+// ═══ NOTE NAMES ═══
+const noteNames=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
+function hzToNote(hz){
+  if(hz<20)return{name:'--',oct:0,cents:0}
+  const midi=12*Math.log2(hz/440)+69
+  const rounded=Math.round(midi)
+  const cents=Math.round((midi-rounded)*100)
+  const name=noteNames[rounded%12]
+  const oct=Math.floor(rounded/12)-1
+  return{name,oct,cents,midi:rounded}
+}
+
+// ═══ PITCH DETECTION (autocorrelation) ═══
+function detectPitch(buf,sampleRate){
+  let maxVal=-1,maxIdx=-1
+  const half=buf.length/2
+  // find rms
+  let rms=0;for(let i=0;i<buf.length;i++){const v=buf[i]-128;rms+=v*v}
+  rms=Math.sqrt(rms/buf.length)
+  if(rms<5)return 0 // silence
+  // autocorrelation
+  const corr=new Float32Array(half)
+  for(let lag=0;lag<half;lag++){
+    let sum=0
+    for(let i=0;i<half;i++)sum+=(buf[i]-128)*(buf[i+lag]-128)
+    corr[lag]=sum
+  }
+  // find first peak after first dip
+  let foundDip=false
+  for(let i=2;i<half;i++){
+    if(!foundDip&&corr[i]<0)foundDip=true
+    if(foundDip&&corr[i]>maxVal){maxVal=corr[i];maxIdx=i}
+    if(foundDip&&corr[i]<maxVal*.8&&maxIdx>0)break
+  }
+  if(maxIdx<2)return 0
+  return sampleRate/maxIdx
+}
 
 // ═══ BUILD SIN BARS ═══
 const panel=document.getElementById('sins-panel')
@@ -127,6 +180,55 @@ function toggleAudio(el){
   else{activeDrones.forEach(d=>{try{d.o.stop()}catch(e){}});activeDrones=[]}
 }
 window.toggleAudio=toggleAudio
+
+async function toggleMic(el){
+  if(!actx)initAudio()
+  micOn=!micOn;el.classList.toggle('on',micOn)
+  if(micOn){
+    try{
+      micStream=await navigator.mediaDevices.getUserMedia({audio:true})
+      const src=actx.createMediaStreamSource(micStream)
+      micAnalyser=actx.createAnalyser()
+      micAnalyser.fftSize=2048
+      src.connect(micAnalyser)
+      micData=new Uint8Array(micAnalyser.fftSize)
+    }catch(e){micOn=false;el.classList.remove('on')}
+  } else {
+    if(micStream)micStream.getTracks().forEach(t=>t.stop())
+    micStream=null;micAnalyser=null
+  }
+}
+window.toggleMic=toggleMic
+
+function computeTargetNote(){
+  // target note based on dominant sin's corrective frequency
+  let maxI=0;sinLevels.forEach((v,i)=>{if(v>sinLevels[maxI])maxI=i})
+  const dom=sinDefs[maxI]
+  targetHz=dom.corrTone[0]
+  const note=hzToNote(targetHz)
+  targetNote=`${note.name}${note.oct}`
+  return{hz:targetHz,note:targetNote,sinIdx:maxI}
+}
+
+function processVoice(){
+  if(!micOn||!micAnalyser)return
+  micAnalyser.getByteTimeDomainData(micData)
+  voicePitch=detectPitch(micData,actx.sampleRate)
+  // volume
+  let sum=0;for(let i=0;i<micData.length;i++){const v=micData[i]-128;sum+=v*v}
+  voiceVol=Math.sqrt(sum/micData.length)/128
+
+  const target=computeTargetNote()
+  if(voicePitch>20){
+    const current=hzToNote(voicePitch)
+    const diff=voicePitch-target.hz
+    const ratio=voicePitch/target.hz
+    // within a semitone?
+    if(ratio>.94&&ratio<1.06)pitchDirection='✦ ON PITCH ✦'
+    else if(voicePitch<target.hz)pitchDirection='↑ higher'
+    else pitchDirection='↓ lower'
+  } else pitchDirection=''
+}
 
 // ═══ WATCH POLLING ═══
 async function pollWatch(){
@@ -308,6 +410,9 @@ function animate(ts){
   const dom=sinDefs[maxI]
   const stability=1-Math.min(1,totalSin/3.5)
 
+  // voice processing
+  processVoice()
+
   // update audio every 8 seconds
   if(audioOn&&t-droneUpdate>8){droneUpdate=t;initAudio();updateDrones()}
 
@@ -396,6 +501,35 @@ function animate(ts){
     `stability: <b>${(stability*100).toFixed(0)}%</b>\n`+
     `correction: <b>${dom.correction}</b>\n`+
     `binaural: <b>${hrvNum>40?'7.83':'10'}Hz</b> (${hrvNum>40?'Schumann α':'θ recovery'})`
+
+  // voice HUD
+  if(micOn){
+    const target=computeTargetNote()
+    const currentNote=voicePitch>20?hzToNote(voicePitch):null
+    const onPitch=pitchDirection.includes('ON PITCH')
+    document.getElementById('pitch-arrow').textContent=pitchDirection
+    document.getElementById('pitch-arrow').style.color=onPitch?'rgba(100,255,150,.7)':pitchDirection.includes('higher')?'rgba(255,100,100,.5)':'rgba(100,150,255,.5)'
+    document.getElementById('pitch-note').textContent=currentNote?`${currentNote.name}${currentNote.oct} (${voicePitch.toFixed(0)}Hz)`:'...'
+    document.getElementById('pitch-note').style.color=onPitch?'rgba(100,255,150,.6)':'rgba(255,255,255,.3)'
+    document.getElementById('pitch-target').textContent=`sing → ${target.note} (${target.hz}Hz)`
+    document.getElementById('voice-fill').style.width=(voiceVol*100)+'%'
+    document.getElementById('voice-fill').style.background=onPitch?'rgba(100,255,150,.5)':'rgba(255,200,100,.3)'
+    // core responds to voice
+    if(voiceVol>.02){
+      const voiceScale=1+voiceVol*2
+      core.scale.set(voiceScale,voiceScale,voiceScale)
+      coreWire.scale.set(voiceScale,voiceScale,voiceScale)
+      if(onPitch){
+        coreMat.emissiveIntensity=.2+voiceVol*2
+        glowMesh.material.opacity=.03+voiceVol*.2
+      }
+    }
+  } else {
+    document.getElementById('pitch-arrow').textContent=''
+    document.getElementById('pitch-note').textContent=''
+    document.getElementById('pitch-target').textContent=''
+    document.getElementById('voice-fill').style.width='0%'
+  }
 
   document.getElementById('status').textContent=
     connected?`● CONNECTED · polling ${GW}/wearer/${USER}`:'○ OFFLINE · using defaults'
