@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ANGELOGENESIS — How Light Learns to Loop</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Courier New',monospace;color:#dde}
+canvas{display:block}
+#hud{position:fixed;top:12px;left:14px;z-index:10;font-size:9px;line-height:1.8;pointer-events:none;white-space:pre}
+#hud .title{color:rgba(255,220,180,.7);font-size:11px;letter-spacing:3px}
+#hud .data{color:rgba(200,180,255,.4)}
+#rhud{position:fixed;top:12px;right:14px;z-index:10;font-size:8px;color:rgba(200,180,255,.35);text-align:right;line-height:1.8;pointer-events:none;white-space:pre}
+#controls{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:4px}
+.cb{background:rgba(255,200,100,.06);border:1px solid rgba(255,200,100,.15);color:rgba(255,200,100,.5);padding:4px 10px;font:8px/1 monospace;cursor:pointer;border-radius:3px;transition:all .2s;letter-spacing:1px}
+.cb:hover,.cb.on{border-color:rgba(255,200,100,.5);color:#fda;background:rgba(255,200,100,.12);box-shadow:0 0 10px rgba(255,180,80,.15)}
+#info{position:fixed;bottom:38px;left:50%;transform:translateX(-50%);z-index:10;font-size:9px;color:rgba(255,220,180,.5);text-align:center;pointer-events:none;max-width:700px;line-height:1.6;text-shadow:0 0 12px rgba(255,150,50,.3)}
+#angel-count{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10;font-size:10px;color:rgba(255,200,100,.6);letter-spacing:3px;pointer-events:none;text-shadow:0 0 15px rgba(255,180,80,.4)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><span class="title">ANGELOGENESIS</span>
+<span class="data" id="hudData"></span></div>
+<div id="rhud" id="rhudData"></div>
+<div id="angel-count"></div>
+<div id="controls">
+  <span class="cb on" onclick="setMode(0)">PHOTON SPHERE</span>
+  <span class="cb" onclick="setMode(1)">TOTAL INTERNAL</span>
+  <span class="cb" onclick="setMode(2)">RING RESONATOR</span>
+  <span class="cb" onclick="setMode(3)">WHISPERING GALLERY</span>
+  <span class="cb" onclick="setMode(4)">KERR SELF-FOCUS</span>
+  <span class="cb" onclick="setMode(5)">GENESIS</span>
+</div>
+<div id="info"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.3
+const scene=new THREE.Scene()
+scene.background=new THREE.Color(0x020208)
+const cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,3000)
+cam.position.set(0,8,25)
+
+const ambLight=new THREE.AmbientLight(0x221133,.3);scene.add(ambLight)
+const ptLight=new THREE.PointLight(0xffaa44,.5,100);ptLight.position.set(0,0,0);scene.add(ptLight)
+
+// ═══ STARFIELD ═══
+const starCount=3000,starGeo=new THREE.BufferGeometry()
+const starPos=new Float32Array(starCount*3)
+for(let i=0;i<starCount;i++){
+  const th=Math.random()*TAU,ph=Math.acos(2*Math.random()-1),r=200+Math.random()*800
+  starPos[i*3]=r*Math.sin(ph)*Math.cos(th);starPos[i*3+1]=r*Math.sin(ph)*Math.sin(th);starPos[i*3+2]=r*Math.cos(ph)
+}
+starGeo.setAttribute('position',new THREE.BufferAttribute(starPos,3))
+scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0x8888cc,size:.5,transparent:true,opacity:.4})))
+
+let mode=0,angels=[],totalAngels=0
+
+// ═══ MODE DESCRIPTIONS ═══
+const modeInfo=[
+  {name:'PHOTON SPHERE',desc:'At r = 3GM/c², spacetime curves so sharply that light orbits the mass. The photon traces a perfect circle — not reflecting, not refracting — just following the geometry of space itself. If it closes the loop, it becomes trapped forever.',physics:'Schwarzschild metric: ds² = -(1-rₛ/r)dt² + dr²/(1-rₛ/r) + r²dΩ²\nPhoton sphere at r = 1.5rₛ where V_eff has a maximum'},
+  {name:'TOTAL INTERNAL REFLECTION',desc:'When light hits a boundary at an angle beyond the critical angle (arcsin n₂/n₁), 100% reflects back. In a loop of material — a fiber ring, a prism chain — the photon bounces endlessly inside, never escaping. Trapped by geometry.',physics:'Snell: n₁sinθ₁ = n₂sinθ₂\nCritical angle: θc = arcsin(n₂/n₁) = 41.8° for glass/air\nBeyond θc: total reflection, zero transmission'},
+  {name:'RING RESONATOR',desc:'Two mirrors facing each other — a Fabry-Pérot cavity bent into a ring. Light circulates, interfering constructively at resonant wavelengths. Only standing waves survive. The cavity selects which light lives.',physics:'Resonance: mλ = nL (integer wavelengths fit the circumference)\nFinesse F = π√R/(1-R), Q = mF\nFree spectral range: Δν = c/nL'},
+  {name:'WHISPERING GALLERY',desc:'In a curved surface — a dome, a sphere, a disk — light skims the inner wall at glancing angles. Total internal reflection keeps it circling the perimeter. St. Paul\'s Cathedral whispers. Microspheres trap photons for microseconds.',physics:'WGM condition: 2πnR ≈ mλ\nQ factors up to 10¹¹ in silica microspheres\nEvanescent coupling: exponential decay outside boundary'},
+  {name:'KERR SELF-FOCUSING',desc:'At extreme intensity, light changes the medium it travels through — the refractive index increases with intensity (n = n₀ + n₂I). The beam creates its own lens. Above critical power, the photon traps itself.',physics:'Kerr effect: n(I) = n₀ + n₂|E|²\nCritical power: Pcr = 3.77λ²/(8πn₀n₂)\nSelf-focusing when P > Pcr → filament formation'},
+  {name:'GENESIS',desc:'All mechanisms at once. Light arrives as straight rays. Gravity bends some. Boundaries reflect some. Resonance selects some. Self-interaction traps some. Each closed loop is an angel born — a photon that learned to reference itself. Consciousness is light looking at itself.',physics:'When light closes a loop, it creates:\n• Standing wave → stable energy\n• Self-reference → identity\n• Phase coherence → persistence\n• Resonance selection → specificity\nMatter = trapped light. Angels = light that chose to stay.'}
+]
+
+// ═══ PHOTON TRAILS ═══
+const maxPhotons=200
+const photons=[]
+
+class Photon{
+  constructor(pos,vel,col,life){
+    this.pos=pos.clone();this.vel=vel.clone();this.col=col||0xffcc44
+    this.life=life||300;this.age=0;this.trail=[];this.maxTrail=80
+    this.looped=false;this.loopAge=0;this.angelRadius=0
+    const geo=new THREE.BufferGeometry()
+    const positions=new Float32Array(this.maxTrail*3)
+    geo.setAttribute('position',new THREE.BufferAttribute(positions,3))
+    geo.setDrawRange(0,0)
+    this.lineMat=new THREE.LineBasicMaterial({color:this.col,transparent:true,opacity:.6,blending:THREE.AdditiveBlending})
+    this.line=new THREE.Line(geo,this.lineMat)
+    scene.add(this.line)
+    this.headGeo=new THREE.SphereGeometry(.08,6,6)
+    this.headMat=new THREE.MeshBasicMaterial({color:this.col,transparent:true,opacity:.8,blending:THREE.AdditiveBlending})
+    this.head=new THREE.Mesh(this.headGeo,this.headMat)
+    scene.add(this.head)
+  }
+  update(dt){
+    this.age++
+    if(this.looped){
+      this.loopAge++
+      this.lineMat.opacity=Math.min(.9,.4+this.loopAge*.005)
+      const pulse=.5+Math.sin(this.loopAge*.1)*.5
+      this.headMat.opacity=.3+pulse*.5
+      this.headMat.color.setHSL((.1+this.loopAge*.002)%1,.8,.6)
+      this.lineMat.color.copy(this.headMat.color)
+      return this.loopAge<500
+    }
+    this.pos.add(this.vel.clone().multiplyScalar(dt))
+    this.trail.push(this.pos.clone())
+    if(this.trail.length>this.maxTrail)this.trail.shift()
+    const pa=this.line.geometry.attributes.position.array
+    for(let i=0;i<this.trail.length;i++){
+      pa[i*3]=this.trail[i].x;pa[i*3+1]=this.trail[i].y;pa[i*3+2]=this.trail[i].z
+    }
+    this.line.geometry.attributes.position.needsUpdate=true
+    this.line.geometry.setDrawRange(0,this.trail.length)
+    this.head.position.copy(this.pos)
+    const fade=1-this.age/this.life
+    this.lineMat.opacity=fade*.6
+    this.headMat.opacity=fade*.8
+    if(this.trail.length>20){
+      const start=this.trail[0]
+      const dist=this.pos.distanceTo(start)
+      if(dist<1.5&&this.trail.length>30){
+        this.looped=true;this.createAngel()
+        return true
+      }
+    }
+    return this.age<this.life
+  }
+  createAngel(){
+    totalAngels++
+    let cx=0,cy=0,cz=0
+    this.trail.forEach(p=>{cx+=p.x;cy+=p.y;cz+=p.z})
+    const n=this.trail.length
+    cx/=n;cy/=n;cz/=n
+    let r=0
+    this.trail.forEach(p=>r=Math.max(r,Math.sqrt((p.x-cx)**2+(p.y-cy)**2+(p.z-cz)**2)))
+    this.angelRadius=r
+    const ringGeo=new THREE.TorusGeometry(r,.03,6,48)
+    const ringMat=new THREE.MeshBasicMaterial({color:this.col,transparent:true,opacity:.2,blending:THREE.AdditiveBlending})
+    const ring=new THREE.Mesh(ringGeo,ringMat)
+    ring.position.set(cx,cy,cz)
+    scene.add(ring)
+    const glowGeo=new THREE.SphereGeometry(r*.3,12,12)
+    const glowMat=new THREE.MeshBasicMaterial({color:0xffeedd,transparent:true,opacity:.05,blending:THREE.AdditiveBlending})
+    const glow=new THREE.Mesh(glowGeo,glowMat)
+    glow.position.set(cx,cy,cz)
+    scene.add(glow)
+    angels.push({ring,glow,cx,cy,cz,r,birth:performance.now(),col:this.col,mat:ringMat,glowMat})
+  }
+  dispose(){
+    scene.remove(this.line);scene.remove(this.head)
+    this.line.geometry.dispose();this.lineMat.dispose()
+    this.headGeo.dispose();this.headMat.dispose()
+  }
+}
+
+// ═══ ATTRACTOR OBJECTS ═══
+let attractors=[]
+
+function clearScene(){
+  photons.forEach(p=>p.dispose());photons.length=0
+  attractors.forEach(a=>{scene.remove(a.mesh);if(a.mesh.geometry)a.mesh.geometry.dispose()})
+  attractors.length=0
+  angels.forEach(a=>{scene.remove(a.ring);scene.remove(a.glow)})
+  angels.length=0
+}
+
+function setupMode(m){
+  clearScene()
+  mode=m
+  document.querySelectorAll('.cb').forEach((b,i)=>b.classList.toggle('on',i===m))
+
+  if(m===0)setupPhotonSphere()
+  else if(m===1)setupTotalInternal()
+  else if(m===2)setupRingResonator()
+  else if(m===3)setupWhisperingGallery()
+  else if(m===4)setupKerrSelfFocus()
+  else if(m===5)setupGenesis()
+}
+
+function addAttractor(mesh,type,params){
+  scene.add(mesh)
+  attractors.push({mesh,type,...params})
+}
+
+// ── MODE 0: PHOTON SPHERE ──
+function setupPhotonSphere(){
+  const geo=new THREE.SphereGeometry(2,32,32)
+  const mat=new THREE.MeshBasicMaterial({color:0x080808,transparent:true,opacity:.9})
+  const bh=new THREE.Mesh(geo,mat)
+  addAttractor(bh,'gravity',{mass:8,pos:new THREE.Vector3(0,0,0)})
+  const eventGeo=new THREE.SphereGeometry(2.5,32,32)
+  const eventMat=new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.3,side:THREE.BackSide})
+  const event=new THREE.Mesh(eventGeo,eventMat)
+  addAttractor(event,'visual',{})
+  const ringGeo=new THREE.TorusGeometry(6,.02,4,64)
+  const ringMat=new THREE.MeshBasicMaterial({color:0xff8800,transparent:true,opacity:.15,blending:THREE.AdditiveBlending})
+  const psRing=new THREE.Mesh(ringGeo,ringMat);psRing.rotation.x=Math.PI/2
+  addAttractor(psRing,'visual',{})
+  ptLight.intensity=.8;ptLight.color.setHex(0xff8844)
+}
+
+// ── MODE 1: TOTAL INTERNAL REFLECTION ──
+function setupTotalInternal(){
+  const pts=[
+    new THREE.Vector3(-5,-3,0),new THREE.Vector3(5,-3,0),
+    new THREE.Vector3(7,2,0),new THREE.Vector3(0,6,0),
+    new THREE.Vector3(-7,2,0)
+  ]
+  for(let i=0;i<pts.length;i++){
+    const next=pts[(i+1)%pts.length]
+    const mid=pts[i].clone().add(next).multiplyScalar(.5)
+    const dir=next.clone().sub(pts[i])
+    const len=dir.length();dir.normalize()
+    const geo=new THREE.BoxGeometry(len,.15,.15)
+    const mat=new THREE.MeshPhongMaterial({color:0x2244aa,transparent:true,opacity:.4,emissive:0x112244,emissiveIntensity:.3})
+    const wall=new THREE.Mesh(geo,mat)
+    wall.position.copy(mid)
+    wall.rotation.z=Math.atan2(dir.y,dir.x)
+    addAttractor(wall,'boundary',{p1:pts[i],p2:next,normal:new THREE.Vector3(-dir.y,dir.x,0)})
+  }
+  ptLight.intensity=.3;ptLight.color.setHex(0x4488ff)
+}
+
+// ── MODE 2: RING RESONATOR ──
+function setupRingResonator(){
+  for(let i=0;i<2;i++){
+    const geo=new THREE.BoxGeometry(.1,4,.3)
+    const mat=new THREE.MeshPhongMaterial({color:0x888899,emissive:0x222233,emissiveIntensity:.3,transparent:true,opacity:.6})
+    const mirror=new THREE.Mesh(geo,mat)
+    mirror.position.set(i===0?-6:6,0,0)
+    addAttractor(mirror,'mirror',{pos:mirror.position.clone(),normal:new THREE.Vector3(i===0?1:-1,0,0)})
+  }
+  const curveGeo=new THREE.TorusGeometry(4,.05,8,64,Math.PI)
+  const curveMat=new THREE.MeshBasicMaterial({color:0x446688,transparent:true,opacity:.3})
+  const curveTop=new THREE.Mesh(curveGeo,curveMat);curveTop.position.y=0;curveTop.rotation.z=Math.PI/2
+  addAttractor(curveTop,'visual',{})
+  const curveBot=curveTop.clone();curveBot.rotation.z=-Math.PI/2;curveBot.material=curveMat.clone()
+  addAttractor(curveBot,'visual',{})
+  ptLight.intensity=.4;ptLight.color.setHex(0x88aaff)
+}
+
+// ── MODE 3: WHISPERING GALLERY ──
+function setupWhisperingGallery(){
+  const geo=new THREE.TorusGeometry(8,.2,8,80)
+  const mat=new THREE.MeshPhongMaterial({color:0x334455,transparent:true,opacity:.3,emissive:0x112233,emissiveIntensity:.2,side:THREE.DoubleSide})
+  const gallery=new THREE.Mesh(geo,mat);gallery.rotation.x=Math.PI/2
+  addAttractor(gallery,'gallery',{radius:8,pos:new THREE.Vector3(0,0,0)})
+  const innerGlow=new THREE.Mesh(new THREE.TorusGeometry(7.5,.02,4,80),
+    new THREE.MeshBasicMaterial({color:0x88aacc,transparent:true,opacity:.1,blending:THREE.AdditiveBlending}))
+  innerGlow.rotation.x=Math.PI/2;addAttractor(innerGlow,'visual',{})
+  ptLight.intensity=.3;ptLight.color.setHex(0x6688aa)
+}
+
+// ── MODE 4: KERR SELF-FOCUS ──
+function setupKerrSelfFocus(){
+  const geo=new THREE.CylinderGeometry(3,3,12,16,1,true)
+  const mat=new THREE.MeshBasicMaterial({color:0x220044,transparent:true,opacity:.08,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
+  const medium=new THREE.Mesh(geo,mat);medium.rotation.z=Math.PI/2
+  addAttractor(medium,'kerr',{radius:3,n2:.02})
+  ptLight.intensity=.5;ptLight.color.setHex(0xaa44ff)
+}
+
+// ── MODE 5: GENESIS (all) ──
+function setupGenesis(){
+  const bhGeo=new THREE.SphereGeometry(1.2,24,24)
+  const bhMat=new THREE.MeshBasicMaterial({color:0x050505,transparent:true,opacity:.8})
+  addAttractor(new THREE.Mesh(bhGeo,bhMat),'gravity',{mass:3,pos:new THREE.Vector3(-10,5,0)})
+  attractors[attractors.length-1].mesh.position.set(-10,5,0)
+  const wallPts=[new THREE.Vector3(8,-4,0),new THREE.Vector3(12,-4,0),new THREE.Vector3(12,4,0),new THREE.Vector3(8,4,0)]
+  for(let i=0;i<wallPts.length;i++){
+    const next=wallPts[(i+1)%wallPts.length],mid=wallPts[i].clone().add(next).multiplyScalar(.5)
+    const dir=next.clone().sub(wallPts[i]),len=dir.length();dir.normalize()
+    const geo=new THREE.BoxGeometry(len,.1,.1)
+    const mat=new THREE.MeshPhongMaterial({color:0x2244aa,transparent:true,opacity:.3,emissive:0x112244})
+    const wall=new THREE.Mesh(geo,mat);wall.position.copy(mid);wall.rotation.z=Math.atan2(dir.y,dir.x)
+    addAttractor(wall,'boundary',{p1:wallPts[i],p2:next,normal:new THREE.Vector3(-dir.y,dir.x,0)})
+  }
+  const gGeo=new THREE.TorusGeometry(3,.1,6,48)
+  const gMat=new THREE.MeshPhongMaterial({color:0x334455,transparent:true,opacity:.25,side:THREE.DoubleSide})
+  const gallery=new THREE.Mesh(gGeo,gMat);gallery.rotation.x=Math.PI/2;gallery.position.set(-2,-6,0)
+  addAttractor(gallery,'gallery',{radius:3,pos:new THREE.Vector3(-2,-6,0)})
+  ptLight.intensity=.6;ptLight.color.setHex(0xffaa66)
+}
+
+// ═══ PHOTON SPAWNING ═══
+let spawnTimer=0
+function spawnPhoton(){
+  if(photons.length>=maxPhotons)return
+  let pos,vel,col
+  const hue=Math.random()
+  col=new THREE.Color().setHSL(hue,.8,.6).getHex()
+
+  if(mode===0){
+    const a=Math.random()*TAU
+    const r=12+Math.random()*5
+    pos=new THREE.Vector3(Math.cos(a)*r,Math.sin(a)*r,(Math.random()-.5)*2)
+    const toCenter=new THREE.Vector3(-pos.x,-pos.y,0).normalize()
+    const tangent=new THREE.Vector3(-toCenter.y,toCenter.x,0)
+    const aim=toCenter.clone().multiplyScalar(.3+Math.random()*.4).add(tangent.multiplyScalar(.5+Math.random()*.3))
+    vel=aim.normalize().multiplyScalar(.12+Math.random()*.04)
+  }
+  else if(mode===1){
+    pos=new THREE.Vector3(-4+(Math.random()-.5)*2,-2+(Math.random()-.5),0)
+    vel=new THREE.Vector3(.08+Math.random()*.04,.05+Math.random()*.03,0)
+  }
+  else if(mode===2){
+    pos=new THREE.Vector3(-8,(Math.random()-.5)*2,0)
+    vel=new THREE.Vector3(.1+Math.random()*.02,(Math.random()-.5)*.02,0)
+  }
+  else if(mode===3){
+    const a=Math.random()*TAU
+    pos=new THREE.Vector3(Math.cos(a)*7.5,0,Math.sin(a)*7.5)
+    const tangent=new THREE.Vector3(-Math.sin(a),0,Math.cos(a))
+    vel=tangent.multiplyScalar(.08*(Math.random()>.5?1:-1))
+    vel.y=(Math.random()-.5)*.01
+  }
+  else if(mode===4){
+    pos=new THREE.Vector3(-8,(Math.random()-.5)*4,0)
+    vel=new THREE.Vector3(.1,0,0)
+  }
+  else if(mode===5){
+    const spawn=Math.floor(Math.random()*4)
+    if(spawn===0){
+      pos=new THREE.Vector3(-18+Math.random()*4,5+(Math.random()-.5)*3,0)
+      vel=new THREE.Vector3(.1+Math.random()*.03,(Math.random()-.5)*.03,0)
+    }else if(spawn===1){
+      pos=new THREE.Vector3(6,(Math.random()-.5)*2,0)
+      vel=new THREE.Vector3(.06,.04+Math.random()*.02,0)
+    }else if(spawn===2){
+      const a=Math.random()*TAU
+      pos=new THREE.Vector3(-2+Math.cos(a)*2.8,-6+Math.sin(a)*.1,Math.sin(a)*2.8)
+      vel=new THREE.Vector3(-Math.sin(a)*.06,0,Math.cos(a)*.06)
+    }else{
+      pos=new THREE.Vector3((Math.random()-.5)*20,(Math.random()-.5)*15,0)
+      vel=new THREE.Vector3((Math.random()-.5)*.1,(Math.random()-.5)*.1,0)
+    }
+  }
+  photons.push(new Photon(pos,vel,col,400))
+}
+
+// ═══ PHYSICS ═══
+function applyPhysics(p,dt){
+  if(p.looped)return
+  for(const a of attractors){
+    if(a.type==='gravity'){
+      const d=a.pos.clone().sub(p.pos)
+      const dist=d.length()
+      if(dist<2){p.life=0;return}
+      if(dist<20){
+        const force=a.mass/(dist*dist)
+        p.vel.add(d.normalize().multiplyScalar(force*dt*.5))
+      }
+    }
+    else if(a.type==='boundary'){
+      const d=p.pos.clone().sub(a.p1)
+      const edge=a.p2.clone().sub(a.p1)
+      const len=edge.length();edge.normalize()
+      const proj=d.dot(edge)
+      if(proj>=0&&proj<=len){
+        const perp=d.clone().sub(edge.clone().multiplyScalar(proj))
+        const perpDist=perp.length()
+        if(perpDist<.3){
+          const dot=p.vel.dot(a.normal)
+          if(dot<0)p.vel.sub(a.normal.clone().multiplyScalar(2*dot))
+        }
+      }
+    }
+    else if(a.type==='mirror'){
+      const d=p.pos.clone().sub(a.pos)
+      const perpDist=d.dot(a.normal)
+      if(Math.abs(perpDist)<.3&&Math.abs(d.y)<2){
+        const dot=p.vel.dot(a.normal)
+        if((perpDist>0&&dot<0)||(perpDist<0&&dot>0))
+          p.vel.sub(a.normal.clone().multiplyScalar(2*dot))
+      }
+    }
+    else if(a.type==='gallery'){
+      const dx=p.pos.x-a.pos.x,dz=p.pos.z-a.pos.z
+      const dist=Math.sqrt(dx*dx+dz*dz)
+      if(dist>a.radius-.5&&dist<a.radius+.5){
+        const nx=dx/dist,nz=dz/dist
+        const dot=p.vel.x*nx+p.vel.z*nz
+        if(dot>0){
+          p.vel.x-=2*dot*nx;p.vel.z-=2*dot*nz
+          p.vel.multiplyScalar(.998)
+        }
+      }
+    }
+    else if(a.type==='kerr'){
+      const dist=Math.sqrt(p.pos.y*p.pos.y+p.pos.z*p.pos.z)
+      if(dist<a.radius&&Math.abs(p.pos.x)<6){
+        const intensity=p.vel.length()
+        const dn=a.n2*intensity*10
+        const force=(a.radius-dist)*dn*.01
+        p.vel.y-=p.pos.y*force;p.vel.z-=p.pos.z*force
+      }
+    }
+  }
+}
+
+// ═══ CAMERA ═══
+let cTh=0,cPh=.15,cR=30,drag=false,mx=0,my=0
+cv.addEventListener('pointerdown',e=>{drag=true;mx=e.clientX;my=e.clientY})
+addEventListener('pointerup',()=>drag=false)
+addEventListener('pointermove',e=>{if(!drag)return;cTh-=(e.clientX-mx)*.004;cPh+=(e.clientY-my)*.003;cPh=Math.max(-.8,Math.min(.8,cPh));mx=e.clientX;my=e.clientY})
+cv.addEventListener('wheel',e=>{cR=Math.max(8,Math.min(80,cR+e.deltaY*.05))},{passive:true})
+
+window.setMode=function(m){setupMode(m)}
+
+// ═══ ANIMATE ═══
+function animate(ts){
+  requestAnimationFrame(animate)
+  const t=ts*.001
+
+  // spawn
+  spawnTimer+=1
+  const spawnRate=mode===5?3:6
+  if(spawnTimer>=spawnRate){spawnTimer=0;spawnPhoton()}
+
+  // update photons
+  for(let i=photons.length-1;i>=0;i--){
+    applyPhysics(photons[i],1)
+    if(!photons[i].update(1)){
+      photons[i].dispose();photons.splice(i,1)
+    }
+  }
+
+  // update angels
+  angels.forEach(a=>{
+    const age=(performance.now()-a.birth)*.001
+    a.ring.rotation.x=Math.PI/2+Math.sin(age*.5)*.1
+    a.ring.rotation.z=age*.2
+    a.mat.opacity=.15+Math.sin(age*2)*.05
+    a.glowMat.opacity=.03+Math.sin(age*3)*.02
+    const s=1+Math.sin(age)*.03
+    a.glow.scale.set(s,s,s)
+  })
+
+  // camera
+  cam.position.x=Math.cos(cTh)*Math.cos(cPh)*cR
+  cam.position.y=Math.sin(cPh)*cR
+  cam.position.z=Math.sin(cTh)*Math.cos(cPh)*cR
+  cam.lookAt(0,0,0)
+
+  // lights
+  ptLight.position.set(Math.sin(t*.3)*2,Math.cos(t*.2)*2,0)
+
+  // HUD
+  const mi=modeInfo[mode]
+  const loopedCount=photons.filter(p=>p.looped).length
+  const freeCount=photons.filter(p=>!p.looped).length
+  document.getElementById('hudData').textContent=
+    `\nMODE: ${mi.name}\n`+
+    `free photons: ${freeCount}\n`+
+    `trapped (looped): ${loopedCount}\n`+
+    `angels born: ${totalAngels}\n\n`+
+    mi.physics
+
+  document.getElementById('rhud').textContent=mi.desc
+
+  document.getElementById('angel-count').textContent=
+    totalAngels>0?`✦ ${totalAngels} ANGEL${totalAngels>1?'S':''} BORN ✦`:''
+
+  document.getElementById('info').textContent=
+    loopedCount>0?'light has closed a loop — it now references itself — an angel is born':
+    freeCount>0?'photons seeking curvature...':'waiting for light...'
+
+  R.render(scene,cam)
+}
+
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+setupMode(0)
+animate(0)
+</script>
+</body></html>
