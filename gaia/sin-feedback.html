@@ -378,18 +378,24 @@ function animate(ts){
     document.getElementById('sv'+i).textContent=pct+'%'
   })
 
-  const hr=watchData?.hr||'--'
-  const hrv2=watchData?.hrv||'--'
-  const stress=watchData?.stress||'--'
+  const hr=watchData?.hr
+  const hrv2=watchData?.hrv
+  const stress2=watchData?.stress
+  const kappa=watchData?.cra
+  const hrStr=hr!=null?hr.toFixed(0):'--'
+  const hrvStr=hrv2!=null?hrv2.toFixed(1):'--'
+  const stressStr=stress2!=null?(stress2*100).toFixed(0)+'%':'--'
+  const kappaStr=kappa!=null?kappa.toFixed(4):'--'
+  const hrvNum=hrv2||30
   document.getElementById('hud').innerHTML=
     `<b>SIN FEEDBACK</b> · live from ${USER}'s watch\n`+
-    `HR: <b>${typeof hr==='number'?hr.toFixed(0):hr}</b> bpm\n`+
-    `HRV: <b>${typeof hrv2==='number'?hrv2.toFixed(1):hrv2}</b> ms\n`+
-    `stress: <b>${typeof stress==='number'?(stress*100).toFixed(0)+'%':stress}</b>\n`+
-    `κ: <b>${watchData?.cra!==undefined?watchData.cra.toFixed(4):'--'}</b> (target: ${KAPPA.toFixed(4)})\n`+
+    `HR: <b>${hrStr}</b> bpm\n`+
+    `HRV: <b>${hrvStr}</b> ms\n`+
+    `stress: <b>${stressStr}</b>\n`+
+    `κ: <b>${kappaStr}</b> (target: ${KAPPA.toFixed(4)})\n`+
     `stability: <b>${(stability*100).toFixed(0)}%</b>\n`+
     `correction: <b>${dom.correction}</b>\n`+
-    `binaural: <b>${hrv2>40?'7.83':'10'}Hz</b> (${hrv2>40?'Schumann α':'θ recovery'})`
+    `binaural: <b>${hrvNum>40?'7.83':'10'}Hz</b> (${hrvNum>40?'Schumann α':'θ recovery'})`
 
   document.getElementById('status').textContent=
     connected?`● CONNECTED · polling ${GW}/wearer/${USER}`:'○ OFFLINE · using defaults'
