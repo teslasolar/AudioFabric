@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>ELEMENTAL SEQUENCES — 1999 × Fibonacci × Geometry</title>
+<title>ELEMENTAL SEQUENCES — Super-Prime Chain × Planetary Elements</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#030308;overflow-y:auto;overflow-x:hidden;font-family:'Courier New',monospace;color:#ccd}
@@ -20,404 +20,346 @@ h1{font-size:14px;letter-spacing:5px;color:rgba(255,200,100,.6);margin-bottom:4p
 .elem .sym{font-size:11px;color:rgba(200,220,255,.8);margin:2px 0}
 .elem .name{font-size:7px;color:rgba(200,200,220,.35);letter-spacing:1px}
 .elem .note{font-size:7px;color:rgba(180,160,255,.3);margin-top:2px}
-.eq{font-size:10px;color:rgba(200,180,255,.4);line-height:1.8;margin:6px 0}
+.eq{font-size:10px;color:rgba(200,180,255,.4);line-height:1.8;margin:4px 0}
 .eq b{color:rgba(255,200,100,.6)}
-.seq-row{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin:6px 0}
-.seq-item{display:inline-flex;flex-direction:column;align-items:center;padding:4px 6px;border-radius:4px;min-width:40px;font-size:8px;transition:all .2s}
-.seq-item .sn{font-size:11px;font-weight:bold}
-.seq-item .se{font-size:8px;margin-top:1px}
+.seq-row{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.seq-item{display:inline-flex;flex-direction:column;align-items:center;padding:5px 7px;border-radius:4px;min-width:44px;font-size:8px;transition:all .2s}
+.seq-item .sn{font-size:12px;font-weight:bold}
+.seq-item .se{font-size:8px;margin-top:2px}
 .seq-item .si{font-size:6px;color:rgba(255,255,255,.2);margin-top:1px}
 .arrow{color:rgba(255,255,255,.15);font-size:14px;align-self:center}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}
-.geo-card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:10px;text-align:center}
-.geo-card .gn{font-size:9px;color:rgba(255,200,100,.5);margin-bottom:4px}
-.geo-card .gv{font-size:14px;font-weight:bold;margin-bottom:2px}
-.geo-card .ge{font-size:8px;color:rgba(200,220,255,.5)}
-.geo-card .gd{font-size:7px;color:rgba(200,200,220,.25);margin-top:3px;line-height:1.4}
-.highlight{color:rgba(255,200,100,.8)}
-.prime-badge{display:inline-block;background:rgba(255,100,100,.1);border:1px solid rgba(255,100,100,.2);border-radius:3px;padding:1px 5px;font-size:7px;color:rgba(255,150,150,.6);letter-spacing:1px;margin-left:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px}
+.deep{background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.04);border-radius:6px;padding:12px 16px;margin:8px 0}
+.deep h3{font-size:9px;letter-spacing:2px;color:rgba(255,200,100,.45);margin-bottom:6px}
+.prime-badge{display:inline-block;background:rgba(255,100,100,.1);border:1px solid rgba(255,100,100,.2);border-radius:3px;padding:1px 5px;font-size:7px;color:rgba(255,150,150,.6);letter-spacing:1px;margin-left:4px}
+.planet-card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:14px 18px;margin:8px 0}
+.planet-card h3{font-size:11px;letter-spacing:2px;margin-bottom:8px}
+.planet-card .row{margin-bottom:6px}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="ui">
 <h1>ELEMENTAL SEQUENCES</h1>
-<div class="sub">1999 × FIBONACCI × PRIMES × GEOMETRY — NUMBERS AS MATTER</div>
+<div class="sub">SUPER-PRIME CHAIN × IRIDIUM × RADIUM × PLANETARY METALS</div>
 
+<div class="section" id="schain"></div>
+<div class="section" id="siridium"></div>
+<div class="section" id="sradium"></div>
+<div class="section" id="splanets"></div>
 <div class="section" id="s1999"></div>
-<div class="section" id="sfib"></div>
-<div class="section" id="sprimes"></div>
-<div class="section" id="slucas"></div>
-<div class="section" id="striangular"></div>
-<div class="section" id="scatalan"></div>
-<div class="section" id="smersenne"></div>
-<div class="section" id="szeck"></div>
-<div class="section" id="sgeo"></div>
+<div class="section" id="sconnect"></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-// ═══ PERIODIC TABLE DATA ═══
-const EL=[
-  '','H','He','Li','Be','B','C','N','O','F','Ne',
-  'Na','Mg','Al','Si','P','S','Cl','Ar','K','Ca',
-  'Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn',
-  'Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr',
-  'Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn',
-  'Sb','Te','I','Xe','Cs','Ba','La','Ce','Pr','Nd',
-  'Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb',
-  'Lu','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg',
-  'Tl','Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th',
-  'Pa','U','Np','Pu','Am','Cm','Bk','Cf','Es','Fm',
-  'Md','No','Lr','Rf','Db','Sg','Bh','Hs','Mt','Ds',
-  'Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og'
-]
-const NAMES=[
-  '','Hydrogen','Helium','Lithium','Beryllium','Boron','Carbon','Nitrogen','Oxygen','Fluorine','Neon',
-  'Sodium','Magnesium','Aluminum','Silicon','Phosphorus','Sulfur','Chlorine','Argon','Potassium','Calcium',
-  'Scandium','Titanium','Vanadium','Chromium','Manganese','Iron','Cobalt','Nickel','Copper','Zinc',
-  'Gallium','Germanium','Arsenic','Selenium','Bromine','Krypton','Rubidium','Strontium','Yttrium','Zirconium',
-  'Niobium','Molybdenum','Technetium','Ruthenium','Rhodium','Palladium','Silver','Cadmium','Indium','Tin',
-  'Antimony','Tellurium','Iodine','Xenon','Cesium','Barium','Lanthanum','Cerium','Praseodymium','Neodymium',
-  'Promethium','Samarium','Europium','Gadolinium','Terbium','Dysprosium','Holmium','Erbium','Thulium','Ytterbium',
-  'Lutetium','Hafnium','Tantalum','Tungsten','Rhenium','Osmium','Iridium','Platinum','Gold','Mercury',
-  'Thallium','Lead','Bismuth','Polonium','Astatine','Radon','Francium','Radium','Actinium','Thorium',
-  'Protactinium','Uranium','Neptunium','Plutonium','Americium','Curium','Berkelium','Californium','Einsteinium','Fermium',
-  'Mendelevium','Nobelium','Lawrencium','Rutherfordium','Dubnium','Seaborgium','Bohrium','Hassium','Meitnerium','Darmstadtium',
-  'Roentgenium','Copernicium','Nihonium','Flerovium','Moscovium','Livermorium','Tennessine','Oganesson'
-]
-const GEOM=['point','line','triangle','tetrahedron','square','pentagon','hexagon','heptagon',
-  'octahedron','nonagon','decagon','hendecagon','dodecahedron','tridecagon','tetradecagon',
-  'pentadecagon','hexadecagon','heptadecagon','octadecagon','icosahedron']
-const PLATONIC={4:'Tetrahedron',6:'Cube',8:'Octahedron',12:'Dodecahedron',20:'Icosahedron'}
+// ═══ PERIODIC TABLE ═══
+const EL=['','H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si','P','S','Cl','Ar','K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe','Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th','Pa','U','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr','Rf','Db','Sg','Bh','Hs','Mt','Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og']
+const NAMES=['','Hydrogen','Helium','Lithium','Beryllium','Boron','Carbon','Nitrogen','Oxygen','Fluorine','Neon','Sodium','Magnesium','Aluminum','Silicon','Phosphorus','Sulfur','Chlorine','Argon','Potassium','Calcium','Scandium','Titanium','Vanadium','Chromium','Manganese','Iron','Cobalt','Nickel','Copper','Zinc','Gallium','Germanium','Arsenic','Selenium','Bromine','Krypton','Rubidium','Strontium','Yttrium','Zirconium','Niobium','Molybdenum','Technetium','Ruthenium','Rhodium','Palladium','Silver','Cadmium','Indium','Tin','Antimony','Tellurium','Iodine','Xenon','Cesium','Barium','Lanthanum','Cerium','Praseodymium','Neodymium','Promethium','Samarium','Europium','Gadolinium','Terbium','Dysprosium','Holmium','Erbium','Thulium','Ytterbium','Lutetium','Hafnium','Tantalum','Tungsten','Rhenium','Osmium','Iridium','Platinum','Gold','Mercury','Thallium','Lead','Bismuth','Polonium','Astatine','Radon','Francium','Radium','Actinium','Thorium','Protactinium','Uranium','Neptunium','Plutonium','Americium','Curium','Berkelium','Californium','Einsteinium','Fermium','Mendelevium','Nobelium','Lawrencium','Rutherfordium','Dubnium','Seaborgium','Bohrium','Hassium','Meitnerium','Darmstadtium','Roentgenium','Copernicium','Nihonium','Flerovium','Moscovium','Livermorium','Tennessine','Oganesson']
 
 function el(z){return z>=1&&z<=118?{z,sym:EL[z],name:NAMES[z]}:{z,sym:'?'+z,name:'beyond known'}}
-function elHTML(z,note){
-  const e=el(z)
-  return `<div class="elem"><span class="z">${e.z}</span><span class="sym">${e.sym}</span><span class="name">${e.name.toUpperCase()}</span>${note?'<span class="note">'+note+'</span>':''}</div>`
-}
+function elHTML(z,note){const e=el(z);return `<div class="elem"><span class="z">${e.z}</span><span class="sym">${e.sym}</span><span class="name">${e.name.toUpperCase()}</span>${note?'<span class="note">'+note+'</span>':''}</div>`}
 
 function isPrime(n){if(n<2)return false;if(n<4)return true;if(n%2===0||n%3===0)return false;for(let i=5;i*i<=n;i+=6)if(n%i===0||n%(i+2)===0)return false;return true}
-function factorize(n){const f=[];let d=2;let x=n;while(d*d<=x){while(x%d===0){f.push(d);x/=d}d++}if(x>1)f.push(x);return f}
+function factorize(n){const f=[];let x=n,d=2;while(d*d<=x){while(x%d===0){f.push(d);x/=d}d++}if(x>1)f.push(x);return f}
 function digitSum(n){let s=0,x=n;while(x>0){s+=x%10;x=Math.floor(x/10)}return s}
 function digitalRoot(n){while(n>=10)n=digitSum(n);return n}
+function nthPrime(n){let count=0,num=1;while(count<n){num++;if(isPrime(num))count++}return num}
 
-// ═══ 1999 ANALYSIS ═══
+// ═══ GENERATE PRIMES (sieve for super-prime chain) ═══
+const SIEVE_LIMIT=700000
+const sieve=new Uint8Array(SIEVE_LIMIT)
+sieve[0]=1;sieve[1]=1
+for(let i=2;i*i<SIEVE_LIMIT;i++){if(!sieve[i])for(let j=i*i;j<SIEVE_LIMIT;j+=i)sieve[j]=1}
+const primeList=[]
+for(let i=2;i<SIEVE_LIMIT;i++)if(!sieve[i])primeList.push(i)
+
+function primeAt(n){return n<=primeList.length?primeList[n-1]:null}
+
+// ═══ SUPER-PRIME CHAIN: a(n+1) = prime(a(n)) ═══
 ;(function(){
-  const N=1999
-  const ds=digitSum(N)
-  const dr=digitalRoot(N)
-  const mod118=(N%118)||118
-  const factors=factorize(N)
-  const prime=isPrime(N)
+  const chain=[2]
+  for(let i=0;i<10;i++){
+    const next=primeAt(chain[chain.length-1])
+    if(next)chain.push(next);else break
+  }
 
-  // decompositions
-  const digits=[1,9,9,9]
-  const digitEls=digits.map(d=>elHTML(d,'digit'))
+  let h=`<h2>SUPER-PRIME CHAIN — a(n+1) = prime(a(n))</h2>`
+  h+=`<div class="eq">Start with <b>2</b>. Take the 2nd prime → <b>3</b>. Take the 3rd prime → <b>5</b>. Take the 5th prime → <b>11</b>. Each step indexes deeper into the primes.</div>`
+  h+=`<div class="eq">This is the <b>prime-indexed prime sequence</b> — primes selecting primes selecting primes. Self-referential recursion through the fundamental theorem.</div>`
 
-  // 1999 = 1000 + 999, or interesting splits
-  const splits=[
-    [19,99,'19×99=1881'],
-    [1,999,'1+999=1000'],
-    [19,9,9,'concatenation']
+  h+=`<div class="seq-row">`
+  chain.forEach((v,i)=>{
+    const z=(v%118)||118
+    const e=el(z)
+    h+=`<div class="seq-item" style="background:rgba(255,100,50,.05);border:1px solid rgba(255,100,50,.15)">`
+    h+=`<span class="si">a(${i+1})</span>`
+    h+=`<span class="sn" style="color:rgba(255,180,100,.8)">${v.toLocaleString()}</span>`
+    h+=`<span class="se" style="color:rgba(255,200,100,.5)">${e.sym} (${z})</span>`
+    h+=`</div>`
+    if(i<chain.length-1)h+=`<span class="arrow">→</span>`
+  })
+  h+=`</div>`
+
+  h+=`<div class="eq" style="margin-top:8px"><b>The chain reads</b>:</div>`
+  h+=`<div class="row">`
+  chain.forEach((v,i)=>{
+    const z=(v%118)||118
+    h+=elHTML(z,'a('+(i+1)+')='+v.toLocaleString())
+  })
+  h+=`</div>`
+
+  // growth analysis
+  h+=`<div class="deep"><h3>GROWTH ANALYSIS</h3>`
+  h+=`<div class="eq"><b>Ratios</b> a(n+1)/a(n):</div>`
+  for(let i=1;i<chain.length;i++){
+    const ratio=(chain[i]/chain[i-1]).toFixed(4)
+    h+=`<div class="eq">a(${i+1})/a(${i}) = ${chain[i].toLocaleString()}/${chain[i-1].toLocaleString()} = <b>${ratio}</b></div>`
+  }
+  h+=`<div class="eq" style="margin-top:6px">Growth rate ≈ <b>n·ln(n)</b> by prime number theorem. Each step multiplies by roughly <b>ln(a(n))</b>.</div>`
+  h+=`<div class="eq">After 10 steps we're at <b>${chain[chain.length-1].toLocaleString()}</b> — exponential acceleration through the primes.</div>`
+
+  // Mersenne connection
+  h+=`<div class="eq" style="margin-top:8px"><b>Mersenne intersection</b>: a(6) = <b>127</b> = M₇ = 2⁷-1 — the chain hits a Mersenne prime!</div>`
+  h+=`<div class="eq">127 is simultaneously the 31st prime AND 2⁷-1. Two deep structures collide at one number.</div>`
+  h+=`</div>`
+
+  // which elements appear
+  h+=`<div class="deep"><h3>ELEMENTAL IDENTITY OF THE CHAIN</h3>`
+  const unique=new Set(chain.map(v=>(v%118)||118))
+  h+=`<div class="eq"><b>${unique.size} unique elements</b> visited by the first ${chain.length} terms:</div>`
+  chain.forEach((v,i)=>{
+    const z=(v%118)||118;const e=el(z)
+    h+=`<div class="eq">a(${i+1}) = ${v.toLocaleString()} → <b>${z}</b> = ${e.sym} (${e.name})`
+    if(z===77)h+=` ← <span style="color:#fda">IRIDIUM</span>`
+    if(z===88)h+=` ← <span style="color:#fda">RADIUM</span>`
+    if(z===79)h+=` ← <span style="color:#fda">GOLD</span>`
+    if(z===82)h+=` ← <span style="color:#fda">LEAD (SATURN)</span>`
+    if(z===50)h+=` ← <span style="color:#fda">TIN (JUPITER)</span>`
+    h+=`</div>`
+  })
+  h+=`</div>`
+
+  document.getElementById('schain').innerHTML=h
+})()
+
+// ═══ IRIDIUM (77) DEEP ANALYSIS ═══
+;(function(){
+  const Z=77
+  const factors=factorize(Z)
+  const ds=digitSum(Z)
+  const dr=digitalRoot(Z)
+
+  let h=`<h2>IRIDIUM — ELEMENT 77 — DEEP ANALYSIS</h2>`
+  h+=`<div class="eq"><b>77 = 7 × 11</b> — product of the 4th and 5th primes. Two sacred primes multiplied.</div>`
+  h+=`<div class="row">${elHTML(77,'Ir · Iridium')} ${elHTML(7,'factor')} ${elHTML(11,'factor')}</div>`
+
+  h+=`<div class="deep"><h3>NUMBER THEORY OF 77</h3>`
+  h+=`<div class="eq"><b>77</b> = 7 × 11 — semiprime (product of exactly 2 primes)</div>`
+  h+=`<div class="eq"><b>digit sum</b>: 7+7 = <b>14</b> → ${el(14).sym} (${el(14).name}) — Silicon, semiconductor, bridge between metal and nonmetal</div>`
+  h+=`<div class="eq"><b>digital root</b>: 14 → 1+4 = <b>5</b> → ${el(5).sym} (${el(5).name}) — Boron, also a metalloid</div>`
+  h+=`<div class="eq"><b>binary</b>: ${(77).toString(2)} — 1001101 (7 bits, palindrome-adjacent)</div>`
+  h+=`<div class="eq"><b>hex</b>: 0x${(77).toString(16).toUpperCase()} = 4D — "4D" = four-dimensional</div>`
+  h+=`<div class="eq"><b>octal</b>: ${(77).toString(8)} — 115</div>`
+  h+=`<div class="eq"><b>base 7</b>: ${(77).toString(7)} — 140 (clean in base 7 because 77 = 7 × 11)</div>`
+
+  // position in sequences
+  h+=`<div class="eq" style="margin-top:8px"><b>77 in the prime sequence</b>: between P(21)=73 and P(22)=79. NOT prime.</div>`
+  h+=`<div class="eq">73 (Ta) → <span style="color:rgba(255,100,100,.5)">77 (Ir, composite)</span> → 79 (Au)</div>`
+  h+=`<div class="eq"><b>77 is flanked by primes</b>: Tantalum and Gold. The non-prime between two nobles.</div>`
+
+  // divisors
+  h+=`<div class="eq" style="margin-top:8px"><b>divisors of 77</b>: 1, 7, 11, 77 — exactly 4 divisors (semiprime signature)</div>`
+  h+=`<div class="eq"><b>divisor sum</b>: 1+7+11+77 = <b>96</b> → ${el(96).sym} (${el(96).name}) — Curium, named after Marie Curie</div>`
+  h+=`<div class="eq"><b>aliquot sum</b>: 1+7+11 = <b>19</b> → ${el(19).sym} (${el(19).name}) — Potassium (K), essential electrolyte</div>`
+  h+=`<div class="eq">77 is <b>deficient</b> (aliquot sum 19 < 77)</div>`
+  h+=`</div>`
+
+  h+=`<div class="deep"><h3>PHYSICAL: IRIDIUM</h3>`
+  h+=`<div class="eq"><b>Densest stable element on Earth</b> — 22.56 g/cm³ (tied with Osmium)</div>`
+  h+=`<div class="eq"><b>Named from Greek "iris"</b> (rainbow) — its salts are vividly colored</div>`
+  h+=`<div class="eq"><b>Melting point</b>: 2,446°C — survives almost everything</div>`
+  h+=`<div class="eq"><b>K-T boundary</b>: Iridium anomaly proved asteroid killed the dinosaurs</div>`
+  h+=`<div class="eq"><b>Electron config</b>: [Xe] 4f¹⁴ 5d⁷ 6s² — 7 electrons in the d-orbital (there's the 7 again)</div>`
+  h+=`<div class="eq"><b>Cosmic origin</b>: formed in neutron star mergers and supernovae. Rare on Earth's surface — most sank to the core.</div>`
+  h+=`<div class="eq"><b>Oxidation states</b>: -3 to +9 — one of the widest ranges of any element</div>`
+  h+=`</div>`
+
+  h+=`<div class="deep"><h3>KONOMI CONNECTION</h3>`
+  h+=`<div class="eq">KONOMI = K(11)+O(15)+N(14)+O(15)+M(13)+I(9) = <b>77</b> = Iridium</div>`
+  h+=`<div class="eq">77 = <b>7 × 11</b> — both in the konomi prime set P={2,3,5,7,11,13,17}</div>`
+  h+=`<div class="eq">The name literally factors into two of the seven sacred primes.</div>`
+  h+=`<div class="eq">Iridium = rainbow = bridge between worlds. Densest = most compressed meaning per symbol.</div>`
+  h+=`</div>`
+
+  document.getElementById('siridium').innerHTML=h
+})()
+
+// ═══ RADIUM (88) DEEP ANALYSIS ═══
+;(function(){
+  const Z=88
+  const factors=factorize(Z)
+
+  let h=`<h2>RADIUM — ELEMENT 88 — DEEP ANALYSIS</h2>`
+  h+=`<div class="eq"><b>88 = 2³ × 11</b> — the number that glows in the dark.</div>`
+  h+=`<div class="row">${elHTML(88,'Ra · Radium')} ${elHTML(2,'factor ×3')} ${elHTML(11,'factor')}</div>`
+
+  h+=`<div class="deep"><h3>NUMBER THEORY OF 88</h3>`
+  h+=`<div class="eq"><b>88</b> = 2³ × 11 = 8 × 11</div>`
+  h+=`<div class="eq"><b>digit sum</b>: 8+8 = <b>16</b> → ${el(16).sym} (${el(16).name}) — Sulfur, brimstone, fire and transformation</div>`
+  h+=`<div class="eq"><b>digital root</b>: 16 → 7 → <b>7</b> → ${el(7).sym} (${el(7).name}) — Nitrogen, 78% of the air we breathe</div>`
+  h+=`<div class="eq"><b>binary</b>: ${(88).toString(2)} — 1011000</div>`
+  h+=`<div class="eq"><b>hex</b>: 0x${(88).toString(16).toUpperCase()} = 58</div>`
+
+  h+=`<div class="eq" style="margin-top:8px"><b>divisors</b>: 1, 2, 4, 8, 11, 22, 44, 88 — <b>8 divisors</b></div>`
+  h+=`<div class="eq"><b>divisor sum</b>: ${1+2+4+8+11+22+44+88} = <b>180</b> → 180 mod 118 = ${180%118} → ${el(180%118).sym} (${el(180%118).name})</div>`
+  h+=`<div class="eq"><b>180° = half turn</b> — the divisor sum of radium is a straight line. Pi radians.</div>`
+  h+=`<div class="eq"><b>aliquot sum</b>: 1+2+4+8+11+22+44 = <b>92</b> → ${el(92).sym} (${el(92).name}) — URANIUM</div>`
+  h+=`<div class="eq" style="color:rgba(255,200,100,.6)"><b>The aliquot sum of Radium IS Uranium.</b> Radium literally decays into Uranium mathematically.</div>`
+
+  // 88 in sequences
+  h+=`<div class="eq" style="margin-top:8px"><b>88 in the prime landscape</b>: between P(23)=83 and P(24)=89</div>`
+  h+=`<div class="eq">83 (Bi, Bismuth) → <span style="color:rgba(255,100,100,.5)">88 (Ra, composite)</span> → 89 (Ac, Actinium)</div>`
+  h+=`<div class="eq">88 = the number of constellations recognized until 1922. The number of keys on a piano.</div>`
+  h+=`</div>`
+
+  h+=`<div class="deep"><h3>PHYSICAL: RADIUM</h3>`
+  h+=`<div class="eq"><b>Ra</b> — discovered by Marie & Pierre Curie, 1898</div>`
+  h+=`<div class="eq"><b>Glows blue</b> in the dark — radioluminescence from its own decay</div>`
+  h+=`<div class="eq"><b>Half-life</b>: ²²⁶Ra = 1,600 years — it's literally counting down</div>`
+  h+=`<div class="eq"><b>Decay chain</b>: ²³⁸U → ... → ²²⁶Ra → ²²²Rn → ... → ²⁰⁶Pb</div>`
+  h+=`<div class="eq">Uranium(92) decays INTO Radium(88). And Radium's aliquot sum IS 92.</div>`
+  h+=`<div class="eq"><b>The math mirrors the physics.</b></div>`
+  h+=`<div class="eq"><b>Electron config</b>: [Rn] 7s² — only 2 valence electrons. Alkaline earth metal.</div>`
+  h+=`<div class="eq"><b>Named from Latin "radius"</b> = ray. Ra. The sun god. The element that IS light.</div>`
+  h+=`</div>`
+
+  h+=`<div class="deep"><h3>RA = SUN = LIGHT = ELEMENT 88</h3>`
+  h+=`<div class="eq">88 = 8 × 11. The number 8 is infinity on its side. 11 is a master number.</div>`
+  h+=`<div class="eq">∞ × mastery = Radium = the element that teaches itself to glow.</div>`
+  h+=`<div class="eq">88 piano keys span the full range of human musical perception.</div>`
+  h+=`<div class="eq">88 constellations map the full sky.</div>`
+  h+=`<div class="eq">88 days = Mercury's orbital period (the messenger circles the sun in 88 days).</div>`
+  h+=`<div class="eq">Ra, the sun god. Radium, the element that makes its own light.</div>`
+  h+=`</div>`
+
+  document.getElementById('sradium').innerHTML=h
+})()
+
+// ═══ PLANETARY METALS ═══
+;(function(){
+  const planets=[
+    {name:'SUN',symbol:'☉',metal:'Gold',z:79,alch:'Au',
+      orbit:'-',moons:'-',mass:'1.989×10³⁰ kg',
+      facts:['Center of the solar system — everything orbits the source','Au: does not corrode, does not tarnish — permanence itself','Atomic number 79 is prime','Gold reflects infrared — it literally rejects heat','Nuclear fusion: 4H → He + energy — the sun IS hydrogen becoming helium','79 = 7+9 = 16 = Sulfur (brimstone, transformation)','79th prime = 401. 401 = 4+0+1 = 5 = Boron']},
+    {name:'MOON',symbol:'☽',metal:'Silver',z:47,alch:'Ag',
+      orbit:'27.3 days',moons:'-',mass:'7.342×10²² kg',
+      facts:['Ag from Latin "argentum" — the shining one','47 is prime — the moon is irreducible','47 = the 15th prime. 15 = P (Phosphorus) — "light-bearer" in Greek','Silver is the most electrically conductive element','Reflects 95% of visible light — a near-perfect mirror','Antimicrobial — silver kills bacteria (moonlight purifies)','47 electrons, [Kr] 4d¹⁰ 5s¹ — full d-orbital + lone wanderer']},
+    {name:'MERCURY',symbol:'☿',metal:'Mercury',z:80,alch:'Hg',
+      orbit:'88 days',moons:0,mass:'3.301×10²³ kg',
+      facts:['88 day orbit — shares its number with Radium','Only metal liquid at room temperature — refuses to be solid','Hg from "hydrargyrum" = liquid silver','80 = 2⁴ × 5 — clean factorization, 16 × 5','Digit sum 8 = Oxygen — the breath','Mercury the messenger — fastest planet, closest to sun','80 = number of stable elements with at least one stable isotope']},
+    {name:'VENUS',symbol:'♀',metal:'Copper',z:29,alch:'Cu',
+      orbit:'225 days',moons:0,mass:'4.867×10²⁴ kg',
+      facts:['29 is prime — Venus is irreducible','Cu = Cuprum from Cyprus, island of Aphrodite (Venus)','Copper turns green with age (Statue of Liberty) — patina = time made visible','29 = 2+9 = 11 — master number','Essential trace element for all life','First metal worked by humans (~10,000 years ago)','Venus rotates BACKWARDS — only planet with retrograde rotation']},
+    {name:'MARS',symbol:'♂',metal:'Iron',z:26,alch:'Fe',
+      orbit:'687 days',moons:2,mass:'6.417×10²³ kg',
+      facts:['26 = 2 × 13 — the warrior is made of primes from P','Fe = Ferrum — the word for sword and tool','Iron is the endpoint of stellar fusion — heavier elements cost energy','Mars is red because its surface is iron oxide (rust) — a planet of oxidized iron','26 = number of letters in English alphabet','Most abundant element on Earth by mass (32.1% of total)','Iron in your blood (hemoglobin) carries oxygen — Mars runs through your veins']},
+    {name:'JUPITER',symbol:'♃',metal:'Tin',z:50,alch:'Sn',
+      orbit:'4,333 days (11.86 yr)',moons:95,mass:'1.898×10²⁷ kg',
+      facts:['50 = 2 × 5² — the half-century, the golden jubilee','Sn from Latin "stannum" — tin was the bronze age enabler (bronze = Cu + Sn = 29 + 50 = 79 = GOLD)','Jupiter = Zeus = king of gods — largest planet','50 = the 25th even number. 25 = 5² = Manganese','95 moons — 95 = 5 × 19, digit sum 14 = Silicon','Great Red Spot: storm bigger than Earth, running 400+ years','Jupiter protects inner planets by gravitational shepherding — absorbs comets','50 = T(9) + T(4) = 45 + 5 — nested triangulars','Cu(29) + Sn(50) = 79 = Au — <b>Venus + Jupiter = the Sun</b>']},
+    {name:'SATURN',symbol:'♄',metal:'Lead',z:82,alch:'Pb',
+      orbit:'10,759 days (29.46 yr)',moons:146,mass:'5.683×10²⁶ kg',
+      facts:['82 = 2 × 41 — semiprime. 41 is prime = Niobium = <b>ANETA</b>','Pb from Latin "plumbum" — plumbing, plumb line, weight','Saturn = Kronos = time itself — the slowest visible planet','Lead is the stable endpoint of radioactive decay — where all heavy elements end up','82 protons = a "magic number" in nuclear physics — extra stable nucleus','Saturn\'s rings are 99.9% water ice — frozen time','29.46 year orbit ≈ Saturn Return — astrological coming of age','82 = digit sum 10 = Neon — noble gas, full shell, inert','146 moons — 146 = 2 × 73. 73 is prime = Tantalum','<b>82 = 2 × 41 = 2 × ANETA</b> — Saturn is paired Niobium']},
+    {name:'URANUS',symbol:'⛢',metal:'Uranium',z:92,alch:'U',
+      orbit:'30,687 days (84 yr)',moons:28,mass:'8.681×10²⁵ kg',
+      facts:['92 = 2² × 23 — THOMAS FRUMKIN = 92','The planet and element were both named after Ouranos (sky god)','Uranium was the heaviest known element for 150 years','92 = digit sum 11 — master number again','Uranus rotates on its SIDE — 97.77° axial tilt — it rolls','28 moons — 28 = perfect number (1+2+4+7+14 = 28) = Nickel','84 year orbit — human lifetime. You get one Uranus return if you\'re lucky.','Fission of U-235 powers nuclear reactors — splitting the atom']},
+    {name:'NEPTUNE',symbol:'♆',metal:'Neptunium',z:93,alch:'Np',
+      orbit:'60,190 days (164.8 yr)',moons:16,mass:'1.024×10²⁶ kg',
+      facts:['93 = 3 × 31 — product of prime and Mersenne prime','Neptunium was the first transuranium element synthesized (1940)','Named after Neptune/Poseidon — god of the seas','Neptune was predicted mathematically before being seen — pure theory finding reality','93 = digit sum 12 = Magnesium — structural metal, chlorophyll core','Winds up to 2,100 km/h — fastest in the solar system','16 moons — 16 = 2⁴ — clean power of the first prime','164.8 year orbit — no human has ever seen it complete one lap']},
+    {name:'PLUTO',symbol:'♇',metal:'Plutonium',z:94,alch:'Pu',
+      orbit:'90,560 days (248 yr)',moons:5,mass:'1.303×10²² kg',
+      facts:['94 = 2 × 47 — Pluto is 2 × Silver(Moon)','Plutonium was named after Pluto, continuing U→Np→Pu','94 = digit sum 13 = Aluminum — light but strong','Pluto\'s orbit is ECCENTRIC — sometimes closer than Neptune','Dwarf planet, reclassified 2006 — identity crisis','5 moons: Charon, Nix, Hydra, Kerberos, Styx — all underworld names','Charon is so large relative to Pluto they orbit each other — binary system','Pu-239 half-life: 24,110 years — outlasts civilizations']}
   ]
 
-  let h=`<h2>1999 — THE NUMBER ${prime?'<span class="prime-badge">PRIME</span>':''}</h2>`
-  h+=`<div class="eq"><b>1999</b> is the <b>303rd prime</b> — irreducible, indivisible, a fundamental particle of arithmetic</div>`
-  h+=`<div class="eq"><b>digit sum</b>: 1+9+9+9 = <b>${ds}</b> → Element ${ds} = <b>${el(ds).sym}</b> (${el(ds).name})</div>`
-  h+=`<div class="eq"><b>digital root</b>: ${ds} → ${digitSum(ds)} → <b>${dr}</b> → Element ${dr} = <b>${el(dr).sym}</b> (${el(dr).name}) — everything reduces to Hydrogen</div>`
-  h+=`<div class="eq"><b>mod 118</b>: 1999 mod 118 = <b>${mod118}</b> → Element = <b>${el(mod118).sym}</b> (${el(mod118).name})</div>`
-  h+=`<div class="eq"><b>year digits as elements</b>:</div><div class="row">`
-  digits.forEach(d=>{h+=elHTML(d,'digit='+d)})
+  let h=`<h2>PLANETARY METALS — ALCHEMICAL CORRESPONDENCE</h2>`
+  h+=`<div class="eq">Every classical planet maps to a metal. The ancients knew: <b>as above, so below</b>.</div>`
+
+  planets.forEach(p=>{
+    h+=`<div class="planet-card"><h3 style="color:rgba(255,200,100,.6)">${p.symbol} ${p.name} → ${p.metal.toUpperCase()} (${p.alch}, Z=${p.z})</h3>`
+    h+=`<div class="row">${elHTML(p.z,p.name.toLowerCase())}</div>`
+    h+=`<div class="eq"><b>orbit</b>: ${p.orbit} · <b>moons</b>: ${p.moons} · <b>mass</b>: ${p.mass}</div>`
+    const f=factorize(p.z)
+    h+=`<div class="eq"><b>${p.z}</b> = ${f.join(' × ')}${isPrime(p.z)?' <span class="prime-badge">PRIME</span>':''} · digit sum ${digitSum(p.z)} → ${el(digitSum(p.z)).sym} · digital root ${digitalRoot(p.z)} → ${el(digitalRoot(p.z)).sym}</div>`
+    p.facts.forEach(f=>{h+=`<div class="eq">▸ ${f}</div>`})
+    h+=`</div>`
+  })
+
+  // connections
+  h+=`<div class="deep"><h3>CROSS-PLANETARY ARITHMETIC</h3>`
+  h+=`<div class="eq"><b>Cu(29) + Sn(50) = 79 = Au</b> — Venus + Jupiter = Sun (bronze age truth)</div>`
+  h+=`<div class="eq"><b>Fe(26) + Sn(50) = 76 = Os</b> — Mars + Jupiter = Osmium = THOMAS</div>`
+  h+=`<div class="eq"><b>Au(79) + Ag(47) = 126</b> — Sun + Moon = 126 → beyond known, but 126 = next magic number in nuclear physics</div>`
+  h+=`<div class="eq"><b>Pb(82) - Sn(50) = 32 = Ge</b> — Saturn - Jupiter = Germanium (semiconductor, bridge)</div>`
+  h+=`<div class="eq"><b>U(92) - Pb(82) = 10 = Ne</b> — Uranus - Saturn = Neon (noble gas, complete shell)</div>`
+  h+=`<div class="eq"><b>Hg(80) + Ra(88) = 168</b> — Mercury + Radium = 168 = 8 × 21 = 8 × 3 × 7</div>`
+  h+=`<div class="eq"><b>Ir(77) + Xe(54) = 131</b> — Iridium + Xenon = 131 = PRIME (the bond is irreducible)</div>`
   h+=`</div>`
 
-  // nearby primes
-  let prevP=N-1;while(!isPrime(prevP))prevP--
-  let nextP=N+1;while(!isPrime(nextP))nextP++
-  h+=`<div class="eq"><b>prime neighborhood</b>: ...${prevP}, <span class="highlight">1999</span>, ${nextP}...</div>`
-  h+=`<div class="eq"><b>gap</b>: ${N-prevP} before, ${nextP-N} after — <b>${nextP-prevP}</b> total gap</div>`
+  document.getElementById('splanets').innerHTML=h
+})()
 
-  // 1999 in other bases
-  h+=`<div class="eq"><b>binary</b>: ${N.toString(2)} (${N.toString(2).length} bits)</div>`
-  h+=`<div class="eq"><b>hex</b>: 0x${N.toString(16).toUpperCase()}</div>`
-  h+=`<div class="eq"><b>base 7</b>: ${N.toString(7)} (7 primes → base 7)</div>`
+// ═══ 1999 REDUX ═══
+;(function(){
+  let h=`<h2>1999 — THE PRIME YEAR</h2>`
+  h+=`<div class="eq"><b>1999</b> is the <b>303rd prime</b> <span class="prime-badge">PRIME</span> — irreducible. The last year of the old millennium.</div>`
+  h+=`<div class="eq"><b>digit sum 28</b> = Ni (Nickel) = ferromagnetic = perfect number (1+2+4+7+14=28)</div>`
+  h+=`<div class="eq"><b>digital root 1</b> = H (Hydrogen) = everything returns to the beginning</div>`
+  h+=`<div class="eq"><b>mod 118 = 111</b> = Rg (Roentgenium) = discoverer of X-rays = seeing through things</div>`
+  h+=`<div class="eq"><b>1999 = 2048 - 49</b> = 2¹¹ - 7² — power of 2 minus square of prime</div>`
 
-  // sum of elements
-  h+=`<div class="eq"><b>1999 as element chain</b>: ${N} = `
-  const chain=[]
-  let rem=N
-  while(rem>0){
-    const take=Math.min(rem,118)
-    chain.push(take)
-    rem-=take
-  }
-  h+=chain.map(z=>el(z).sym+'('+z+')').join(' + ')
-  h+=` = ${chain.length} atoms</div>`
+  // Zeckendorf
+  const fib=[1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,1597,2584]
+  const zeck=[];let rem=1999
+  for(let i=fib.length-1;i>=0&&rem>0;i--)if(fib[i]<=rem){zeck.push(fib[i]);rem-=fib[i]}
+  h+=`<div class="eq"><b>Zeckendorf</b>: ${zeck.join(' + ')} — <b>${zeck.length} golden atoms</b></div>`
   h+=`<div class="row">`
-  chain.forEach(z=>{h+=elHTML(z)})
+  zeck.forEach(f=>{const z=(f%118)||118;h+=elHTML(z,'F='+f)})
   h+=`</div>`
+
+  // super-prime position
+  h+=`<div class="eq"><b>super-prime chain position</b>: 1999 is between a(8)=5381 and... wait.</div>`
+  h+=`<div class="eq">prime(1999) = the 1999th prime = <b>${primeAt(1999)?.toLocaleString()||'?'}</b> → mod 118 = <b>${((primeAt(1999)||0)%118)||'?'}</b> → ${el(((primeAt(1999)||0)%118)||1).sym}</div>`
+
+  const p1999=primeAt(1999)
+  if(p1999){
+    h+=`<div class="eq">If we seed the chain with 1999: a(1)=1999, a(2)=prime(1999)=<b>${p1999.toLocaleString()}</b></div>`
+    const p2=primeAt(p1999)
+    if(p2)h+=`<div class="eq">a(3)=prime(${p1999.toLocaleString()})=<b>${p2.toLocaleString()}</b> — already beyond our sieve</div>`
+    else h+=`<div class="eq">a(3)=prime(${p1999.toLocaleString()}) — beyond our sieve of ${(SIEVE_LIMIT).toLocaleString()}, accelerating into the infinite</div>`
+  }
 
   document.getElementById('s1999').innerHTML=h
 })()
 
-// ═══ FIBONACCI AS ELEMENTS ═══
+// ═══ THE CONNECTION ═══
 ;(function(){
-  const fib=[1,1]
-  while(fib[fib.length-1]<3000)fib.push(fib[fib.length-2]+fib[fib.length-1])
-
-  let h=`<h2>FIBONACCI SEQUENCE → ELEMENTS</h2>`
-  h+=`<div class="eq">Each Fibonacci number maps to an element (mod 118). The golden ratio φ = 1.618... governs the spiral.</div>`
-
-  // find where 1999 sits
-  let fibIdx=-1
-  for(let i=0;i<fib.length-1;i++){
-    if(fib[i]<=1999&&fib[i+1]>1999){fibIdx=i;break}
-  }
-  h+=`<div class="eq"><b>1999</b> sits between F(${fibIdx+1})=<b>${fib[fibIdx]}</b> and F(${fibIdx+2})=<b>${fib[fibIdx+1]}</b></div>`
-  h+=`<div class="eq">ratio: 1999/${fib[fibIdx]} = <b>${(1999/fib[fibIdx]).toFixed(6)}</b> (φ = 1.618034...)</div>`
-
-  h+=`<div class="seq-row">`
-  for(let i=0;i<18;i++){
-    const f=fib[i]
-    const z=(f%118)||118
-    const e=el(z)
-    const isCurrent=i===fibIdx
-    const bg=isCurrent?'rgba(255,200,100,.1)':'rgba(255,255,255,.02)'
-    const border=isCurrent?'rgba(255,200,100,.3)':'rgba(255,255,255,.06)'
-    h+=`<div class="seq-item" style="background:${bg};border:1px solid ${border}">`
-    h+=`<span class="si">F(${i+1})</span>`
-    h+=`<span class="sn" style="color:${isCurrent?'#fda':'rgba(200,220,255,.6)'}">${f}</span>`
-    h+=`<span class="se" style="color:rgba(255,200,100,.5)">${e.sym}</span>`
-    h+=`</div>`
-    if(i<17)h+=`<span class="arrow">→</span>`
-  }
+  let h=`<h2>THE THREAD</h2>`
+  h+=`<div class="deep" style="border-color:rgba(255,200,100,.15)">`
+  h+=`<div class="eq" style="color:rgba(255,200,100,.5)">Every number is a compressed universe. Decompose it and physics falls out:</div>`
+  h+=`<div class="eq">▸ <b>Radium(88)</b>'s aliquot sum = <b>92 = Uranium</b> — the math predicted the decay chain</div>`
+  h+=`<div class="eq">▸ <b>Venus(29) + Jupiter(50) = 79 = Gold = Sun</b> — bronze age metallurgy as planetary arithmetic</div>`
+  h+=`<div class="eq">▸ <b>Saturn(82) = 2 × 41 = 2 × Niobium = 2 × ANETA</b> — time is paired superconductor</div>`
+  h+=`<div class="eq">▸ <b>Iridium(77) = 7 × 11</b> — both konomi primes. The name IS the factorization.</div>`
+  h+=`<div class="eq">▸ <b>Super-prime chain</b> hits Mersenne 127 at step 6 — two independent structures collide</div>`
+  h+=`<div class="eq">▸ <b>Mars(26) + Jupiter(50) = 76 = Osmium = THOMAS</b></div>`
+  h+=`<div class="eq">▸ <b>Mercury orbits in 88 days = Radium = the element that makes its own light = Ra = the sun god</b></div>`
+  h+=`<div class="eq" style="margin-top:8px;color:rgba(255,200,100,.5)">The periodic table is not a list. It's a <b>coordinate system</b>. And names are coordinates.</div>`
   h+=`</div>`
 
-  // Fibonacci as geometry: F(n) vertices polygon
-  h+=`<div class="eq" style="margin-top:10px"><b>geometric interpretation</b>: F(n) = number of vertices in the nth Fibonacci polygon</div>`
-  h+=`<div class="grid">`
-  for(let i=0;i<10;i++){
-    const f=fib[i]
-    const geoName=f<=20?(GEOM[f-1]||f+'-gon'):f+'-gon'
-    const z=(f%118)||118
-    h+=`<div class="geo-card"><div class="gn">F(${i+1})</div><div class="gv" style="color:rgba(255,200,100,.7)">${f}</div><div class="ge">${el(z).sym} · ${geoName}</div><div class="gd">${f} vertices, ${f} edges</div></div>`
-  }
-  h+=`</div>`
-
-  document.getElementById('sfib').innerHTML=h
+  document.getElementById('sconnect').innerHTML=h
 })()
 
-// ═══ PRIMES AS ELEMENTS ═══
-;(function(){
-  const primes=[]
-  for(let n=2;primes.length<30;n++)if(isPrime(n))primes.push(n)
-
-  let h=`<h2>PRIME SEQUENCE → ELEMENTS</h2>`
-  h+=`<div class="eq">Primes are the atoms of arithmetic. 1999 is the <b>303rd prime</b>.</div>`
-  h+=`<div class="eq">Super-prime chain (prime-indexed primes): `
-  let sp=[2];for(let i=0;i<6;i++){let idx=sp[sp.length-1];sp.push(primes[idx-1]||0)}
-  h+=sp.filter(x=>x).map(p=>`<b>${p}</b>(${el((p%118)||118).sym})`).join(' → ')
-  h+=`</div>`
-
-  h+=`<div class="seq-row">`
-  for(let i=0;i<20;i++){
-    const p=primes[i]
-    const z=(p%118)||118
-    h+=`<div class="seq-item" style="background:rgba(255,100,100,.04);border:1px solid rgba(255,100,100,.1)">`
-    h+=`<span class="si">P(${i+1})</span>`
-    h+=`<span class="sn" style="color:rgba(255,150,150,.7)">${p}</span>`
-    h+=`<span class="se" style="color:rgba(255,200,100,.5)">${el(z).sym}</span>`
-    h+=`</div>`
-    if(i<19)h+=`<span class="arrow">→</span>`
-  }
-  h+=`</div>`
-
-  // prime factorization of numbers around 1999
-  h+=`<div class="eq" style="margin-top:10px"><b>neighborhood factorizations</b>:</div>`
-  for(let n=1996;n<=2002;n++){
-    const f=factorize(n)
-    const p=isPrime(n)
-    h+=`<div class="eq">${p?'<span class="highlight">':''}${n}${p?' (PRIME)':''} = ${f.join(' × ')}${p?'</span>':''}`
-    h+=` → [${f.map(x=>el((x%118)||118).sym).join(', ')}]</div>`
-  }
-
-  document.getElementById('sprimes').innerHTML=h
-})()
-
-// ═══ LUCAS NUMBERS ═══
-;(function(){
-  const lucas=[2,1]
-  while(lucas[lucas.length-1]<3000)lucas.push(lucas[lucas.length-2]+lucas[lucas.length-1])
-
-  let h=`<h2>LUCAS SEQUENCE → ELEMENTS</h2>`
-  h+=`<div class="eq">Lucas numbers: like Fibonacci but start 2, 1. L(n) = F(n-1) + F(n+1). The companion sequence.</div>`
-  h+=`<div class="seq-row">`
-  for(let i=0;i<16;i++){
-    const l=lucas[i]
-    const z=(l%118)||118
-    h+=`<div class="seq-item" style="background:rgba(100,200,255,.04);border:1px solid rgba(100,200,255,.1)">`
-    h+=`<span class="si">L(${i+1})</span>`
-    h+=`<span class="sn" style="color:rgba(100,200,255,.7)">${l}</span>`
-    h+=`<span class="se" style="color:rgba(255,200,100,.5)">${el(z).sym}</span>`
-    h+=`</div>`
-    if(i<15)h+=`<span class="arrow">→</span>`
-  }
-  h+=`</div>`
-
-  // Lucas primality test for 1999
-  h+=`<div class="eq"><b>Lucas primality</b>: 1999 is prime ⟹ L(1999) ≡ 1 (mod 1999) ✓</div>`
-
-  document.getElementById('slucas').innerHTML=h
-})()
-
-// ═══ TRIANGULAR NUMBERS ═══
-;(function(){
-  let h=`<h2>TRIANGULAR NUMBERS → ELEMENTS</h2>`
-  h+=`<div class="eq">T(n) = n(n+1)/2 — the number of dots in a triangle with n rows.</div>`
-
-  // Is 1999 triangular?
-  const disc=Math.sqrt(1+8*1999)
-  const isTriang=disc===Math.floor(disc)&&(Math.floor(disc)-1)%2===0
-  const nearN=Math.floor((-1+Math.sqrt(1+8*1999))/2)
-  h+=`<div class="eq"><b>1999</b> is ${isTriang?'':'NOT '}triangular. Nearest: T(${nearN})=${nearN*(nearN+1)/2}, T(${nearN+1})=${(nearN+1)*(nearN+2)/2}</div>`
-  h+=`<div class="eq">1999 sits at row ~<b>${nearN}</b> of Pascal's triangle (${nearN*(nearN+1)/2} dots needed, short by ${1999-nearN*(nearN+1)/2})</div>`
-
-  h+=`<div class="seq-row">`
-  for(let n=1;n<=15;n++){
-    const t=n*(n+1)/2
-    const z=(t%118)||118
-    h+=`<div class="seq-item" style="background:rgba(100,255,100,.03);border:1px solid rgba(100,255,100,.08)">`
-    h+=`<span class="si">T(${n})</span>`
-    h+=`<span class="sn" style="color:rgba(100,255,150,.6)">${t}</span>`
-    h+=`<span class="se" style="color:rgba(255,200,100,.5)">${el(z).sym}</span>`
-    h+=`</div>`
-    if(n<15)h+=`<span class="arrow">→</span>`
-  }
-  h+=`</div>`
-
-  document.getElementById('striangular').innerHTML=h
-})()
-
-// ═══ CATALAN NUMBERS ═══
-;(function(){
-  function catalan(n){let c=1;for(let i=0;i<n;i++){c=c*2*(2*i+1)/(i+2)}return Math.round(c)}
-  let h=`<h2>CATALAN NUMBERS → ELEMENTS</h2>`
-  h+=`<div class="eq">C(n) = (2n)! / ((n+1)! × n!) — counts valid parenthesizations, binary trees, polygon triangulations.</div>`
-
-  h+=`<div class="seq-row">`
-  for(let n=0;n<=12;n++){
-    const c=catalan(n)
-    const z=(c%118)||118
-    h+=`<div class="seq-item" style="background:rgba(255,100,255,.03);border:1px solid rgba(255,100,255,.08)">`
-    h+=`<span class="si">C(${n})</span>`
-    h+=`<span class="sn" style="color:rgba(255,150,255,.6)">${c>99999?c.toExponential(1):c}</span>`
-    h+=`<span class="se" style="color:rgba(255,200,100,.5)">${el(z).sym}</span>`
-    h+=`</div>`
-    if(n<12)h+=`<span class="arrow">→</span>`
-  }
-  h+=`</div>`
-
-  h+=`<div class="eq"><b>C(n) geometries</b>: C(3)=5 ways to triangulate a pentagon, C(4)=14 ways to triangulate a hexagon</div>`
-
-  document.getElementById('scatalan').innerHTML=h
-})()
-
-// ═══ MERSENNE NUMBERS ═══
-;(function(){
-  const mersenne=[3,7,31,127,8191]
-  const mersenneP=[2,3,5,7,13]
-
-  let h=`<h2>MERSENNE PRIMES → ELEMENTS</h2>`
-  h+=`<div class="eq">M(p) = 2ᵖ - 1 — primes of the form one-less-than-a-power-of-two. The rarest atoms.</div>`
-
-  h+=`<div class="seq-row">`
-  for(let i=0;i<5;i++){
-    const m=mersenne[i]
-    const z=(m%118)||118
-    h+=`<div class="seq-item" style="background:rgba(255,200,50,.04);border:1px solid rgba(255,200,50,.12)">`
-    h+=`<span class="si">M(${mersenneP[i]})</span>`
-    h+=`<span class="sn" style="color:rgba(255,220,100,.7)">${m}</span>`
-    h+=`<span class="se" style="color:rgba(255,200,100,.6)">${el(z).sym}</span>`
-    h+=`</div>`
-    if(i<4)h+=`<span class="arrow">→</span>`
-  }
-  h+=`</div>`
-
-  h+=`<div class="eq"><b>1999 and Mersenne</b>: 2¹⁰ = 1024, 2¹¹ = 2048. So 1999 = 2¹¹ - 49 = 2048 - 49</div>`
-  h+=`<div class="eq">49 = 7² — the square of the 4th prime. 1999 is a Mersenne number <b>minus a prime square</b>.</div>`
-  h+=`<div class="eq">M(7) = 127 → Element 127 is beyond known, but 127 mod 118 = 9 = <b>Fluorine</b> (most reactive element)</div>`
-
-  document.getElementById('smersenne').innerHTML=h
-})()
-
-// ═══ ZECKENDORF REPRESENTATION ═══
-;(function(){
-  const fib=[1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,1597,2584]
-
-  function zeckendorf(n){
-    const terms=[];let rem=n
-    for(let i=fib.length-1;i>=0&&rem>0;i--){
-      if(fib[i]<=rem){terms.push(fib[i]);rem-=fib[i]}
-    }
-    return terms
-  }
-
-  const z=zeckendorf(1999)
-
-  let h=`<h2>ZECKENDORF DECOMPOSITION OF 1999</h2>`
-  h+=`<div class="eq">Every positive integer has a unique representation as sum of non-consecutive Fibonacci numbers.</div>`
-  h+=`<div class="eq"><b>1999</b> = ${z.join(' + ')}</div>`
-  h+=`<div class="row">`
-  z.forEach(f=>{
-    const idx=fib.indexOf(f)+1
-    const ze=(f%118)||118
-    h+=elHTML(ze,'F('+idx+')='+f)
-  })
-  h+=`</div>`
-  h+=`<div class="eq"><b>${z.length} Fibonacci components</b> — 1999 decomposes into ${z.length} golden atoms</div>`
-
-  // each component's element
-  h+=`<div class="eq">elemental formula: `
-  h+=z.map(f=>{const ze=(f%118)||118;return el(ze).sym}).join(' + ')
-  h+=`</div>`
-
-  document.getElementById('szeck').innerHTML=h
-})()
-
-// ═══ GEOMETRIC PROPERTIES ═══
-;(function(){
-  let h=`<h2>1999 AS GEOMETRY</h2>`
-  h+=`<div class="grid">`
-
-  const geos=[
-    {name:'Regular 1999-gon',val:'1999 vertices',desc:'Interior angle: '+((1999-2)*180/1999).toFixed(4)+'°',el:el(((1999-2)%118)||118)},
-    {name:'1999-simplex',val:'2000 vertices',desc:'1999-dimensional tetrahedron\n'+1999+' faces meet at each vertex',el:el((2000%118)||118)},
-    {name:'1999-cube',val:'2¹⁹⁹⁹ vertices',desc:'Hypercube in 1999 dimensions\nEdges per vertex: 1999',el:el(1)},
-    {name:'Diagonal count',val:1999*(1999-3)/2,desc:'Diagonals in a 1999-gon\n='+1999*(1999-3)/2,el:el((1999*(1999-3)/2%118)||118)},
-    {name:'Star polygon',val:'{1999/φ}',desc:'1999 is prime → 999 distinct\nstar polygon forms',el:el(((999)%118)||118)},
-    {name:'Circle packing',val:'Layer ~25',desc:'√(1999/π) ≈ 25.2\n~25 concentric rings',el:el(25)},
-    {name:'Platonic echo',val:'mod 5 = 4',desc:'1999 mod 5 = 4\nNearest Platonic: Octahedron (8 faces)',el:el(8)},
-    {name:'Sphere packing',val:'dim 1999',desc:'Kissing number grows with dimension\nIn dim 1999: astronomical contacts',el:el((1999%118)||118)},
-  ]
-
-  geos.forEach(g=>{
-    h+=`<div class="geo-card"><div class="gn">${g.name}</div><div class="gv" style="color:rgba(200,220,255,.6)">${g.val}</div><div class="ge">${g.el.sym} (${g.el.z})</div><div class="gd">${g.desc}</div></div>`
-  })
-  h+=`</div>`
-
-  // the big connection
-  h+=`<div class="eq" style="margin-top:14px;color:rgba(255,200,100,.5)"><b>THE IDENTITY</b></div>`
-  h+=`<div class="eq">1999 is prime → it IS an element of arithmetic</div>`
-  h+=`<div class="eq">digit sum 28 = Nickel = ferromagnetic = forms permanent magnets</div>`
-  h+=`<div class="eq">digital root 1 = Hydrogen = everything begins and ends here</div>`
-  h+=`<div class="eq">mod 118 = 111 = Roentgenium (Rg) = named after the discoverer of X-rays</div>`
-  h+=`<div class="eq">1999 = 1597 + 377 + 21 + 3 + 1 → Zeckendorf: 5 golden atoms</div>`
-  h+=`<div class="eq">a prime number that reduces to 1. irreducible yet fundamental. <b>the last year of the old millennium.</b></div>`
-
-  document.getElementById('sgeo').innerHTML=h
-})()
-
-// ═══ 3D BACKGROUND ═══
+// ═══ 3D BACKGROUND — super-prime spiral ═══
 const cv=document.getElementById('c')
 const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true})
 renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2))
@@ -425,34 +367,29 @@ const sc=new THREE.Scene()
 const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,2000)
 camera.position.set(0,0,30)
 
-// spiral of 1999 points
-const spiralGeo=new THREE.BufferGeometry()
-const spiralPos=new Float32Array(1999*3)
-const spiralCol=new Float32Array(1999*3)
-for(let i=0;i<1999;i++){
-  const th=i*.1
-  const r=.5+i*.008
-  const y=(i/1999-.5)*20
+// spiral: prime-indexed positions
+const spiralCount=2000,spiralGeo=new THREE.BufferGeometry()
+const spiralPos=new Float32Array(spiralCount*3),spiralCol=new Float32Array(spiralCount*3)
+for(let i=0;i<spiralCount;i++){
+  const p=isPrime(i+1)
+  const th=(i+1)*.15
+  const r=p?2+i*.006:.5+i*.004
+  const y=(i/spiralCount-.5)*25
   spiralPos[i*3]=Math.cos(th)*r
   spiralPos[i*3+1]=y
   spiralPos[i*3+2]=Math.sin(th)*r
-  const c=new THREE.Color().setHSL(i/1999,.6,.4)
+  const c=new THREE.Color().setHSL(p?.08:.6,p?.9:.3,p?.6:.25)
   spiralCol[i*3]=c.r;spiralCol[i*3+1]=c.g;spiralCol[i*3+2]=c.b
 }
 spiralGeo.setAttribute('position',new THREE.BufferAttribute(spiralPos,3))
 spiralGeo.setAttribute('color',new THREE.BufferAttribute(spiralCol,3))
-const spiral=new THREE.Points(spiralGeo,new THREE.PointsMaterial({
-  size:.15,transparent:true,opacity:.3,vertexColors:true,blending:THREE.AdditiveBlending
-}))
-sc.add(spiral)
+sc.add(new THREE.Points(spiralGeo,new THREE.PointsMaterial({size:.15,transparent:true,opacity:.25,vertexColors:true,blending:THREE.AdditiveBlending})))
 
 function animate(ts){
   requestAnimationFrame(animate)
   const t=ts*.001
-  spiral.rotation.y=t*.05
-  spiral.rotation.x=Math.sin(t*.03)*.1
-  const scrollY=window.scrollY||0
-  camera.position.y=-scrollY*.01
+  sc.rotation.y=t*.03
+  camera.position.y=-(window.scrollY||0)*.008
   renderer.render(sc,camera)
 }
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)})
