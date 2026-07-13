@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ELEMENTAL SEQUENCES — 1999 × Fibonacci × Geometry</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#030308;overflow-y:auto;overflow-x:hidden;font-family:'Courier New',monospace;color:#ccd}
+canvas{position:fixed;top:0;left:0;z-index:0}
+#ui{position:relative;z-index:10;padding:20px 24px 60px;max-width:1100px;margin:0 auto}
+h1{font-size:14px;letter-spacing:5px;color:rgba(255,200,100,.6);margin-bottom:4px;text-shadow:0 0 20px rgba(255,150,50,.3)}
+.sub{font-size:9px;color:rgba(200,180,255,.35);letter-spacing:2px;margin-bottom:20px}
+.section{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:16px 20px;margin-bottom:16px}
+.section h2{font-size:10px;letter-spacing:3px;color:rgba(255,200,100,.5);margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.05);padding-bottom:6px}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.elem{display:inline-flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:8px 10px;min-width:60px;transition:all .2s;cursor:default}
+.elem:hover{border-color:rgba(255,200,100,.3);box-shadow:0 0 12px rgba(255,150,50,.1)}
+.elem .z{font-size:16px;font-weight:bold;color:rgba(255,200,100,.7)}
+.elem .sym{font-size:11px;color:rgba(200,220,255,.8);margin:2px 0}
+.elem .name{font-size:7px;color:rgba(200,200,220,.35);letter-spacing:1px}
+.elem .note{font-size:7px;color:rgba(180,160,255,.3);margin-top:2px}
+.eq{font-size:10px;color:rgba(200,180,255,.4);line-height:1.8;margin:6px 0}
+.eq b{color:rgba(255,200,100,.6)}
+.seq-row{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.seq-item{display:inline-flex;flex-direction:column;align-items:center;padding:4px 6px;border-radius:4px;min-width:40px;font-size:8px;transition:all .2s}
+.seq-item .sn{font-size:11px;font-weight:bold}
+.seq-item .se{font-size:8px;margin-top:1px}
+.seq-item .si{font-size:6px;color:rgba(255,255,255,.2);margin-top:1px}
+.arrow{color:rgba(255,255,255,.15);font-size:14px;align-self:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}
+.geo-card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:10px;text-align:center}
+.geo-card .gn{font-size:9px;color:rgba(255,200,100,.5);margin-bottom:4px}
+.geo-card .gv{font-size:14px;font-weight:bold;margin-bottom:2px}
+.geo-card .ge{font-size:8px;color:rgba(200,220,255,.5)}
+.geo-card .gd{font-size:7px;color:rgba(200,200,220,.25);margin-top:3px;line-height:1.4}
+.highlight{color:rgba(255,200,100,.8)}
+.prime-badge{display:inline-block;background:rgba(255,100,100,.1);border:1px solid rgba(255,100,100,.2);border-radius:3px;padding:1px 5px;font-size:7px;color:rgba(255,150,150,.6);letter-spacing:1px;margin-left:6px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+<h1>ELEMENTAL SEQUENCES</h1>
+<div class="sub">1999 × FIBONACCI × PRIMES × GEOMETRY — NUMBERS AS MATTER</div>
+
+<div class="section" id="s1999"></div>
+<div class="section" id="sfib"></div>
+<div class="section" id="sprimes"></div>
+<div class="section" id="slucas"></div>
+<div class="section" id="striangular"></div>
+<div class="section" id="scatalan"></div>
+<div class="section" id="smersenne"></div>
+<div class="section" id="szeck"></div>
+<div class="section" id="sgeo"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═══ PERIODIC TABLE DATA ═══
+const EL=[
+  '','H','He','Li','Be','B','C','N','O','F','Ne',
+  'Na','Mg','Al','Si','P','S','Cl','Ar','K','Ca',
+  'Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn',
+  'Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr',
+  'Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn',
+  'Sb','Te','I','Xe','Cs','Ba','La','Ce','Pr','Nd',
+  'Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb',
+  'Lu','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg',
+  'Tl','Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th',
+  'Pa','U','Np','Pu','Am','Cm','Bk','Cf','Es','Fm',
+  'Md','No','Lr','Rf','Db','Sg','Bh','Hs','Mt','Ds',
+  'Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og'
+]
+const NAMES=[
+  '','Hydrogen','Helium','Lithium','Beryllium','Boron','Carbon','Nitrogen','Oxygen','Fluorine','Neon',
+  'Sodium','Magnesium','Aluminum','Silicon','Phosphorus','Sulfur','Chlorine','Argon','Potassium','Calcium',
+  'Scandium','Titanium','Vanadium','Chromium','Manganese','Iron','Cobalt','Nickel','Copper','Zinc',
+  'Gallium','Germanium','Arsenic','Selenium','Bromine','Krypton','Rubidium','Strontium','Yttrium','Zirconium',
+  'Niobium','Molybdenum','Technetium','Ruthenium','Rhodium','Palladium','Silver','Cadmium','Indium','Tin',
+  'Antimony','Tellurium','Iodine','Xenon','Cesium','Barium','Lanthanum','Cerium','Praseodymium','Neodymium',
+  'Promethium','Samarium','Europium','Gadolinium','Terbium','Dysprosium','Holmium','Erbium','Thulium','Ytterbium',
+  'Lutetium','Hafnium','Tantalum','Tungsten','Rhenium','Osmium','Iridium','Platinum','Gold','Mercury',
+  'Thallium','Lead','Bismuth','Polonium','Astatine','Radon','Francium','Radium','Actinium','Thorium',
+  'Protactinium','Uranium','Neptunium','Plutonium','Americium','Curium','Berkelium','Californium','Einsteinium','Fermium',
+  'Mendelevium','Nobelium','Lawrencium','Rutherfordium','Dubnium','Seaborgium','Bohrium','Hassium','Meitnerium','Darmstadtium',
+  'Roentgenium','Copernicium','Nihonium','Flerovium','Moscovium','Livermorium','Tennessine','Oganesson'
+]
+const GEOM=['point','line','triangle','tetrahedron','square','pentagon','hexagon','heptagon',
+  'octahedron','nonagon','decagon','hendecagon','dodecahedron','tridecagon','tetradecagon',
+  'pentadecagon','hexadecagon','heptadecagon','octadecagon','icosahedron']
+const PLATONIC={4:'Tetrahedron',6:'Cube',8:'Octahedron',12:'Dodecahedron',20:'Icosahedron'}
+
+function el(z){return z>=1&&z<=118?{z,sym:EL[z],name:NAMES[z]}:{z,sym:'?'+z,name:'beyond known'}}
+function elHTML(z,note){
+  const e=el(z)
+  return `<div class="elem"><span class="z">${e.z}</span><span class="sym">${e.sym}</span><span class="name">${e.name.toUpperCase()}</span>${note?'<span class="note">'+note+'</span>':''}</div>`
+}
+
+function isPrime(n){if(n<2)return false;if(n<4)return true;if(n%2===0||n%3===0)return false;for(let i=5;i*i<=n;i+=6)if(n%i===0||n%(i+2)===0)return false;return true}
+function factorize(n){const f=[];let d=2;let x=n;while(d*d<=x){while(x%d===0){f.push(d);x/=d}d++}if(x>1)f.push(x);return f}
+function digitSum(n){let s=0,x=n;while(x>0){s+=x%10;x=Math.floor(x/10)}return s}
+function digitalRoot(n){while(n>=10)n=digitSum(n);return n}
+
+// ═══ 1999 ANALYSIS ═══
+;(function(){
+  const N=1999
+  const ds=digitSum(N)
+  const dr=digitalRoot(N)
+  const mod118=(N%118)||118
+  const factors=factorize(N)
+  const prime=isPrime(N)
+
+  // decompositions
+  const digits=[1,9,9,9]
+  const digitEls=digits.map(d=>elHTML(d,'digit'))
+
+  // 1999 = 1000 + 999, or interesting splits
+  const splits=[
+    [19,99,'19×99=1881'],
+    [1,999,'1+999=1000'],
+    [19,9,9,'concatenation']
+  ]
+
+  let h=`<h2>1999 — THE NUMBER ${prime?'<span class="prime-badge">PRIME</span>':''}</h2>`
+  h+=`<div class="eq"><b>1999</b> is the <b>303rd prime</b> — irreducible, indivisible, a fundamental particle of arithmetic</div>`
+  h+=`<div class="eq"><b>digit sum</b>: 1+9+9+9 = <b>${ds}</b> → Element ${ds} = <b>${el(ds).sym}</b> (${el(ds).name})</div>`
+  h+=`<div class="eq"><b>digital root</b>: ${ds} → ${digitSum(ds)} → <b>${dr}</b> → Element ${dr} = <b>${el(dr).sym}</b> (${el(dr).name}) — everything reduces to Hydrogen</div>`
+  h+=`<div class="eq"><b>mod 118</b>: 1999 mod 118 = <b>${mod118}</b> → Element = <b>${el(mod118).sym}</b> (${el(mod118).name})</div>`
+  h+=`<div class="eq"><b>year digits as elements</b>:</div><div class="row">`
+  digits.forEach(d=>{h+=elHTML(d,'digit='+d)})
+  h+=`</div>`
+
+  // nearby primes
+  let prevP=N-1;while(!isPrime(prevP))prevP--
+  let nextP=N+1;while(!isPrime(nextP))nextP++
+  h+=`<div class="eq"><b>prime neighborhood</b>: ...${prevP}, <span class="highlight">1999</span>, ${nextP}...</div>`
+  h+=`<div class="eq"><b>gap</b>: ${N-prevP} before, ${nextP-N} after — <b>${nextP-prevP}</b> total gap</div>`
+
+  // 1999 in other bases
+  h+=`<div class="eq"><b>binary</b>: ${N.toString(2)} (${N.toString(2).length} bits)</div>`
+  h+=`<div class="eq"><b>hex</b>: 0x${N.toString(16).toUpperCase()}</div>`
+  h+=`<div class="eq"><b>base 7</b>: ${N.toString(7)} (7 primes → base 7)</div>`
+
+  // sum of elements
+  h+=`<div class="eq"><b>1999 as element chain</b>: ${N} = `
+  const chain=[]
+  let rem=N
+  while(rem>0){
+    const take=Math.min(rem,118)
+    chain.push(take)
+    rem-=take
+  }
+  h+=chain.map(z=>el(z).sym+'('+z+')').join(' + ')
+  h+=` = ${chain.length} atoms</div>`
+  h+=`<div class="row">`
+  chain.forEach(z=>{h+=elHTML(z)})
+  h+=`</div>`
+
+  document.getElementById('s1999').innerHTML=h
+})()
+
+// ═══ FIBONACCI AS ELEMENTS ═══
+;(function(){
+  const fib=[1,1]
+  while(fib[fib.length-1]<3000)fib.push(fib[fib.length-2]+fib[fib.length-1])
+
+  let h=`<h2>FIBONACCI SEQUENCE → ELEMENTS</h2>`
+  h+=`<div class="eq">Each Fibonacci number maps to an element (mod 118). The golden ratio φ = 1.618... governs the spiral.</div>`
+
+  // find where 1999 sits
+  let fibIdx=-1
+  for(let i=0;i<fib.length-1;i++){
+    if(fib[i]<=1999&&fib[i+1]>1999){fibIdx=i;break}
+  }
+  h+=`<div class="eq"><b>1999</b> sits between F(${fibIdx+1})=<b>${fib[fibIdx]}</b> and F(${fibIdx+2})=<b>${fib[fibIdx+1]}</b></div>`
+  h+=`<div class="eq">ratio: 1999/${fib[fibIdx]} = <b>${(1999/fib[fibIdx]).toFixed(6)}</b> (φ = 1.618034...)</div>`
+
+  h+=`<div class="seq-row">`
+  for(let i=0;i<18;i++){
+    const f=fib[i]
+    const z=(f%118)||118
+    const e=el(z)
+    const isCurrent=i===fibIdx
+    const bg=isCurrent?'rgba(255,200,100,.1)':'rgba(255,255,255,.02)'
+    const border=isCurrent?'rgba(255,200,100,.3)':'rgba(255,255,255,.06)'
+    h+=`<div class="seq-item" style="background:${bg};border:1px solid ${border}">`
+    h+=`<span class="si">F(${i+1})</span>`
+    h+=`<span class="sn" style="color:${isCurrent?'#fda':'rgba(200,220,255,.6)'}">${f}</span>`
+    h+=`<span class="se" style="color:rgba(255,200,100,.5)">${e.sym}</span>`
+    h+=`</div>`
+    if(i<17)h+=`<span class="arrow">→</span>`
+  }
+  h+=`</div>`
+
+  // Fibonacci as geometry: F(n) vertices polygon
+  h+=`<div class="eq" style="margin-top:10px"><b>geometric interpretation</b>: F(n) = number of vertices in the nth Fibonacci polygon</div>`
+  h+=`<div class="grid">`
+  for(let i=0;i<10;i++){
+    const f=fib[i]
+    const geoName=f<=20?(GEOM[f-1]||f+'-gon'):f+'-gon'
+    const z=(f%118)||118
+    h+=`<div class="geo-card"><div class="gn">F(${i+1})</div><div class="gv" style="color:rgba(255,200,100,.7)">${f}</div><div class="ge">${el(z).sym} · ${geoName}</div><div class="gd">${f} vertices, ${f} edges</div></div>`
+  }
+  h+=`</div>`
+
+  document.getElementById('sfib').innerHTML=h
+})()
+
+// ═══ PRIMES AS ELEMENTS ═══
+;(function(){
+  const primes=[]
+  for(let n=2;primes.length<30;n++)if(isPrime(n))primes.push(n)
+
+  let h=`<h2>PRIME SEQUENCE → ELEMENTS</h2>`
+  h+=`<div class="eq">Primes are the atoms of arithmetic. 1999 is the <b>303rd prime</b>.</div>`
+  h+=`<div class="eq">Super-prime chain (prime-indexed primes): `
+  let sp=[2];for(let i=0;i<6;i++){let idx=sp[sp.length-1];sp.push(primes[idx-1]||0)}
+  h+=sp.filter(x=>x).map(p=>`<b>${p}</b>(${el((p%118)||118).sym})`).join(' → ')
+  h+=`</div>`
+
+  h+=`<div class="seq-row">`
+  for(let i=0;i<20;i++){
+    const p=primes[i]
+    const z=(p%118)||118
+    h+=`<div class="seq-item" style="background:rgba(255,100,100,.04);border:1px solid rgba(255,100,100,.1)">`
+    h+=`<span class="si">P(${i+1})</span>`
+    h+=`<span class="sn" style="color:rgba(255,150,150,.7)">${p}</span>`
+    h+=`<span class="se" style="color:rgba(255,200,100,.5)">${el(z).sym}</span>`
+    h+=`</div>`
+    if(i<19)h+=`<span class="arrow">→</span>`
+  }
+  h+=`</div>`
+
+  // prime factorization of numbers around 1999
+  h+=`<div class="eq" style="margin-top:10px"><b>neighborhood factorizations</b>:</div>`
+  for(let n=1996;n<=2002;n++){
+    const f=factorize(n)
+    const p=isPrime(n)
+    h+=`<div class="eq">${p?'<span class="highlight">':''}${n}${p?' (PRIME)':''} = ${f.join(' × ')}${p?'</span>':''}`
+    h+=` → [${f.map(x=>el((x%118)||118).sym).join(', ')}]</div>`
+  }
+
+  document.getElementById('sprimes').innerHTML=h
+})()
+
+// ═══ LUCAS NUMBERS ═══
+;(function(){
+  const lucas=[2,1]
+  while(lucas[lucas.length-1]<3000)lucas.push(lucas[lucas.length-2]+lucas[lucas.length-1])
+
+  let h=`<h2>LUCAS SEQUENCE → ELEMENTS</h2>`
+  h+=`<div class="eq">Lucas numbers: like Fibonacci but start 2, 1. L(n) = F(n-1) + F(n+1). The companion sequence.</div>`
+  h+=`<div class="seq-row">`
+  for(let i=0;i<16;i++){
+    const l=lucas[i]
+    const z=(l%118)||118
+    h+=`<div class="seq-item" style="background:rgba(100,200,255,.04);border:1px solid rgba(100,200,255,.1)">`
+    h+=`<span class="si">L(${i+1})</span>`
+    h+=`<span class="sn" style="color:rgba(100,200,255,.7)">${l}</span>`
+    h+=`<span class="se" style="color:rgba(255,200,100,.5)">${el(z).sym}</span>`
+    h+=`</div>`
+    if(i<15)h+=`<span class="arrow">→</span>`
+  }
+  h+=`</div>`
+
+  // Lucas primality test for 1999
+  h+=`<div class="eq"><b>Lucas primality</b>: 1999 is prime ⟹ L(1999) ≡ 1 (mod 1999) ✓</div>`
+
+  document.getElementById('slucas').innerHTML=h
+})()
+
+// ═══ TRIANGULAR NUMBERS ═══
+;(function(){
+  let h=`<h2>TRIANGULAR NUMBERS → ELEMENTS</h2>`
+  h+=`<div class="eq">T(n) = n(n+1)/2 — the number of dots in a triangle with n rows.</div>`
+
+  // Is 1999 triangular?
+  const disc=Math.sqrt(1+8*1999)
+  const isTriang=disc===Math.floor(disc)&&(Math.floor(disc)-1)%2===0
+  const nearN=Math.floor((-1+Math.sqrt(1+8*1999))/2)
+  h+=`<div class="eq"><b>1999</b> is ${isTriang?'':'NOT '}triangular. Nearest: T(${nearN})=${nearN*(nearN+1)/2}, T(${nearN+1})=${(nearN+1)*(nearN+2)/2}</div>`
+  h+=`<div class="eq">1999 sits at row ~<b>${nearN}</b> of Pascal's triangle (${nearN*(nearN+1)/2} dots needed, short by ${1999-nearN*(nearN+1)/2})</div>`
+
+  h+=`<div class="seq-row">`
+  for(let n=1;n<=15;n++){
+    const t=n*(n+1)/2
+    const z=(t%118)||118
+    h+=`<div class="seq-item" style="background:rgba(100,255,100,.03);border:1px solid rgba(100,255,100,.08)">`
+    h+=`<span class="si">T(${n})</span>`
+    h+=`<span class="sn" style="color:rgba(100,255,150,.6)">${t}</span>`
+    h+=`<span class="se" style="color:rgba(255,200,100,.5)">${el(z).sym}</span>`
+    h+=`</div>`
+    if(n<15)h+=`<span class="arrow">→</span>`
+  }
+  h+=`</div>`
+
+  document.getElementById('striangular').innerHTML=h
+})()
+
+// ═══ CATALAN NUMBERS ═══
+;(function(){
+  function catalan(n){let c=1;for(let i=0;i<n;i++){c=c*2*(2*i+1)/(i+2)}return Math.round(c)}
+  let h=`<h2>CATALAN NUMBERS → ELEMENTS</h2>`
+  h+=`<div class="eq">C(n) = (2n)! / ((n+1)! × n!) — counts valid parenthesizations, binary trees, polygon triangulations.</div>`
+
+  h+=`<div class="seq-row">`
+  for(let n=0;n<=12;n++){
+    const c=catalan(n)
+    const z=(c%118)||118
+    h+=`<div class="seq-item" style="background:rgba(255,100,255,.03);border:1px solid rgba(255,100,255,.08)">`
+    h+=`<span class="si">C(${n})</span>`
+    h+=`<span class="sn" style="color:rgba(255,150,255,.6)">${c>99999?c.toExponential(1):c}</span>`
+    h+=`<span class="se" style="color:rgba(255,200,100,.5)">${el(z).sym}</span>`
+    h+=`</div>`
+    if(n<12)h+=`<span class="arrow">→</span>`
+  }
+  h+=`</div>`
+
+  h+=`<div class="eq"><b>C(n) geometries</b>: C(3)=5 ways to triangulate a pentagon, C(4)=14 ways to triangulate a hexagon</div>`
+
+  document.getElementById('scatalan').innerHTML=h
+})()
+
+// ═══ MERSENNE NUMBERS ═══
+;(function(){
+  const mersenne=[3,7,31,127,8191]
+  const mersenneP=[2,3,5,7,13]
+
+  let h=`<h2>MERSENNE PRIMES → ELEMENTS</h2>`
+  h+=`<div class="eq">M(p) = 2ᵖ - 1 — primes of the form one-less-than-a-power-of-two. The rarest atoms.</div>`
+
+  h+=`<div class="seq-row">`
+  for(let i=0;i<5;i++){
+    const m=mersenne[i]
+    const z=(m%118)||118
+    h+=`<div class="seq-item" style="background:rgba(255,200,50,.04);border:1px solid rgba(255,200,50,.12)">`
+    h+=`<span class="si">M(${mersenneP[i]})</span>`
+    h+=`<span class="sn" style="color:rgba(255,220,100,.7)">${m}</span>`
+    h+=`<span class="se" style="color:rgba(255,200,100,.6)">${el(z).sym}</span>`
+    h+=`</div>`
+    if(i<4)h+=`<span class="arrow">→</span>`
+  }
+  h+=`</div>`
+
+  h+=`<div class="eq"><b>1999 and Mersenne</b>: 2¹⁰ = 1024, 2¹¹ = 2048. So 1999 = 2¹¹ - 49 = 2048 - 49</div>`
+  h+=`<div class="eq">49 = 7² — the square of the 4th prime. 1999 is a Mersenne number <b>minus a prime square</b>.</div>`
+  h+=`<div class="eq">M(7) = 127 → Element 127 is beyond known, but 127 mod 118 = 9 = <b>Fluorine</b> (most reactive element)</div>`
+
+  document.getElementById('smersenne').innerHTML=h
+})()
+
+// ═══ ZECKENDORF REPRESENTATION ═══
+;(function(){
+  const fib=[1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,1597,2584]
+
+  function zeckendorf(n){
+    const terms=[];let rem=n
+    for(let i=fib.length-1;i>=0&&rem>0;i--){
+      if(fib[i]<=rem){terms.push(fib[i]);rem-=fib[i]}
+    }
+    return terms
+  }
+
+  const z=zeckendorf(1999)
+
+  let h=`<h2>ZECKENDORF DECOMPOSITION OF 1999</h2>`
+  h+=`<div class="eq">Every positive integer has a unique representation as sum of non-consecutive Fibonacci numbers.</div>`
+  h+=`<div class="eq"><b>1999</b> = ${z.join(' + ')}</div>`
+  h+=`<div class="row">`
+  z.forEach(f=>{
+    const idx=fib.indexOf(f)+1
+    const ze=(f%118)||118
+    h+=elHTML(ze,'F('+idx+')='+f)
+  })
+  h+=`</div>`
+  h+=`<div class="eq"><b>${z.length} Fibonacci components</b> — 1999 decomposes into ${z.length} golden atoms</div>`
+
+  // each component's element
+  h+=`<div class="eq">elemental formula: `
+  h+=z.map(f=>{const ze=(f%118)||118;return el(ze).sym}).join(' + ')
+  h+=`</div>`
+
+  document.getElementById('szeck').innerHTML=h
+})()
+
+// ═══ GEOMETRIC PROPERTIES ═══
+;(function(){
+  let h=`<h2>1999 AS GEOMETRY</h2>`
+  h+=`<div class="grid">`
+
+  const geos=[
+    {name:'Regular 1999-gon',val:'1999 vertices',desc:'Interior angle: '+((1999-2)*180/1999).toFixed(4)+'°',el:el(((1999-2)%118)||118)},
+    {name:'1999-simplex',val:'2000 vertices',desc:'1999-dimensional tetrahedron\n'+1999+' faces meet at each vertex',el:el((2000%118)||118)},
+    {name:'1999-cube',val:'2¹⁹⁹⁹ vertices',desc:'Hypercube in 1999 dimensions\nEdges per vertex: 1999',el:el(1)},
+    {name:'Diagonal count',val:1999*(1999-3)/2,desc:'Diagonals in a 1999-gon\n='+1999*(1999-3)/2,el:el((1999*(1999-3)/2%118)||118)},
+    {name:'Star polygon',val:'{1999/φ}',desc:'1999 is prime → 999 distinct\nstar polygon forms',el:el(((999)%118)||118)},
+    {name:'Circle packing',val:'Layer ~25',desc:'√(1999/π) ≈ 25.2\n~25 concentric rings',el:el(25)},
+    {name:'Platonic echo',val:'mod 5 = 4',desc:'1999 mod 5 = 4\nNearest Platonic: Octahedron (8 faces)',el:el(8)},
+    {name:'Sphere packing',val:'dim 1999',desc:'Kissing number grows with dimension\nIn dim 1999: astronomical contacts',el:el((1999%118)||118)},
+  ]
+
+  geos.forEach(g=>{
+    h+=`<div class="geo-card"><div class="gn">${g.name}</div><div class="gv" style="color:rgba(200,220,255,.6)">${g.val}</div><div class="ge">${g.el.sym} (${g.el.z})</div><div class="gd">${g.desc}</div></div>`
+  })
+  h+=`</div>`
+
+  // the big connection
+  h+=`<div class="eq" style="margin-top:14px;color:rgba(255,200,100,.5)"><b>THE IDENTITY</b></div>`
+  h+=`<div class="eq">1999 is prime → it IS an element of arithmetic</div>`
+  h+=`<div class="eq">digit sum 28 = Nickel = ferromagnetic = forms permanent magnets</div>`
+  h+=`<div class="eq">digital root 1 = Hydrogen = everything begins and ends here</div>`
+  h+=`<div class="eq">mod 118 = 111 = Roentgenium (Rg) = named after the discoverer of X-rays</div>`
+  h+=`<div class="eq">1999 = 1597 + 377 + 21 + 3 + 1 → Zeckendorf: 5 golden atoms</div>`
+  h+=`<div class="eq">a prime number that reduces to 1. irreducible yet fundamental. <b>the last year of the old millennium.</b></div>`
+
+  document.getElementById('sgeo').innerHTML=h
+})()
+
+// ═══ 3D BACKGROUND ═══
+const cv=document.getElementById('c')
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true})
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2))
+const sc=new THREE.Scene()
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,2000)
+camera.position.set(0,0,30)
+
+// spiral of 1999 points
+const spiralGeo=new THREE.BufferGeometry()
+const spiralPos=new Float32Array(1999*3)
+const spiralCol=new Float32Array(1999*3)
+for(let i=0;i<1999;i++){
+  const th=i*.1
+  const r=.5+i*.008
+  const y=(i/1999-.5)*20
+  spiralPos[i*3]=Math.cos(th)*r
+  spiralPos[i*3+1]=y
+  spiralPos[i*3+2]=Math.sin(th)*r
+  const c=new THREE.Color().setHSL(i/1999,.6,.4)
+  spiralCol[i*3]=c.r;spiralCol[i*3+1]=c.g;spiralCol[i*3+2]=c.b
+}
+spiralGeo.setAttribute('position',new THREE.BufferAttribute(spiralPos,3))
+spiralGeo.setAttribute('color',new THREE.BufferAttribute(spiralCol,3))
+const spiral=new THREE.Points(spiralGeo,new THREE.PointsMaterial({
+  size:.15,transparent:true,opacity:.3,vertexColors:true,blending:THREE.AdditiveBlending
+}))
+sc.add(spiral)
+
+function animate(ts){
+  requestAnimationFrame(animate)
+  const t=ts*.001
+  spiral.rotation.y=t*.05
+  spiral.rotation.x=Math.sin(t*.03)*.1
+  const scrollY=window.scrollY||0
+  camera.position.y=-scrollY*.01
+  renderer.render(sc,camera)
+}
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)})
+animate(0)
+</script>
+</body></html>
