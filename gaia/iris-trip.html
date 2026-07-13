@@ -207,6 +207,63 @@ function render(){
   ctx.fillStyle=`rgba(0,0,0,${.08+vol*.1})`
   ctx.fillRect(0,0,W,H)
 
+  // ═══ LAYER 0: deep rainbow mandala wash ═══
+  for(let ring=0;ring<8;ring++){
+    const rr=maxR*.3+ring*maxR*.1
+    const segments=12+ring*4
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(t*.02*(ring%2?1:-1))
+    ctx.globalAlpha=.02+bass*.04+vol*.03
+    for(let s=0;s<segments;s++){
+      const a1=s*TAU/segments,a2=(s+1)*TAU/segments
+      const hue=(t*8+ring*30+s*(360/segments))%360
+      ctx.beginPath();ctx.moveTo(0,0)
+      ctx.arc(0,0,rr,a1,a2);ctx.closePath()
+      ctx.fillStyle=`hsla(${hue},70%,${30+vol*25}%,1)`;ctx.fill()
+    }
+    ctx.restore()
+  }
+
+  // ═══ LAYER 0b: petal flowers — multiple rings ═══
+  for(let fl=0;fl<4;fl++){
+    const petalCount=[5,8,13,21][fl]
+    const petalR=maxR*(.2+fl*.18)
+    const petalLen=maxR*(.08+fl*.05)+bass*20
+    const petalW=petalLen*(.3+mid*.2)
+    ctx.save();ctx.translate(cx,cy)
+    ctx.rotate(t*(.1+fl*.05)*(fl%2?-1:1))
+    ctx.globalAlpha=.04+vol*.08
+    for(let p=0;p<petalCount;p++){
+      const a=p*TAU/petalCount
+      const hue=(t*12+fl*60+p*(360/petalCount))%360
+      ctx.save();ctx.rotate(a)
+      ctx.beginPath()
+      ctx.moveTo(petalR,0)
+      ctx.bezierCurveTo(petalR+petalLen*.4,petalW,petalR+petalLen*.7,petalW*.6,petalR+petalLen,0)
+      ctx.bezierCurveTo(petalR+petalLen*.7,-petalW*.6,petalR+petalLen*.4,-petalW,petalR,0)
+      ctx.closePath()
+      const grad=ctx.createLinearGradient(petalR,0,petalR+petalLen,0)
+      grad.addColorStop(0,`hsla(${hue},80%,${40+high*20}%,.8)`)
+      grad.addColorStop(.5,`hsla(${(hue+30)%360},90%,${50+vol*20}%,.6)`)
+      grad.addColorStop(1,`hsla(${(hue+60)%360},70%,${35+bass*15}%,.2)`)
+      ctx.fillStyle=grad;ctx.fill()
+      ctx.restore()
+    }
+    ctx.restore()
+  }
+
+  // ═══ LAYER 0c: chromatic halo rings ═══
+  for(let h=0;h<6;h++){
+    const hr=maxR*(.4+h*.1)+Math.sin(t+h)*(10+bass*15)
+    const hue=(t*20+h*60)%360
+    ctx.beginPath();ctx.arc(cx,cy,hr,0,TAU)
+    ctx.strokeStyle=`hsla(${hue},85%,55%,${.03+vol*.06})`
+    ctx.lineWidth=2+mid*4+Math.sin(t*2+h)*2
+    ctx.shadowColor=`hsla(${hue},90%,50%,.3)`
+    ctx.shadowBlur=10+vol*20
+    ctx.stroke()
+    ctx.shadowBlur=0
+  }
+
   // ═══ LAYER 1: deep background sacred geometry ═══
   const geoAlpha=.03+bass*.08
   drawSacredGeo(cx,cy,maxR*.9,7,t*.02,`hsla(${t*5%360},60%,40%,1)`,geoAlpha)
@@ -331,6 +388,119 @@ function render(){
       ctx.lineWidth=1
       ctx.stroke()
     }
+  }
+
+  // ═══ LAYER 13: lotus petal overlay — inner flower ═══
+  const lotusLayers=[
+    {petals:6,r:maxR*.12,len:maxR*.1,hueOff:0,rot:t*.2,wFactor:.5},
+    {petals:12,r:maxR*.18,len:maxR*.12,hueOff:30,rot:-t*.15,wFactor:.4},
+    {petals:18,r:maxR*.26,len:maxR*.1,hueOff:60,rot:t*.1,wFactor:.35}
+  ]
+  lotusLayers.forEach(l=>{
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(l.rot)
+    ctx.globalAlpha=.06+vol*.12
+    const pLen=l.len+bass*15+vol*20
+    for(let p=0;p<l.petals;p++){
+      const a=p*TAU/l.petals
+      const hue=(t*15+l.hueOff+p*(360/l.petals))%360
+      ctx.save();ctx.rotate(a)
+      ctx.beginPath();ctx.moveTo(l.r,0)
+      const w=pLen*l.wFactor
+      ctx.bezierCurveTo(l.r+pLen*.3,w*.7,l.r+pLen*.6,w*.9,l.r+pLen,0)
+      ctx.bezierCurveTo(l.r+pLen*.6,-w*.9,l.r+pLen*.3,-w*.7,l.r,0)
+      ctx.fillStyle=`hsla(${hue},75%,${45+high*20}%,.6)`
+      ctx.fill()
+      ctx.strokeStyle=`hsla(${(hue+20)%360},85%,60%,.3)`
+      ctx.lineWidth=.5;ctx.stroke()
+      ctx.restore()
+    }
+    ctx.restore()
+  })
+
+  // ═══ LAYER 14: color smoke rings ═══
+  for(let sm=0;sm<5;sm++){
+    const smokePhase=(t*.3+sm*.2)%1
+    const smokeR=maxR*(.15+smokePhase*.7)
+    const smokeAlpha=(1-smokePhase)*(.03+vol*.08)
+    const hue=(t*25+sm*72)%360
+    ctx.beginPath()
+    for(let a=0;a<=TAU;a+=.03){
+      const wobble=Math.sin(a*8+t*3+sm*2)*5*(1+bass*10)*smokePhase
+      const rr=smokeR+wobble
+      const px=cx+Math.cos(a)*rr,py=cy+Math.sin(a)*rr
+      a===0?ctx.moveTo(px,py):ctx.lineTo(px,py)
+    }
+    ctx.closePath()
+    ctx.strokeStyle=`hsla(${hue},70%,55%,${smokeAlpha})`
+    ctx.lineWidth=3+mid*5
+    ctx.shadowColor=`hsla(${hue},80%,50%,.2)`
+    ctx.shadowBlur=15
+    ctx.stroke()
+    ctx.shadowBlur=0
+  }
+
+  // ═══ LAYER 15: starburst rays from center ═══
+  if(vol>.01){
+    ctx.save();ctx.translate(cx,cy)
+    const rayCount=24+Math.floor(high*20)
+    ctx.globalAlpha=vol*.4
+    for(let r=0;r<rayCount;r++){
+      const a=r*TAU/rayCount+t*.1
+      const rayLen=maxR*(.3+bass*.5+Math.sin(t*4+r)*.1)
+      const hue=(t*30+r*(360/rayCount))%360
+      const grad=ctx.createLinearGradient(0,0,Math.cos(a)*rayLen,Math.sin(a)*rayLen)
+      grad.addColorStop(0,`hsla(${hue},90%,60%,.4)`)
+      grad.addColorStop(1,`hsla(${hue},80%,40%,0)`)
+      ctx.beginPath();ctx.moveTo(0,0)
+      ctx.lineTo(Math.cos(a)*rayLen,Math.sin(a)*rayLen)
+      ctx.strokeStyle=grad
+      ctx.lineWidth=1+bass*3
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+
+  // ═══ LAYER 16: rotating color vortex ═══
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(t*.08)
+  ctx.globalAlpha=.02+vol*.05
+  for(let v=0;v<36;v++){
+    const a=v*TAU/36
+    const vr=maxR*(.5+Math.sin(t+v*.3)*.15)
+    const hue=(t*10+v*10+pitchNorm*120)%360
+    ctx.beginPath()
+    ctx.arc(Math.cos(a)*vr*.3,Math.sin(a)*vr*.3,vr*.08+mid*8,0,TAU)
+    ctx.fillStyle=`hsla(${hue},80%,50%,1)`;ctx.fill()
+  }
+  ctx.restore()
+
+  // ═══ LAYER 17: outer petal crown ═══
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(-t*.06)
+  ctx.globalAlpha=.04+bass*.08
+  for(let p=0;p<24;p++){
+    const a=p*TAU/24
+    const hue=(t*8+p*15)%360
+    const pR=maxR*.85+Math.sin(t+p)*(5+bass*10)
+    const pLen=maxR*.12+mid*20+Math.sin(t*2+p*.5)*5
+    ctx.save();ctx.rotate(a);ctx.translate(pR,0);ctx.rotate(Math.sin(t+p)*.3)
+    ctx.beginPath();ctx.ellipse(0,0,pLen,pLen*.35,0,0,TAU)
+    const grad=ctx.createRadialGradient(0,0,0,0,0,pLen)
+    grad.addColorStop(0,`hsla(${hue},85%,55%,.7)`)
+    grad.addColorStop(1,`hsla(${(hue+40)%360},70%,40%,.1)`)
+    ctx.fillStyle=grad;ctx.fill()
+    ctx.restore()
+  }
+  ctx.restore()
+
+  // ═══ LAYER 18: glowing particle dust ═══
+  ctx.globalAlpha=.3+vol*.4
+  for(let d=0;d<40;d++){
+    const da=t*.15+d*PHI*TAU
+    const dr=maxR*(.1+((d*PHI)%1)*.8)+Math.sin(t+d)*10
+    const dx=cx+Math.cos(da)*dr,dy=cy+Math.sin(da)*dr
+    const ds=1+vol*3+Math.sin(t*3+d)
+    const hue=(t*20+d*9)%360
+    ctx.beginPath();ctx.arc(dx,dy,ds,0,TAU)
+    ctx.fillStyle=`hsla(${hue},80%,60%,1)`;ctx.fill()
   }
 }
 
