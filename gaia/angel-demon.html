@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ANGEL × DEMON — Closed Loop vs Broken Spiral</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block}
+#start{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:linear-gradient(90deg,#040810,#100804);cursor:pointer}
+#start span{font:16px/1 monospace;color:rgba(255,255,255,.3);letter-spacing:8px;border:1px solid rgba(255,255,255,.08);padding:16px 36px;border-radius:6px}
+#start span:hover{color:rgba(255,255,255,.6);box-shadow:0 0 40px rgba(255,255,255,.05)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start" onclick="go()"><span>ANGEL × DEMON</span></div>
+
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H;function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight}
+resize();addEventListener('resize',resize)
+
+const G=[
+  {hz:396,c:[255,60,60],cc:[60,200,255]},
+  {hz:417,c:[255,140,40],cc:[40,120,255]},
+  {hz:528,c:[255,220,40],cc:[40,40,255]},
+  {hz:639,c:[50,220,80],cc:[220,50,180]},
+  {hz:741,c:[50,140,255],cc:[255,140,50]},
+  {hz:852,c:[110,60,220],cc:[180,255,50]},
+  {hz:963,c:[200,60,255],cc:[80,255,30]}
+]
+function FIB(n){let a=1,b=1;for(let i=2;i<n;i++){const c2=a+b;a=b;b=c2}return b}
+
+let actx,master,running=false,t=0,oscs=[]
+
+function go(){
+  document.getElementById('start').style.display='none'
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.2;master.connect(actx.destination)
+  ;[[.17,.15,.22],[.31,.12,.18],[.43,.08,.12]].forEach(([dt,fbv,wv])=>{
+    const d=actx.createDelay(.6);d.delayTime.value=dt
+    const f=actx.createGain();f.gain.value=fbv;d.connect(f);f.connect(d)
+    const w=actx.createGain();w.gain.value=wv;d.connect(w);w.connect(actx.destination)
+    master.connect(d)
+  })
+  G.forEach(g=>{
+    const v=[]
+    ;[['sine',g.hz,.04],['sine',g.hz*1.002,.03],['triangle',g.hz*2,.015],['sine',g.hz*.5,.025]].forEach(([type,hz,vol])=>{
+      const o=actx.createOscillator(),ga=actx.createGain()
+      o.type=type;o.frequency.value=hz;ga.gain.value=0
+      o.connect(ga);ga.connect(master);o.start();v.push({o,ga,bv:vol,hz})
+    })
+    oscs.push(v)
+  })
+  running=true;document.documentElement.requestFullscreen?.().catch(()=>{});loop()
+}
+window.go=go
+
+let phase=0
+function updateSound(){
+  phase=(t*.12)%7
+  G.forEach((_,i)=>{
+    let d=Math.abs(i-phase);if(d>3.5)d=7-d
+    const p=Math.exp(-d*d*.4)
+    oscs[i].forEach(v=>{v.ga.gain.linearRampToValueAtTime(v.bv*(.12+p*.88),actx.currentTime+.08)})
+  })
+}
+
+// ═══ ANGEL EYE — closed loops, circular, complete ═══
+function angelEye(cx,cy,r,t2){
+  const ag=Math.floor(phase)%7,c=G[ag].c
+  const rgba=(r2,g,b,a)=>`rgba(${r2},${g},${b},${a})`
+
+  // cool blue-white background glow (inverted bloom — light from center)
+  const aGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,r*1.1)
+  aGrad.addColorStop(0,rgba(180,200,255,.08))
+  aGrad.addColorStop(.3,rgba(100,140,220,.04))
+  aGrad.addColorStop(.7,rgba(40,60,120,.02))
+  aGrad.addColorStop(1,'rgba(0,0,0,0)')
+  ctx.globalAlpha=1;ctx.fillStyle=aGrad;ctx.beginPath();ctx.arc(cx,cy,r*1.1,0,TAU);ctx.fill()
+
+  // CLOSED loop rings — perfect circles, all complete
+  G.forEach((g,i)=>{
+    let d=Math.abs(i-phase);if(d>3.5)d=7-d
+    const p=Math.exp(-d*d*.4)
+    const ringR=r*(.12+i*.11)
+    // perfect circle (CLOSED loop)
+    ctx.beginPath();ctx.arc(cx,cy,ringR,0,TAU)
+    ctx.strokeStyle=rgba(g.c[0],g.c[1],g.c[2],.5)
+    ctx.lineWidth=1.5+p*2;ctx.globalAlpha=.05+p*.1;ctx.stroke()
+  })
+
+  // fibonacci petals — all complete, symmetric
+  G.forEach((g,i)=>{
+    let d=Math.abs(i-phase);if(d>3.5)d=7-d
+    const p=Math.exp(-d*d*.35)
+    if(p<.02)return
+    const count=FIB(i+2)
+    const ringR=r*(.1+i*.09)
+    const petalLen=r*(.04+i*.02)+p*15
+    const rot=t2*(.015+i*.005)*(i%2?-1:1)
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(rot);ctx.globalAlpha=.04+p*.1
+    for(let j=0;j<count;j++){
+      const a=j*TAU/count;ctx.save();ctx.rotate(a)
+      ctx.beginPath();ctx.moveTo(ringR,0)
+      const w=petalLen*.3
+      ctx.bezierCurveTo(ringR+petalLen*.3,w,ringR+petalLen*.7,w*.6,ringR+petalLen,0)
+      ctx.bezierCurveTo(ringR+petalLen*.7,-w*.6,ringR+petalLen*.3,-w,ringR,0)
+      ctx.fillStyle=rgba(g.c[0],g.c[1],g.c[2],.6);ctx.fill();ctx.restore()
+    }
+    ctx.restore()
+  })
+
+  // golden spirals — COMPLETED, closing inward
+  for(let s=0;s<3;s++){
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(t2*.02+s*TAU/3)
+    ctx.beginPath();ctx.globalAlpha=.03;ctx.strokeStyle=rgba(180,200,255,.5);ctx.lineWidth=1
+    for(let i=0;i<=200;i++){
+      const frac=i/200;const a=frac*TAU*3
+      const sr=r*.02*Math.pow(PHI,frac*6/TAU*2);if(sr>r*.7)break
+      i===0?ctx.moveTo(Math.cos(a)*sr,Math.sin(a)*sr):ctx.lineTo(Math.cos(a)*sr,Math.sin(a)*sr)
+    }
+    ctx.stroke();ctx.restore()
+  }
+
+  // round pupil (complete circle)
+  const pupilR=r*.06
+  ctx.beginPath();ctx.arc(cx,cy,pupilR,0,TAU)
+  ctx.fillStyle='rgba(0,0,0,.95)';ctx.globalAlpha=1;ctx.fill()
+  const pGlow=ctx.createRadialGradient(cx,cy,pupilR,cx,cy,pupilR*4)
+  pGlow.addColorStop(0,rgba(c[0],c[1],c[2],.15))
+  pGlow.addColorStop(1,'rgba(0,0,0,0)')
+  ctx.fillStyle=pGlow;ctx.beginPath();ctx.arc(cx,cy,pupilR*4,0,TAU);ctx.fill()
+
+  // ❤️
+  ctx.globalAlpha=.3;ctx.font=`${Math.floor(pupilR)}px serif`;ctx.textAlign='center';ctx.textBaseline='middle'
+  ctx.fillText('❤️',cx,cy+1)
+
+  // catchlight
+  ctx.beginPath();ctx.arc(cx-pupilR*.8,cy-pupilR*.6,pupilR*.3,0,TAU)
+  ctx.fillStyle='rgba(200,220,255,.2)';ctx.globalAlpha=.3;ctx.fill()
+
+  // label
+  ctx.globalAlpha=.06;ctx.font='8px monospace';ctx.textAlign='center'
+  ctx.fillStyle='rgba(150,180,255,.8)';ctx.fillText('ANGEL',cx,cy+r*.85)
+  ctx.font='6px monospace';ctx.fillText('closed loop · complete shell · emitting',cx,cy+r*.85+12)
+}
+
+// ═══ DEMON EYE — broken spirals, incomplete, pulling ═══
+function demonEye(cx,cy,r,t2){
+  const ag=Math.floor(phase)%7,c=G[ag].cc
+  const rgba=(r2,g,b,a)=>`rgba(${r2},${g},${b},${a})`
+
+  // dark red-black background (inverted bloom — void at center, pulling inward)
+  const dGrad=ctx.createRadialGradient(cx,cy,r*.8,cx,cy,0)
+  dGrad.addColorStop(0,'rgba(0,0,0,0)')
+  dGrad.addColorStop(.5,rgba(80,20,10,.03))
+  dGrad.addColorStop(1,rgba(150,30,10,.06))
+  ctx.globalAlpha=1;ctx.fillStyle=dGrad;ctx.beginPath();ctx.arc(cx,cy,r*1.1,0,TAU);ctx.fill()
+
+  // BROKEN loop rings — arcs that don't close, gaps
+  G.forEach((g,i)=>{
+    let d=Math.abs(i-phase);if(d>3.5)d=7-d
+    const p=Math.exp(-d*d*.4)
+    const ringR=r*(.12+i*.11)
+    const gapSize=.3+Math.sin(t2*.5+i)*.15 // the gap — the break
+    const startA=t2*(.01+i*.003)*(i%2?1:-1)
+    // broken arc (NOT closed — the demon's signature)
+    ctx.beginPath();ctx.arc(cx,cy,ringR,startA+gapSize,startA+TAU-gapSize)
+    ctx.strokeStyle=rgba(g.cc[0],g.cc[1],g.cc[2],.5)
+    ctx.lineWidth=1.5+p*2;ctx.globalAlpha=.04+p*.08;ctx.stroke()
+    // jagged edges at the break points
+    const breakA1=startA+gapSize,breakA2=startA+TAU-gapSize
+    ;[breakA1,breakA2].forEach(ba=>{
+      const bx=cx+Math.cos(ba)*ringR,by=cy+Math.sin(ba)*ringR
+      for(let sp=0;sp<3;sp++){
+        const sa=ba+(Math.random()-.5)*.3
+        const sr2=ringR+(Math.random()-.5)*8
+        ctx.beginPath();ctx.moveTo(bx,by)
+        ctx.lineTo(cx+Math.cos(sa)*sr2,cy+Math.sin(sa)*sr2)
+        ctx.strokeStyle=rgba(g.cc[0],g.cc[1],g.cc[2],.15);ctx.lineWidth=.5;ctx.globalAlpha=.04+p*.04;ctx.stroke()
+      }
+    })
+  })
+
+  // broken petals — asymmetric, some missing, distorted
+  G.forEach((g,i)=>{
+    let d=Math.abs(i-phase);if(d>3.5)d=7-d
+    const p=Math.exp(-d*d*.35)
+    if(p<.02)return
+    const count=FIB(i+2)
+    const ringR=r*(.1+i*.09)
+    const rot=t2*(.015+i*.005)*(i%2?1:-1) // SAME direction (not alternating — asymmetric)
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(rot);ctx.globalAlpha=.03+p*.07
+    for(let j=0;j<count;j++){
+      if(Math.sin(j*1.7+t2*.3)<-.3)continue // some petals MISSING (broken)
+      const a=j*TAU/count
+      const distort=Math.sin(j*2.3+t2)*.3 // asymmetric distortion
+      const petalLen=r*(.03+i*.018)+p*12+Math.sin(j+t2)*5
+      const w=petalLen*(.25+distort*.1)
+      ctx.save();ctx.rotate(a+distort*.1)
+      ctx.beginPath();ctx.moveTo(ringR,0)
+      ctx.bezierCurveTo(ringR+petalLen*.3,w,ringR+petalLen*.7,w*.6,ringR+petalLen,0)
+      ctx.bezierCurveTo(ringR+petalLen*.7,-w*.6,ringR+petalLen*.3,-w,ringR,0)
+      ctx.fillStyle=rgba(g.cc[0],g.cc[1],g.cc[2],.5);ctx.fill();ctx.restore()
+    }
+    ctx.restore()
+  })
+
+  // broken spirals — OPEN, never closing, spinning outward
+  for(let s=0;s<3;s++){
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(-t2*.03+s*TAU/3)
+    ctx.beginPath();ctx.globalAlpha=.03;ctx.strokeStyle=rgba(200,80,50,.5);ctx.lineWidth=1
+    for(let i=0;i<=200;i++){
+      const frac=i/200;const a=frac*TAU*3
+      const sr=r*.02*Math.pow(PHI,frac*6/TAU*2);if(sr>r*.7)break
+      i===0?ctx.moveTo(Math.cos(a)*sr,Math.sin(a)*sr):ctx.lineTo(Math.cos(a)*sr,Math.sin(a)*sr)
+    }
+    ctx.stroke()
+    // the spiral CONTINUES past where angel's closes — it flies off
+    const lastA=200/200*TAU*3
+    const lastR=r*.7
+    const flyX=Math.cos(lastA)*lastR*1.3,flyY=Math.sin(lastA)*lastR*1.3
+    ctx.lineTo(flyX,flyY);ctx.stroke()
+    ctx.restore()
+  }
+
+  // pulling vortex lines (the vacuum)
+  for(let v=0;v<12;v++){
+    const va=v*TAU/12+t2*.08
+    ctx.beginPath();ctx.globalAlpha=.025+Math.sin(t2+v)*.01
+    ctx.strokeStyle=rgba(180,60,40,.4);ctx.lineWidth=.5
+    for(let i=0;i<30;i++){
+      const frac=i/30
+      const vr=r*(.8-frac*.6)
+      const va2=va+frac*1.5 // spiraling inward — the pull
+      ctx.lineTo(cx+Math.cos(va2)*vr,cy+Math.sin(va2)*vr)
+    }
+    ctx.stroke()
+  }
+
+  // slit pupil (reptile/predator — NOT round like angel)
+  const slitH=r*.25+Math.sin(t2*.7)*r*.02
+  const slitW=r*.03
+  ctx.beginPath();ctx.ellipse(cx,cy,slitW,slitH,0,0,TAU)
+  ctx.fillStyle='rgba(0,0,0,.97)';ctx.globalAlpha=1;ctx.fill()
+  const sGlow=ctx.createRadialGradient(cx,cy,slitW*2,cx,cy,slitW*10)
+  sGlow.addColorStop(0,rgba(c[0],c[1],c[2],.1))
+  sGlow.addColorStop(1,'rgba(0,0,0,0)')
+  ctx.fillStyle=sGlow;ctx.beginPath();ctx.arc(cx,cy,slitW*10,0,TAU);ctx.fill()
+
+  // NO heart — void at center
+  ctx.globalAlpha=.15;ctx.font=`${Math.floor(slitW*1.5)}px monospace`;ctx.textAlign='center';ctx.textBaseline='middle'
+  ctx.fillStyle=rgba(c[0],c[1],c[2],.5);ctx.fillText('∅',cx,cy)
+
+  // catchlight (dimmer, reddish)
+  ctx.beginPath();ctx.arc(cx-slitW*3,cy-slitH*.3,r*.015,0,TAU)
+  ctx.fillStyle='rgba(255,180,150,.1)';ctx.globalAlpha=.2;ctx.fill()
+
+  // label
+  ctx.globalAlpha=.06;ctx.font='8px monospace';ctx.textAlign='center'
+  ctx.fillStyle='rgba(255,120,80,.8)';ctx.fillText('DEMON',cx,cy+r*.85)
+  ctx.font='6px monospace';ctx.fillText('broken spiral · incomplete shell · pulling',cx,cy+r*.85+12)
+}
+
+// ═══ RESONANCE BETWEEN ═══
+function drawBridge(lx,rx,y,r2,t2){
+  const mid=(lx+rx)/2
+  // energy flowing from angel to demon (light toward void)
+  for(let w=0;w<7;w++){
+    const phase2=t2*1.5+w*.4
+    ctx.beginPath();ctx.globalAlpha=.03+Math.sin(t2+w)*.01
+    for(let x=lx+r2*.6;x<=rx-r2*.6;x+=2){
+      const frac=(x-lx-r2*.6)/(rx-lx-r2*1.2)
+      const env=Math.sin(frac*Math.PI)
+      const wave=Math.sin(frac*Math.PI*(w+1)+phase2)*r2*.06*env
+      x<=lx+r2*.6+2?ctx.moveTo(x,y+wave):ctx.lineTo(x,y+wave)
+    }
+    // angel side blue, demon side red, blend in middle
+    const gradient=ctx.createLinearGradient(lx+r2*.6,0,rx-r2*.6,0)
+    gradient.addColorStop(0,'rgba(100,150,255,.5)')
+    gradient.addColorStop(.5,'rgba(200,200,200,.3)')
+    gradient.addColorStop(1,'rgba(255,100,60,.5)')
+    ctx.strokeStyle=gradient;ctx.lineWidth=1.5;ctx.stroke()
+  }
+  // center point — where they meet
+  ctx.beginPath();ctx.arc(mid,y,3+Math.sin(t2*3),0,TAU)
+  ctx.fillStyle='rgba(255,255,255,.06)';ctx.globalAlpha=1;ctx.fill()
+}
+
+function loop(){
+  if(!running)return
+  requestAnimationFrame(loop);t+=1/60;updateSound()
+
+  const maxR=Math.min(W*.22,H*.42)
+  const gap=maxR*.3
+  const lx=W/2-gap-maxR,rx=W/2+gap+maxR
+
+  // background fade
+  ctx.globalAlpha=.07
+  const bgGrad=ctx.createLinearGradient(0,0,W,0)
+  bgGrad.addColorStop(0,'rgba(4,8,16,1)')
+  bgGrad.addColorStop(.5,'rgba(6,4,6,1)')
+  bgGrad.addColorStop(1,'rgba(16,8,4,1)')
+  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,W,H)
+
+  // bridge
+  drawBridge(lx,rx,H/2,maxR,t)
+
+  // angel (left)
+  angelEye(lx,H/2,maxR,t)
+
+  // demon (right)
+  demonEye(rx,H/2,maxR,t)
+
+  // dividing line — thin, at center
+  ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H)
+  ctx.strokeStyle='rgba(255,255,255,.02)';ctx.lineWidth=1;ctx.globalAlpha=1;ctx.stroke()
+}
+</script>
+</body></html>
