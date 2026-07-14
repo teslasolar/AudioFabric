@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>KUNDALINI — The Light Snake</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#050508;overflow:hidden;font-family:'Courier New',monospace}
+canvas{display:block}
+#hud{position:fixed;top:8px;left:10px;z-index:10;font:7px/1.6 monospace;color:rgba(255,255,255,.15);pointer-events:none;white-space:pre}
+#gate-info{position:fixed;top:50%;right:14px;transform:translateY(-50%);z-index:10;text-align:right;pointer-events:none}
+#gate-info .name{font-size:14px;letter-spacing:3px}
+#gate-info .sub{font-size:8px;color:rgba(255,255,255,.15);margin-top:4px;line-height:1.6}
+#instruction{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:10;font:9px monospace;color:rgba(255,255,255,.12);pointer-events:none;text-align:center;letter-spacing:2px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<div id="gate-info"></div>
+<div id="instruction">breathe to wake the snake · voice to move it · space to pulse</div>
+
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H;function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight}
+resize();addEventListener('resize',resize)
+
+const gates=[
+  {name:'MULADHARA',label:'R0 · ROOT',color:'#ff1111',hz:55,prime:2,
+   body:'perineum · pelvic floor',fascia:'plantar fascia → achilles → hamstrings',
+   element:'Earth · Fe(26)',coils:3.5,note:'C',
+   unlock:'feet on ground · eat · kegel'},
+  {name:'SVADHISTHANA',label:'R1 · SACRAL',color:'#ff6600',hz:73,prime:3,
+   body:'sacrum · lower abdomen',fascia:'psoas → iliacus → hip flexors',
+   element:'Water · H₂O',coils:0,note:'D',
+   unlock:'hip circles · fluid movement · water'},
+  {name:'MANIPURA',label:'R2 · SOLAR PLEXUS',color:'#ffcc00',hz:110,prime:5,
+   body:'diaphragm · solar plexus',fascia:'thoracolumbar fascia → diaphragm → transverse abdominis',
+   element:'Fire · He(2)',coils:0,note:'E',
+   unlock:'belly breathing · twist · laugh or cry'},
+  {name:'ANAHATA',label:'R3 · HEART',color:'#44cc44',hz:147,prime:7,
+   body:'heart · thymus · chest',fascia:'pericardial fascia → intercostals → pectorals',
+   element:'Air · N₂+O₂',coils:0,note:'F',
+   unlock:'hand on chest · love · 5-5 coherence'},
+  {name:'VISHUDDHA',label:'R4 · THROAT',color:'#4488ff',hz:196,prime:11,
+   body:'throat · jaw · thyroid',fascia:'cervical fascia → SCM → scalenes → hyoid',
+   element:'Aether · C(6)',coils:0,note:'G',
+   unlock:'sing · hum · speak truth'},
+  {name:'AJNA',label:'R5 · THIRD EYE',color:'#6644cc',hz:262,prime:13,
+   body:'pineal · pituitary · insula',fascia:'galea aponeurotica → occipitofrontalis → dura mater',
+   element:'Light · γ photon',coils:0,note:'A',
+   unlock:'close eyes · body scan · nature'},
+  {name:'SAHASRARA',label:'R6 · CROWN',color:'#cc44ff',hz:330,prime:17,
+   body:'crown · fontanelle · DMN',fascia:'entire fascial web terminus · cranial sutures',
+   element:'Void · Z=0',coils:0,note:'B',
+   unlock:'opens itself · surrender · service'}
+]
+
+// ═══ AUDIO ═══
+let actx,analyser,fftData,master
+let bass=0,mid=0,high=0,vol=0
+let drones=[]
+
+async function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.1;master.connect(actx.destination)
+  const del=actx.createDelay(.4);del.delayTime.value=.15
+  const fb=actx.createGain();fb.gain.value=.12;del.connect(fb);fb.connect(del)
+  const wet=actx.createGain();wet.gain.value=.2;del.connect(wet);wet.connect(actx.destination)
+  master.connect(del)
+  analyser=actx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=.8
+  fftData=new Uint8Array(analyser.frequencyBinCount)
+  try{const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});actx.createMediaStreamSource(s).connect(analyser)}catch(e){}
+  // gate drones
+  gates.forEach(g=>{
+    const o=actx.createOscillator(),ga=actx.createGain()
+    o.type='sine';o.frequency.value=g.hz;ga.gain.value=0
+    o.connect(ga);ga.connect(master);o.start()
+    drones.push({o,g:ga})
+  })
+}
+
+function getAudio(){
+  if(!analyser)return
+  analyser.getByteFrequencyData(fftData)
+  const n=fftData.length;let b=0,m=0,h=0,tot=0
+  const bE=Math.floor(n*.06),mE=Math.floor(n*.25),hE=Math.floor(n*.6)
+  for(let i=0;i<n;i++){const v=fftData[i]/255;tot+=v;if(i<bE)b+=v;else if(i<mE)m+=v;else if(i<hE)h+=v}
+  bass=b/bE;mid=m/(mE-bE);high=h/(hE-mE);vol=tot/n
+}
+
+// ═══ SNAKE STATE ═══
+let snakePos=0 // 0-6, float, position along spine
+let snakeEnergy=0 // accumulated energy
+let snakeVel=0
+let gateStates=[0,0,0,0,0,0,0] // 0=locked, 1=open
+let pulseFlash=0
+
+addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();pulseFlash=1;snakeEnergy+=.5}})
+addEventListener('click',()=>{pulseFlash=1;snakeEnergy+=.3})
+
+// ═══ SPINE GEOMETRY ═══
+function spineY(gate){return H*.85-gate*(H*.7/6)}
+function spineX(gate){return W*.38+Math.sin(gate*.5)*W*.03}
+
+// ═══ RENDER ═══
+let t=0
+
+function loop(){
+  requestAnimationFrame(loop)
+  t+=1/60;getAudio();pulseFlash*=.93
+
+  // snake physics
+  const breathForce=bass*2+vol
+  snakeEnergy+=breathForce*.01
+  snakeEnergy*=.995 // slow decay
+  snakeVel+=(snakeEnergy*.005-snakeVel*.1) // spring toward energy-determined position
+  snakePos+=snakeVel
+  snakePos=Math.max(0,Math.min(6.5,snakePos))
+
+  // gate opening
+  for(let i=0;i<7;i++){
+    if(snakePos>=i-.2)gateStates[i]+=(1-gateStates[i])*.02
+    else gateStates[i]*=.99
+  }
+
+  // drone volumes follow snake position
+  drones.forEach((d,i)=>{
+    const dist=Math.abs(snakePos-i)
+    const vol2=dist<1.5?(.04-dist*.025)*gateStates[i]:0
+    d.g.gain.linearRampToValueAtTime(Math.max(0,vol2),actx?.currentTime+.1||0)
+  })
+
+  // ═══ DRAW ═══
+  // trail fade
+  ctx.globalAlpha=.08+pulseFlash*.1
+  ctx.fillStyle=`hsl(260,15%,${2+snakePos*.5}%)`
+  ctx.fillRect(0,0,W,H)
+
+  // ═══ BODY SILHOUETTE ═══
+  const bodyX=W*.38,bodyTop=H*.1,bodyBot=H*.9
+  const bodyW=W*.08
+
+  // body outline — subtle
+  ctx.globalAlpha=.06
+  ctx.strokeStyle='rgba(255,255,255,.3)'
+  ctx.lineWidth=1
+  ctx.beginPath()
+  // head
+  ctx.arc(bodyX,bodyTop+bodyW,bodyW*.6,0,TAU)
+  ctx.stroke()
+  // torso
+  ctx.beginPath()
+  ctx.moveTo(bodyX-bodyW*.5,bodyTop+bodyW*1.8)
+  ctx.lineTo(bodyX-bodyW*.6,bodyBot*.6)
+  ctx.lineTo(bodyX-bodyW*.3,bodyBot)
+  ctx.moveTo(bodyX+bodyW*.5,bodyTop+bodyW*1.8)
+  ctx.lineTo(bodyX+bodyW*.6,bodyBot*.6)
+  ctx.lineTo(bodyX+bodyW*.3,bodyBot)
+  ctx.stroke()
+
+  // ═══ SPINE (central channel) ═══
+  ctx.globalAlpha=.1+snakeEnergy*.05
+  ctx.strokeStyle='rgba(200,180,255,.3)'
+  ctx.lineWidth=2
+  ctx.beginPath()
+  for(let i=0;i<=6;i++){
+    const x=spineX(i),y=spineY(i)
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)
+  }
+  ctx.stroke()
+
+  // ═══ FASCIA LINES (subtle body-wide network) ═══
+  ctx.globalAlpha=.02+snakeEnergy*.01
+  ctx.strokeStyle='rgba(180,160,220,.3)'
+  ctx.lineWidth=.5
+  for(let f=0;f<20;f++){
+    const startGate=Math.floor(f*7/20)
+    const endGate=Math.min(6,startGate+1+Math.floor(Math.random()*2))
+    const sx=spineX(startGate)+(Math.sin(f*3.7)*bodyW*(1+f*.05))
+    const sy=spineY(startGate)
+    const ex=spineX(endGate)+(Math.cos(f*2.3)*bodyW*(1+f*.04))
+    const ey=spineY(endGate)
+    ctx.beginPath();ctx.moveTo(sx,sy)
+    ctx.quadraticCurveTo(bodyX+Math.sin(t*.3+f)*30,((sy+ey)/2),ex,ey)
+    ctx.stroke()
+  }
+
+  // ═══ 7 GATES ═══
+  let currentGate=Math.floor(Math.min(6,snakePos))
+  gates.forEach((g,i)=>{
+    const x=spineX(i),y=spineY(i)
+    const open=gateStates[i]
+    const active=Math.abs(snakePos-i)<1
+    const isCurrent=i===currentGate
+
+    // gate glow
+    const glowR=15+open*25+pulseFlash*10*(isCurrent?1:.2)
+    const gGrad=ctx.createRadialGradient(x,y,0,x,y,glowR)
+    gGrad.addColorStop(0,g.color+(isCurrent?'44':'15'))
+    gGrad.addColorStop(.5,g.color+'08')
+    gGrad.addColorStop(1,'rgba(0,0,0,0)')
+    ctx.globalAlpha=1;ctx.fillStyle=gGrad
+    ctx.beginPath();ctx.arc(x,y,glowR,0,TAU);ctx.fill()
+
+    // gate ring
+    ctx.beginPath();ctx.arc(x,y,10+open*8,0,TAU)
+    ctx.strokeStyle=g.color;ctx.lineWidth=1+open*2
+    ctx.globalAlpha=.1+open*.2+(isCurrent?.15:0)+pulseFlash*(isCurrent?.2:.05)
+    ctx.stroke()
+
+    // inner dot
+    ctx.beginPath();ctx.arc(x,y,3+open*4,0,TAU)
+    ctx.fillStyle=g.color;ctx.globalAlpha=.1+open*.3+(isCurrent?.2:0)
+    ctx.fill()
+
+    // gate label
+    ctx.globalAlpha=.08+open*.08+(isCurrent?.1:0)
+    ctx.font='6px monospace';ctx.textAlign='left'
+    ctx.fillStyle=g.color
+    ctx.fillText(g.label,x+25,y-3)
+    ctx.fillStyle='rgba(255,255,255,.1)'
+    ctx.fillText(g.note+' · '+g.hz+'Hz',x+25,y+5)
+
+    // piezoelectric emission (photons from fascia at this gate)
+    if(open>.3&&(active||isCurrent)){
+      const photonCount=Math.floor(open*5+pulseFlash*8)
+      for(let p=0;p<photonCount;p++){
+        const pa=Math.random()*TAU
+        const pr=glowR*(.5+Math.random()*.5)
+        const px=x+Math.cos(pa)*pr,py=y+Math.sin(pa)*pr
+        ctx.beginPath();ctx.arc(px,py,1+Math.random(),0,TAU)
+        ctx.fillStyle=g.color;ctx.globalAlpha=.1+open*.15
+        ctx.fill()
+      }
+    }
+  })
+
+  // ═══ THE SNAKE ═══
+  const snakeLen=40 // trail length
+  ctx.globalAlpha=1
+  for(let s=0;s<snakeLen;s++){
+    const age=s/snakeLen
+    const sPos=snakePos-age*2 // trail behind current position
+    if(sPos<0)continue
+    const gateIdx=Math.min(6,Math.max(0,sPos))
+    const fracGate=gateIdx%1
+    const lowerGate=Math.floor(gateIdx)
+    const upperGate=Math.min(6,lowerGate+1)
+
+    const sx=spineX(lowerGate)*(1-fracGate)+spineX(upperGate)*fracGate
+    const sy=spineY(lowerGate)*(1-fracGate)+spineY(upperGate)*fracGate
+
+    // snake body width
+    const bodyWidth=3+Math.sin(t*4-s*.3)*1.5-age*2
+    if(bodyWidth<.5)continue
+
+    // snake wobble
+    const wobbleX=Math.sin(t*3-s*.2+sPos)*8*(1-age)
+    const wobbleY=Math.cos(t*2.5-s*.15)*3*(1-age)
+
+    // color from current gate
+    const gateColor=gates[lowerGate].color
+    const alpha=(1-age)*(.3+snakeEnergy*.2+pulseFlash*.15)
+
+    // main body
+    ctx.beginPath();ctx.arc(sx+wobbleX,sy+wobbleY,bodyWidth,0,TAU)
+    ctx.fillStyle=gateColor;ctx.globalAlpha=alpha*.5;ctx.fill()
+
+    // bright core
+    ctx.beginPath();ctx.arc(sx+wobbleX,sy+wobbleY,bodyWidth*.4,0,TAU)
+    ctx.fillStyle='rgba(255,255,255,.5)';ctx.globalAlpha=alpha*.3;ctx.fill()
+  }
+
+  // snake head (brighter, leading)
+  const headGate=Math.min(6,snakePos)
+  const headFrac=headGate%1
+  const headLower=Math.floor(headGate),headUpper=Math.min(6,headLower+1)
+  const headX=spineX(headLower)*(1-headFrac)+spineX(headUpper)*headFrac+Math.sin(t*3)*10
+  const headY=spineY(headLower)*(1-headFrac)+spineY(headUpper)*headFrac+Math.cos(t*2.5)*4
+  const headColor=gates[Math.min(6,Math.floor(snakePos))].color
+
+  // head glow
+  const headGlowR=15+snakeEnergy*10+pulseFlash*15
+  const hGrad=ctx.createRadialGradient(headX,headY,0,headX,headY,headGlowR)
+  hGrad.addColorStop(0,headColor+'66')
+  hGrad.addColorStop(.4,headColor+'22')
+  hGrad.addColorStop(1,'rgba(0,0,0,0)')
+  ctx.globalAlpha=1;ctx.fillStyle=hGrad
+  ctx.beginPath();ctx.arc(headX,headY,headGlowR,0,TAU);ctx.fill()
+
+  // head body
+  ctx.beginPath();ctx.arc(headX,headY,5+snakeEnergy*2,0,TAU)
+  ctx.fillStyle=headColor;ctx.globalAlpha=.5+snakeEnergy*.2;ctx.fill()
+
+  // eyes
+  const eyeOff=3
+  ;[-1,1].forEach(side=>{
+    ctx.beginPath();ctx.arc(headX+side*eyeOff,headY-2,1.5,0,TAU)
+    ctx.fillStyle='rgba(255,255,255,.6)';ctx.globalAlpha=.4+pulseFlash*.3;ctx.fill()
+  })
+
+  // ═══ COLOR SPECTRUM along the spine ═══
+  // rainbow gradient showing where the snake has passed
+  for(let i=0;i<6;i++){
+    if(gateStates[i]<.1)continue
+    const y1=spineY(i),y2=spineY(i+1)
+    const grad=ctx.createLinearGradient(spineX(i)-3,y1,spineX(i+1)-3,y2)
+    grad.addColorStop(0,gates[i].color+'15')
+    grad.addColorStop(1,gates[i+1].color+'15')
+    ctx.globalAlpha=gateStates[i]*.3
+    ctx.fillStyle=grad
+    ctx.fillRect(spineX(i)-5,y2,10,y1-y2)
+  }
+
+  // ═══ INFO ═══
+  const cg=gates[currentGate]
+  document.getElementById('gate-info').innerHTML=
+    `<div class="name" style="color:${cg.color}55">${cg.name}</div>`+
+    `<div class="sub">${cg.label}<br>${cg.body}<br><br>fascia: ${cg.fascia}<br><br>element: ${cg.element}<br>note: ${cg.note} · ${cg.hz}Hz · P=${cg.prime}<br><br>unlock: ${cg.unlock}</div>`
+
+  document.getElementById('hud').textContent=
+    `KUNDALINI\n`+
+    `snake: ${snakePos.toFixed(2)} / 6\n`+
+    `energy: ${snakeEnergy.toFixed(2)}\n`+
+    `gate: ${currentGate} ${cg.name}\n`+
+    `open: ${gateStates.map(g=>g>.5?'O':'·').join('')}\n`+
+    `fascia: piezoelectric\n`+
+    `breathe · sing · space=pulse`
+}
+
+initAudio();loop()
+</script>
+</body></html>
