@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ALL GATES — 7 Frequencies At Once</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#050508;overflow:hidden;font-family:'Courier New',monospace}
+canvas{display:block}
+#start{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:#050508;cursor:pointer}
+#start span{font:14px/1 monospace;color:rgba(200,150,255,.4);letter-spacing:6px;border:1px solid rgba(200,150,255,.15);padding:14px 30px;border-radius:6px}
+#start span:hover{color:rgba(200,150,255,.7);border-color:rgba(200,150,255,.4);box-shadow:0 0 30px rgba(150,100,255,.15)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start" onclick="go()"><span>PLAY ALL 7</span></div>
+
+<script>
+const TAU=Math.PI*2
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H;function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight}
+resize();addEventListener('resize',resize)
+
+const gates=[
+  {name:'R0 ROOT',note:'C',hz:55,color:'#ff1111'},
+  {name:'R1 SACRAL',note:'D',hz:73.4,color:'#ff6600'},
+  {name:'R2 SOLAR',note:'E',hz:110,color:'#ffcc00'},
+  {name:'R3 HEART',note:'F',hz:146.8,color:'#44cc44'},
+  {name:'R4 THROAT',note:'G',hz:196,color:'#4488ff'},
+  {name:'R5 THIRD EYE',note:'A',hz:261.6,color:'#6644cc'},
+  {name:'R6 CROWN',note:'B',hz:329.6,color:'#cc44ff'}
+]
+
+let actx,master,oscs=[],running=false,t=0
+
+function go(){
+  document.getElementById('start').style.display='none'
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.15;master.connect(actx.destination)
+
+  // reverb
+  const del=actx.createDelay(.5);del.delayTime.value=.2
+  const fb=actx.createGain();fb.gain.value=.15;del.connect(fb);fb.connect(del)
+  const wet=actx.createGain();wet.gain.value=.25;del.connect(wet);wet.connect(actx.destination)
+  master.connect(del)
+
+  // all 7 gate tones + harmonics
+  gates.forEach((g,i)=>{
+    // fundamental
+    const o1=actx.createOscillator(),g1=actx.createGain()
+    o1.type='sine';o1.frequency.value=g.hz;g1.gain.value=.04
+    o1.connect(g1);g1.connect(master);o1.start()
+
+    // octave
+    const o2=actx.createOscillator(),g2=actx.createGain()
+    o2.type='sine';o2.frequency.value=g.hz*2;g2.gain.value=.02
+    o2.connect(g2);g2.connect(master);o2.start()
+
+    // fifth
+    const o3=actx.createOscillator(),g3=actx.createGain()
+    o3.type='triangle';o3.frequency.value=g.hz*1.5;g3.gain.value=.012
+    o3.connect(g3);g3.connect(master);o3.start()
+
+    // slight detune for richness
+    const o4=actx.createOscillator(),g4=actx.createGain()
+    o4.type='sine';o4.frequency.value=g.hz*1.003;g4.gain.value=.025
+    o4.connect(g4);g4.connect(master);o4.start()
+
+    oscs.push({o1,g1,o2,g2,o3,g3,o4,g4,gate:g})
+  })
+
+  running=true;loop()
+}
+window.go=go
+
+function loop(){
+  if(!running)return
+  requestAnimationFrame(loop)
+  t+=1/60
+
+  // background fade
+  ctx.globalAlpha=.06
+  ctx.fillStyle='#050508'
+  ctx.fillRect(0,0,W,H)
+
+  const cx=W/2,cy=H/2
+
+  // 7 rings radiating from center — one per gate
+  gates.forEach((g,i)=>{
+    const baseR=30+i*45
+    const pulse=Math.sin(t*g.hz*.02+i)
+    const r=baseR+pulse*10
+
+    // ring
+    ctx.beginPath();ctx.arc(cx,cy,r,0,TAU)
+    ctx.strokeStyle=g.color;ctx.lineWidth=2+pulse*1.5
+    ctx.globalAlpha=.15+Math.sin(t*2+i)*.05;ctx.stroke()
+
+    // inner glow ring
+    ctx.beginPath();ctx.arc(cx,cy,r,0,TAU)
+    ctx.strokeStyle=g.color;ctx.lineWidth=8+pulse*4
+    ctx.globalAlpha=.03+Math.sin(t*1.5+i)*.01;ctx.stroke()
+
+    // wave on ring (the actual frequency visualized)
+    ctx.beginPath()
+    ctx.globalAlpha=.12+Math.sin(t+i)*.04
+    for(let a=0;a<=TAU;a+=.02){
+      const wave=Math.sin(a*g.hz*.05+t*g.hz*.1)*5*(1+Math.sin(t+i)*.3)
+      const wr=r+wave
+      const px=cx+Math.cos(a)*wr,py=cy+Math.sin(a)*wr
+      a===0?ctx.moveTo(px,py):ctx.lineTo(px,py)
+    }
+    ctx.closePath()
+    ctx.strokeStyle=g.color;ctx.lineWidth=1;ctx.stroke()
+
+    // label
+    ctx.globalAlpha=.12+Math.sin(t*1.5+i)*.03
+    ctx.font='7px monospace';ctx.textAlign='center'
+    ctx.fillStyle=g.color
+    ctx.fillText(`${g.note} ${g.hz}Hz`,cx+Math.cos(t*.1+i*.9)*(r+15),cy+Math.sin(t*.1+i*.9)*(r+15))
+  })
+
+  // center — all frequencies converge
+  const centerGlow=ctx.createRadialGradient(cx,cy,0,cx,cy,30)
+  centerGlow.addColorStop(0,'rgba(255,255,255,.1)')
+  centerGlow.addColorStop(.3,'rgba(200,150,255,.04)')
+  centerGlow.addColorStop(1,'rgba(0,0,0,0)')
+  ctx.globalAlpha=1;ctx.fillStyle=centerGlow
+  ctx.beginPath();ctx.arc(cx,cy,30,0,TAU);ctx.fill()
+
+  // interference pattern where rings overlap
+  for(let i=0;i<6;i++){
+    const r1=30+i*45,r2=30+(i+1)*45
+    const interfR=(r1+r2)/2
+    const beatFreq=Math.abs(gates[i].hz-gates[i+1].hz)
+    const beat=Math.sin(t*beatFreq*.05)
+    ctx.beginPath();ctx.arc(cx,cy,interfR,0,TAU)
+    ctx.strokeStyle=`rgba(255,255,255,${.02+beat*.02})`
+    ctx.lineWidth=r2-r1;ctx.globalAlpha=1;ctx.stroke()
+  }
+}
+</script>
+</body></html>
