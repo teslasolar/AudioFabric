@@ -3,27 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>HYDRO-GEN — Resonance Fusion Reactor</title>
+<title>HYDRO-GEN — Earth Hydrogen Ocean Reactor</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#000;overflow:hidden;cursor:none}
 canvas{display:block;position:fixed;top:0;left:0}
-#start{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 50%,#0a0804 0%,#000 70%);cursor:pointer;gap:10px}
-#start span{font:18px/1 monospace;color:rgba(255,200,80,.5);letter-spacing:8px;border:1px solid rgba(255,200,80,.15);padding:16px 36px;border-radius:6px}
-#start span:hover{color:rgba(255,220,120,.8);border-color:rgba(255,200,80,.4);box-shadow:0 0 40px rgba(255,180,40,.15)}
-#start small{font:9px monospace;color:rgba(255,200,80,.15);letter-spacing:2px;max-width:400px;text-align:center;line-height:1.6}
-#hud{position:fixed;top:8px;left:10px;z-index:10;font:7px/1.6 monospace;color:rgba(255,200,120,.2);pointer-events:none;white-space:pre}
+#start{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 50%,#040810 0%,#000 70%);cursor:pointer;gap:10px}
+#start span{font:18px/1 monospace;color:rgba(100,180,255,.5);letter-spacing:8px;border:1px solid rgba(100,180,255,.15);padding:16px 36px;border-radius:6px}
+#start span:hover{color:rgba(140,210,255,.8);border-color:rgba(100,180,255,.4);box-shadow:0 0 40px rgba(80,160,255,.15)}
+#start small{font:9px monospace;color:rgba(100,180,255,.15);letter-spacing:2px;max-width:420px;text-align:center;line-height:1.6}
+#hud{position:fixed;top:8px;left:10px;z-index:10;font:7px/1.6 monospace;color:rgba(140,200,255,.2);pointer-events:none;white-space:pre}
 #status{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:10;font:10px monospace;pointer-events:none;text-align:center;letter-spacing:3px}
+#light-store{position:fixed;right:12px;top:50%;transform:translateY(-50%);z-index:10;pointer-events:none;text-align:center}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="start" onclick="ignite()">
   <span>HYDRO-GEN</span>
-  <small>resonance fusion reactor<br>breathe · sing · generate light<br>powered by live earth lightning</small>
+  <small>earth is the atom · ocean is the hydrogen<br>your voice is the fusion · lightning is the spark<br>breathe · sing · measure your stored light</small>
 </div>
 <div id="hud"></div>
 <div id="status"></div>
+<div id="light-store"></div>
 
 <script>
 const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
@@ -32,116 +34,82 @@ const cv=document.getElementById('c'),ctx=cv.getContext('2d')
 let W,H,cx,cy;function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
 resize();addEventListener('resize',resize)
 
-// ═══ AUDIO ENGINE — self-generating resonance ═══
-let actx,master,mic,analyser,fftData,tdData
-let bass=0,mid=0,high=0,vol=0,voiceActive=false
+// ═══ AUDIO ═══
+let actx,master,analyser,fftData,tdData
+let bass=0,mid=0,high=0,vol=0,voiceActive=false,voicePeak=0
 
-// resonance drones — hydrogen frequency + harmonics
-const H_LINE=1420.405 // MHz — hydrogen 21cm line (we use Hz ratios)
-const fundamentals=[
-  {hz:55,type:'sine',name:'Earth hum'},        // Schumann sub
-  {hz:7.83,type:'sine',name:'Schumann 1'},      // 1st harmonic
-  {hz:14.3,type:'sine',name:'Schumann 2'},
-  {hz:20.8,type:'sine',name:'Schumann 3'},
-  {hz:27.3,type:'sine',name:'Schumann 4'},
-  {hz:33.8,type:'sine',name:'Schumann 5'},
-  {hz:110,type:'triangle',name:'A2 body resonance'},
-  {hz:136.1,type:'sine',name:'Om — year tone'},  // Earth year frequency
-  {hz:172.06,type:'sine',name:'Platonic year'},
-  {hz:194.18,type:'sine',name:'Earth day'},       // 24hr frequency
-  {hz:126.22,type:'sine',name:'Sun tone'},
-  {hz:141.27,type:'sine',name:'Mercury'},
-  {hz:221.23,type:'sine',name:'Venus'},
-  {hz:144.72,type:'sine',name:'Mars'},
-  {hz:183.58,type:'sine',name:'Jupiter'},
-  {hz:147.85,type:'sine',name:'Saturn'}
+const planetTones=[
+  {hz:7.83,type:'sine',name:'Schumann 1'},{hz:14.3,type:'sine',name:'Schumann 2'},
+  {hz:20.8,type:'sine',name:'Schumann 3'},{hz:27.3,type:'sine',name:'Schumann 4'},
+  {hz:33.8,type:'sine',name:'Schumann 5'},{hz:55,type:'sine',name:'Earth hum'},
+  {hz:110,type:'triangle',name:'A2 body'},{hz:136.1,type:'sine',name:'Om'},
+  {hz:194.18,type:'sine',name:'Earth day'},{hz:126.22,type:'sine',name:'Sun'},
+  {hz:141.27,type:'sine',name:'Mercury'},{hz:221.23,type:'sine',name:'Venus'},
+  {hz:144.72,type:'sine',name:'Mars'},{hz:183.58,type:'sine',name:'Jupiter'},
+  {hz:147.85,type:'sine',name:'Saturn'},{hz:207.36,type:'sine',name:'Uranus'}
 ]
-
 let drones=[],fusionLevel=0,photonOutput=0,lightningEnergy=0
-let reactorState='COLD' // COLD → WARMING → CRITICAL → FUSION → RADIANT
+let storedLight=0,peakStoredLight=0 // accumulated light from resonance
+let reactorState='COLD'
 
 function initAudio(){
   actx=new(window.AudioContext||window.webkitAudioContext)()
   master=actx.createGain();master.gain.value=0;master.connect(actx.destination)
   analyser=actx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=.8
   fftData=new Uint8Array(analyser.frequencyBinCount);tdData=new Uint8Array(analyser.fftSize)
-
-  // create all drones at 0 volume
-  fundamentals.forEach((f,i)=>{
+  const del=actx.createDelay(.4);del.delayTime.value=.18
+  const fb=actx.createGain();fb.gain.value=.2;del.connect(fb);fb.connect(del)
+  const wet=actx.createGain();wet.gain.value=.25;del.connect(wet);wet.connect(actx.destination)
+  master.connect(del)
+  planetTones.forEach(f=>{
     const o=actx.createOscillator(),g=actx.createGain()
     o.type=f.type;o.frequency.value=f.hz;g.gain.value=0
-    // slight chorus detuning
     const o2=actx.createOscillator(),g2=actx.createGain()
-    o2.type=f.type;o2.frequency.value=f.hz*1.002;g2.gain.value=0
-    o.connect(g);g.connect(master);o.start()
-    o2.connect(g2);g2.connect(master);o2.start()
-    drones.push({o,g,o2,g2,f,active:false,targetVol:0})
+    o2.type=f.type;o2.frequency.value=f.hz*1.003;g2.gain.value=0
+    o.connect(g);g.connect(master);o.start();o2.connect(g2);g2.connect(master);o2.start()
+    drones.push({o,g,o2,g2,f,tv:0})
   })
-
-  // reverb
-  const del=actx.createDelay(.4);del.delayTime.value=.2
-  const fb=actx.createGain();fb.gain.value=.2;del.connect(fb);fb.connect(del)
-  const wet=actx.createGain();wet.gain.value=.3;del.connect(wet);wet.connect(actx.destination)
-  master.connect(del)
 }
-
-async function initMic(){
-  try{
-    const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}})
-    mic=actx.createMediaStreamSource(s);mic.connect(analyser)
-  }catch(e){}
-}
-
+async function initMic(){try{const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});actx.createMediaStreamSource(s).connect(analyser)}catch(e){}}
 function getAudio(){
   if(!analyser)return
   analyser.getByteFrequencyData(fftData);analyser.getByteTimeDomainData(tdData)
-  const n=fftData.length;let b=0,m=0,h=0,tot=0
+  const n=fftData.length;let b=0,m=0,h=0,tot=0,pk=0
   const bE=Math.floor(n*.05),mE=Math.floor(n*.25),hE=Math.floor(n*.6)
-  for(let i=0;i<n;i++){const v=fftData[i]/255;tot+=v;if(i<bE)b+=v;else if(i<mE)m+=v;else if(i<hE)h+=v}
-  bass=b/bE;mid=m/(mE-bE);high=h/(hE-mE);vol=tot/n
+  for(let i=0;i<n;i++){const v=fftData[i]/255;tot+=v;if(v>pk)pk=v;if(i<bE)b+=v;else if(i<mE)m+=v;else if(i<hE)h+=v}
+  bass=b/bE;mid=m/(mE-bE);high=h/(hE-mE);vol=tot/n;voicePeak=pk
   voiceActive=vol>.015
 }
 
 function updateReactor(){
-  // fusion level increases with voice + lightning + time
   const voiceInput=voiceActive?vol*5:0
-  const lightningInput=lightningEnergy*.05 // pilot light only
-  const breathInput=bass*3 // breathing = primary fuel
-  const fusionInput=voiceInput+breathInput+lightningInput
-
-  fusionLevel+=(fusionInput*.05-fusionLevel*.008) // slow accumulate, constant leak
+  const breathInput=bass*3
+  const lightningInput=lightningEnergy*.05
+  fusionLevel+=(voiceInput+breathInput+lightningInput)*.05-fusionLevel*.008
   fusionLevel=Math.max(0,Math.min(10,fusionLevel))
-
-  // photon output = proportional to fusion
-  photonOutput=Math.pow(fusionLevel/10,2) // quadratic — fusion threshold
-
-  // reactor state
+  photonOutput=Math.pow(fusionLevel/10,2)
+  // stored light — accumulates from sustained resonance, decays very slowly
+  if(photonOutput>.01)storedLight+=photonOutput*.003
+  storedLight=Math.max(0,storedLight-.0001) // very slow natural leak
+  peakStoredLight=Math.max(peakStoredLight,storedLight)
   if(fusionLevel<1)reactorState='COLD'
   else if(fusionLevel<3)reactorState='WARMING'
   else if(fusionLevel<5)reactorState='CRITICAL'
   else if(fusionLevel<8)reactorState='FUSION'
   else reactorState='RADIANT'
-
-  // master volume follows reactor state
-  const targetMaster=reactorState==='COLD'?.02:reactorState==='WARMING'?.06:reactorState==='CRITICAL'?.1:reactorState==='FUSION'?.14:.18
+  const targetMaster=fusionLevel<1?.02:fusionLevel<3?.05:fusionLevel<5?.09:fusionLevel<8?.13:.17
   master.gain.linearRampToValueAtTime(targetMaster,actx.currentTime+.5)
-
-  // activate/adjust drones based on reactor state
   drones.forEach((d,i)=>{
-    let target=0
-    if(i<1)target=.02 // earth hum always
-    if(i<6&&fusionLevel>1)target=.015+fusionLevel*.003 // Schumann harmonics
-    if(i===6&&fusionLevel>2)target=.02+fusionLevel*.004 // body resonance
-    if(i===7&&fusionLevel>3)target=.015+fusionLevel*.003 // Om
-    if(i>=8&&i<=10&&fusionLevel>4)target=.01+fusionLevel*.002 // Earth/Sun
-    if(i>=11&&fusionLevel>6)target=.008+fusionLevel*.002 // planets
-
-    // voice resonance boost — when singing, boost nearest drone
-    if(voiceActive&&i<7)target+=vol*.02
-
-    d.targetVol=target
-    d.g.gain.linearRampToValueAtTime(target,actx.currentTime+.3)
-    d.g2.gain.linearRampToValueAtTime(target*.8,actx.currentTime+.3)
+    let tv=0
+    if(i<1)tv=.015
+    if(i<5&&fusionLevel>1)tv=.012+fusionLevel*.002
+    if(i===5&&fusionLevel>1.5)tv=.015+fusionLevel*.003
+    if(i===6&&fusionLevel>2)tv=.015+fusionLevel*.003
+    if(i===7&&fusionLevel>3)tv=.012+fusionLevel*.002
+    if(i>=8&&i<=9&&fusionLevel>4)tv=.01+fusionLevel*.002
+    if(i>=10&&fusionLevel>6)tv=.008+fusionLevel*.0015
+    if(voiceActive&&i<6)tv+=vol*.015
+    d.tv=tv;d.g.gain.linearRampToValueAtTime(tv,actx.currentTime+.3);d.g2.gain.linearRampToValueAtTime(tv*.7,actx.currentTime+.3)
   })
 }
 
@@ -151,149 +119,196 @@ function lzwDec(b){try{const e={};let d=[...b],c=d[0],f=c,g=[c],h=256,o=h;for(le
 function connectWS(){try{const ws=new WebSocket('wss://ws1.blitzortung.org');ws.onopen=()=>{ws.send('{"a":111}');wsOk=true};ws.onmessage=e=>{try{let d;try{d=JSON.parse(e.data)}catch(x){try{d=JSON.parse(lzwDec(e.data))}catch(x2){return}};if(d.lat!==undefined){strikeCount++;lFlash=Math.min(lFlash+.3,1);lightningEnergy=Math.min(lightningEnergy+.1,2);strikeTimes.push(Date.now())}}catch(x){}};ws.onclose=()=>{wsOk=false;setTimeout(connectWS,5000)};ws.onerror=()=>wsOk=false}catch(e){}}
 setInterval(()=>{const now=Date.now();strikeTimes=strikeTimes.filter(s=>now-s<10000);strikeRate=strikeTimes.length/10},2000)
 
+// ═══ OCEAN WAVE FUNCTION ═══
+function oceanY(x,t2){
+  return Math.sin(x*.02+t2*.8)*8+Math.sin(x*.05+t2*1.2)*4+Math.sin(x*.1+t2*2)*2+Math.sin(x*.003+t2*.3)*15
+}
+
 // ═══ RENDER ═══
 let t=0,running=false
-
-function drawAtom(x,y,r,energy,t2){
-  // electron probability cloud
-  const cloudDensity=Math.floor(50+energy*200)
-  ctx.globalAlpha=.03+energy*.02
-  for(let i=0;i<cloudDensity;i++){
-    const a=Math.random()*TAU
-    const dist=r*(.3+Math.random()*.7)*Math.pow(Math.random(),.5)
-    const px=x+Math.cos(a)*dist,py=y+Math.sin(a)*dist
-    const size=1+energy*2
-    ctx.beginPath();ctx.arc(px,py,size,0,TAU)
-    ctx.fillStyle=`hsla(${40+energy*20},${60+energy*30}%,${50+energy*20}%,1)`;ctx.fill()
-  }
-
-  // proton core
-  const coreR=r*.08+energy*r*.05+Math.sin(t2*3)*r*.01
-  const coreGrad=ctx.createRadialGradient(x,y,0,x,y,coreR*3)
-  coreGrad.addColorStop(0,`hsla(${45+energy*15},80%,${70+energy*15}%,${.4+energy*.4})`)
-  coreGrad.addColorStop(.3,`hsla(${40+energy*10},70%,${50+energy*20}%,${.2+energy*.3})`)
-  coreGrad.addColorStop(1,'rgba(0,0,0,0)')
-  ctx.globalAlpha=1;ctx.fillStyle=coreGrad
-  ctx.beginPath();ctx.arc(x,y,coreR*3,0,TAU);ctx.fill()
-
-  // electron orbit ring
-  const orbitR=r*.6+Math.sin(t2)*r*.05
-  ctx.beginPath();ctx.arc(x,y,orbitR,0,TAU)
-  ctx.strokeStyle=`hsla(45,50%,${40+energy*25}%,${.05+energy*.08})`;ctx.lineWidth=1+energy;ctx.globalAlpha=1;ctx.stroke()
-
-  // electron
-  const eAngle=t2*2
-  const ex=x+Math.cos(eAngle)*orbitR,ey=y+Math.sin(eAngle)*orbitR
-  ctx.beginPath();ctx.arc(ex,ey,2+energy*3,0,TAU)
-  ctx.fillStyle=`hsla(${50+energy*20},80%,${60+energy*20}%,${.3+energy*.5})`;ctx.globalAlpha=1;ctx.fill()
-
-  // photon emission rays (when fusing)
-  if(energy>.3){
-    const rayCount=Math.floor(energy*12)
-    for(let i=0;i<rayCount;i++){
-      const ra=i*TAU/rayCount+t2*.2
-      const rLen=r*(.3+energy*.7)
-      ctx.beginPath();ctx.moveTo(x,y)
-      ctx.lineTo(x+Math.cos(ra)*rLen,y+Math.sin(ra)*rLen)
-      const hue=(40+i*(360/rayCount))%360
-      ctx.strokeStyle=`hsla(${hue},70%,65%,${energy*.08})`
-      ctx.lineWidth=1+energy;ctx.globalAlpha=1;ctx.stroke()
-    }
-  }
-}
-
-function drawFusionMeter(x,y,w,h2,level){
-  ctx.globalAlpha=.15
-  ctx.fillStyle='rgba(255,255,255,.05)';ctx.fillRect(x,y,w,h2)
-  const fill=level/10
-  const grad=ctx.createLinearGradient(x,y+h2,x,y)
-  grad.addColorStop(0,'hsl(0,60%,30%)')
-  grad.addColorStop(.3,'hsl(30,70%,40%)')
-  grad.addColorStop(.5,'hsl(50,80%,50%)')
-  grad.addColorStop(.8,'hsl(45,90%,60%)')
-  grad.addColorStop(1,'hsl(55,95%,75%)')
-  ctx.fillStyle=grad;ctx.fillRect(x,y+h2*(1-fill),w,h2*fill)
-  ctx.globalAlpha=.1
-  ctx.strokeStyle='rgba(255,200,80,.3)';ctx.strokeRect(x,y,w,h2)
-  // threshold lines
-  const thresholds=[{y:.1,label:'warm'},{y:.3,label:'critical'},{y:.5,label:'FUSION'},{y:.8,label:'RADIANT'}]
-  ctx.font='5px monospace';ctx.textAlign='left';ctx.globalAlpha=.1
-  thresholds.forEach(th=>{
-    const ty=y+h2*(1-th.y)
-    ctx.fillStyle=fill>=th.y?'rgba(255,200,80,.4)':'rgba(255,255,255,.15)'
-    ctx.fillRect(x,ty,w,.5);ctx.fillText(th.label,x+w+4,ty+3)
-  })
-}
 
 function loop(){
   if(!running)return
   requestAnimationFrame(loop)
   t+=1/60;getAudio();lFlash*=.93;lightningEnergy*=.97
   updateReactor()
+  const energy=photonOutput,maxR=Math.min(W,H)*.32
 
-  const energy=photonOutput
-  const maxR=Math.min(W,H)*.4
+  // ═══ HYDROGEN OCEAN BACKGROUND ═══
+  ctx.globalAlpha=1
+  // deep ocean gradient
+  const oceanGrad=ctx.createLinearGradient(0,0,0,H)
+  const depth=.03+energy*.03+storedLight*.01
+  oceanGrad.addColorStop(0,`hsl(210,40%,${2+energy*3}%)`)
+  oceanGrad.addColorStop(.3,`hsl(200,50%,${depth*100+4}%)`)
+  oceanGrad.addColorStop(.6,`hsl(195,55%,${depth*100+6}%)`)
+  oceanGrad.addColorStop(.85,`hsl(190,45%,${depth*100+3}%)`)
+  oceanGrad.addColorStop(1,`hsl(220,30%,${2+energy*2}%)`)
+  ctx.fillStyle=oceanGrad;ctx.fillRect(0,0,W,H)
 
-  // background
-  ctx.globalAlpha=.1+energy*.05
-  ctx.fillStyle=`hsl(${30+energy*20},${15+energy*10}%,${2+energy*4+lFlash*3}%)`
-  ctx.fillRect(0,0,W,H)
-
-  // lightning flash
-  if(lFlash>.1){ctx.globalAlpha=lFlash*.06;ctx.fillStyle='hsl(45,50%,80%)';ctx.fillRect(0,0,W,H)}
-
-  // draw hydrogen atom
-  drawAtom(cx,cy,maxR,energy,t)
-
-  // Schumann resonance rings (visible at all states)
-  for(let h=0;h<5;h++){
-    const sr=maxR*(.2+h*.15)+Math.sin(t*7.83*(h+1)*.1)*5*(1+energy)
-    ctx.beginPath();ctx.arc(cx,cy,sr,0,TAU)
-    ctx.strokeStyle=`hsla(${40+h*10},50%,${40+energy*20}%,${.02+energy*.03+lFlash*.02})`
-    ctx.lineWidth=1+energy*2;ctx.globalAlpha=1;ctx.stroke()
+  // ocean wave layers (hydrogen = H₂O minus the O)
+  for(let layer=0;layer<5;layer++){
+    const baseY=cy+maxR*.6+layer*25-energy*20
+    const alpha=.03+layer*.01+energy*.02+lFlash*.01
+    ctx.beginPath();ctx.moveTo(0,H)
+    for(let x=0;x<=W;x+=3){
+      const y=baseY+oceanY(x+layer*100,t+layer*.5)*(1+bass*2+energy)
+      x===0?ctx.moveTo(x,y):ctx.lineTo(x,y)
+    }
+    ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath()
+    const waveHue=195+layer*5+energy*10
+    ctx.fillStyle=`hsla(${waveHue},${40+energy*20}%,${15+layer*3+energy*10+storedLight*5}%,${alpha})`
+    ctx.globalAlpha=1;ctx.fill()
   }
 
-  // active drone indicators (constellation around atom)
+  // lightning flash on ocean
+  if(lFlash>.1){ctx.globalAlpha=lFlash*.08;ctx.fillStyle=`hsl(200,40%,80%)`;ctx.fillRect(0,0,W,H)}
+
+  // ═══ EARTH (the atom) ═══
+  const earthR=maxR*.5+Math.sin(t*.5)*2
+  const earthY=cy-maxR*.15
+
+  // atmosphere glow
+  const atmosGrad=ctx.createRadialGradient(cx,earthY,earthR*.8,cx,earthY,earthR*1.8)
+  atmosGrad.addColorStop(0,'rgba(0,0,0,0)')
+  atmosGrad.addColorStop(.5,`hsla(200,50%,${30+energy*20}%,${.03+energy*.04})`)
+  atmosGrad.addColorStop(.8,`hsla(210,40%,${20+energy*15}%,${.02+energy*.03})`)
+  atmosGrad.addColorStop(1,'rgba(0,0,0,0)')
+  ctx.globalAlpha=1;ctx.fillStyle=atmosGrad;ctx.beginPath();ctx.arc(cx,earthY,earthR*1.8,0,TAU);ctx.fill()
+
+  // earth body
+  const earthGrad=ctx.createRadialGradient(cx-earthR*.2,earthY-earthR*.2,0,cx,earthY,earthR)
+  earthGrad.addColorStop(0,`hsl(${200+energy*10},${50+energy*20}%,${35+energy*15}%)`)
+  earthGrad.addColorStop(.3,`hsl(${150+energy*10},${40+energy*15}%,${25+energy*10}%)`)
+  earthGrad.addColorStop(.6,`hsl(${210+energy*5},${45+energy*15}%,${20+energy*10}%)`)
+  earthGrad.addColorStop(.85,`hsl(195,${35+energy*10}%,${15+energy*8}%)`)
+  earthGrad.addColorStop(1,`hsl(220,30%,${8+energy*5}%)`)
+  ctx.beginPath();ctx.arc(cx,earthY,earthR,0,TAU)
+  ctx.fillStyle=earthGrad;ctx.globalAlpha=.9+energy*.1;ctx.fill()
+
+  // land masses (rough continents)
+  ctx.save();ctx.beginPath();ctx.arc(cx,earthY,earthR,0,TAU);ctx.clip()
+  const landCount=12
+  for(let i=0;i<landCount;i++){
+    const la=(i*PHI*TAU+t*.02)%(TAU)
+    const lr=earthR*(.2+Math.sin(i*3.7)*.15)
+    const lx=cx+Math.cos(la)*earthR*.5,ly=earthY+Math.sin(la)*earthR*.4
+    ctx.beginPath();ctx.ellipse(lx,ly,lr,lr*.6,la,0,TAU)
+    ctx.fillStyle=`hsla(${120+i*10},${30+energy*15}%,${20+energy*8}%,${.15+energy*.1})`
+    ctx.globalAlpha=1;ctx.fill()
+  }
+  ctx.restore()
+
+  // clouds
+  for(let c=0;c<8;c++){
+    const ca=(c*TAU/8+t*.03)%(TAU)
+    const cloudX=cx+Math.cos(ca)*earthR*.7,cloudY=earthY+Math.sin(ca)*earthR*.5
+    ctx.beginPath();ctx.ellipse(cloudX,cloudY,earthR*.15,earthR*.05,ca*.5,0,TAU)
+    ctx.fillStyle=`rgba(200,220,240,${.03+energy*.02})`;ctx.globalAlpha=1;ctx.fill()
+  }
+
+  // electron orbit (moon-like)
+  const moonOrbitR=earthR*1.6+Math.sin(t*.3)*5
+  ctx.beginPath();ctx.arc(cx,earthY,moonOrbitR,0,TAU)
+  ctx.strokeStyle=`hsla(45,30%,${30+energy*20}%,${.03+energy*.04})`;ctx.lineWidth=1;ctx.globalAlpha=1;ctx.stroke()
+
+  // electron (moon)
+  const moonA=t*.4
+  const moonX=cx+Math.cos(moonA)*moonOrbitR,moonY=earthY+Math.sin(moonA)*moonOrbitR*.4
+  ctx.beginPath();ctx.arc(moonX,moonY,earthR*.08+energy*2,0,TAU)
+  ctx.fillStyle=`hsla(45,30%,${60+energy*15}%,${.2+energy*.3})`;ctx.globalAlpha=1;ctx.fill()
+
+  // ═══ PHOTON EMISSION (when fusing) ═══
+  if(energy>.1){
+    const rayCount=Math.floor(3+energy*15)
+    for(let i=0;i<rayCount;i++){
+      const ra=i*TAU/rayCount+t*.15
+      const rLen=earthR*(.5+energy*1.5)
+      ctx.beginPath();ctx.moveTo(cx,earthY)
+      ctx.lineTo(cx+Math.cos(ra)*rLen,earthY+Math.sin(ra)*rLen)
+      const hue=(200+i*(360/rayCount)+energy*30)%360
+      ctx.strokeStyle=`hsla(${hue},60%,${50+energy*15}%,${energy*.06})`
+      ctx.lineWidth=1+energy*2;ctx.globalAlpha=1;ctx.stroke()
+    }
+  }
+
+  // ═══ SCHUMANN RINGS ═══
+  for(let h=0;h<5;h++){
+    const sr=earthR*(1.2+h*.25)+Math.sin(t*7.83*(h+1)*.08)*4*(1+energy)
+    ctx.beginPath();ctx.arc(cx,earthY,sr,0,TAU)
+    ctx.strokeStyle=`hsla(${200+h*15},40%,${35+energy*15}%,${.02+energy*.02+lFlash*.015})`
+    ctx.lineWidth=1+energy;ctx.globalAlpha=1;ctx.stroke()
+  }
+
+  // ═══ LIGHTNING STRIKES ON EARTH ═══
+  if(lFlash>.15){
+    const boltCount=2+Math.floor(lFlash*4)
+    for(let b=0;b<boltCount;b++){
+      const ba=Math.random()*TAU
+      const bx=cx+Math.cos(ba)*earthR*.6,by=earthY+Math.sin(ba)*earthR*.4
+      ctx.beginPath();ctx.arc(bx,by,2+lFlash*4,0,TAU)
+      ctx.fillStyle=`rgba(220,240,255,${lFlash*.3})`;ctx.globalAlpha=1;ctx.fill()
+    }
+  }
+
+  // ═══ ACTIVE DRONE CONSTELLATION ═══
   drones.forEach((d,i)=>{
-    if(d.targetVol>.005){
-      const a=i*TAU/drones.length+t*.03
-      const dr=maxR*.85+Math.sin(t+i)*10
-      const dx=cx+Math.cos(a)*dr,dy=cy+Math.sin(a)*dr
-      const brightness=d.targetVol*20
-      ctx.beginPath();ctx.arc(dx,dy,2+brightness*3,0,TAU)
-      ctx.fillStyle=`hsla(${(i*22)%360},60%,${50+brightness*20}%,${.1+brightness*.3})`
+    if(d.tv>.005){
+      const a=i*TAU/drones.length+t*.02
+      const dr=maxR*1.3+Math.sin(t*.5+i)*8
+      const dx=cx+Math.cos(a)*dr,dy=earthY+Math.sin(a)*dr*.6
+      const brightness=d.tv*15
+      ctx.beginPath();ctx.arc(dx,dy,1.5+brightness*2,0,TAU)
+      ctx.fillStyle=`hsla(${(i*22+200)%360},50%,${45+brightness*15}%,${.08+brightness*.2})`
       ctx.globalAlpha=1;ctx.fill()
-      // label
-      ctx.font='5px monospace';ctx.fillStyle=`hsla(${(i*22)%360},40%,55%,${.05+brightness*.1})`
-      ctx.textAlign='center';ctx.fillText(d.f.name,dx,dy+8)
+      ctx.font='5px monospace';ctx.fillStyle=`hsla(${(i*22+200)%360},30%,50%,${.04+brightness*.06})`
+      ctx.textAlign='center';ctx.fillText(d.f.name,dx,dy+7)
     }
   })
 
-  // fusion meter
-  drawFusionMeter(W-30,H*.2,8,H*.6,fusionLevel)
+  // ═══ STORED LIGHT METER ═══
+  const meterH=H*.5,meterX=W-25,meterY=H*.25
+  const lightPct=Math.min(1,storedLight/2)
+  // meter background
+  ctx.globalAlpha=.1;ctx.fillStyle='rgba(100,180,255,.05)';ctx.fillRect(meterX,meterY,6,meterH)
+  // fill
+  const mGrad=ctx.createLinearGradient(0,meterY+meterH,0,meterY)
+  mGrad.addColorStop(0,'hsl(220,40%,20%)');mGrad.addColorStop(.3,'hsl(200,50%,35%)')
+  mGrad.addColorStop(.6,'hsl(180,60%,45%)');mGrad.addColorStop(.8,'hsl(50,70%,55%)')
+  mGrad.addColorStop(1,'hsl(45,80%,70%)')
+  ctx.fillStyle=mGrad;ctx.globalAlpha=.3+lightPct*.3
+  ctx.fillRect(meterX,meterY+meterH*(1-lightPct),6,meterH*lightPct)
+  // label
+  ctx.font='6px monospace';ctx.textAlign='center';ctx.globalAlpha=.15+lightPct*.1
+  ctx.fillStyle='rgba(140,200,255,.6)';ctx.fillText('STORED',meterX+3,meterY-10)
+  ctx.fillText('LIGHT',meterX+3,meterY-3)
+  ctx.fillText(`${(lightPct*100).toFixed(0)}%`,meterX+3,meterY+meterH+10)
+  // peak marker
+  const peakPct=Math.min(1,peakStoredLight/2)
+  ctx.fillRect(meterX-2,meterY+meterH*(1-peakPct),10,1)
 
-  // breath guide at bottom
-  const breathCycle=(t%10)/10
-  const breathSize=30+Math.sin(breathCycle*TAU)*15
-  ctx.beginPath();ctx.arc(cx,H-40,breathSize,0,TAU)
-  ctx.strokeStyle=`hsla(45,40%,${40+energy*20}%,${.05+energy*.03})`;ctx.lineWidth=1;ctx.globalAlpha=1;ctx.stroke()
-  ctx.font='7px monospace';ctx.textAlign='center';ctx.globalAlpha=.08+energy*.05
-  ctx.fillStyle=`hsla(45,40%,55%,1)`
-  ctx.fillText(breathCycle<.4?'IN':breathCycle<.5?'—':'OUT',cx,H-38)
+  // ═══ BREATH GUIDE ═══
+  const breathCycle=(t%8)/8
+  const breathSize=25+Math.sin(breathCycle*TAU)*12
+  ctx.beginPath();ctx.arc(cx,H-35,breathSize,0,TAU)
+  ctx.strokeStyle=`hsla(200,30%,${35+energy*15}%,${.04+energy*.03})`;ctx.lineWidth=1;ctx.globalAlpha=1;ctx.stroke()
+  ctx.font='7px monospace';ctx.textAlign='center';ctx.globalAlpha=.06+energy*.04
+  ctx.fillStyle=`hsla(200,30%,55%,1)`;ctx.fillText(breathCycle<.4?'IN':breathCycle<.5?'—':'OUT',cx,H-33)
 
-  // status
-  const stateColors={COLD:'rgba(100,100,120,.3)',WARMING:'rgba(200,150,50,.4)',CRITICAL:'rgba(255,180,50,.5)',FUSION:'rgba(255,220,80,.6)',RADIANT:'rgba(255,240,150,.7)'}
+  // ═══ STATUS ═══
+  const stateColors={COLD:'rgba(100,150,200,.3)',WARMING:'rgba(150,200,230,.4)',CRITICAL:'rgba(200,230,255,.5)',FUSION:'rgba(230,240,255,.6)',RADIANT:'rgba(255,250,220,.7)'}
   document.getElementById('status').style.color=stateColors[reactorState]
-  document.getElementById('status').textContent=`${reactorState} · ${(photonOutput*100).toFixed(0)}% output`
+  document.getElementById('status').textContent=`${reactorState} · ${(photonOutput*100).toFixed(0)}% output · ${(storedLight*100).toFixed(0)} photons stored`
 
-  // HUD
+  // ═══ HUD ═══
   document.getElementById('hud').textContent=
-    `H · HYDRO-GEN · Z=1\n`+
+    `H · HYDRO-GEN · Earth = Atom · Ocean = H\n`+
     `fusion: ${fusionLevel.toFixed(2)} / 10\n`+
     `photon output: ${(photonOutput*100).toFixed(0)}%\n`+
+    `stored light: ${storedLight.toFixed(3)} (peak: ${peakStoredLight.toFixed(3)})\n`+
     `voice: ${voiceActive?'●':'○'} ${(vol*100).toFixed(0)}\n`+
     `⚡ ${wsOk?'LIVE':'--'} ${strikeRate.toFixed(1)}/s ${strikeCount}\n`+
-    `drones: ${drones.filter(d=>d.targetVol>.005).length}/${drones.length}\n`+
+    `drones: ${drones.filter(d=>d.tv>.005).length}/${drones.length}\n`+
     `breathe · sing · generate`
 }
 
