@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>IRIS DEEP — 3D Voice-Reactive Biofeedback</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block}
+#start{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#000;cursor:pointer;gap:8px}
+#start span{font:14px/1 monospace;color:rgba(255,100,50,.4);letter-spacing:6px;border:1px solid rgba(255,100,50,.15);padding:14px 30px;border-radius:6px}
+#start span:hover{color:rgba(255,100,50,.7);border-color:rgba(255,100,50,.4);box-shadow:0 0 30px rgba(255,60,20,.15)}
+#start small{font:8px monospace;color:rgba(255,100,50,.2);letter-spacing:2px}
+#hud{position:fixed;top:8px;left:10px;z-index:10;font:7px/1.6 monospace;color:rgba(200,180,220,.25);pointer-events:none;white-space:pre}
+#ai{position:fixed;bottom:8px;left:10px;z-index:10;font:7px/1.5 monospace;color:rgba(100,200,150,.25);pointer-events:none;white-space:pre;max-width:300px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start" onclick="init()">
+  <span>IRIS DEEP</span>
+  <small>3D · VOICE · BIOMETRICS · AI</small>
+</div>
+<div id="hud"></div>
+<div id="ai"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+const params=new URLSearchParams(location.search)
+const USER=params.get('user')||'thomas'
+const GW=params.get('gw')||'http://localhost:5540'
+
+let W=innerWidth,H=innerHeight
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.5
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x000000)
+const cam=new THREE.PerspectiveCamera(55,innerWidth/2/innerHeight,.1,500)
+cam.position.set(0,0,30)
+R.setScissorTest(true)
+const IPD=3.2
+
+// ═══ AUDIO ENGINE ═══
+let actx,master,analyser,fftData,tdData,mic
+let bass=0,mid=0,high=0,vol=0,pitch=0
+
+// drone voices
+let drones=[],reverbNode=null
+
+function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.2
+  // simple reverb via delay feedback
+  const delay=actx.createDelay(.5);delay.delayTime.value=.15
+  const fb=actx.createGain();fb.gain.value=.3
+  const wet=actx.createGain();wet.gain.value=.4
+  delay.connect(fb);fb.connect(delay);delay.connect(wet);wet.connect(actx.destination)
+  master.connect(actx.destination);master.connect(delay)
+  reverbNode={delay,fb,wet}
+  analyser=actx.createAnalyser();analyser.fftSize=4096;analyser.smoothingTimeConstant=.75
+  fftData=new Uint8Array(analyser.frequencyBinCount)
+  tdData=new Uint8Array(analyser.fftSize)
+}
+
+function startDrones(){
+  if(!actx)return
+  const voices=[
+    {hz:55,type:'sine',vol:.04},{hz:82.4,type:'triangle',vol:.025},
+    {hz:110,type:'sine',vol:.035},{hz:146.8,type:'sine',vol:.02},
+    {hz:220,type:'triangle',vol:.015},{hz:55.5,type:'sine',vol:.03},
+    {hz:329.6,type:'sine',vol:.01},{hz:164.8,type:'triangle',vol:.015}
+  ]
+  voices.forEach(v=>{
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type=v.type;o.frequency.value=v.hz;g.gain.value=0
+    o.connect(g);g.connect(master);o.start()
+    drones.push({o,g,baseHz:v.hz,baseVol:v.vol,targetVol:v.vol})
+  })
+  // binaural base
+  const oL=actx.createOscillator(),oR=actx.createOscillator()
+  const gL=actx.createGain(),gR=actx.createGain()
+  const merger=actx.createChannelMerger(2)
+  oL.frequency.value=150;oR.frequency.value=157.83
+  gL.gain.value=0;gR.gain.value=0
+  oL.connect(gL);oR.connect(gR);gL.connect(merger,0,0);gR.connect(merger,0,1)
+  merger.connect(master);oL.start();oR.start()
+  drones.push({o:oL,g:gL,baseVol:.03,targetVol:.03,binaural:true,pair:{o:oR,g:gR}})
+}
+
+function updateDroneVolumes(intensity){
+  drones.forEach((d,i)=>{
+    const target=d.targetVol*(.3+intensity*.7)
+    d.g.gain.linearRampToValueAtTime(target,actx.currentTime+.5)
+    if(d.pair)d.pair.g.linearRampToValueAtTime?.(target,actx.currentTime+.5)
+    // slight detuning based on biometrics for organic feel
+    if(d.o.frequency&&!d.binaural){
+      const detune=Math.sin(performance.now()*.001+i)*2*intensity
+      d.o.frequency.linearRampToValueAtTime(d.baseHz+detune,actx.currentTime+.3)
+    }
+  })
+}
+
+async function initMic(){
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})
+    mic=actx.createMediaStreamSource(stream);mic.connect(analyser)
+  }catch(e){}
+}
+
+function getAudio(){
+  if(!analyser)return
+  analyser.getByteFrequencyData(fftData);analyser.getByteTimeDomainData(tdData)
+  const n=fftData.length;let b=0,m=0,h=0,total=0
+  const bE=Math.floor(n*.05),mE=Math.floor(n*.25),hE=Math.floor(n*.6)
+  for(let i=0;i<n;i++){const v=fftData[i]/255;total+=v;if(i<bE)b+=v;else if(i<mE)m+=v;else if(i<hE)h+=v}
+  bass=b/bE;mid=m/(mE-bE);high=h/(hE-mE);vol=total/n
+  // pitch
+  let maxC=-1,maxL=0;const half=tdData.length/2
+  let rms=0;for(let i=0;i<tdData.length;i++){const v=tdData[i]-128;rms+=v*v}
+  rms=Math.sqrt(rms/tdData.length)
+  if(rms>3){let dip=false;for(let lag=20;lag<half;lag++){let s=0;for(let i=0;i<half;i++)s+=(tdData[i]-128)*(tdData[i+lag]-128);if(!dip&&s<0)dip=true;if(dip&&s>maxC){maxC=s;maxL=lag}if(dip&&s<maxC*.7&&maxL>20)break}pitch=maxL>20?actx.sampleRate/maxL:0}else pitch=0
+}
+
+// ═══ WATCH DATA ═══
+let watchData=null,watchOnline=false
+async function pollWatch(){
+  try{const r=await fetch(`${GW}/wearer/${USER}`,{signal:AbortSignal.timeout(3000)});watchData=await r.json();watchOnline=watchData?.online||false}catch(e){watchOnline=false}
+}
+
+// ═══ AI BRAIN (lightweight rules engine, upgradable to WebLLM) ═══
+let aiState={mood:'neutral',intensity:.5,palette:'warm',breathRate:4,message:'initializing...'}
+
+function aiBrain(){
+  const hr=watchData?.hr,hrv=watchData?.hrv,stress=watchData?.stress
+  if(!watchOnline){
+    // voice-only mode
+    const energy=vol*3+bass*2
+    if(energy>.5){aiState.mood='energized';aiState.intensity=Math.min(1,.5+energy*.3);aiState.palette='fire';aiState.breathRate=2;aiState.message='voice energy high — opening layers, fire palette'}
+    else if(energy>.1){aiState.mood='active';aiState.intensity=.4+energy;aiState.palette='warm';aiState.breathRate=3;aiState.message='moderate input — warm palette, steady depth'}
+    else{aiState.mood='calm';aiState.intensity=.2;aiState.palette='cool';aiState.breathRate=5;aiState.message='quiet — cooling palette, slow breath, deep layers'}
+    return
+  }
+  // biometric mode
+  if(stress>.7){aiState.mood='stressed';aiState.intensity=.3;aiState.palette='cool';aiState.breathRate=6;aiState.message=`stress ${(stress*100).toFixed(0)}% — cooling, slowing, expanding depth`}
+  else if(stress>.4){aiState.mood='moderate';aiState.intensity=.5;aiState.palette='warm';aiState.breathRate=4;aiState.message=`stress ${(stress*100).toFixed(0)}% — warm balance, moderate depth`}
+  else{aiState.mood='coherent';aiState.intensity=.7;aiState.palette='rainbow';aiState.breathRate=5;aiState.message=`stress ${(stress*100).toFixed(0)}% — coherent! rainbow palette, full bloom`}
+  if(hr&&hr>100){aiState.palette='cool';aiState.breathRate=7;aiState.message+='\nHR elevated — extending exhale'}
+  if(hrv&&hrv>50){aiState.palette='rainbow';aiState.message+='\nHRV strong — full spectrum unlocked'}
+}
+
+// ═══ 3D SCENE ═══
+
+// depth layers — each ring of geometry at a different Z
+const LAYERS=12
+const layerGroups=[]
+const layerZ=[]
+
+function hslToHex(h,s,l){const c=new THREE.Color();c.setHSL(h,s,l);return c}
+
+function buildScene(){
+  // ── LAYER 0-3: deep background petal rings (far away) ──
+  const petalCounts=[5,8,13,21]
+  for(let li=0;li<4;li++){
+    const g=new THREE.Group();g.position.z=-20-li*8
+    const count=petalCounts[li]
+    for(let p=0;p<count;p++){
+      const shape=new THREE.Shape()
+      const len=4+li*2,w=len*.35
+      shape.moveTo(0,0)
+      shape.bezierCurveTo(len*.35,w*.8,len*.7,w,len,0)
+      shape.bezierCurveTo(len*.7,-w,len*.35,-w*.8,0,0)
+      const geo=new THREE.ShapeGeometry(shape)
+      const mat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.06,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
+      const mesh=new THREE.Mesh(geo,mat)
+      mesh.rotation.z=p*TAU/count
+      mesh.userData={petal:true,layer:li,idx:p,count,mat}
+      g.add(mesh)
+    }
+    scene.add(g);layerGroups.push(g);layerZ.push(g.position.z)
+  }
+
+  // ── LAYER 4-5: mid iris shutters ──
+  for(let si=0;si<2;si++){
+    const g=new THREE.Group();g.position.z=-5-si*5
+    const blades=si===0?12:8
+    for(let b=0;b<blades;b++){
+      const shape=new THREE.Shape()
+      const r=8-si*2,w=TAU/blades*.35
+      shape.moveTo(2,0);shape.bezierCurveTo(r*.5,r*w,r*.8,r*w*.5,r,0)
+      shape.bezierCurveTo(r*.8,-r*w*.5,r*.5,-r*w,2,0)
+      const geo=new THREE.ShapeGeometry(shape)
+      const mat=new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.08,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
+      const mesh=new THREE.Mesh(geo,mat)
+      mesh.rotation.z=b*TAU/blades
+      mesh.userData={blade:true,layer:4+si,idx:b,mat}
+      g.add(mesh)
+    }
+    scene.add(g);layerGroups.push(g);layerZ.push(g.position.z)
+  }
+
+  // ── LAYER 6: inner lotus ──
+  const lotus=new THREE.Group();lotus.position.z=0
+  for(let ring=0;ring<3;ring++){
+    const pc=[6,12,18][ring]
+    for(let p=0;p<pc;p++){
+      const shape=new THREE.Shape()
+      const len=2+ring*1.5,w=len*.4
+      shape.moveTo(.5+ring,0)
+      shape.bezierCurveTo(.5+ring+len*.3,w*.7,.5+ring+len*.6,w*.9,.5+ring+len,0)
+      shape.bezierCurveTo(.5+ring+len*.6,-w*.9,.5+ring+len*.3,-w*.7,.5+ring,0)
+      const geo=new THREE.ShapeGeometry(shape)
+      const mat=new THREE.MeshBasicMaterial({color:0xff8844,transparent:true,opacity:.07,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
+      const mesh=new THREE.Mesh(geo,mat)
+      mesh.rotation.z=p*TAU/pc
+      mesh.userData={lotus:true,ring,idx:p,mat}
+      lotus.add(mesh)
+    }
+  }
+  scene.add(lotus);layerGroups.push(lotus);layerZ.push(0)
+
+  // ── LAYER 7: halo rings at various depths ──
+  const halos=new THREE.Group()
+  for(let h=0;h<8;h++){
+    const r=3+h*1.5
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.04,4,128),
+      new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.03,blending:THREE.AdditiveBlending}))
+    ring.position.z=-3+h*1.5
+    ring.userData={halo:true,idx:h,mat:ring.material}
+    halos.add(ring)
+  }
+  scene.add(halos);layerGroups.push(halos);layerZ.push(-3)
+
+  // ── LAYER 8: particle dust cloud (3D distributed) ──
+  const dustCount=600,dustGeo=new THREE.BufferGeometry()
+  const dustPos=new Float32Array(dustCount*3),dustCol=new Float32Array(dustCount*3)
+  for(let i=0;i<dustCount;i++){
+    const a=Math.random()*TAU,r=2+Math.random()*12
+    dustPos[i*3]=Math.cos(a)*r;dustPos[i*3+1]=Math.sin(a)*r;dustPos[i*3+2]=(Math.random()-.5)*40
+    const c=new THREE.Color().setHSL(Math.random(),.7,.5)
+    dustCol[i*3]=c.r;dustCol[i*3+1]=c.g;dustCol[i*3+2]=c.b
+  }
+  dustGeo.setAttribute('position',new THREE.BufferAttribute(dustPos,3))
+  dustGeo.setAttribute('color',new THREE.BufferAttribute(dustCol,3))
+  const dust=new THREE.Points(dustGeo,new THREE.PointsMaterial({size:.12,transparent:true,opacity:.3,vertexColors:true,blending:THREE.AdditiveBlending,sizeAttenuation:true}))
+  scene.add(dust);layerGroups.push(dust);layerZ.push(0)
+
+  // ── LAYER 9: spectrum ring ──
+  const specGeo=new THREE.BufferGeometry()
+  const specPos=new Float32Array(256*3),specCol=new Float32Array(256*3)
+  for(let i=0;i<256;i++){const a=i/256*TAU;specPos[i*3]=Math.cos(a)*5;specPos[i*3+1]=Math.sin(a)*5;specPos[i*3+2]=2}
+  specGeo.setAttribute('position',new THREE.BufferAttribute(specPos,3))
+  specGeo.setAttribute('color',new THREE.BufferAttribute(specCol,3))
+  const specRing=new THREE.Points(specGeo,new THREE.PointsMaterial({size:.15,transparent:true,opacity:.4,vertexColors:true,blending:THREE.AdditiveBlending,sizeAttenuation:true}))
+  scene.add(specRing);layerGroups.push(specRing);layerZ.push(2)
+
+  // ── LAYER 10: sacred geometry wireframes at depth ──
+  const sacredGroup=new THREE.Group()
+  const sacredSides=[7,5,3,11]
+  sacredSides.forEach((sides,si)=>{
+    const pts=[];for(let i=0;i<sides;i++){const a=i*TAU/sides;pts.push(new THREE.Vector3(Math.cos(a)*(6+si*2),Math.sin(a)*(6+si*2),0))}
+    for(let i=0;i<pts.length;i++){
+      for(let j=i+1;j<pts.length;j++){
+        const geo=new THREE.BufferGeometry().setFromPoints([pts[i],pts[j]])
+        const mat=new THREE.LineBasicMaterial({color:0x444466,transparent:true,opacity:.03,blending:THREE.AdditiveBlending})
+        sacredGroup.add(new THREE.Line(geo,mat))
+      }
+    }
+    sacredGroup.position.z=-15-si*5
+  })
+  scene.add(sacredGroup);layerGroups.push(sacredGroup);layerZ.push(-25)
+
+  // ── HEART at center ──
+  const heartCanvas=document.createElement('canvas')
+  heartCanvas.width=64;heartCanvas.height=64
+  const hctx=heartCanvas.getContext('2d')
+  hctx.font='48px serif';hctx.textAlign='center';hctx.textBaseline='middle'
+  hctx.fillText('❤️',32,32)
+  const heartTex=new THREE.CanvasTexture(heartCanvas)
+  const heartMat=new THREE.SpriteMaterial({map:heartTex,transparent:true,opacity:.3,blending:THREE.AdditiveBlending})
+  heart=new THREE.Sprite(heartMat)
+  heart.scale.set(1.2,1.2,1);heart.position.z=3
+  scene.add(heart)
+
+  // ── LAYER 11: forward bloom particles (come toward camera) ──
+  const bloomCount=100,bloomGeo=new THREE.BufferGeometry()
+  const bloomPos=new Float32Array(bloomCount*3)
+  for(let i=0;i<bloomCount;i++){
+    const a=Math.random()*TAU,r=Math.random()*8
+    bloomPos[i*3]=Math.cos(a)*r;bloomPos[i*3+1]=Math.sin(a)*r;bloomPos[i*3+2]=-20+Math.random()*50
+  }
+  bloomGeo.setAttribute('position',new THREE.BufferAttribute(bloomPos,3))
+  const bloomMat=new THREE.PointsMaterial({color:0xffaa44,size:.2,transparent:true,opacity:.15,blending:THREE.AdditiveBlending,sizeAttenuation:true})
+  const bloom=new THREE.Points(bloomGeo,bloomMat)
+  scene.add(bloom);layerGroups.push(bloom);layerZ.push(0)
+}
+
+// ═══ ANIMATE ═══
+let running=false,t=0,lastWatchPoll=0,lastAiBrain=0,heart=null
+
+async function init(){
+  document.getElementById('start').style.display='none'
+  initAudio();await initMic();startDrones();buildScene()
+  running=true;document.documentElement.requestFullscreen?.().catch(()=>{})
+  animate()
+}
+window.init=init
+
+function animate(){
+  if(!running)return
+  requestAnimationFrame(animate)
+  t+=1/60
+  getAudio()
+
+  // poll watch every 8s
+  if(t-lastWatchPoll>8){lastWatchPoll=t;pollWatch()}
+  // AI brain every 5s
+  if(t-lastAiBrain>5){lastAiBrain=t;aiBrain()}
+
+  const intensity=aiState.intensity
+  const voiceE=Math.min(1,vol*6)
+  const palette=aiState.palette
+
+  // update drone volumes
+  updateDroneVolumes(.3+voiceE*.5+intensity*.2)
+
+  // palette colors
+  let baseHue=0
+  if(palette==='fire')baseHue=t*15%360
+  else if(palette==='cool')baseHue=180+t*5%60
+  else if(palette==='warm')baseHue=20+t*10%40
+  else baseHue=t*20%360 // rainbow
+
+  // ═══ CAMERA — depth dolly with voice ═══
+  const targetZ=30-voiceE*15-bass*8
+  cam.position.z+=(targetZ-cam.position.z)*.05
+  cam.position.x=Math.sin(t*.1)*2*(1+voiceE)
+  cam.position.y=Math.cos(t*.07)*1.5*(1+voiceE)
+  cam.lookAt(0,0,-5)
+  cam.rotation.z=Math.sin(t*.15)*(.02+voiceE*.05)
+
+  // ═══ UPDATE LAYERS ═══
+  layerGroups.forEach((group,gi)=>{
+    if(gi<4){
+      // petal rings — rotate, color cycle
+      group.rotation.z+=(gi%2?-.003:.003)*(1+voiceE*3)
+      group.position.z=-20-gi*8+voiceE*5+Math.sin(t*.3+gi)*2
+      group.children.forEach((mesh,mi)=>{
+        if(mesh.userData.mat){
+          const hue=((baseHue+gi*40+mi*(360/mesh.userData.count))%360)/360
+          mesh.userData.mat.color.setHSL(hue,.75,.45+voiceE*.15)
+          mesh.userData.mat.opacity=.04+voiceE*.08+bass*.05+intensity*.03
+        }
+      })
+    }
+    else if(gi===4||gi===5){
+      // shutters — counter-rotate with voice
+      const dir=gi===4?1:-1
+      group.rotation.z+=dir*(.005+voiceE*.03+mid*.02)
+      group.position.z+=((-5-(gi-4)*5+voiceE*3)-group.position.z)*.05
+      group.children.forEach((mesh,mi)=>{
+        if(mesh.userData.mat){
+          const hue=((baseHue+90+mi*15)%360)/360
+          mesh.userData.mat.color.setHSL(hue,.7,.4+high*.2)
+          mesh.userData.mat.opacity=.05+voiceE*.1+high*.06
+        }
+      })
+    }
+    else if(gi===6){
+      // lotus — gentle rotation, voice-reactive
+      group.rotation.z+=.002*(1+voiceE*2)
+      group.children.forEach(mesh=>{
+        if(mesh.userData.mat){
+          const hue=((baseHue+180+mesh.userData.ring*30+mesh.userData.idx*10)%360)/360
+          mesh.userData.mat.color.setHSL(hue,.8,.5+voiceE*.2)
+          mesh.userData.mat.opacity=.05+voiceE*.12+mid*.05
+          const s=1+voiceE*.3+Math.sin(t*2+mesh.userData.idx)*.05
+          mesh.scale.set(s,s,1)
+        }
+      })
+    }
+    else if(gi===7){
+      // halos
+      group.children.forEach(mesh=>{
+        if(mesh.userData.halo){
+          const hi=mesh.userData.idx
+          const hue=((baseHue+hi*45)%360)/360
+          mesh.userData.mat.color.setHSL(hue,.8,.55)
+          mesh.userData.mat.opacity=.02+voiceE*.06+bass*.03
+          mesh.position.z=-3+hi*1.5+Math.sin(t+hi)*(2+voiceE*3)
+          mesh.rotation.x=Math.sin(t*.2+hi)*.2
+          mesh.rotation.y=Math.cos(t*.15+hi)*.2
+          const s=1+voiceE*.15+Math.sin(t*1.5+hi)*.05
+          mesh.scale.set(s,s,s)
+        }
+      })
+    }
+    else if(gi===8){
+      // dust particles
+      const pp=group.geometry.attributes.position.array
+      const pc=group.geometry.attributes.color.array
+      for(let i=0;i<pp.length/3;i++){
+        pp[i*3+2]+=.02+voiceE*.1
+        if(pp[i*3+2]>25)pp[i*3+2]=-25
+        pp[i*3]+=Math.sin(t+i*.1)*.01*(1+voiceE*2)
+        pp[i*3+1]+=Math.cos(t*.8+i*.15)*.01*(1+voiceE*2)
+        const hue=((baseHue+i*1.5)%360)/360
+        const c=new THREE.Color().setHSL(hue,.7,.5)
+        pc[i*3]=c.r;pc[i*3+1]=c.g;pc[i*3+2]=c.b
+      }
+      group.geometry.attributes.position.needsUpdate=true
+      group.geometry.attributes.color.needsUpdate=true
+      group.material.opacity=.15+voiceE*.3+intensity*.1
+      group.material.size=.08+voiceE*.15+bass*.1
+    }
+    else if(gi===9){
+      // spectrum ring from FFT
+      if(fftData){
+        const pp=group.geometry.attributes.position.array
+        const pc=group.geometry.attributes.color.array
+        const step=Math.floor(fftData.length/256)
+        for(let i=0;i<256;i++){
+          const a=i/256*TAU
+          const v=fftData[i*step]/255
+          const r=5+v*6
+          pp[i*3]=Math.cos(a)*r;pp[i*3+1]=Math.sin(a)*r;pp[i*3+2]=2+v*3
+          const hue=((baseHue+i*1.4)%360)/360
+          const c=new THREE.Color().setHSL(hue,.9,.4+v*.3)
+          pc[i*3]=c.r;pc[i*3+1]=c.g;pc[i*3+2]=c.b
+        }
+        group.geometry.attributes.position.needsUpdate=true
+        group.geometry.attributes.color.needsUpdate=true
+      }
+      group.rotation.z=t*.05
+      group.material.opacity=.2+voiceE*.5
+      group.material.size=.1+voiceE*.2+bass*.15
+    }
+    else if(gi===10){
+      // sacred geometry — slow rotation
+      group.rotation.z=t*.01;group.rotation.x=Math.sin(t*.05)*.1
+      group.children.forEach(c=>{if(c.material){c.material.opacity=.02+bass*.04+intensity*.02}})
+    }
+    else if(gi===11){
+      // bloom particles rushing forward
+      const pp=group.geometry.attributes.position.array
+      for(let i=0;i<pp.length/3;i++){
+        pp[i*3+2]+=.05+voiceE*.3+bass*.2
+        if(pp[i*3+2]>30){pp[i*3+2]=-20;const a=Math.random()*TAU,r=Math.random()*8;pp[i*3]=Math.cos(a)*r;pp[i*3+1]=Math.sin(a)*r}
+      }
+      group.geometry.attributes.position.needsUpdate=true
+      group.material.opacity=.1+voiceE*.3
+      group.material.size=.15+voiceE*.3
+      const hue=(baseHue/360+.1)%1
+      group.material.color.setHSL(hue,.8,.55)
+    }
+  })
+
+  // background color
+  const bgL=.005+voiceE*.015+intensity*.01
+  scene.background.setHSL(baseHue/360,.3,bgL)
+
+  // breath guide — modulate scene FOV
+  const breathPhase=Math.sin(t*TAU/aiState.breathRate)
+  cam.fov=65+breathPhase*3*intensity
+  cam.updateProjectionMatrix()
+
+  // ═══ HUD ═══
+  const hr=watchData?.hr,hrv=watchData?.hrv
+  document.getElementById('hud').textContent=
+    `IRIS DEEP · ${palette.toUpperCase()}\n`+
+    `vol: ${(vol*100).toFixed(0)}  bass: ${(bass*100).toFixed(0)}  mid: ${(mid*100).toFixed(0)}  high: ${(high*100).toFixed(0)}\n`+
+    `pitch: ${pitch>20?pitch.toFixed(0)+'Hz':'--'}  depth: ${cam.position.z.toFixed(1)}\n`+
+    `HR: ${hr!=null?hr.toFixed(0):'--'}  HRV: ${hrv!=null?hrv.toFixed(1):'--'}  watch: ${watchOnline?'●':'○'}\n`+
+    `ai mood: ${aiState.mood}  breath: ${aiState.breathRate}s`
+
+  document.getElementById('ai').textContent=`AI: ${aiState.message}`
+
+  // heart pulse
+  if(heart){
+    const hPulse=1+Math.sin(t*3)*.15+voiceE*.3
+    heart.scale.set(hPulse,hPulse,1)
+    heart.material.opacity=.2+voiceE*.3+intensity*.15
+  }
+
+  // ═══ RENDER TWO EYES ═══
+  const halfW=Math.floor(W/2)
+  cam.aspect=halfW/H;cam.updateProjectionMatrix()
+
+  // left eye
+  const cx0=cam.position.x
+  cam.position.x=cx0-IPD
+  R.setViewport(0,0,halfW,H);R.setScissor(0,0,halfW,H)
+  R.render(scene,cam)
+
+  // right eye
+  cam.position.x=cx0+IPD
+  R.setViewport(halfW,0,halfW,H);R.setScissor(halfW,0,halfW,H)
+  R.render(scene,cam)
+
+  cam.position.x=cx0 // restore
+}
+
+addEventListener('resize',()=>{W=innerWidth;H=innerHeight;R.setSize(W,H)})
+</script>
+</body></html>
