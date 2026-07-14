@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>COLLAGEN REACTOR — Super Botox Formulation</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block}
+#start{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#080004,#000408);cursor:pointer;gap:10px}
+#start span{font:16px/1 monospace;color:rgba(255,150,180,.4);letter-spacing:6px;border:1px solid rgba(255,150,180,.12);padding:14px 30px;border-radius:6px}
+#start span:hover{color:rgba(255,180,200,.7);box-shadow:0 0 30px rgba(255,100,150,.1)}
+#start small{font:8px monospace;color:rgba(255,150,180,.15);letter-spacing:2px}
+#hud{position:fixed;top:8px;left:10px;z-index:10;font:7px/1.6 monospace;color:rgba(255,180,200,.2);pointer-events:none;white-space:pre}
+#phase{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:10;font:10px monospace;pointer-events:none;text-align:center;letter-spacing:3px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start" onclick="go()">
+  <span>COLLAGEN REACTOR</span>
+  <small>AGE BREAK · FIBROBLAST · HYDRATE · PHOTOACTIVATE</small>
+</div>
+<div id="hud"></div>
+<div id="phase"></div>
+
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+// 4 mechanisms as phases
+const phases=[
+  {name:'AGE BREAKER',sub:'ALT-711 · alagebrium',desc:'cleaving sugar crosslinks from collagen fibers',
+   color:[255,80,80],complement:[80,255,255],hz:396,
+   molecule:'C₁₄H₁₇ClN₂·2HBr',mw:412.6,
+   action:'breaks C-C bonds between glucose and lysine residues'},
+  {name:'FIBROBLAST',sub:'GHK-Cu · copper tripeptide',desc:'signaling cells to produce fresh collagen',
+   color:[255,180,50],complement:[50,80,255],hz:528,
+   molecule:'C₁₄H₂₃CuN₆O₄',mw:403.9,
+   action:'activates TGF-β pathway → procollagen I & III synthesis'},
+  {name:'HYDRATION',sub:'bound hyaluronic acid',desc:'1000× water retention in the collagen scaffold',
+   color:[50,180,255],complement:[255,80,50],hz:639,
+   molecule:'(C₁₄H₂₁NO₁₁)ₙ',mw:'1-2 MDa polymer',
+   action:'osmotic water retention + viscoelastic cushioning'},
+  {name:'PHOTOACTIVATE',sub:'5-ALA → protoporphyrin IX',desc:'collagen becomes a light antenna',
+   color:[200,50,255],complement:[100,255,50],hz:852,
+   molecule:'C₅H₉NO₃ → C₃₄H₃₄N₄O₄',mw:'131→562',
+   action:'absorbs 405nm → emits 635nm → fibroblast stimulation'}
+]
+
+let actx,master,running=false,t=0,oscs=[]
+
+function go(){
+  document.getElementById('start').style.display='none'
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.2;master.connect(actx.destination)
+  ;[[.17,.15,.25],[.31,.12,.2]].forEach(([dt,fbv,wv])=>{
+    const d=actx.createDelay(.6);d.delayTime.value=dt
+    const f=actx.createGain();f.gain.value=fbv;d.connect(f);f.connect(d)
+    const w=actx.createGain();w.gain.value=wv;d.connect(w);w.connect(actx.destination)
+    master.connect(d)
+  })
+  phases.forEach(p=>{
+    const v=[];
+    [['sine',p.hz,.04],['sine',p.hz*1.002,.03],['triangle',p.hz*2,.015],['sine',p.hz*.5,.025],['sine',p.hz*1.5,.012]].forEach(([type,hz,vol])=>{
+      const o=actx.createOscillator(),ga=actx.createGain()
+      o.type=type;o.frequency.value=hz;ga.gain.value=0
+      o.connect(ga);ga.connect(master);o.start()
+      v.push({o,ga,bv:vol,hz})
+    })
+    oscs.push(v)
+  })
+  running=true;document.documentElement.requestFullscreen?.().catch(()=>{});loop()
+}
+window.go=go
+
+let phaseIdx=0,phaseT=0
+function updateSound(){
+  phaseT=(t*.1)%4
+  phaseIdx=Math.floor(phaseT)%4
+  phases.forEach((_,i)=>{
+    let d=Math.abs(i-phaseT);if(d>2)d=4-d
+    const p=Math.exp(-d*d*.6)
+    oscs[i].forEach(v=>{
+      v.ga.gain.linearRampToValueAtTime(v.bv*(.1+p*.9),actx.currentTime+.08)
+      if(p>.5)v.o.frequency.linearRampToValueAtTime(v.hz+Math.sin(t*4+i)*p*.5,actx.currentTime+.05)
+    })
+  })
+}
+
+// ═══ COLLAGEN FIBER ═══
+function drawFiber(x1,y1,x2,y2,thickness,color,alpha,crosslinks){
+  const dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy)
+  const nx=-dy/len,ny=dx/len
+  // triple helix
+  ctx.globalAlpha=alpha
+  for(let strand=0;strand<3;strand++){
+    const offset=strand*TAU/3
+    ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=thickness
+    for(let i=0;i<=20;i++){
+      const frac=i/20
+      const px=x1+dx*frac+Math.sin(frac*TAU*3+offset+t*2)*nx*thickness*3
+      const py=y1+dy*frac+Math.sin(frac*TAU*3+offset+t*2)*ny*thickness*3
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py)
+    }
+    ctx.stroke()
+  }
+  // crosslinks (AGE bonds — the things to break)
+  if(crosslinks>0){
+    ctx.strokeStyle='rgba(255,100,50,.3)';ctx.lineWidth=1
+    for(let cl=0;cl<crosslinks;cl++){
+      const pos=.2+cl*.6/crosslinks
+      const px=x1+dx*pos,py=y1+dy*pos
+      const size=thickness*4
+      ctx.beginPath();ctx.moveTo(px-size*nx,py-size*ny)
+      ctx.lineTo(px+size*nx,py+size*ny);ctx.stroke()
+      // sugar molecule at crosslink
+      ctx.beginPath();ctx.arc(px,py,2,0,TAU)
+      ctx.fillStyle='rgba(255,150,50,.25)';ctx.globalAlpha=alpha;ctx.fill()
+    }
+  }
+}
+
+// ═══ MICRONEEDLE ═══
+function drawNeedle(x,y,len,angle,phase2,color,alpha){
+  ctx.save();ctx.translate(x,y);ctx.rotate(angle)
+  ctx.globalAlpha=alpha
+  // needle body
+  ctx.beginPath();ctx.moveTo(-2,0);ctx.lineTo(0,-len);ctx.lineTo(2,0);ctx.closePath()
+  ctx.fillStyle=color;ctx.fill()
+  // dissolving microspheres inside
+  const sphereCount=3+Math.floor(phase2*4)
+  for(let s=0;s<sphereCount;s++){
+    const sy=-len*.3-s*len*.15
+    const sr=1.5-phase2
+    if(sr>0){
+      ctx.beginPath();ctx.arc(0,sy,sr,0,TAU)
+      ctx.fillStyle='rgba(255,255,255,.2)';ctx.fill()
+    }
+  }
+  ctx.restore()
+}
+
+// ═══ MAIN LOOP ═══
+function loop(){
+  if(!running)return
+  requestAnimationFrame(loop)
+  t+=1/60;updateSound()
+
+  const maxR=Math.min(W,H)*.44
+  const p=phases[phaseIdx]
+  const c=p.color,cc=p.complement
+  const rgba=(r,g,b,a)=>`rgba(${r},${g},${b},${a})`
+  const phaseFrac=phaseT%1
+
+  // background — skin tone with inverted bloom
+  ctx.globalAlpha=.08
+  const bgGrad=ctx.createRadialGradient(cx,cy,maxR*.2,cx,cy,maxR*1.3)
+  bgGrad.addColorStop(0,rgba(20,12,10,1))
+  bgGrad.addColorStop(.4,rgba(Math.floor(cc[0]*.02)+10,Math.floor(cc[1]*.02)+8,Math.floor(cc[2]*.02)+6,1))
+  bgGrad.addColorStop(1,rgba(Math.floor(cc[0]*.04)+5,Math.floor(cc[1]*.04)+4,Math.floor(cc[2]*.04)+3,1))
+  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,W,H)
+
+  // ═══ COLLAGEN FIBER NETWORK ═══
+  const fiberCount=16
+  const crosslinkAmount=phaseIdx===0?Math.max(0,3-phaseFrac*3):phaseIdx>0?0:3
+  for(let f=0;f<fiberCount;f++){
+    const angle=f*TAU/fiberCount+t*.02
+    const r1=maxR*.15,r2=maxR*(.6+Math.sin(t*.3+f)*.05)
+    const x1=cx+Math.cos(angle)*r1,y1=cy+Math.sin(angle)*r1
+    const x2=cx+Math.cos(angle+.1)*r2,y2=cy+Math.sin(angle+.1)*r2
+    const fiberAlpha=.06+Math.sin(t+f)*.02
+
+    // fiber color changes by phase
+    let fiberCol
+    if(phaseIdx===0)fiberCol=rgba(200,150,130,.4) // damaged collagen
+    else if(phaseIdx===1)fiberCol=rgba(220,200,180,.5) // fresh collagen being made
+    else if(phaseIdx===2)fiberCol=rgba(150,200,230,.4) // hydrated
+    else fiberCol=rgba(230,200,255,.5) // photoactivated — glowing
+
+    drawFiber(x1,y1,x2,y2,1,fiberCol,fiberAlpha,Math.floor(crosslinkAmount))
+  }
+
+  // ═══ PHASE-SPECIFIC GEOMETRY ═══
+  if(phaseIdx===0){
+    // AGE BREAKER — scissors cutting crosslinks, fragments flying off
+    const breakCount=8+Math.floor(phaseFrac*12)
+    for(let b=0;b<breakCount;b++){
+      const a=b*TAU/breakCount+t*.5
+      const r=maxR*(.2+phaseFrac*.3)
+      const bx=cx+Math.cos(a)*r,by=cy+Math.sin(a)*r
+      // breaking spark
+      ctx.beginPath();ctx.arc(bx,by,2+Math.sin(t*8+b)*1.5,0,TAU)
+      ctx.fillStyle=rgba(255,200,100,.1+phaseFrac*.08);ctx.globalAlpha=1;ctx.fill()
+      // fragment flying outward
+      if(phaseFrac>.3){
+        const frag=phaseFrac-.3
+        const fx=bx+Math.cos(a+1)*frag*30,fy=by+Math.sin(a+1)*frag*30
+        ctx.beginPath();ctx.arc(fx,fy,1,0,TAU)
+        ctx.fillStyle=rgba(255,150,50,.05);ctx.fill()
+      }
+    }
+    // sugar molecules being cleaved
+    for(let s=0;s<6;s++){
+      const sa=s*TAU/6+t*.3
+      const sr=maxR*(.3+Math.sin(t+s)*.05)
+      ctx.font='8px monospace';ctx.textAlign='center';ctx.globalAlpha=.06*(1-phaseFrac)
+      ctx.fillStyle=rgba(255,180,80,1);ctx.fillText('glucose',cx+Math.cos(sa)*sr,cy+Math.sin(sa)*sr)
+    }
+  }
+
+  else if(phaseIdx===1){
+    // FIBROBLAST — cells activating, new collagen spiraling out
+    const cellCount=7
+    for(let fc=0;fc<cellCount;fc++){
+      const a=fc*TAU/cellCount+t*.15
+      const r=maxR*(.25+fc*.04)
+      const fcx=cx+Math.cos(a)*r,fcy=cy+Math.sin(a)*r
+      // cell body
+      ctx.beginPath();ctx.arc(fcx,fcy,5+Math.sin(t*3+fc)*2,0,TAU)
+      const cellGrad=ctx.createRadialGradient(fcx,fcy,0,fcx,fcy,8)
+      cellGrad.addColorStop(0,rgba(255,220,100,.15))
+      cellGrad.addColorStop(1,rgba(255,180,50,.02))
+      ctx.fillStyle=cellGrad;ctx.globalAlpha=1;ctx.fill()
+      // GHK-Cu signal (copper colored)
+      ctx.beginPath();ctx.arc(fcx,fcy,8+phaseFrac*5,0,TAU)
+      ctx.strokeStyle=rgba(180,120,50,.08);ctx.lineWidth=1;ctx.stroke()
+      // new collagen spiraling out
+      if(phaseFrac>.2){
+        ctx.beginPath();ctx.globalAlpha=.04+phaseFrac*.03
+        ctx.strokeStyle=rgba(220,200,180,.5);ctx.lineWidth=.5
+        for(let sp=0;sp<20;sp++){
+          const sa=sp*.3+t*2+fc
+          const sr2=3+sp*1.5
+          ctx.lineTo(fcx+Math.cos(sa)*sr2,fcy+Math.sin(sa)*sr2)
+        }
+        ctx.stroke()
+      }
+    }
+  }
+
+  else if(phaseIdx===2){
+    // HYDRATION — HA molecules holding water, blue glow
+    const haCount=12
+    for(let h=0;h<haCount;h++){
+      const ha=h*TAU/haCount+t*.08
+      const hr=maxR*(.15+h*.03)
+      const hx=cx+Math.cos(ha)*hr,hy=cy+Math.sin(ha)*hr
+      // HA polymer chain
+      ctx.beginPath();ctx.globalAlpha=.04+phaseFrac*.03
+      ctx.strokeStyle=rgba(100,180,255,.4);ctx.lineWidth=1.5
+      for(let seg=0;seg<10;seg++){
+        const sa=ha+seg*.15+Math.sin(t+seg)*.1
+        const sr3=hr+seg*3
+        ctx.lineTo(cx+Math.cos(sa)*sr3,cy+Math.sin(sa)*sr3)
+      }
+      ctx.stroke()
+      // water molecules attached
+      for(let w=0;w<3;w++){
+        const wa=ha+w*.2+t*.5
+        const wr=hr+5+w*4
+        ctx.beginPath();ctx.arc(cx+Math.cos(wa)*wr,cy+Math.sin(wa)*wr,1.5+Math.sin(t*4+w),0,TAU)
+        ctx.fillStyle=rgba(80,160,255,.06+phaseFrac*.04);ctx.globalAlpha=1;ctx.fill()
+      }
+    }
+    // hydration glow
+    const waterGlow=ctx.createRadialGradient(cx,cy,maxR*.1,cx,cy,maxR*.5)
+    waterGlow.addColorStop(0,rgba(80,160,255,.02+phaseFrac*.03))
+    waterGlow.addColorStop(1,'rgba(0,0,0,0)')
+    ctx.globalAlpha=1;ctx.fillStyle=waterGlow
+    ctx.beginPath();ctx.arc(cx,cy,maxR*.5,0,TAU);ctx.fill()
+  }
+
+  else if(phaseIdx===3){
+    // PHOTOACTIVATE — light absorption → re-emission, collagen glows
+    // incoming photons (405nm = violet)
+    const photonCount=15+Math.floor(phaseFrac*20)
+    for(let ph=0;ph<photonCount;ph++){
+      const pa=ph*TAU/photonCount+t*.3
+      const startR=maxR*.8-phaseFrac*maxR*.5
+      const pr=startR+Math.sin(t*5+ph)*10
+      const px=cx+Math.cos(pa)*pr,py=cy+Math.sin(pa)*pr
+      ctx.beginPath();ctx.arc(px,py,1.5,0,TAU)
+      ctx.fillStyle=rgba(150,50,255,.08+phaseFrac*.06);ctx.globalAlpha=1;ctx.fill()
+      // trail
+      const tx=cx+Math.cos(pa)*(pr+15),ty=cy+Math.sin(pa)*(pr+15)
+      ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(tx,ty)
+      ctx.strokeStyle=rgba(150,50,255,.04);ctx.lineWidth=1;ctx.stroke()
+    }
+    // re-emitted photons (635nm = red)
+    if(phaseFrac>.3){
+      const emitCount=Math.floor((phaseFrac-.3)*25)
+      for(let em=0;em<emitCount;em++){
+        const ea=em*PHI*TAU+t*.2
+        const er=maxR*(.1+em*.015)
+        ctx.beginPath();ctx.arc(cx+Math.cos(ea)*er,cy+Math.sin(ea)*er,2+Math.sin(t*3+em),0,TAU)
+        ctx.fillStyle=rgba(255,80,80,.06+(phaseFrac-.3)*.08);ctx.globalAlpha=1;ctx.fill()
+      }
+    }
+    // whole field glowing
+    const glowGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,maxR*.6)
+    glowGrad.addColorStop(0,rgba(255,200,255,.01+phaseFrac*.03))
+    glowGrad.addColorStop(.5,rgba(200,100,255,.005+phaseFrac*.015))
+    glowGrad.addColorStop(1,'rgba(0,0,0,0)')
+    ctx.globalAlpha=1;ctx.fillStyle=glowGrad
+    ctx.beginPath();ctx.arc(cx,cy,maxR*.6,0,TAU);ctx.fill()
+  }
+
+  // ═══ MICRONEEDLE ARRAY (always visible, subtle) ═══
+  const needleCount=8
+  for(let n=0;n<needleCount;n++){
+    const na=n*TAU/needleCount+t*.02
+    const nr=maxR*.7
+    const nx2=cx+Math.cos(na)*nr,ny2=cy+Math.sin(na)*nr
+    drawNeedle(nx2,ny2,15+Math.sin(t+n)*3,na+Math.PI/2+Math.PI,.3+phaseFrac*.2,rgba(200,200,210,.08),.3)
+  }
+
+  // ═══ MOLECULE FORMULA at center ═══
+  ctx.globalAlpha=.08+Math.sin(t*2)*.02
+  ctx.font='7px monospace';ctx.textAlign='center';ctx.fillStyle=rgba(c[0],c[1],c[2],1)
+  ctx.fillText(p.molecule,cx,cy-8)
+  ctx.fillText(`MW: ${p.mw}`,cx,cy)
+  ctx.fillText(p.action.slice(0,50),cx,cy+8)
+
+  // ═══ PHASE INFO ═══
+  document.getElementById('phase').style.color=rgba(c[0],c[1],c[2],.4)
+  document.getElementById('phase').textContent=`${p.name} · ${p.sub}`
+
+  document.getElementById('hud').textContent=
+    `COLLAGEN REACTOR\n`+
+    `phase: ${phaseIdx+1}/4 · ${p.name}\n`+
+    `frequency: ${p.hz}Hz\n`+
+    `molecule: ${p.molecule}\n`+
+    `action: ${p.action.slice(0,40)}\n\n`+
+    `delivery: microneedle patch\n`+
+    `duration: 6-12 months\n`+
+    `mechanism: repair not freeze`
+
+  // phase dots
+  phases.forEach((p2,i)=>{
+    let d=Math.abs(i-phaseT);if(d>2)d=4-d
+    const pr=Math.exp(-d*d*.6)
+    ctx.beginPath();ctx.arc(cx+(i-1.5)*30,H-5,2+pr*3,0,TAU)
+    ctx.fillStyle=rgba(p2.color[0],p2.color[1],p2.color[2],.1+pr*.5)
+    ctx.globalAlpha=1;ctx.fill()
+  })
+}
+</script>
+</body></html>
