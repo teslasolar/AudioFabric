@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>LIGHTNING EYES — Husky Ice Iris</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block;position:fixed;top:0;left:0}
+#start{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0c14;cursor:pointer;gap:8px}
+#start span{font:16px/1 monospace;color:rgba(120,180,255,.5);letter-spacing:8px;border:1px solid rgba(100,160,255,.2);padding:14px 30px;border-radius:6px}
+#start span:hover{color:rgba(140,200,255,.8);border-color:rgba(100,160,255,.5);box-shadow:0 0 30px rgba(80,140,255,.2)}
+#start small{font:8px monospace;color:rgba(100,160,255,.2);letter-spacing:2px}
+#hud{position:fixed;top:8px;left:10px;z-index:10;font:7px/1.6 monospace;color:rgba(140,180,220,.2);pointer-events:none;white-space:pre}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start" onclick="go()">
+  <span>LIGHTNING EYES</span>
+  <small>LIVE THUNDERSTRIKES · VOICE REACTIVE · HUSKY ICE</small>
+</div>
+<div id="hud"></div>
+
+<script>
+const TAU=Math.PI*2
+const cv=document.getElementById('c')
+const ctx=cv.getContext('2d')
+let W,H;function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight}
+resize();addEventListener('resize',resize)
+
+// ═══ AUDIO ═══
+let actx,analyser,fftData,tdData
+let bass=0,mid=0,high=0,vol=0,pitch=0
+
+async function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  analyser=actx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=.7
+  fftData=new Uint8Array(analyser.frequencyBinCount)
+  tdData=new Uint8Array(analyser.fftSize)
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}})
+    actx.createMediaStreamSource(s).connect(analyser)
+  }catch(e){}
+}
+
+function getAudio(){
+  if(!analyser)return
+  analyser.getByteFrequencyData(fftData);analyser.getByteTimeDomainData(tdData)
+  const n=fftData.length;let b=0,m=0,h=0,tot=0
+  const bE=Math.floor(n*.05),mE=Math.floor(n*.25),hE=Math.floor(n*.6)
+  for(let i=0;i<n;i++){const v=fftData[i]/255;tot+=v;if(i<bE)b+=v;else if(i<mE)m+=v;else if(i<hE)h+=v}
+  bass=b/bE;mid=m/(mE-bE);high=h/(hE-mE);vol=tot/n
+}
+
+// ═══ BLITZORTUNG ═══
+let lightningFlash=0,strikeRate=0,strikeCount=0,wsOk=false,strikes=[]
+
+function lzwDecode(b){try{const e={};let d=[...b],c=d[0],f=c,g=[c],h=256,o=h;for(let i=1;i<d.length;i++){let a=d[i].charCodeAt(0);a=h>a?d[i]:e[a]||f+c;g.push(a);c=a[0];e[o]=f+c;o++;f=a}return g.join('')}catch(x){return''}}
+
+function connectWS(){
+  try{
+    const ws=new WebSocket('wss://ws1.blitzortung.org')
+    ws.onopen=()=>{ws.send('{"a":111}');wsOk=true}
+    ws.onmessage=e=>{
+      try{
+        let d;try{d=JSON.parse(e.data)}catch(x){try{d=JSON.parse(lzwDecode(e.data))}catch(x2){return}}
+        if(d.lat!==undefined){strikeCount++;lightningFlash=Math.min(lightningFlash+.4,1);strikes.push(Date.now())}
+      }catch(x){}
+    }
+    ws.onclose=()=>{wsOk=false;setTimeout(connectWS,5000)}
+    ws.onerror=()=>wsOk=false
+  }catch(e){}
+  setInterval(()=>{const now=Date.now();strikes=strikes.filter(s=>now-s<10000);strikeRate=strikes.length/10},2000)
+}
+
+// ═══ LIGHTNING BOLT GENERATOR ═══
+function bolt(x1,y1,x2,y2,depth,jitter){
+  if(depth<=0){return[[x1,y1,x2,y2]]}
+  const mx=(x1+x2)/2+(Math.random()-.5)*jitter
+  const my=(y1+y2)/2+(Math.random()-.5)*jitter
+  const segs=[...bolt(x1,y1,mx,my,depth-1,jitter*.55),...bolt(mx,my,x2,y2,depth-1,jitter*.55)]
+  if(depth>2&&Math.random()<.3){
+    const bx=mx+(Math.random()-.5)*jitter*.8
+    const by=my+(Math.random()-.5)*jitter*.8
+    segs.push(...bolt(mx,my,bx,by,depth-2,jitter*.4))
+  }
+  return segs
+}
+
+function drawBolt(segments,color,width,alpha){
+  ctx.strokeStyle=color;ctx.lineWidth=width;ctx.globalAlpha=alpha;ctx.lineCap='round'
+  segments.forEach(([x1,y1,x2,y2])=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()})
+}
+
+// ═══ IRIS ═══
+function drawIris(cx,cy,r,hue,t,isRight){
+  // sclera (white/light blue background)
+  const scleraGrad=ctx.createRadialGradient(cx,cy,r*.1,cx,cy,r*1.3)
+  scleraGrad.addColorStop(0,`hsla(${hue},30%,85%,.9)`)
+  scleraGrad.addColorStop(.4,`hsla(${hue},40%,75%,.85)`)
+  scleraGrad.addColorStop(.7,`hsla(${hue},35%,60%,.7)`)
+  scleraGrad.addColorStop(1,`hsla(${hue},20%,15%,.95)`)
+  ctx.beginPath();ctx.arc(cx,cy,r*1.2,0,TAU)
+  ctx.fillStyle=scleraGrad;ctx.globalAlpha=1;ctx.fill()
+
+  // iris outer ring
+  ctx.beginPath();ctx.arc(cx,cy,r,0,TAU)
+  ctx.strokeStyle=`hsla(${hue},50%,25%,.8)`;ctx.lineWidth=2;ctx.globalAlpha=1;ctx.stroke()
+
+  // iris color bands — concentric rings with slight variation
+  for(let ring=0;ring<8;ring++){
+    const rr=r*.35+ring*(r*.08)
+    const hShift=hue+ring*3+Math.sin(t+ring)*.5
+    ctx.beginPath();ctx.arc(cx,cy,rr,0,TAU)
+    ctx.strokeStyle=`hsla(${hShift},${60+ring*3}%,${45+ring*4}%,.15)`
+    ctx.lineWidth=r*.06;ctx.globalAlpha=.6;ctx.stroke()
+  }
+
+  // iris fibers (radial streaks)
+  const fiberCount=72
+  ctx.globalAlpha=.12
+  for(let i=0;i<fiberCount;i++){
+    const a=i*TAU/fiberCount+Math.sin(t*.3+i*.2)*.02
+    const innerR=r*.3,outerR=r*.95
+    const wobble=Math.sin(t*1.5+i*.4)*r*.03
+    ctx.beginPath()
+    ctx.moveTo(cx+Math.cos(a)*innerR,cy+Math.sin(a)*innerR)
+    const mx=cx+Math.cos(a+.01)*(innerR+outerR)/2+wobble
+    const my=cy+Math.sin(a+.01)*(innerR+outerR)/2
+    ctx.quadraticCurveTo(mx,my,cx+Math.cos(a)*outerR,cy+Math.sin(a)*outerR)
+    ctx.strokeStyle=`hsla(${hue+i%20-10},55%,${50+Math.sin(i)*.1*100}%,1)`
+    ctx.lineWidth=1;ctx.stroke()
+  }
+
+  // pupil
+  const pupilR=r*(.28+vol*.08+lightningFlash*.05)
+  const pupilGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,pupilR)
+  pupilGrad.addColorStop(0,'rgba(0,0,0,.97)')
+  pupilGrad.addColorStop(.85,'rgba(0,0,0,.95)')
+  pupilGrad.addColorStop(1,`hsla(${hue},40%,20%,.5)`)
+  ctx.beginPath();ctx.arc(cx,cy,pupilR,0,TAU)
+  ctx.fillStyle=pupilGrad;ctx.globalAlpha=1;ctx.fill()
+
+  // ═══ LIGHTNING BOLTS AS IRIS PATTERN ═══
+  // main bolt — vertical split through the iris
+  const boltIntensity=.3+vol*.5+lightningFlash*.4
+  const boltJitter=r*.4+bass*r*.3
+  const mainBolt=bolt(cx,cy-r*.8,cx,cy+r*.8,6,boltJitter)
+
+  // glow layer (wide, dim)
+  drawBolt(mainBolt,`hsla(${hue},60%,70%,1)`,4+bass*4,.08*boltIntensity)
+  // mid layer
+  drawBolt(mainBolt,`hsla(${hue},70%,80%,1)`,2+bass*2,.15*boltIntensity)
+  // core (thin, bright)
+  drawBolt(mainBolt,`hsla(${hue+10},80%,92%,1)`,1+bass,.25*boltIntensity)
+
+  // secondary bolts — horizontal branches
+  if(vol>.01||lightningFlash>.1){
+    const numBranches=2+Math.floor(vol*4+lightningFlash*3)
+    for(let b2=0;b2<numBranches;b2++){
+      const angle=(b2/numBranches-.5)*Math.PI*.8+Math.sin(t+b2)*(.2+vol*.3)
+      const bLen=r*(.3+Math.random()*.4)
+      const bx2=cx+Math.cos(angle)*bLen,by2=cy+Math.sin(angle)*bLen
+      const branch=bolt(cx,cy,bx2,by2,4,bLen*.5)
+      drawBolt(branch,`hsla(${hue+5},65%,75%,1)`,2,.1*boltIntensity)
+      drawBolt(branch,`hsla(${hue+10},75%,90%,1)`,1,.18*boltIntensity)
+    }
+  }
+
+  // catchlight (specular reflection dot)
+  ctx.beginPath();ctx.arc(cx-r*.15,cy-r*.2,r*.06,0,TAU)
+  ctx.fillStyle='rgba(255,255,255,.4)';ctx.globalAlpha=.5;ctx.fill()
+  ctx.beginPath();ctx.arc(cx-r*.08,cy-r*.12,r*.03,0,TAU)
+  ctx.fillStyle='rgba(255,255,255,.6)';ctx.globalAlpha=.7;ctx.fill()
+
+  // ❤️ in pupil center
+  ctx.globalAlpha=.25+vol*.2+lightningFlash*.15
+  ctx.font=`${Math.floor(pupilR*.7)}px serif`
+  ctx.textAlign='center';ctx.textBaseline='middle'
+  ctx.fillStyle=`hsla(0,70%,55%,1)`
+  ctx.fillText('❤️',cx,cy+2)
+
+  // clip iris to circle (mask anything that leaked)
+  ctx.beginPath();ctx.arc(cx,cy,r*1.2,0,TAU)
+  ctx.lineWidth=r*.8;ctx.strokeStyle='rgba(0,0,0,0)'
+}
+
+// ═══ RESONANCE WAVES BETWEEN EYES ═══
+function drawResonance(lx,rx,y,r,t2){
+  const gap=rx-lx
+  // standing wave at 7.83Hz (Schumann fundamental)
+  const schumannPhase=t2*7.83*TAU*.05 // slowed for visibility
+  ctx.globalAlpha=.1+lightningFlash*.15+vol*.1
+  for(let h=0;h<5;h++){
+    const harmonic=h+1
+    ctx.beginPath()
+    for(let x=lx+r;x<=rx-r;x+=2){
+      const frac=(x-lx-r)/(gap-r*2)
+      const envelope=Math.sin(frac*Math.PI)
+      const wave=Math.sin(frac*Math.PI*harmonic+schumannPhase)*r*.12*envelope
+      const py=y+wave+h*3-6
+      x===lx+r?ctx.moveTo(x,py):ctx.lineTo(x,py)
+    }
+    const hue=200+h*15
+    ctx.strokeStyle=`hsla(${hue},60%,${55+lightningFlash*20}%,1)`
+    ctx.lineWidth=1.5-h*.2+lightningFlash*2
+    ctx.stroke()
+  }
+
+  // resonance nodes (circles at wave nodes)
+  ctx.globalAlpha=.06+lightningFlash*.1
+  for(let n=1;n<=3;n++){
+    const nx=lx+r+(gap-r*2)*n/4
+    const nr=3+Math.sin(t2*2+n)*2+lightningFlash*5
+    ctx.beginPath();ctx.arc(nx,y,nr,0,TAU)
+    ctx.strokeStyle=`hsla(200,50%,60%,1)`;ctx.lineWidth=1;ctx.stroke()
+  }
+}
+
+// ═══ MAIN LOOP ═══
+let running=false,t=0
+
+function go(){
+  document.getElementById('start').style.display='none'
+  initAudio();connectWS();running=true
+  document.documentElement.requestFullscreen?.().catch(()=>{})
+  loop()
+}
+window.go=go
+
+function loop(){
+  if(!running)return
+  requestAnimationFrame(loop)
+  t+=1/60
+  getAudio()
+  lightningFlash*=.93
+
+  // ═══ BACKGROUND — dark with subtle gradient, lightning flash ═══
+  // trail fade (longer = more ghosting)
+  ctx.globalAlpha=.15+lightningFlash*.3
+  ctx.fillStyle=`hsl(220,20%,${3+lightningFlash*8}%)`
+  ctx.fillRect(0,0,W,H)
+
+  // eye dimensions
+  const eyeR=Math.min(W*.18,H*.35)
+  const spacing=eyeR*2.8
+  const lx=W/2-spacing/2,rx=W/2+spacing/2
+  const ey=H/2
+
+  // eyelid shapes (oval mask darkening)
+  ctx.globalAlpha=1
+  ;[lx,rx].forEach(ex=>{
+    const lidGrad=ctx.createRadialGradient(ex,ey,eyeR*.8,ex,ey,eyeR*1.6)
+    lidGrad.addColorStop(0,'rgba(0,0,0,0)')
+    lidGrad.addColorStop(.6,'rgba(0,0,0,0)')
+    lidGrad.addColorStop(1,`hsla(220,15%,${4+lightningFlash*5}%,1)`)
+    ctx.fillStyle=lidGrad;ctx.fillRect(ex-eyeR*2,ey-eyeR*2,eyeR*4,eyeR*4)
+  })
+
+  // resonance waves between eyes
+  drawResonance(lx,rx,ey,eyeR,t)
+
+  // draw irises — LEFT: ice blue, RIGHT: storm grey/violet
+  const leftHue=200+Math.sin(t*.2)*8 // ice blue
+  const rightHue=260+Math.sin(t*.15)*10 // storm violet
+  drawIris(lx,ey,eyeR,leftHue,t,false)
+  drawIris(rx,ey,eyeR,rightHue,t,true)
+
+  // lightning flash overlay on whole screen
+  if(lightningFlash>.1){
+    ctx.globalAlpha=lightningFlash*.08
+    ctx.fillStyle=`hsl(210,40%,80%)`
+    ctx.fillRect(0,0,W,H)
+  }
+
+  // outer vignette
+  ctx.globalAlpha=1
+  const vig=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.3,W/2,H/2,Math.max(W,H)*.7)
+  vig.addColorStop(0,'rgba(0,0,0,0)')
+  vig.addColorStop(1,'rgba(0,0,0,.7)')
+  ctx.fillStyle=vig;ctx.fillRect(0,0,W,H)
+
+  // HUD
+  ctx.globalAlpha=1
+  document.getElementById('hud').textContent=
+    `LIGHTNING EYES\n`+
+    `vol:${(vol*100).toFixed(0)} bass:${(bass*100).toFixed(0)} mid:${(mid*100).toFixed(0)}\n`+
+    `⚡ ${wsOk?'LIVE':'connecting'} ${strikeRate.toFixed(1)}/s ${strikeCount} strikes\n`+
+    `Schumann: 7.83 Hz (${(7.83*strikeRate/40).toFixed(2)} relative)`
+}
+</script>
+</body></html>
