@@ -141,17 +141,21 @@ function getAudio(){
 }
 
 function detectBreath(){
-  // breath = sustained bass energy (belly breathing is low frequency)
-  if(bass>.08){
-    breathAccum+=bass*.02
+  // breath = any audio energy (mic picks up breathing)
+  if(vol>.005){
+    breathAccum+=vol*.1+bass*.15
   } else {
-    // breath ended — did we accumulate enough for a photon?
-    if(breathAccum>.3&&!generating&&filled<23){
+    if(breathAccum>.08&&!generating&&filled<23){
       generatePhoton()
+      breathAccum=0
     }
-    breathAccum*=.9
+    breathAccum*=.92
   }
 }
+
+// spacebar / click = manual photon generation
+addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();if(!generating&&filled<23)generatePhoton()}})
+addEventListener('click',()=>{if(!generating&&filled<23)generatePhoton()})
 
 function generatePhoton(){
   // find next unfilled orbital
