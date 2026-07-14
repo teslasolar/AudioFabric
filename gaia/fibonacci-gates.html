@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>FIBONACCI GATES — Sacred Overlay</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block}
+#start{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:#000;cursor:pointer}
+#start span{font:16px/1 monospace;color:rgba(255,200,100,.4);letter-spacing:8px;border:1px solid rgba(255,200,100,.12);padding:16px 36px;border-radius:6px}
+#start span:hover{color:rgba(255,220,130,.7);border-color:rgba(255,200,100,.3);box-shadow:0 0 40px rgba(255,180,50,.12)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start" onclick="go()"><span>FIBONACCI GATES</span></div>
+
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+// 7 gates — TRUE frequencies (Solfeggio + Schumann + body resonance)
+const G=[
+  {n:'UT',hz:396,hz2:55,color:[220,30,30],fib:1,geo:3,mantra:'LAM'},
+  {n:'RE',hz:417,hz2:73.4,color:[230,120,20],fib:1,geo:4,mantra:'VAM'},
+  {n:'MI',hz:528,hz2:110,color:[230,210,30],fib:2,geo:5,mantra:'RAM'},
+  {n:'FA',hz:639,hz2:146.8,color:[50,200,50],fib:3,geo:6,mantra:'YAM'},
+  {n:'SOL',hz:741,hz2:196,color:[50,120,230],fib:5,geo:7,mantra:'HAM'},
+  {n:'LA',hz:852,hz2:261.6,color:[100,50,200],fib:8,geo:9,mantra:'OM'},
+  {n:'SI',hz:963,hz2:329.6,color:[190,50,230],fib:13,geo:12,mantra:'AUM'}
+]
+
+// fibonacci sequence for geometry counts
+const FIB=[1,1,2,3,5,8,13,21,34,55,89,144]
+
+let actx,master,running=false,t=0
+let oscs=[]
+
+function go(){
+  document.getElementById('start').style.display='none'
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.25;master.connect(actx.destination)
+
+  // dual stereo reverb
+  const dL=actx.createDelay(.6);dL.delayTime.value=.17
+  const fbL=actx.createGain();fbL.gain.value=.18;dL.connect(fbL);fbL.connect(dL)
+  const wL=actx.createGain();wL.gain.value=.25;dL.connect(wL);wL.connect(actx.destination)
+  const dR=actx.createDelay(.6);dR.delayTime.value=.29
+  const fbR=actx.createGain();fbR.gain.value=.14;dR.connect(fbR);fbR.connect(dR)
+  const wR=actx.createGain();wR.gain.value=.2;dR.connect(wR);wR.connect(actx.destination)
+  master.connect(dL);master.connect(dR)
+
+  // ═══ SOUND DESIGN — each gate gets serious treatment ═══
+  G.forEach((g,i)=>{
+    const voices=[]
+
+    // solfeggio fundamental (loud, pure)
+    mk('sine',g.hz,.05,voices)
+    mk('sine',g.hz*1.002,.04,voices) // chorus
+    mk('sine',g.hz*.999,.035,voices)
+
+    // body resonance fundamental
+    mk('sine',g.hz2,.04,voices)
+    mk('triangle',g.hz2*2,.02,voices) // octave
+    mk('sine',g.hz2*1.5,.015,voices) // fifth
+
+    // sub (felt not heard)
+    mk('sine',g.hz2/2,.03,voices)
+
+    // shimmer (high harmonic)
+    mk('triangle',g.hz*2,.01,voices)
+    mk('sine',g.hz*3,.005,voices)
+
+    oscs.push(voices)
+
+    function mk(type,hz,vol,arr){
+      const o=actx.createOscillator(),ga=actx.createGain()
+      o.type=type;o.frequency.value=hz;ga.gain.value=0
+      o.connect(ga);ga.connect(master);o.start()
+      arr.push({o,ga,baseVol:vol,hz})
+    }
+  })
+
+  running=true
+  document.documentElement.requestFullscreen?.().catch(()=>{})
+  loop()
+}
+window.go=go
+
+// ═══ CYCLING — smooth crossfade with overlap ═══
+let phase=0
+function updateSound(){
+  phase=(t*.15)%7 // slower cycle, 6.67s per gate
+  G.forEach((_,i)=>{
+    // gaussian presence curve — wide overlap
+    let dist=Math.abs(i-phase)
+    if(dist>3.5)dist=7-dist
+    const presence=Math.exp(-dist*dist*.5) // gaussian falloff
+
+    oscs[i].forEach(v=>{
+      const target=v.baseVol*(.15+presence*.85)
+      v.ga.gain.linearRampToValueAtTime(target,actx.currentTime+.08)
+      // slow vibrato on active
+      if(presence>.6){
+        const vib=Math.sin(t*5+i)*presence*.8
+        v.o.frequency.linearRampToValueAtTime(v.hz+vib,actx.currentTime+.05)
+      }
+    })
+  })
+}
+
+// ═══ DRAWING ═══
+function goldenSpiral(x,y,maxR,turns,rotation,color,alpha,width){
+  ctx.save();ctx.translate(x,y);ctx.rotate(rotation)
+  ctx.beginPath();ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=width
+  const steps=turns*80
+  for(let i=0;i<=steps;i++){
+    const frac=i/steps
+    const a=frac*turns*TAU
+    const r=maxR*.02*Math.pow(PHI,frac*turns*2/TAU*2)
+    if(r>maxR)break
+    const px=Math.cos(a)*r,py=Math.sin(a)*r
+    i===0?ctx.moveTo(px,py):ctx.lineTo(px,py)
+  }
+  ctx.stroke();ctx.restore()
+}
+
+function flowerOfLife(x,y,r,depth,color,alpha){
+  ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=.5
+  // center circle
+  ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.stroke()
+  if(depth<=0)return
+  // 6 surrounding circles
+  for(let i=0;i<6;i++){
+    const a=i*TAU/6
+    ctx.beginPath();ctx.arc(x+Math.cos(a)*r,y+Math.sin(a)*r,r,0,TAU);ctx.stroke()
+    if(depth>1)for(let j=0;j<6;j++){
+      const a2=j*TAU/6
+      const nx=x+Math.cos(a)*r+Math.cos(a2)*r*.5
+      const ny=y+Math.sin(a)*r+Math.sin(a2)*r*.5
+      ctx.beginPath();ctx.arc(nx,ny,r*.5,0,TAU);ctx.stroke()
+    }
+  }
+}
+
+function fibPetals(x,y,innerR,outerR,count,rotation,color,alpha){
+  ctx.save();ctx.translate(x,y);ctx.rotate(rotation)
+  ctx.globalAlpha=alpha
+  const len=outerR-innerR,w=len*.3
+  for(let i=0;i<count;i++){
+    const a=i*TAU/count
+    ctx.save();ctx.rotate(a)
+    ctx.beginPath();ctx.moveTo(innerR,0)
+    ctx.bezierCurveTo(innerR+len*.3,w,innerR+len*.7,w*.6,outerR,0)
+    ctx.bezierCurveTo(innerR+len*.7,-w*.6,innerR+len*.3,-w,innerR,0)
+
+    const grad=ctx.createLinearGradient(innerR,0,outerR,0)
+    grad.addColorStop(0,color)
+    grad.addColorStop(1,color.replace(/[\d.]+\)$/,'.01)'))
+    ctx.fillStyle=grad;ctx.fill()
+    ctx.restore()
+  }
+  ctx.restore()
+}
+
+function metatronsCube(x,y,r,rotation,color,alpha){
+  ctx.save();ctx.translate(x,y);ctx.rotate(rotation)
+  ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=.4
+  const pts=[[0,0]]
+  for(let i=0;i<6;i++){const a=i*TAU/6;pts.push([Math.cos(a)*r,Math.sin(a)*r])}
+  for(let i=0;i<6;i++){const a=i*TAU/6+TAU/12;pts.push([Math.cos(a)*r*1.732,Math.sin(a)*r*1.732])}
+  for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+    ctx.beginPath();ctx.moveTo(pts[i][0],pts[i][1]);ctx.lineTo(pts[j][0],pts[j][1]);ctx.stroke()
+  }
+  ctx.restore()
+}
+
+// ═══ MAIN LOOP ═══
+function loop(){
+  if(!running)return
+  requestAnimationFrame(loop)
+  t+=1/60;updateSound()
+
+  const maxR=Math.min(W,H)*.46
+  const ag=Math.floor(phase)%7
+  const c=G[ag].color
+  const rgba=(r,g,b,a)=>`rgba(${r},${g},${b},${a})`
+
+  // fade with color tint
+  ctx.globalAlpha=.06
+  ctx.fillStyle=rgba(Math.floor(c[0]*.04),Math.floor(c[1]*.04),Math.floor(c[2]*.04),1)
+  ctx.fillRect(0,0,W,H)
+
+  // ═══ DEEP LAYER: Metatron's Cube ═══
+  const mc=G[ag].color
+  metatronsCube(cx,cy,maxR*.65,t*.01,rgba(mc[0],mc[1],mc[2],.5),.03+Math.sin(t)*.01)
+
+  // ═══ DEEP LAYER: Flower of Life ═══
+  flowerOfLife(cx,cy,maxR*.18,1,rgba(mc[0],mc[1],mc[2],.3),.025+Math.sin(t*.5)*.005)
+
+  // ═══ 7 FIBONACCI PETAL RINGS — all overlaid ═══
+  G.forEach((g,i)=>{
+    let dist=Math.abs(i-phase);if(dist>3.5)dist=7-dist
+    const presence=Math.exp(-dist*dist*.4)
+    if(presence<.02)return
+
+    const fibCount=FIB[i+2] // 2,3,5,8,13,21,34
+    const ringR=maxR*(.08+i*.1)
+    const petalLen=maxR*(.05+i*.03)+presence*25
+    const rot=t*(.02+i*.006)*(i%2?-1:1)
+    const col=rgba(g.color[0],g.color[1],g.color[2],.7)
+    fibPetals(cx,cy,ringR,ringR+petalLen,fibCount,rot,col,.04+presence*.12)
+
+    // wavy ring underneath petals — wave count = fibonacci
+    ctx.beginPath();ctx.globalAlpha=.03+presence*.06
+    ctx.strokeStyle=rgba(g.color[0],g.color[1],g.color[2],1);ctx.lineWidth=1+presence*2
+    for(let a=0;a<=TAU;a+=.015){
+      const wave=Math.sin(a*fibCount+t*g.hz*.005)*4*(1+presence)
+      const wr=ringR+wave
+      a===0?ctx.moveTo(cx+Math.cos(a+rot)*wr,cy+Math.sin(a+rot)*wr):
+             ctx.lineTo(cx+Math.cos(a+rot)*wr,cy+Math.sin(a+rot)*wr)
+    }
+    ctx.closePath();ctx.stroke()
+  })
+
+  // ═══ GOLDEN SPIRALS — 3 interleaved ═══
+  for(let s=0;s<3;s++){
+    const hue=phase/7
+    goldenSpiral(cx,cy,maxR*.9,4,t*.03+s*TAU/3,
+      `hsla(${(hue*360+s*40)%360},60%,50%,1)`,.02+Math.sin(t+s)*.008,1)
+  }
+
+  // ═══ SHUTTER IRIS — fibonacci blade count ═══
+  {
+    const blades=FIB[ag+3]||8 // 3,5,8,13,21,34,55
+    const shutR=maxR*.55
+    const rot=t*.06*(ag%2?1:-1)
+    const open=.25+Math.sin(t*1.5)*.08
+    ctx.globalAlpha=1
+    for(let b=0;b<Math.min(blades,34);b++){
+      const a=b*TAU/blades+rot
+      ctx.save();ctx.translate(cx,cy);ctx.rotate(a)
+      ctx.beginPath()
+      const iR=shutR*open,oR=shutR
+      const w=TAU/blades*.22
+      ctx.moveTo(iR,0)
+      ctx.bezierCurveTo(oR*.5,oR*w,oR*.8,oR*w*.4,oR,0)
+      ctx.bezierCurveTo(oR*.8,-oR*w*.4,oR*.5,-oR*w,iR,0)
+      ctx.fillStyle=rgba(c[0],c[1],c[2],.04+Math.sin(t+b)*.01)
+      ctx.fill();ctx.restore()
+    }
+  }
+
+  // ═══ STARBURST — count follows fibonacci ═══
+  {
+    const rayCount=FIB[ag+4]||13
+    ctx.globalAlpha=.03+Math.sin(t*2)*.01
+    for(let r=0;r<Math.min(rayCount,55);r++){
+      const a=r*TAU/rayCount+t*.02
+      const rLen=maxR*(.15+Math.sin(t*.5+r)*.1)
+      const grad=ctx.createLinearGradient(cx,cy,cx+Math.cos(a)*rLen,cy+Math.sin(a)*rLen)
+      grad.addColorStop(0,rgba(c[0],c[1],c[2],.3))
+      grad.addColorStop(1,'rgba(0,0,0,0)')
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*rLen,cy+Math.sin(a)*rLen)
+      ctx.strokeStyle=grad;ctx.lineWidth=1.5;ctx.stroke()
+    }
+  }
+
+  // ═══ PHYLLOTAXIS — fibonacci sunflower seed pattern ═══
+  ctx.globalAlpha=1
+  const seedCount=Math.min(300,FIB[ag+5]*3||100)
+  for(let s=0;s<seedCount;s++){
+    const a=s*TAU/PHI/PHI // golden angle
+    const r=Math.sqrt(s)*maxR*.025
+    if(r>maxR*.45)continue
+    const px=cx+Math.cos(a+t*.02)*r,py=cy+Math.sin(a+t*.02)*r
+    const dist2=Math.abs(ag-phase);const d2=dist2>3.5?7-dist2:dist2
+    const pres=Math.exp(-d2*d2*.5)
+    ctx.beginPath();ctx.arc(px,py,1+pres,0,TAU)
+    ctx.fillStyle=rgba(c[0],c[1],c[2],.03+pres*.04)
+    ctx.fill()
+  }
+
+  // ═══ CENTER PUPIL ═══
+  const pupilR=maxR*.05+Math.sin(t*3)*.002*maxR
+  const pGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,pupilR*3)
+  pGrad.addColorStop(0,'rgba(0,0,0,.95)')
+  pGrad.addColorStop(.4,rgba(c[0],c[1],c[2],.1))
+  pGrad.addColorStop(1,'rgba(0,0,0,0)')
+  ctx.globalAlpha=1;ctx.fillStyle=pGrad
+  ctx.beginPath();ctx.arc(cx,cy,pupilR*3,0,TAU);ctx.fill()
+  ctx.beginPath();ctx.arc(cx,cy,pupilR,0,TAU)
+  ctx.fillStyle='rgba(0,0,0,.97)';ctx.fill()
+
+  // ❤️
+  ctx.globalAlpha=.25+Math.sin(t*3)*.05
+  ctx.font=`${Math.floor(pupilR)}px serif`;ctx.textAlign='center';ctx.textBaseline='middle'
+  ctx.fillText('❤️',cx,cy+1)
+
+  // ═══ GATE INFO ═══
+  const g=G[ag]
+  ctx.globalAlpha=.08
+  ctx.font='8px monospace';ctx.textAlign='center';ctx.fillStyle=rgba(c[0],c[1],c[2],1)
+  ctx.fillText(`${g.n} · ${g.hz}Hz (solfeggio) · ${g.hz2}Hz (body) · F=${FIB[ag+2]} · ${g.mantra}`,cx,H-12)
+
+  // gate dots
+  G.forEach((g2,i)=>{
+    let d=Math.abs(i-phase);if(d>3.5)d=7-d
+    const p=Math.exp(-d*d*.5)
+    ctx.beginPath();ctx.arc(cx+(i-3)*22,H-5,2+p*3,0,TAU)
+    ctx.fillStyle=rgba(g2.color[0],g2.color[1],g2.color[2],.1+p*.5)
+    ctx.globalAlpha=1;ctx.fill()
+  })
+}
+</script>
+</body></html>
