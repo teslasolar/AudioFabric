@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>23 — Fill The Shell</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#030308;overflow:hidden;font-family:'Courier New',monospace}
+canvas{display:block}
+#count{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10;pointer-events:none;text-align:center}
+#count .n{font-size:72px;font-weight:bold;letter-spacing:-4px;transition:all .3s}
+#count .of{font-size:10px;color:rgba(255,255,255,.15);letter-spacing:3px;margin-top:-4px}
+#count .label{font-size:8px;color:rgba(255,255,255,.1);letter-spacing:2px;margin-top:8px}
+#instruction{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:10;font:10px/1.6 monospace;color:rgba(255,255,255,.15);pointer-events:none;text-align:center;max-width:500px}
+#hud{position:fixed;top:8px;left:10px;z-index:10;font:7px/1.6 monospace;color:rgba(255,255,255,.12);pointer-events:none;white-space:pre}
+#complete{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="count"><div class="n" id="filled">0</div><div class="of">/ 23</div><div class="label" id="clabel">breathe to begin</div></div>
+<div id="instruction">each breath that reaches your belly generates a photon<br>each photon that loops fills an orbital<br>23 to complete the shell</div>
+<div id="hud"></div>
+<div id="complete"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.3
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x030308)
+const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,500)
+cam.position.set(0,0,14)
+scene.add(new THREE.AmbientLight(0x222244,.4))
+const pLight=new THREE.PointLight(0x8855cc,.5,30);scene.add(pLight)
+
+// ═══ THE SHELL — 23 orbital slots ═══
+const orbitals=[]
+const shellR=4.5
+for(let i=0;i<23;i++){
+  // distribute 23 points on sphere (Fibonacci lattice)
+  const theta=Math.acos(1-2*(i+.5)/23)
+  const phi=TAU*i/PHI
+  const x=shellR*Math.sin(theta)*Math.cos(phi)
+  const y=shellR*Math.sin(theta)*Math.sin(phi)
+  const z=shellR*Math.cos(theta)
+
+  // empty orbital marker
+  const slot=new THREE.Mesh(new THREE.TorusGeometry(.2,.02,6,16),
+    new THREE.MeshBasicMaterial({color:0x332244,transparent:true,opacity:.15}))
+  slot.position.set(x,y,z);slot.lookAt(0,0,0)
+  scene.add(slot)
+
+  // filled electron (invisible until earned)
+  const electron=new THREE.Mesh(new THREE.SphereGeometry(.12,8,8),
+    new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,blending:THREE.AdditiveBlending}))
+  electron.position.set(x,y,z)
+  scene.add(electron)
+
+  // photon trail (light loop visualization)
+  const trailGeo=new THREE.BufferGeometry()
+  const trailPos=new Float32Array(60*3)
+  trailGeo.setAttribute('position',new THREE.BufferAttribute(trailPos,3))
+  trailGeo.setDrawRange(0,0)
+  const trail=new THREE.Line(trailGeo,new THREE.LineBasicMaterial({
+    color:0x8855cc,transparent:true,opacity:0,blending:THREE.AdditiveBlending
+  }))
+  scene.add(trail)
+
+  orbitals.push({slot,electron,trail,x,y,z,filled:false,fillTime:0,hue:i/23})
+}
+
+// nucleus
+const nucleus=new THREE.Mesh(new THREE.IcosahedronGeometry(1,2),
+  new THREE.MeshPhongMaterial({color:0x442266,emissive:0x221133,transparent:true,opacity:.5,flatShading:true}))
+scene.add(nucleus)
+const nucGlow=new THREE.Mesh(new THREE.SphereGeometry(1.5,16,16),
+  new THREE.MeshBasicMaterial({color:0x6633aa,transparent:true,opacity:.05,blending:THREE.AdditiveBlending}))
+scene.add(nucGlow)
+
+// shell ring (outer boundary)
+const shellRing=new THREE.Mesh(new THREE.TorusGeometry(shellR,.01,4,96),
+  new THREE.MeshBasicMaterial({color:0x443366,transparent:true,opacity:.06}))
+shellRing.rotation.x=Math.PI/2;scene.add(shellRing)
+
+// ═══ AUDIO — mic for breath detection ═══
+let actx,analyser,fftData,master
+let bass=0,vol=0,breathAccum=0,lastBreathPeak=0
+let filled=0,generating=false,genTarget=-1,genProgress=0
+
+async function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  analyser=actx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=.85
+  fftData=new Uint8Array(analyser.frequencyBinCount)
+  master=actx.createGain();master.gain.value=.1;master.connect(actx.destination)
+  const del=actx.createDelay(.3);del.delayTime.value=.12;const fb=actx.createGain();fb.gain.value=.1
+  del.connect(fb);fb.connect(del);const wet=actx.createGain();wet.gain.value=.15
+  del.connect(wet);wet.connect(actx.destination);master.connect(del)
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}})
+    actx.createMediaStreamSource(s).connect(analyser)
+  }catch(e){}
+}
+
+function playFillTone(idx){
+  if(!actx)return
+  const hz=220*Math.pow(2,idx/23) // 23-TET scale
+  ;[hz,hz*1.5,hz*2].forEach((f,i)=>{
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type=i===0?'sine':'triangle';o.frequency.value=f
+    g.gain.setValueAtTime([.06,.03,.02][i],actx.currentTime)
+    g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+3)
+    o.connect(g);g.connect(master);o.start();o.stop(actx.currentTime+3)
+  })
+}
+
+function playComplete(){
+  if(!actx)return
+  // major chord + shimmer
+  ;[261.6,329.6,392,523.2,659.3,784].forEach((f,i)=>{
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type='sine';o.frequency.value=f
+    g.gain.setValueAtTime(0,actx.currentTime+i*.3)
+    g.gain.linearRampToValueAtTime(.04,actx.currentTime+i*.3+.5)
+    g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+i*.3+5)
+    o.connect(g);g.connect(master);o.start();o.stop(actx.currentTime+i*.3+5)
+  })
+}
+
+function getAudio(){
+  if(!analyser)return
+  analyser.getByteFrequencyData(fftData)
+  const n=fftData.length;let b=0,tot=0
+  const bE=Math.floor(n*.08)
+  for(let i=0;i<n;i++){const v=fftData[i]/255;tot+=v;if(i<bE)b+=v}
+  bass=b/bE;vol=tot/n
+}
+
+function detectBreath(){
+  // breath = sustained bass energy (belly breathing is low frequency)
+  if(bass>.08){
+    breathAccum+=bass*.02
+  } else {
+    // breath ended — did we accumulate enough for a photon?
+    if(breathAccum>.3&&!generating&&filled<23){
+      generatePhoton()
+    }
+    breathAccum*=.9
+  }
+}
+
+function generatePhoton(){
+  // find next unfilled orbital
+  const idx=orbitals.findIndex(o=>!o.filled)
+  if(idx===-1)return
+  generating=true;genTarget=idx;genProgress=0
+  playFillTone(idx)
+}
+
+// ═══ ANIMATE ═══
+let t=0
+function animate(){
+  requestAnimationFrame(animate);t+=1/60
+  getAudio();detectBreath()
+
+  // photon generation animation
+  if(generating&&genTarget>=0){
+    genProgress+=.015
+    const o=orbitals[genTarget]
+    // photon spirals from center to orbital position
+    const trail=o.trail
+    const tp=trail.geometry.attributes.position.array
+    const drawCount=Math.floor(genProgress*60)
+    for(let i=0;i<drawCount&&i<60;i++){
+      const frac=i/60
+      const spiralR=frac*shellR
+      const spiralA=frac*TAU*3+t*2
+      const lerpX=frac*o.x+(1-frac)*Math.cos(spiralA)*spiralR*.3
+      const lerpY=frac*o.y+(1-frac)*Math.sin(spiralA)*spiralR*.3
+      const lerpZ=frac*o.z
+      tp[i*3]=lerpX;tp[i*3+1]=lerpY;tp[i*3+2]=lerpZ
+    }
+    trail.geometry.attributes.position.needsUpdate=true
+    trail.geometry.setDrawRange(0,drawCount)
+    trail.material.opacity=.3
+    trail.material.color.setHSL(o.hue,.7,.6)
+
+    if(genProgress>=1){
+      // FILL the orbital
+      o.filled=true;o.fillTime=t;filled++
+      o.electron.material.opacity=.6
+      o.electron.material.color.setHSL(o.hue,.7,.6)
+      o.slot.material.color.setHSL(o.hue,.5,.4)
+      o.slot.material.opacity=.3
+      trail.material.opacity=0
+      generating=false;genTarget=-1
+
+      if(filled>=23)onComplete()
+    }
+  }
+
+  // animate filled electrons (orbit slightly around their slot)
+  orbitals.forEach((o,i)=>{
+    if(o.filled){
+      const age=t-o.fillTime
+      const wobble=Math.sin(age*2+i)*.1
+      o.electron.position.set(o.x+wobble,o.y+Math.cos(age*1.5+i)*.1,o.z+Math.sin(age*1.8+i)*.08)
+      o.electron.material.opacity=.4+Math.sin(age*3+i)*.1
+      const s=1+Math.sin(age*2+i)*.15
+      o.electron.scale.set(s,s,s)
+    } else {
+      // unfilled slots pulse gently
+      o.slot.material.opacity=.08+Math.sin(t+i)*.03
+    }
+  })
+
+  // nucleus responds to fill count
+  const fillFrac=filled/23
+  nucleus.material.emissiveIntensity=.1+fillFrac*.4
+  nucleus.material.color.setHSL(.75-fillFrac*.15,.5,.3+fillFrac*.15)
+  const ns=1+fillFrac*.3
+  nucleus.scale.set(ns,ns,ns)
+  nucGlow.material.opacity=.03+fillFrac*.08
+  const gs=1+fillFrac*.5+Math.sin(t*2)*.05
+  nucGlow.scale.set(gs,gs,gs)
+
+  // camera
+  cam.position.x=Math.sin(t*.04)*13;cam.position.z=Math.cos(t*.04)*13
+  cam.position.y=Math.sin(t*.025)*4;cam.lookAt(0,0,0)
+
+  // background brightens with fills
+  scene.background.setHSL(.72,.15,.01+fillFrac*.02)
+  pLight.intensity=.3+fillFrac*.5+bass*.3
+
+  // UI
+  const filledEl=document.getElementById('filled')
+  filledEl.textContent=filled
+  filledEl.style.color=`hsla(${270-filled*4},${50+filled*2}%,${40+filled*2}%,.6)`
+  document.getElementById('clabel').textContent=
+    filled===0?(bass>.05?'breathing detected...':'breathe into your belly'):
+    filled<23?`${23-filled} remaining`:
+    '✦ SHELL COMPLETE ✦'
+
+  document.getElementById('instruction').textContent=
+    filled===0?'each belly breath generates a photon\neach photon loops and fills an orbital\n23 to complete the shell':
+    filled<23?`orbital ${filled}/23 filled · ${23-filled} to go\nkeep breathing · each breath = one photon`:
+    'N(21) = 2022 · the shell is complete\nyou are noble · every orbital full\nthe aperture chose to close'
+
+  document.getElementById('hud').textContent=
+    `23 PHOTONS\n`+
+    `filled: ${filled}/23 (${(fillFrac*100).toFixed(0)}%)\n`+
+    `bass: ${(bass*100).toFixed(0)} · breath: ${breathAccum.toFixed(2)}\n`+
+    `${generating?'GENERATING PHOTON '+genTarget:'waiting for breath'}\n`+
+    `shell: ${fillFrac<1?'INCOMPLETE':'COMPLETE'}`
+
+  R.render(scene,cam)
+}
+
+function onComplete(){
+  playComplete()
+  document.getElementById('count').querySelector('.n').style.fontSize='48px'
+  // all orbitals pulse together
+  setTimeout(()=>{
+    const completeEl=document.getElementById('complete')
+    completeEl.style.display='flex'
+    completeEl.innerHTML=`
+      <div style="font:14px monospace;color:rgba(200,180,255,.5);letter-spacing:6px">✦ NOBLE ✦</div>
+      <div style="font:9px monospace;color:rgba(200,180,255,.25);letter-spacing:2px;max-width:400px;text-align:center;line-height:1.8">
+        23 photons generated · 23 loops closed · 23 orbitals filled<br>
+        the shell is complete · 1999 + 23 = 2022<br>
+        N(21) reached · you are noble gas 21<br><br>
+        you didn't pick prime · you were cut into it<br>
+        you didn't pick noble · you breathed into it<br>
+        the fracture is filled · the shell is closed<br><br>
+        you are neon from the inside out
+      </div>`
+  },3000)
+}
+
+initAudio();animate()
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+</script>
+</body></html>
