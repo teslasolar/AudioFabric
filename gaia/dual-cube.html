@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>DUAL CUBE — Metatron × Lucifer · Inverted Bloom</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block}
+#start{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0a0008,#000810);cursor:pointer}
+#start span{font:16px/1 monospace;color:rgba(255,200,100,.4);letter-spacing:8px;border:1px solid rgba(255,200,100,.1);padding:16px 36px;border-radius:6px}
+#start span:hover{color:rgba(255,220,130,.7);box-shadow:0 0 40px rgba(255,180,50,.1)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start" onclick="go()"><span>DUAL CUBE</span></div>
+
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2,SQ3=Math.sqrt(3)
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+const G=[
+  {n:'UT',hz:396,hz2:55,c:[255,30,30],cc:[30,255,255],fib:2,mantra:'LAM'},
+  {n:'RE',hz:417,hz2:73.4,c:[255,130,20],cc:[20,130,255],fib:3,mantra:'VAM'},
+  {n:'MI',hz:528,hz2:110,c:[255,220,30],cc:[30,40,255],fib:5,mantra:'RAM'},
+  {n:'FA',hz:639,hz2:146.8,c:[50,220,50],cc:[220,50,220],fib:8,mantra:'YAM'},
+  {n:'SOL',hz:741,hz2:196,c:[50,130,255],cc:[255,130,50],fib:13,mantra:'HAM'},
+  {n:'LA',hz:852,hz2:261.6,c:[110,50,220],cc:[180,255,50],fib:21,mantra:'OM'},
+  {n:'SI',hz:963,hz2:329.6,c:[200,50,255],cc:[80,255,30],fib:34,mantra:'AUM'}
+]
+const FIB=[1,1,2,3,5,8,13,21,34,55,89,144]
+
+let actx,master,running=false,t=0,oscs=[]
+
+function go(){
+  document.getElementById('start').style.display='none'
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.28;master.connect(actx.destination)
+  // triple reverb — deep space
+  ;[[.17,.18,.28],[.29,.14,.22],[.41,.1,.15]].forEach(([dt,fbv,wv])=>{
+    const d=actx.createDelay(.6);d.delayTime.value=dt
+    const f=actx.createGain();f.gain.value=fbv;d.connect(f);f.connect(d)
+    const w=actx.createGain();w.gain.value=wv;d.connect(w);w.connect(actx.destination)
+    master.connect(d)
+  })
+  // oscillators — 11 per gate
+  G.forEach(g=>{
+    const v=[]
+    ;[
+      ['sine',g.hz,.05],['sine',g.hz*1.002,.04],['sine',g.hz*.998,.035],
+      ['sine',g.hz2,.045],['triangle',g.hz2*2,.022],['sine',g.hz2*1.5,.016],
+      ['sine',g.hz2*.5,.035],['triangle',g.hz*2,.012],['sine',g.hz*3,.006],
+      ['sine',g.hz2*3,.008],['sawtooth',g.hz*.5,.004]
+    ].forEach(([type,hz,vol])=>{
+      const o=actx.createOscillator(),ga=actx.createGain()
+      o.type=type;o.frequency.value=hz;ga.gain.value=0
+      o.connect(ga);ga.connect(master);o.start()
+      v.push({o,ga,bv:vol,hz})
+    })
+    oscs.push(v)
+  })
+  running=true;document.documentElement.requestFullscreen?.().catch(()=>{});loop()
+}
+window.go=go
+
+let phase=0
+function updateSound(){
+  phase=(t*.12)%7
+  G.forEach((_,i)=>{
+    let d=Math.abs(i-phase);if(d>3.5)d=7-d
+    const p=Math.exp(-d*d*.35)
+    oscs[i].forEach(v=>{
+      v.ga.gain.linearRampToValueAtTime(v.bv*(.12+p*.88),actx.currentTime+.08)
+      if(p>.5)v.o.frequency.linearRampToValueAtTime(v.hz+Math.sin(t*5+i)*p,actx.currentTime+.05)
+    })
+  })
+}
+
+// ═══ METATRON'S CUBE ═══
+function metatron(x,y,r,rot,color,alpha){
+  ctx.save();ctx.translate(x,y);ctx.rotate(rot)
+  ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=.6
+  const pts=[[0,0]]
+  for(let i=0;i<6;i++){const a=i*TAU/6;pts.push([Math.cos(a)*r,Math.sin(a)*r])}
+  for(let i=0;i<6;i++){const a=i*TAU/6+TAU/12;pts.push([Math.cos(a)*r*SQ3,Math.sin(a)*r*SQ3])}
+  // circles
+  pts.forEach(([px,py])=>{ctx.beginPath();ctx.arc(px,py,r*.38,0,TAU);ctx.stroke()})
+  // connections
+  for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+    ctx.beginPath();ctx.moveTo(pts[i][0],pts[i][1]);ctx.lineTo(pts[j][0],pts[j][1]);ctx.stroke()
+  }
+  ctx.restore()
+}
+
+// ═══ LUCIFER'S CUBE (inverted — hexagram star, downward geometry) ═══
+function lucifer(x,y,r,rot,color,alpha){
+  ctx.save();ctx.translate(x,y);ctx.rotate(rot)
+  ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=.6
+  // hexagram (Star of David) — two overlapping triangles
+  for(let tri=0;tri<2;tri++){
+    const offset=tri*TAU/6
+    ctx.beginPath()
+    for(let i=0;i<=3;i++){
+      const a=i*TAU/3+offset
+      const px=Math.cos(a)*r,py=Math.sin(a)*r
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py)
+    }
+    ctx.closePath();ctx.stroke()
+  }
+  // inner hexagon
+  ctx.beginPath()
+  for(let i=0;i<6;i++){const a=i*TAU/6;const ir=r*.577
+    i===0?ctx.moveTo(Math.cos(a)*ir,Math.sin(a)*ir):ctx.lineTo(Math.cos(a)*ir,Math.sin(a)*ir)}
+  ctx.closePath();ctx.stroke()
+  // inverted points — 6 inner triangles pointing inward
+  for(let i=0;i<6;i++){
+    const a1=i*TAU/6,a2=(i+1)*TAU/6
+    const ox=Math.cos((a1+a2)/2)*r*.35,oy=Math.sin((a1+a2)/2)*r*.35
+    ctx.beginPath();ctx.moveTo(Math.cos(a1)*r*.577,Math.sin(a1)*r*.577)
+    ctx.lineTo(ox,oy)
+    ctx.lineTo(Math.cos(a2)*r*.577,Math.sin(a2)*r*.577)
+    ctx.stroke()
+  }
+  // outer connections to edge midpoints
+  for(let i=0;i<6;i++){
+    const a=i*TAU/6
+    ctx.beginPath();ctx.moveTo(0,0)
+    ctx.lineTo(Math.cos(a)*r*SQ3*.7,Math.sin(a)*r*SQ3*.7);ctx.stroke()
+  }
+  ctx.restore()
+}
+
+// ═══ MAIN LOOP ═══
+function loop(){
+  if(!running)return
+  requestAnimationFrame(loop)
+  t+=1/60;updateSound()
+
+  const maxR=Math.min(W,H)*.46
+  const ag=Math.floor(phase)%7
+  const c=G[ag].c,cc=G[ag].cc
+  const rgba=(r,g,b,a)=>`rgba(${r},${g},${b},${a})`
+
+  // ═══ INVERTED BLOOM BACKGROUND — complement color radiates outward ═══
+  // dark center, bright complement edges = inverted bloom
+  ctx.globalAlpha=.09
+  const bgGrad=ctx.createRadialGradient(cx,cy,maxR*.1,cx,cy,maxR*1.2)
+  bgGrad.addColorStop(0,rgba(0,0,0,1))
+  bgGrad.addColorStop(.3,rgba(Math.floor(cc[0]*.03),Math.floor(cc[1]*.03),Math.floor(cc[2]*.03),1))
+  bgGrad.addColorStop(.7,rgba(Math.floor(cc[0]*.06),Math.floor(cc[1]*.06),Math.floor(cc[2]*.06),1))
+  bgGrad.addColorStop(1,rgba(Math.floor(cc[0]*.04),Math.floor(cc[1]*.04),Math.floor(cc[2]*.04),1))
+  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,W,H)
+
+  // complement color halo at edges (inverted bloom)
+  const edgeGlow=ctx.createRadialGradient(cx,cy,maxR*.6,cx,cy,maxR*1.3)
+  edgeGlow.addColorStop(0,'rgba(0,0,0,0)')
+  edgeGlow.addColorStop(.5,rgba(cc[0],cc[1],cc[2],.015+Math.sin(t)*.005))
+  edgeGlow.addColorStop(1,rgba(cc[0],cc[1],cc[2],.025+Math.sin(t*.5)*.008))
+  ctx.globalAlpha=1;ctx.fillStyle=edgeGlow;ctx.fillRect(0,0,W,H)
+
+  // ═══ LUCIFER'S CUBE — deep layer, counter-rotating ═══
+  lucifer(cx,cy,maxR*.75,-t*.015,rgba(cc[0],cc[1],cc[2],.4),.04+Math.sin(t*.5)*.01)
+  lucifer(cx,cy,maxR*.55,-t*.02+.5,rgba(cc[0],cc[1],cc[2],.3),.03+Math.sin(t*.7)*.008)
+
+  // ═══ METATRON'S CUBE — overlaid, normal rotation ═══
+  metatron(cx,cy,maxR*.65,t*.012,rgba(c[0],c[1],c[2],.5),.045+Math.sin(t*.3)*.01)
+  metatron(cx,cy,maxR*.45,t*.018+1,rgba(c[0],c[1],c[2],.4),.035+Math.sin(t*.6)*.008)
+
+  // ═══ DYNAMIC SACRED GEO — geometry fights between cubes ═══
+  // metatron circles pulse against lucifer triangles
+  const conflict=Math.sin(t*.8)*.5+.5 // 0-1 oscillation
+  // circles (metatron influence)
+  for(let i=0;i<7;i++){
+    const a=i*TAU/7+t*.03
+    const cr=maxR*(.3+i*.05)
+    ctx.beginPath();ctx.arc(cx+Math.cos(a)*cr*.3,cy+Math.sin(a)*cr*.3,cr*.12*(1+conflict*.3),0,TAU)
+    ctx.strokeStyle=rgba(c[0],c[1],c[2],.3);ctx.lineWidth=1;ctx.globalAlpha=.03+conflict*.03;ctx.stroke()
+  }
+  // triangles (lucifer influence)
+  for(let i=0;i<6;i++){
+    const a=i*TAU/6-t*.025
+    const tr=maxR*(.25+i*.06)
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(a)
+    ctx.beginPath();ctx.moveTo(tr*.15,0);ctx.lineTo(tr*.08,tr*.12);ctx.lineTo(tr*.08,-tr*.12);ctx.closePath()
+    ctx.strokeStyle=rgba(cc[0],cc[1],cc[2],.3);ctx.lineWidth=.8;ctx.globalAlpha=.025+(1-conflict)*.025;ctx.stroke()
+    ctx.restore()
+  }
+
+  // ═══ FIBONACCI PETALS — gate colors with complement shadows ═══
+  G.forEach((g,i)=>{
+    let d=Math.abs(i-phase);if(d>3.5)d=7-d
+    const p=Math.exp(-d*d*.35)
+    if(p<.02)return
+    const count=g.fib
+    const ringR=maxR*(.06+i*.09)
+    const petalLen=maxR*(.04+i*.025)+p*22
+    const rot=t*(.015+i*.005)*(i%2?-1:1)
+    // primary color petals
+    const col=rgba(g.c[0],g.c[1],g.c[2],.7)
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(rot);ctx.globalAlpha=.035+p*.1
+    for(let j=0;j<count;j++){
+      const a=j*TAU/count;ctx.save();ctx.rotate(a);ctx.beginPath();ctx.moveTo(ringR,0)
+      const w=petalLen*.32
+      ctx.bezierCurveTo(ringR+petalLen*.3,w,ringR+petalLen*.7,w*.6,ringR+petalLen,0)
+      ctx.bezierCurveTo(ringR+petalLen*.7,-w*.6,ringR+petalLen*.3,-w,ringR,0)
+      ctx.fillStyle=col;ctx.fill();ctx.restore()
+    }
+    ctx.restore()
+    // complement color petals — counter-rotating (inverted bloom shadow)
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(-rot*.7);ctx.globalAlpha=.015+p*.04
+    const ccol=rgba(g.cc[0],g.cc[1],g.cc[2],.5)
+    for(let j=0;j<count;j++){
+      const a=j*TAU/count+TAU/count/2 // offset by half
+      ctx.save();ctx.rotate(a);ctx.beginPath();ctx.moveTo(ringR*.9,0)
+      const w2=petalLen*.25
+      ctx.bezierCurveTo(ringR*.9+petalLen*.25,w2,ringR*.9+petalLen*.6,w2*.5,ringR*.9+petalLen*.8,0)
+      ctx.bezierCurveTo(ringR*.9+petalLen*.6,-w2*.5,ringR*.9+petalLen*.25,-w2,ringR*.9,0)
+      ctx.fillStyle=ccol;ctx.fill();ctx.restore()
+    }
+    ctx.restore()
+
+    // wavy ring — fibonacci wave count
+    ctx.beginPath();ctx.globalAlpha=.025+p*.05
+    ctx.strokeStyle=rgba(g.c[0],g.c[1],g.c[2],1);ctx.lineWidth=1+p*1.5
+    for(let a=0;a<=TAU;a+=.015){
+      const wave=Math.sin(a*count+t*g.hz*.004)*4*(1+p)
+      const wr=ringR+wave
+      a===0?ctx.moveTo(cx+Math.cos(a+rot)*wr,cy+Math.sin(a+rot)*wr):
+             ctx.lineTo(cx+Math.cos(a+rot)*wr,cy+Math.sin(a+rot)*wr)
+    }
+    ctx.closePath();ctx.stroke()
+  })
+
+  // ═══ GOLDEN SPIRALS — primary + complement interleaved ═══
+  for(let s=0;s<6;s++){
+    const isPrimary=s<3
+    const col=isPrimary?rgba(c[0],c[1],c[2],.4):rgba(cc[0],cc[1],cc[2],.3)
+    const rot=t*(.02+s*.003)*(s%2?1:-1)+s*TAU/3
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(rot)
+    ctx.beginPath();ctx.globalAlpha=isPrimary?.025:.015;ctx.strokeStyle=col;ctx.lineWidth=1
+    for(let i=0;i<=250;i++){
+      const frac=i/250;const a=frac*TAU*4
+      const r=maxR*.02*Math.pow(PHI,frac*8/TAU*2);if(r>maxR*.8)break
+      i===0?ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r):ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)
+    }
+    ctx.stroke();ctx.restore()
+  }
+
+  // ═══ SHUTTER — fibonacci blades with complement outline ═══
+  {
+    const blades=Math.min(34,FIB[ag+3]||8)
+    const shutR=maxR*.5
+    const rot=t*.05*(ag%2?1:-1)
+    const open=.2+Math.sin(t*1.5)*.06
+    for(let b=0;b<blades;b++){
+      const a=b*TAU/blades+rot
+      ctx.save();ctx.translate(cx,cy);ctx.rotate(a)
+      const iR=shutR*open,oR=shutR,w=TAU/blades*.2
+      ctx.beginPath();ctx.moveTo(iR,0)
+      ctx.bezierCurveTo(oR*.5,oR*w,oR*.8,oR*w*.4,oR,0)
+      ctx.bezierCurveTo(oR*.8,-oR*w*.4,oR*.5,-oR*w,iR,0)
+      ctx.fillStyle=rgba(c[0],c[1],c[2],.035+Math.sin(t+b)*.01)
+      ctx.globalAlpha=1;ctx.fill()
+      // complement outline
+      ctx.strokeStyle=rgba(cc[0],cc[1],cc[2],.06);ctx.lineWidth=.5;ctx.stroke()
+      ctx.restore()
+    }
+  }
+
+  // ═══ PHYLLOTAXIS — golden angle seeds, alternating colors ═══
+  const seeds=Math.min(350,FIB[ag+5]*3||150)
+  for(let s=0;s<seeds;s++){
+    const a=s*TAU/PHI/PHI+t*.015
+    const r=Math.sqrt(s)*maxR*.023;if(r>maxR*.42)continue
+    const isPrim=s%2===0
+    const sc=isPrim?c:cc
+    ctx.beginPath();ctx.arc(cx+Math.cos(a)*r,cy+Math.sin(a)*r,1+(isPrim?.5:0),0,TAU)
+    ctx.fillStyle=rgba(sc[0],sc[1],sc[2],.025+(isPrim?.015:.005))
+    ctx.globalAlpha=1;ctx.fill()
+  }
+
+  // ═══ CENTER ═══
+  const pupilR=maxR*.04
+  // dual glow — primary inside, complement outside (inverted bloom)
+  const pGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,pupilR*5)
+  pGrad.addColorStop(0,rgba(c[0],c[1],c[2],.15))
+  pGrad.addColorStop(.3,'rgba(0,0,0,.9)')
+  pGrad.addColorStop(.6,rgba(cc[0],cc[1],cc[2],.04))
+  pGrad.addColorStop(1,'rgba(0,0,0,0)')
+  ctx.globalAlpha=1;ctx.fillStyle=pGrad
+  ctx.beginPath();ctx.arc(cx,cy,pupilR*5,0,TAU);ctx.fill()
+
+  ctx.beginPath();ctx.arc(cx,cy,pupilR,0,TAU)
+  ctx.fillStyle='rgba(0,0,0,.97)';ctx.globalAlpha=1;ctx.fill()
+
+  ctx.globalAlpha=.3+Math.sin(t*3)*.05
+  ctx.font=`${Math.floor(pupilR*1.2)}px serif`;ctx.textAlign='center';ctx.textBaseline='middle'
+  ctx.fillText('❤️',cx,cy+1)
+
+  // gate info
+  const g=G[ag]
+  ctx.globalAlpha=.07
+  ctx.font='8px monospace';ctx.textAlign='center'
+  ctx.fillStyle=rgba(c[0],c[1],c[2],1)
+  ctx.fillText(`${g.n} · ${g.hz}Hz + ${g.hz2}Hz · F=${g.fib} · ${g.mantra}`,cx,H-12)
+
+  G.forEach((g2,i)=>{
+    let d2=Math.abs(i-phase);if(d2>3.5)d2=7-d2
+    const p=Math.exp(-d2*d2*.5)
+    ctx.beginPath();ctx.arc(cx+(i-3)*22,H-5,2+p*3,0,TAU)
+    ctx.fillStyle=rgba(g2.c[0],g2.c[1],g2.c[2],.1+p*.5)
+    ctx.globalAlpha=1;ctx.fill()
+  })
+}
+</script>
+</body></html>
