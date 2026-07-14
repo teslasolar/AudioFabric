@@ -227,11 +227,13 @@ function animate(){
 
     if(u.type==='bg'){u.mat.uniforms.time.value=t;u.mat.uniforms.gate.value=stuckGate;u.mat.uniforms.gateColor.value.set(GC[stuckGate])}
 
-    if(u.type==='metatron'){obj.rotation.z=t*.03;obj.rotation.x=Math.sin(t*.02)*.1
+    if(u.type==='metatron'){obj.rotation.z=t*.08;obj.rotation.x=Math.sin(t*.05)*.15
       obj.children.forEach(c=>{if(c.material)c.material.opacity=.06+voiceE*.08+gateFlash*.05})}
 
     if(u.type==='petals'){
-      obj.rotation.z+=(u.li%2?-.002:.002)*(1+voiceE*3)
+      // each layer rotates at a different speed, alternating direction — always spinning
+      const speeds=[.015,.012,.009,.007,.005,.008,.01]
+      obj.rotation.z+=(u.li%2?-1:1)*speeds[u.li]*(1+voiceE*4)
       obj.position.z=-2-u.li*1.5+voiceE*1.5+Math.sin(t*.3+u.li)*.8
     }
     if(u.petal){
@@ -243,7 +245,7 @@ function animate(){
       u.mat.opacity=(isStuck?.2:.1)+voiceE*.1+bass*.06+gateFlash*(isStuck?.2:.08)
     }
 
-    if(u.type==='shutter'){obj.rotation.z+=(u.si%2?1:-1)*(.003+voiceE*.02)}
+    if(u.type==='shutter'){obj.rotation.z+=(u.si%2?1:-1)*(.012+voiceE*.04)}
     if(u.blade){
       const hue=((baseHue+80+u.idx*12)%360)/360
       u.mat.color.setHSL(hue,.7,.35+high*.2)
@@ -252,14 +254,15 @@ function animate(){
 
     if(u.type==='halo'){
       const ring=obj
-      ring.material.opacity=.06+voiceE*.08+(u.idx===stuckGate?.08:0)+gateFlash*.05
+      ring.material.opacity=.08+voiceE*.1+(u.idx===stuckGate?.1:0)+gateFlash*.05
       ring.position.z=u.idx*.8+Math.sin(t*.4+u.idx)*(1+voiceE*1.5)
-      ring.rotation.x=Math.sin(t*.12+u.idx)*.12
-      ring.rotation.y=Math.cos(t*.1+u.idx)*.1
+      ring.rotation.x=Math.sin(t*.12+u.idx)*.15
+      ring.rotation.y=Math.cos(t*.1+u.idx)*.12
+      ring.rotation.z+=(u.idx%2?1:-1)*(.006+u.idx*.001)
     }
 
     if(u.type==='swirl'){
-      obj.rotation.z+=.008*(1+voiceE*2)
+      obj.rotation.z+=.015*(1+voiceE*3)*(u.idx%2?1:-1)
       obj.rotation.x=Math.sin(t*.3+u.idx)*.15
       const pp=obj.geometry.attributes.position.array
       for(let i=0;i<pp.length/3;i++){
@@ -272,7 +275,7 @@ function animate(){
     }
 
     if(u.type==='complement'){
-      obj.rotation.z-=.005*(1+voiceE)
+      obj.rotation.z-=.012*(1+voiceE*2)*(u.idx%2?1:-1)
       const isStuckComp=u.idx===stuckGate
       obj.material.opacity=isStuckComp?.06+voiceE*.08:.02+voiceE*.03
       const pp=obj.geometry.attributes.position.array
