@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OPEN SESAME — R0 Gate Opener</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0806;overflow:hidden;cursor:none}
+canvas{display:block;position:fixed;top:0;left:0}
+#start{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0806;cursor:pointer;gap:12px}
+#start span{font:18px/1 monospace;color:rgba(180,140,80,.5);letter-spacing:6px;border:1px solid rgba(180,140,80,.15);padding:16px 36px;border-radius:6px}
+#start span:hover{color:rgba(220,180,100,.8);border-color:rgba(180,140,80,.4);box-shadow:0 0 40px rgba(160,120,40,.15)}
+#start small{font:9px monospace;color:rgba(180,140,80,.2);letter-spacing:2px;max-width:400px;text-align:center;line-height:1.6}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start" onclick="go()">
+  <span>OPEN SESAME</span>
+  <small>sit or lie down. feel your weight. breathe into your belly.<br>this opens from the inside.</small>
+</div>
+
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H,cx,cy;function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+let actx,analyser,fftData,tdData,master
+let bass=0,mid=0,high=0,vol=0
+let running=false,t=0,phase=0,gateOpen=0,breathPhase=0
+
+// 6 phases of R0 opening — each ~30 seconds
+const phases=[
+  {name:'GROUND',dur:25,breathIn:4,breathOut:6,
+   instruction:'feel your weight on the surface beneath you',
+   color:[.4,.25,.1],seedColor:'#8B6914',hz:55},
+  {name:'ROOT',dur:25,breathIn:4,breathOut:7,
+   instruction:'breathe into your belly — inflate it like a balloon',
+   color:[.5,.2,.08],seedColor:'#A0522D',hz:65},
+  {name:'WARM',dur:25,breathIn:4,breathOut:8,
+   instruction:'feel warmth spreading from your center downward',
+   color:[.55,.25,.1],seedColor:'#CD853F',hz:75},
+  {name:'SOFTEN',dur:25,breathIn:5,breathOut:8,
+   instruction:'soften your jaw. unclench your teeth. tongue on roof of mouth',
+   color:[.5,.3,.12],seedColor:'#DAA520',hz:85},
+  {name:'RELEASE',dur:30,breathIn:5,breathOut:9,
+   instruction:'let your belly be soft. let it move. it knows what to do',
+   color:[.45,.35,.15],seedColor:'#F0C050',hz:95},
+  {name:'OPEN',dur:30,breathIn:5,breathOut:10,
+   instruction:'the door opens outward. you are leaving the cave.',
+   color:[.4,.38,.2],seedColor:'#FFD700',hz:110}
+]
+
+const totalDur=phases.reduce((s,p)=>s+p.dur,0)
+
+async function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.12;master.connect(actx.destination)
+  analyser=actx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=.8
+  fftData=new Uint8Array(analyser.frequencyBinCount);tdData=new Uint8Array(analyser.fftSize)
+  try{const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});actx.createMediaStreamSource(s).connect(analyser)}catch(e){}
+}
+
+let activeTone=null
+function playTone(hz){
+  if(!actx)return
+  if(activeTone){try{activeTone.g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+2);setTimeout(()=>activeTone.o.stop(),2100)}catch(e){}}
+  const o=actx.createOscillator(),g=actx.createGain()
+  o.type='sine';o.frequency.value=hz
+  g.gain.setValueAtTime(0,actx.currentTime)
+  g.gain.linearRampToValueAtTime(.06,actx.currentTime+3)
+  o.connect(g);g.connect(master);o.start()
+  // sub harmonic
+  const o2=actx.createOscillator(),g2=actx.createGain()
+  o2.type='sine';o2.frequency.value=hz/2
+  g2.gain.setValueAtTime(0,actx.currentTime)
+  g2.gain.linearRampToValueAtTime(.04,actx.currentTime+3)
+  o2.connect(g2);g2.connect(master);o2.start()
+  activeTone={o,g,o2,g2}
+}
+
+function getAudio(){
+  if(!analyser)return
+  analyser.getByteFrequencyData(fftData)
+  const n=fftData.length;let b=0,tot=0
+  const bE=Math.floor(n*.08)
+  for(let i=0;i<n;i++){const v=fftData[i]/255;tot+=v;if(i<bE)b+=v}
+  bass=b/bE;vol=tot/n
+}
+
+// ═══ SESAME SEED ═══
+function drawSeed(x,y,size,rotation,color,alpha){
+  ctx.save();ctx.translate(x,y);ctx.rotate(rotation)
+  ctx.beginPath()
+  ctx.ellipse(0,0,size,size*.55,0,0,TAU)
+  ctx.fillStyle=color;ctx.globalAlpha=alpha;ctx.fill()
+  // seed line
+  ctx.beginPath();ctx.moveTo(-size*.3,0);ctx.lineTo(size*.3,0)
+  ctx.strokeStyle='rgba(0,0,0,.15)';ctx.lineWidth=size*.05;ctx.globalAlpha=alpha*.5;ctx.stroke()
+  ctx.restore()
+}
+
+// ═══ CAVE DOOR ═══
+function drawCaveDoor(openAmount,t2){
+  const doorW=W*.6,doorH=H*.8
+  const doorX=cx-doorW/2,doorY=cy-doorH/2
+
+  // cave walls (dark rock texture)
+  ctx.globalAlpha=1
+  for(let i=0;i<80;i++){
+    const rx=Math.random()*W,ry=Math.random()*H
+    const rs=2+Math.random()*8
+    ctx.beginPath();ctx.arc(rx,ry,rs,0,TAU)
+    ctx.fillStyle=`hsla(25,15%,${5+Math.random()*8}%,.03)`;ctx.fill()
+  }
+
+  // door frame (stone arch)
+  ctx.beginPath()
+  ctx.moveTo(doorX+doorW*openAmount*.5,doorY+doorH)
+  ctx.lineTo(doorX+doorW*openAmount*.5,doorY+doorH*.2)
+  ctx.quadraticCurveTo(cx,doorY-doorH*.1,doorX+doorW*(1-openAmount*.5),doorY+doorH*.2)
+  ctx.lineTo(doorX+doorW*(1-openAmount*.5),doorY+doorH)
+  ctx.strokeStyle=`hsla(30,20%,${25+openAmount*20}%,.4)`;ctx.lineWidth=8+openAmount*4
+  ctx.globalAlpha=.5;ctx.stroke()
+
+  // light through the opening
+  if(openAmount>.05){
+    const lightW=doorW*openAmount*.8
+    const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(lightW,doorH*.5))
+    const warmth=openAmount
+    grad.addColorStop(0,`hsla(40,${50+warmth*30}%,${60+warmth*20}%,${openAmount*.5})`)
+    grad.addColorStop(.3,`hsla(35,${40+warmth*20}%,${40+warmth*20}%,${openAmount*.3})`)
+    grad.addColorStop(.7,`hsla(30,30%,20%,${openAmount*.1})`)
+    grad.addColorStop(1,'rgba(0,0,0,0)')
+    ctx.fillStyle=grad;ctx.globalAlpha=1;ctx.fillRect(0,0,W,H)
+  }
+}
+
+// ═══ BREATH GUIDE ═══
+function drawBreathGuide(phase2,breathIn,breathOut){
+  const totalBreath=breathIn+breathOut
+  const breathCycle=(t%totalBreath)/totalBreath
+  const isInhale=breathCycle<breathIn/totalBreath
+  const cyclePhase=isInhale?breathCycle/(breathIn/totalBreath):(breathCycle-breathIn/totalBreath)/(breathOut/totalBreath)
+
+  // belly circle — expands on inhale, contracts on exhale
+  const bellySize=isInhale?
+    80+cyclePhase*60+gateOpen*30:
+    140-cyclePhase*60+gateOpen*30-cyclePhase*gateOpen*20
+  const bellyAlpha=.08+gateOpen*.06
+
+  // outer guide ring
+  ctx.beginPath();ctx.arc(cx,cy+H*.15,bellySize,0,TAU)
+  ctx.strokeStyle=`hsla(35,50%,${50+gateOpen*20}%,${bellyAlpha})`;ctx.lineWidth=2+gateOpen*2
+  ctx.globalAlpha=1;ctx.stroke()
+
+  // fill
+  const bellyGrad=ctx.createRadialGradient(cx,cy+H*.15,0,cx,cy+H*.15,bellySize)
+  bellyGrad.addColorStop(0,`hsla(30,40%,${30+gateOpen*20}%,${bellyAlpha*.5})`)
+  bellyGrad.addColorStop(1,'rgba(0,0,0,0)')
+  ctx.fillStyle=bellyGrad;ctx.fill()
+
+  // breath text
+  ctx.globalAlpha=.3+gateOpen*.2
+  ctx.font='12px monospace';ctx.textAlign='center';ctx.fillStyle=`hsla(35,50%,${55+gateOpen*20}%,1)`
+  ctx.fillText(isInhale?'IN':'OUT',cx,cy+H*.15+bellySize+25)
+
+  // breath count
+  ctx.font='8px monospace';ctx.globalAlpha=.15
+  ctx.fillText(isInhale?`${breathIn}s`:`${breathOut}s`,cx,cy+H*.15+bellySize+38)
+
+  return bellySize
+}
+
+// ═══ SESAME RING (seeds orbiting = minerals entering) ═══
+function drawSesameRing(radius,count,speed,t2,openAmount){
+  for(let i=0;i<count;i++){
+    const a=i*TAU/count+t2*speed
+    const x=cx+Math.cos(a)*radius*(1-openAmount*.2)
+    const y=cy+H*.15+Math.sin(a)*radius*.4*(1-openAmount*.3)
+    const seedSize=3+openAmount*2+Math.sin(t2+i)
+    const hue=25+i*(30/count)
+    drawSeed(x,y,seedSize,a+t2,`hsla(${hue},45%,${40+openAmount*15}%,1)`,.1+openAmount*.15)
+  }
+}
+
+// ═══ MAIN LOOP ═══
+let lastPhase=-1
+
+function go(){
+  document.getElementById('start').style.display='none'
+  initAudio();running=true
+  document.documentElement.requestFullscreen?.().catch(()=>{})
+  loop()
+}
+window.go=go
+
+function loop(){
+  if(!running)return
+  requestAnimationFrame(loop)
+  t+=1/60;getAudio()
+
+  // compute current phase
+  let elapsed=0,pi=0
+  for(let i=0;i<phases.length;i++){
+    if(t<elapsed+phases[i].dur){pi=i;break}
+    elapsed+=phases[i].dur
+    if(i===phases.length-1)pi=phases.length-1
+  }
+  const p=phases[pi]
+  const phaseT=Math.min(t-elapsed,p.dur)
+  const phaseFrac=phaseT/p.dur
+  gateOpen=Math.min(1,(pi+phaseFrac)/phases.length)
+
+  // new phase — change tone
+  if(pi!==lastPhase){lastPhase=pi;if(actx)playTone(p.hz)}
+
+  // ═══ RENDER ═══
+  // background fade
+  ctx.globalAlpha=.08
+  const bg=p.color
+  ctx.fillStyle=`rgb(${Math.floor(bg[0]*30)},${Math.floor(bg[1]*25)},${Math.floor(bg[2]*20)})`
+  ctx.fillRect(0,0,W,H)
+
+  // cave door
+  drawCaveDoor(gateOpen,t)
+
+  // sesame seed rings
+  drawSesameRing(120+gateOpen*40,12,.15,t,gateOpen)
+  drawSesameRing(180+gateOpen*30,8,-.1,t,gateOpen)
+  drawSesameRing(60+gateOpen*20,5,.2,t,gateOpen)
+
+  // breath guide
+  const bellySize=drawBreathGuide(pi,p.breathIn,p.breathOut)
+
+  // seeds falling INTO the belly (eating the password)
+  if(gateOpen>.1){
+    const fallCount=Math.floor(gateOpen*8)
+    for(let f=0;f<fallCount;f++){
+      const fallPhase=(t*.3+f*.3)%1
+      const fx=cx+(Math.sin(t+f*2)*(40-fallPhase*30))
+      const fy=cy-H*.2+fallPhase*H*.35
+      const fSize=2+gateOpen*2*(1-fallPhase)
+      drawSeed(fx,fy,fSize,t+f,p.seedColor,.15*(1-fallPhase)*gateOpen)
+    }
+  }
+
+  // phase label
+  ctx.globalAlpha=.25+gateOpen*.15
+  ctx.font='10px monospace';ctx.textAlign='center';ctx.letterSpacing='3px'
+  ctx.fillStyle=p.seedColor
+  ctx.fillText(p.name,cx,40)
+
+  // instruction
+  ctx.globalAlpha=.2+phaseFrac*.1
+  ctx.font='11px monospace'
+  ctx.fillStyle=`hsla(35,40%,${50+gateOpen*15}%,1)`
+  ctx.fillText(p.instruction,cx,H-50)
+
+  // gate percentage
+  ctx.globalAlpha=.1+gateOpen*.15
+  ctx.font='8px monospace'
+  ctx.fillText(`R0: ${(gateOpen*100).toFixed(0)}%`,cx,H-30)
+
+  // progress bar
+  const barW=200,barH=2
+  ctx.globalAlpha=.1
+  ctx.fillStyle='rgba(255,255,255,.1)';ctx.fillRect(cx-barW/2,H-20,barW,barH)
+  ctx.fillStyle=p.seedColor;ctx.globalAlpha=.2+gateOpen*.1
+  ctx.fillRect(cx-barW/2,H-20,barW*gateOpen,barH)
+
+  // at full open — golden light floods
+  if(gateOpen>.9){
+    const floodAlpha=(gateOpen-.9)/.1
+    const flood=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(W,H)*.5)
+    flood.addColorStop(0,`hsla(45,60%,60%,${floodAlpha*.15})`)
+    flood.addColorStop(.5,`hsla(40,50%,40%,${floodAlpha*.08})`)
+    flood.addColorStop(1,'rgba(0,0,0,0)')
+    ctx.globalAlpha=1;ctx.fillStyle=flood;ctx.fillRect(0,0,W,H)
+
+    ctx.globalAlpha=floodAlpha*.3
+    ctx.font='14px monospace';ctx.textAlign='center'
+    ctx.fillStyle='#FFD700'
+    ctx.fillText('R0 OPEN',cx,cy-H*.25)
+    ctx.font='9px monospace';ctx.globalAlpha=floodAlpha*.2
+    ctx.fillText('the door opens outward',cx,cy-H*.25+18)
+  }
+
+  // end state
+  if(t>totalDur+5){
+    ctx.globalAlpha=Math.min(.3,(t-totalDur-5)*.02)
+    ctx.font='11px monospace';ctx.fillStyle='#FFD700';ctx.textAlign='center'
+    ctx.fillText('now R1. long exhale. 4 in, 8 out.',cx,cy+H*.35)
+  }
+}
+</script>
+</body></html>
