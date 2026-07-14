@@ -19,7 +19,7 @@ canvas{display:block}
 <canvas id="c"></canvas>
 <div id="hud"></div>
 <div id="gate-info"></div>
-<div id="instruction">breathe to wake the snake · voice to move it · space to pulse</div>
+<div id="instruction">sing each note to open its gate · C D E F G A B · the snake rises with your voice</div>
 
 <script>
 const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
@@ -59,10 +59,10 @@ const gates=[
    unlock:'opens itself · surrender · service'}
 ]
 
-// ═══ AUDIO ═══
-let actx,analyser,fftData,master
-let bass=0,mid=0,high=0,vol=0
-let drones=[]
+// ═══ AUDIO + PITCH DETECTION ═══
+let actx,analyser,fftData,tdData,master
+let bass=0,mid=0,high=0,vol=0,pitch=0,pitchMatch=0
+let drones=[],guideTone=null
 
 async function initAudio(){
   actx=new(window.AudioContext||window.webkitAudioContext)()
@@ -71,16 +71,34 @@ async function initAudio(){
   const fb=actx.createGain();fb.gain.value=.12;del.connect(fb);fb.connect(del)
   const wet=actx.createGain();wet.gain.value=.2;del.connect(wet);wet.connect(actx.destination)
   master.connect(del)
-  analyser=actx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=.8
+  analyser=actx.createAnalyser();analyser.fftSize=4096;analyser.smoothingTimeConstant=.8
   fftData=new Uint8Array(analyser.frequencyBinCount)
+  tdData=new Uint8Array(analyser.fftSize)
   try{const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});actx.createMediaStreamSource(s).connect(analyser)}catch(e){}
-  // gate drones
+  // gate drones — quiet reference tones
   gates.forEach(g=>{
     const o=actx.createOscillator(),ga=actx.createGain()
     o.type='sine';o.frequency.value=g.hz;ga.gain.value=0
     o.connect(ga);ga.connect(master);o.start()
     drones.push({o,g:ga})
   })
+}
+
+function detectPitch(){
+  if(!analyser)return 0
+  analyser.getByteTimeDomainData(tdData)
+  let rms=0;for(let i=0;i<tdData.length;i++){const v=tdData[i]-128;rms+=v*v}
+  rms=Math.sqrt(rms/tdData.length)
+  if(rms<4)return 0
+  // autocorrelation
+  const half=tdData.length/2;let maxC=-1,maxL=0,dip=false
+  for(let lag=20;lag<half;lag++){
+    let sum=0;for(let i=0;i<half;i++)sum+=(tdData[i]-128)*(tdData[i+lag]-128)
+    if(!dip&&sum<0)dip=true
+    if(dip&&sum>maxC){maxC=sum;maxL=lag}
+    if(dip&&sum<maxC*.7&&maxL>20)break
+  }
+  return maxL>20?actx.sampleRate/maxL:0
 }
 
 function getAudio(){
@@ -90,17 +108,32 @@ function getAudio(){
   const bE=Math.floor(n*.06),mE=Math.floor(n*.25),hE=Math.floor(n*.6)
   for(let i=0;i<n;i++){const v=fftData[i]/255;tot+=v;if(i<bE)b+=v;else if(i<mE)m+=v;else if(i<hE)h+=v}
   bass=b/bE;mid=m/(mE-bE);high=h/(hE-mE);vol=tot/n
+  pitch=detectPitch()
+}
+
+function updateGuideTone(gateIdx){
+  // play a quiet reference tone for the target note
+  if(!actx)return
+  const g=gates[gateIdx]
+  drones.forEach((d,i)=>{
+    // active gate drone slightly louder as guide
+    const target=i===gateIdx?.025:.0
+    d.g.gain.linearRampToValueAtTime(target,actx.currentTime+.3)
+  })
 }
 
 // ═══ SNAKE STATE ═══
 let snakePos=0 // 0-6, float, position along spine
-let snakeEnergy=0 // accumulated energy
+let snakeEnergy=0
 let snakeVel=0
 let gateStates=[0,0,0,0,0,0,0] // 0=locked, 1=open
 let pulseFlash=0
+let currentTarget=0 // which gate we're trying to open
+let matchAccum=0 // accumulated pitch match time
+const MATCH_NEEDED=2 // seconds of matching needed to open a gate
+let lastGuideUpdate=-1
 
-addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();pulseFlash=1;snakeEnergy+=.5}})
-addEventListener('click',()=>{pulseFlash=1;snakeEnergy+=.3})
+addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();pulseFlash=1}})
 
 // ═══ SPINE GEOMETRY ═══
 function spineY(gate){return H*.85-gate*(H*.7/6)}
@@ -113,18 +146,55 @@ function loop(){
   requestAnimationFrame(loop)
   t+=1/60;getAudio();pulseFlash*=.93
 
-  // snake physics
-  const breathForce=bass*2+vol
-  snakeEnergy+=breathForce*.01
-  snakeEnergy*=.995 // slow decay
-  snakeVel+=(snakeEnergy*.005-snakeVel*.1) // spring toward energy-determined position
-  snakePos+=snakeVel
-  snakePos=Math.max(0,Math.min(6.5,snakePos))
+  // update guide tone when target changes
+  if(currentTarget!==lastGuideUpdate){lastGuideUpdate=currentTarget;updateGuideTone(currentTarget)}
 
-  // gate opening
+  // pitch matching — is the singer hitting the target gate's frequency?
+  const targetHz=gates[Math.min(6,currentTarget)].hz
+  // allow octave matching (sing at any octave of the target)
+  pitchMatch=0
+  if(pitch>20&&vol>.01){
+    // check fundamental and octaves
+    for(let oct=-2;oct<=3;oct++){
+      const checkHz=targetHz*Math.pow(2,oct)
+      const ratio=pitch/checkHz
+      if(ratio>.92&&ratio<1.08){pitchMatch=1-Math.abs(ratio-1)/.08;break}
+    }
+  }
+
+  // accumulate match time
+  if(pitchMatch>.3){
+    matchAccum+=pitchMatch/60 // per frame at 60fps
+    snakeEnergy+=pitchMatch*.02
+  } else {
+    matchAccum=Math.max(0,matchAccum-.005) // slow decay if not matching
+  }
+
+  // gate opens when enough sustained matching
+  if(matchAccum>=MATCH_NEEDED&&currentTarget<7){
+    gateStates[currentTarget]=1
+    snakePos=currentTarget+.5
+    currentTarget++
+    matchAccum=0
+    pulseFlash=1
+    if(currentTarget<=6){
+      // play a confirmation chime
+      if(actx){const o=actx.createOscillator(),g2=actx.createGain();o.type='sine'
+        o.frequency.value=gates[Math.min(6,currentTarget-1)].hz*2
+        g2.gain.setValueAtTime(.08,actx.currentTime);g2.gain.exponentialRampToValueAtTime(.001,actx.currentTime+1.5)
+        o.connect(g2);g2.connect(master);o.start();o.stop(actx.currentTime+1.5)}
+    }
+  }
+
+  // snake position smoothly follows opened gates
+  const targetPos=currentTarget>0?currentTarget-.5:0
+  snakePos+=(targetPos-snakePos)*.03+pitchMatch*.01
+  snakePos=Math.max(0,Math.min(6.5,snakePos))
+  snakeEnergy=Math.max(0,snakeEnergy*.99)
+
+  // gate states — opened gates stay open
   for(let i=0;i<7;i++){
-    if(snakePos>=i-.2)gateStates[i]+=(1-gateStates[i])*.02
-    else gateStates[i]*=.99
+    if(i<currentTarget)gateStates[i]+=(1-gateStates[i])*.05
   }
 
   // drone volumes follow snake position
@@ -322,14 +392,18 @@ function loop(){
     `<div class="name" style="color:${cg.color}55">${cg.name}</div>`+
     `<div class="sub">${cg.label}<br>${cg.body}<br><br>fascia: ${cg.fascia}<br><br>element: ${cg.element}<br>note: ${cg.note} · ${cg.hz}Hz · P=${cg.prime}<br><br>unlock: ${cg.unlock}</div>`
 
+  const tg=gates[Math.min(6,currentTarget)]
+  const matchPct=Math.min(100,matchAccum/MATCH_NEEDED*100)
+  const pitchStr=pitch>20?pitch.toFixed(0)+'Hz':'--'
+  const matchBar='█'.repeat(Math.floor(matchPct/10))+'░'.repeat(10-Math.floor(matchPct/10))
+
   document.getElementById('hud').textContent=
-    `KUNDALINI\n`+
-    `snake: ${snakePos.toFixed(2)} / 6\n`+
-    `energy: ${snakeEnergy.toFixed(2)}\n`+
-    `gate: ${currentGate} ${cg.name}\n`+
-    `open: ${gateStates.map(g=>g>.5?'O':'·').join('')}\n`+
-    `fascia: piezoelectric\n`+
-    `breathe · sing · space=pulse`
+    `KUNDALINI · SING TO RISE\n`+
+    `target: ${tg.note} ${tg.hz}Hz (${tg.name})\n`+
+    `your pitch: ${pitchStr}\n`+
+    `match: ${pitchMatch>.3?'✓ ON':'·'} [${matchBar}] ${matchPct.toFixed(0)}%\n`+
+    `gates: ${gateStates.map(g=>g>.5?'●':'○').join(' ')}\n`+
+    `${currentTarget>=7?'ALL GATES OPEN':('sing '+tg.note+' to open R'+currentTarget)}`
 }
 
 initAudio();loop()
