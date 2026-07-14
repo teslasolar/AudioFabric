@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>R2 RELEASE — Stand Down</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block}
+#start{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#060804;cursor:pointer;gap:12px}
+#start span{font:16px/1 monospace;color:rgba(255,200,50,.4);letter-spacing:6px;border:1px solid rgba(255,200,50,.12);padding:14px 30px;border-radius:6px}
+#start span:hover{color:rgba(255,220,80,.7);box-shadow:0 0 30px rgba(255,180,40,.12)}
+#start small{font:9px monospace;color:rgba(255,200,50,.15);letter-spacing:2px;max-width:400px;text-align:center;line-height:1.7}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start" onclick="go()">
+  <span>R2 RELEASE</span>
+  <small>lie down · this takes 10 minutes<br>the abs have been on guard since 7th grade<br>this issues the stand-down order</small>
+</div>
+
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+// 6 phases — progressive release
+const phases=[
+  {name:'GROUND',dur:60,breathIn:4,breathOut:6,hz:55,
+   instruction:'lie flat on your back\nfeel your weight on the surface\nyour abs are not needed right now',
+   color:[80,60,40],diaphragmOpen:0},
+  {name:'AWARENESS',dur:60,breathIn:4,breathOut:7,hz:73,
+   instruction:'put your hands on your belly\nfeel the wall\nit has been there since 7th grade\nacknowledge it — it protected you',
+   color:[120,80,40],diaphragmOpen:.1},
+  {name:'PERMISSION',dur:90,breathIn:4,breathOut:8,hz:110,
+   instruction:'breathe INTO your hands\npush them up with your belly\nthe abs will resist — that is the guard responding\ntell it: the threat is over',
+   color:[180,150,40],diaphragmOpen:.3},
+  {name:'SOFTEN',dur:90,breathIn:5,breathOut:9,hz:136,
+   instruction:'on each exhale let the belly fall\ndon\'t pull it in — let gravity do it\nthe abs are learning to let go\n25 years of guard duty ending',
+   color:[200,180,50],diaphragmOpen:.55},
+  {name:'RELEASE',dur:90,breathIn:5,breathOut:10,hz:147,
+   instruction:'your belly is soft\nthe diaphragm is descending\nenergy is flowing past R2 for the first time\nlet the wave move through',
+   color:[220,200,80],diaphragmOpen:.8},
+  {name:'OPEN',dur:90,breathIn:6,breathOut:10,hz:174,
+   instruction:'the gate is open\nthe spiral can complete\nthe arousal loop can close\nyou are not in 7th grade\nyou are safe\nstand down',
+   color:[255,230,120],diaphragmOpen:1}
+]
+const totalDur=phases.reduce((s,p)=>s+p.dur,0)
+
+let actx,master,running=false,t=0,currentPhase=0
+let activeDrone=null,binauralL=null,binauralR=null
+
+function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.15;master.connect(actx.destination)
+  const del=actx.createDelay(.5);del.delayTime.value=.2
+  const fb=actx.createGain();fb.gain.value=.12;del.connect(fb);fb.connect(del)
+  const wet=actx.createGain();wet.gain.value=.2;del.connect(wet);wet.connect(actx.destination)
+  master.connect(del)
+}
+
+function setPhaseAudio(p){
+  // fade out old
+  if(activeDrone){try{activeDrone.forEach(d=>{d.g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+2);setTimeout(()=>d.o.stop(),2100)})}catch(e){}}
+  if(binauralL){try{binauralL.o.stop();binauralR.o.stop()}catch(e){}}
+
+  activeDrone=[]
+  // warm drone at phase frequency
+  ;[p.hz,p.hz*2,p.hz*.5,p.hz*1.002].forEach((hz,i)=>{
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type=i<2?'sine':'triangle'
+    o.frequency.value=hz
+    g.gain.setValueAtTime(0,actx.currentTime)
+    g.gain.linearRampToValueAtTime([.04,.02,.03,.03][i],actx.currentTime+3)
+    o.connect(g);g.connect(master);o.start()
+    activeDrone.push({o,g})
+  })
+
+  // binaural — theta (4-7Hz) for deep relaxation
+  const binauralHz=4+currentPhase*.5 // 4Hz → 7Hz across phases
+  const oL=actx.createOscillator(),oR=actx.createOscillator()
+  const gL=actx.createGain(),gR=actx.createGain()
+  const merger=actx.createChannelMerger(2)
+  oL.frequency.value=100;oR.frequency.value=100+binauralHz
+  gL.gain.value=.03;gR.gain.value=.03
+  oL.connect(gL);oR.connect(gR)
+  gL.connect(merger,0,0);gR.connect(merger,0,1)
+  merger.connect(master);oL.start();oR.start()
+  binauralL={o:oL};binauralR={o:oR}
+}
+
+function go(){
+  document.getElementById('start').style.display='none'
+  initAudio();running=true
+  document.documentElement.requestFullscreen?.().catch(()=>{})
+  loop()
+}
+window.go=go
+
+let lastPhaseIdx=-1
+
+function loop(){
+  if(!running)return
+  requestAnimationFrame(loop)
+  t+=1/60
+
+  // compute current phase
+  let elapsed=0,pi=0
+  for(let i=0;i<phases.length;i++){
+    if(t<elapsed+phases[i].dur){pi=i;break}
+    elapsed+=phases[i].dur;if(i===phases.length-1)pi=phases.length-1
+  }
+  const p=phases[pi]
+  const phaseT=Math.min(t-elapsed,p.dur)
+  const phaseFrac=phaseT/p.dur
+  currentPhase=pi
+  const totalFrac=Math.min(1,t/totalDur)
+  const diaphragmOpen=p.diaphragmOpen
+
+  if(pi!==lastPhaseIdx){lastPhaseIdx=pi;setPhaseAudio(p)}
+
+  // breath cycle
+  const breathTotal=p.breathIn+p.breathOut
+  const breathCycle=(t%breathTotal)/breathTotal
+  const isInhale=breathCycle<p.breathIn/breathTotal
+  const breathFrac=isInhale?breathCycle/(p.breathIn/breathTotal):(breathCycle-p.breathIn/breathTotal)/(p.breathOut/breathTotal)
+  const bellySize=isInhale?breathFrac:1-breathFrac // 0→1 on inhale, 1→0 on exhale
+
+  const c=p.color
+
+  // ═══ BACKGROUND — warm amber, darkening at edges ═══
+  ctx.globalAlpha=.06
+  const bgGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(W,H)*.6)
+  bgGrad.addColorStop(0,`rgba(${Math.floor(c[0]*.06)},${Math.floor(c[1]*.05)},${Math.floor(c[2]*.02)},1)`)
+  bgGrad.addColorStop(1,'rgba(3,3,2,1)')
+  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,W,H)
+
+  // ═══ BODY SILHOUETTE — torso focused on abdomen ═══
+  const bodyW=W*.12,bodyTop=H*.15,bodyBot=H*.85
+  const abdomenY=cy+H*.05 // slightly below center — where R2 lives
+  const abdomenR=bodyW*(.8+bellySize*.5+diaphragmOpen*.3)
+
+  // torso outline
+  ctx.globalAlpha=.04+diaphragmOpen*.02
+  ctx.strokeStyle=`rgba(${c[0]},${c[1]},${c[2]},.3)`
+  ctx.lineWidth=1
+  ctx.beginPath()
+  ctx.moveTo(cx-bodyW*.5,bodyTop);ctx.lineTo(cx-bodyW*.7,abdomenY-H*.1)
+  ctx.quadraticCurveTo(cx-bodyW*.8,abdomenY,cx-bodyW*.6,bodyBot)
+  ctx.moveTo(cx+bodyW*.5,bodyTop);ctx.lineTo(cx+bodyW*.7,abdomenY-H*.1)
+  ctx.quadraticCurveTo(cx+bodyW*.8,abdomenY,cx+bodyW*.6,bodyBot)
+  ctx.stroke()
+
+  // ═══ DIAPHRAGM — the gate ═══
+  const diaphY=abdomenY-H*.08
+  const diaphW=bodyW*1.2
+  const diaphCurve=diaphragmOpen*.3+bellySize*.15 // how much it descends
+
+  // diaphragm muscle
+  ctx.beginPath()
+  ctx.moveTo(cx-diaphW,diaphY)
+  ctx.quadraticCurveTo(cx,diaphY+diaphCurve*H*.1,cx+diaphW,diaphY)
+  ctx.strokeStyle=`rgba(${c[0]},${c[1]},${c[2]},.2)`
+  ctx.lineWidth=3-diaphragmOpen*2 // thins as it relaxes
+  ctx.globalAlpha=.1+diaphragmOpen*.05;ctx.stroke()
+
+  // label
+  ctx.font='6px monospace';ctx.textAlign='center';ctx.globalAlpha=.06+diaphragmOpen*.04
+  ctx.fillStyle=`rgba(${c[0]},${c[1]},${c[2]},.6)`
+  ctx.fillText('DIAPHRAGM',cx,diaphY-8)
+
+  // ═══ BELLY — the balloon ═══
+  // belly circle expanding/contracting with breath
+  const bellyR=abdomenR*(1+bellySize*.3)
+  const bellyGrad=ctx.createRadialGradient(cx,abdomenY,0,cx,abdomenY,bellyR*1.5)
+  bellyGrad.addColorStop(0,`rgba(${c[0]},${c[1]},${c[2]},${.04+bellySize*.04+diaphragmOpen*.03})`)
+  bellyGrad.addColorStop(.5,`rgba(${c[0]},${c[1]},${c[2]},${.02+bellySize*.02})`)
+  bellyGrad.addColorStop(1,'rgba(0,0,0,0)')
+  ctx.globalAlpha=1;ctx.fillStyle=bellyGrad
+  ctx.beginPath();ctx.arc(cx,abdomenY,bellyR*1.5,0,TAU);ctx.fill()
+
+  // belly outline
+  ctx.beginPath();ctx.arc(cx,abdomenY,bellyR,0,TAU)
+  ctx.strokeStyle=`rgba(${c[0]},${c[1]},${c[2]},${.06+bellySize*.06+diaphragmOpen*.04})`
+  ctx.lineWidth=1.5+bellySize;ctx.globalAlpha=1;ctx.stroke()
+
+  // ═══ ABS — the armor (fading as release progresses) ═══
+  const absOpacity=Math.max(0,.08-diaphragmOpen*.07)
+  if(absOpacity>.005){
+    // 6-pack grid lines representing the contracted abs
+    for(let row=0;row<3;row++){
+      const ay=abdomenY-bellyR*.4+row*bellyR*.4
+      // horizontal
+      ctx.beginPath();ctx.moveTo(cx-bellyR*.5,ay);ctx.lineTo(cx+bellyR*.5,ay)
+      ctx.strokeStyle=`rgba(200,100,50,.3)`;ctx.lineWidth=1;ctx.globalAlpha=absOpacity;ctx.stroke()
+    }
+    // vertical center line (linea alba)
+    ctx.beginPath();ctx.moveTo(cx,abdomenY-bellyR*.6);ctx.lineTo(cx,abdomenY+bellyR*.6)
+    ctx.strokeStyle='rgba(200,100,50,.3)';ctx.lineWidth=1;ctx.globalAlpha=absOpacity;ctx.stroke()
+
+    // "GUARD" label when still contracted
+    if(diaphragmOpen<.3){
+      ctx.font='5px monospace';ctx.textAlign='center';ctx.globalAlpha=absOpacity
+      ctx.fillStyle='rgba(200,100,50,.4)';ctx.fillText('GUARD',cx,abdomenY)
+    }
+  }
+
+  // ═══ ENERGY FLOW — blocked or flowing through R2 ═══
+  if(diaphragmOpen>.2){
+    // energy particles flowing THROUGH the diaphragm (past R2)
+    const flowCount=Math.floor(diaphragmOpen*15)
+    for(let f=0;f<flowCount;f++){
+      const fPhase=(t*.3+f*.2)%1
+      const fy=abdomenY+H*.3-fPhase*H*.6 // flowing upward
+      const fx=cx+Math.sin(t+f*1.7)*bodyW*.3
+      const fSize=2+diaphragmOpen*2
+      ctx.beginPath();ctx.arc(fx,fy,fSize,0,TAU)
+      const flowAlpha=Math.sin(fPhase*Math.PI)*diaphragmOpen*.06
+      ctx.fillStyle=`rgba(${c[0]},${c[1]},${c[2]},${flowAlpha})`
+      ctx.globalAlpha=1;ctx.fill()
+    }
+  }
+
+  // ═══ SPIRAL — the arousal loop attempting to close ═══
+  const spiralR=bellyR*1.5
+  const spiralComplete=diaphragmOpen // how much of the spiral is drawn
+  ctx.save();ctx.translate(cx,abdomenY)
+  ctx.beginPath();ctx.globalAlpha=.04+diaphragmOpen*.04
+  ctx.strokeStyle=`rgba(${c[0]},${c[1]},${c[2]},.5)`
+  ctx.lineWidth=1.5
+  const spiralSteps=Math.floor(spiralComplete*100)
+  for(let i=0;i<=spiralSteps;i++){
+    const frac=i/100
+    const a=frac*TAU+t*.2
+    const sr=spiralR*(.3+frac*.5)
+    i===0?ctx.moveTo(Math.cos(a)*sr,Math.sin(a)*sr):ctx.lineTo(Math.cos(a)*sr,Math.sin(a)*sr)
+  }
+  ctx.stroke()
+  // if fully open, close the spiral (the loop completes!)
+  if(diaphragmOpen>.95){
+    // connect end to start — the loop closes
+    const endA=TAU+t*.2,startA=t*.2
+    ctx.lineTo(Math.cos(startA)*spiralR*.3,Math.sin(startA)*spiralR*.3)
+    ctx.strokeStyle=`rgba(255,255,200,.08)`;ctx.stroke()
+    // glow at closure point
+    ctx.beginPath();ctx.arc(Math.cos(startA)*spiralR*.3,Math.sin(startA)*spiralR*.3,4+Math.sin(t*3)*2,0,TAU)
+    ctx.fillStyle=`rgba(255,255,200,.06)`;ctx.globalAlpha=1;ctx.fill()
+  }
+  ctx.restore()
+
+  // ═══ 7 GATE DOTS along the spine ═══
+  const gateColors=['#ff1111','#ff6600','#ffcc00','#44cc44','#4488ff','#6644cc','#cc44ff']
+  for(let i=0;i<7;i++){
+    const gy=H*.85-i*(H*.7/6)
+    const isR2=i===2
+    const gOpen=i<=2?diaphragmOpen:Math.max(0,diaphragmOpen-.3)*(i<5?1:.5)
+    ctx.beginPath();ctx.arc(cx,gy,3+gOpen*4+(isR2?Math.sin(t*2)*2:0),0,TAU)
+    ctx.fillStyle=gateColors[i];ctx.globalAlpha=.05+gOpen*.1+(isR2?.05:0)
+    ctx.fill()
+    if(isR2&&diaphragmOpen<.5){
+      ctx.font='5px monospace';ctx.textAlign='left';ctx.globalAlpha=.04
+      ctx.fillStyle='#ffcc00';ctx.fillText('← R2 GATE (locked)',cx+12,gy+2)
+    }
+    if(isR2&&diaphragmOpen>=.5){
+      ctx.font='5px monospace';ctx.textAlign='left';ctx.globalAlpha=.06
+      ctx.fillStyle='#ffcc00';ctx.fillText('← R2 GATE (opening)',cx+12,gy+2)
+    }
+  }
+
+  // ═══ BREATH GUIDE ═══
+  ctx.globalAlpha=.12+diaphragmOpen*.05
+  ctx.font='14px monospace';ctx.textAlign='center'
+  ctx.fillStyle=`rgba(${c[0]},${c[1]},${c[2]},.6)`
+  ctx.fillText(isInhale?'IN':'OUT',cx,H-50)
+  ctx.font='8px monospace';ctx.globalAlpha=.06
+  ctx.fillText(`${isInhale?p.breathIn:p.breathOut}s`,cx,H-36)
+
+  // breath bar
+  const barW=100,barH=3
+  ctx.globalAlpha=.08;ctx.fillStyle='rgba(255,255,255,.1)'
+  ctx.fillRect(cx-barW/2,H-30,barW,barH)
+  ctx.fillStyle=`rgba(${c[0]},${c[1]},${c[2]},.4)`
+  ctx.fillRect(cx-barW/2,H-30,barW*breathCycle,barH)
+
+  // ═══ PHASE INFO ═══
+  ctx.globalAlpha=.08+diaphragmOpen*.03
+  ctx.font='9px monospace';ctx.textAlign='center'
+  ctx.fillStyle=`rgba(${c[0]},${c[1]},${c[2]},.6)`
+  ctx.fillText(p.name,cx,30)
+
+  // instruction
+  ctx.font='10px monospace';ctx.globalAlpha=.12+phaseFrac*.04
+  ctx.fillStyle=`rgba(${c[0]},${c[1]},${c[2]},.5)`
+  const lines=p.instruction.split('\n')
+  lines.forEach((line,li)=>{
+    ctx.fillText(line,cx,H*.3+li*18)
+  })
+
+  // progress
+  ctx.font='7px monospace';ctx.globalAlpha=.05
+  ctx.fillStyle='rgba(255,255,255,.3)'
+  ctx.fillText(`R2: ${(diaphragmOpen*100).toFixed(0)}% · phase ${pi+1}/6 · ${Math.floor(totalDur-t)}s remaining`,cx,20)
+
+  // ═══ COMPLETION ═══
+  if(t>totalDur+3){
+    const fadeIn=Math.min(1,(t-totalDur-3)*.03)
+    ctx.globalAlpha=fadeIn*.12
+    ctx.font='12px monospace';ctx.textAlign='center'
+    ctx.fillStyle='rgba(255,230,120,.6)'
+    ctx.fillText('R2 OPEN',cx,cy-20)
+    ctx.font='9px monospace';ctx.globalAlpha=fadeIn*.08
+    ctx.fillText('the guard has stood down',cx,cy)
+    ctx.fillText('the spiral can close',cx,cy+14)
+    ctx.fillText('the 7th grader is free',cx,cy+28)
+  }
+}
+</script>
+</body></html>
