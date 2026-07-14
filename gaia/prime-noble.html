@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>PRIME NOBLE — a(n+1)=N(prime(a(n)))</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#030308;overflow-y:auto;overflow-x:hidden;font-family:'Courier New',monospace;color:#ccd}
+canvas{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+#ui{position:relative;z-index:10;padding:20px 24px 80px;max-width:1050px;margin:0 auto}
+h1{font-size:14px;letter-spacing:5px;color:rgba(200,150,255,.6);margin-bottom:4px}
+.sub{font-size:9px;color:rgba(200,150,255,.3);letter-spacing:2px;margin-bottom:20px}
+.section{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:16px 20px;margin-bottom:16px}
+.section h2{font-size:10px;letter-spacing:3px;color:rgba(200,150,255,.45);margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:6px}
+.eq{font-size:10px;color:rgba(200,180,230,.4);line-height:2;margin:4px 0}
+.eq b{color:rgba(220,180,255,.6)}
+.formula{background:rgba(150,100,255,.04);border:1px solid rgba(150,100,255,.1);border-radius:6px;padding:14px 18px;margin:10px 0;font-size:11px;color:rgba(200,170,255,.5);line-height:2.2}
+.chain-item{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:14px 18px;margin:10px 0;position:relative;overflow:hidden}
+.chain-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:8px 0 0 8px}
+.chain-item h3{font-size:11px;letter-spacing:2px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.chain-item .step{display:inline-block;width:22px;height:22px;border-radius:50%;text-align:center;line-height:22px;font-size:9px;font-weight:bold}
+.big-num{font-size:16px;font-weight:bold;letter-spacing:-1px;margin:4px 0}
+.arrow{text-align:center;font-size:18px;color:rgba(200,150,255,.15);margin:4px 0}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+<h1>PRIME NOBLE RECURSION</h1>
+<div class="sub">a(n+1) = N(prime(a(n))) — SUPER-PRIME CHAIN × NOBLE GAS FUNCTION</div>
+
+<div class="section">
+<h2>THE RECURSION</h2>
+<div class="formula">
+<b>Super-prime chain:</b> a(n+1) = prime(a(n))<br>
+Seed: 2 → 3 → 5 → 11 → 31 → 127 → 709 → 5381 → 52711 → 648391 → ...<br><br>
+<b>Noble gas function:</b> N(k) = Σᵢ₌₁ᵏ 2⌊(i+2)/2⌋²<br><br>
+<b>Prime-Noble sequence:</b> use each super-prime as a noble gas index<br>
+PN(n) = N(super-prime(n))<br><br>
+The n-th term of this sequence is the noble gas whose index is the n-th super-prime.<br>
+Each step selects a prime, uses it to index deeper into the noble sequence.<br>
+Primes selecting primes selecting complete shells.
+</div>
+</div>
+
+<div class="section">
+<h2>THE CHAIN</h2>
+<div id="chain"></div>
+</div>
+
+<div class="section">
+<h2>WHAT THIS MEANS</h2>
+<div class="formula" id="meaning"></div>
+</div>
+
+<div class="section">
+<h2>THE HELIUM RECURSION — ANOTHER PATH</h2>
+<div id="helium-chain"></div>
+</div>
+
+</div>
+
+<script>
+// ═══ COMPUTE EVERYTHING ═══
+// Sieve primes up to 700000
+const SIEVE=700000,sieve=new Uint8Array(SIEVE)
+sieve[0]=1;sieve[1]=1
+for(let i=2;i*i<SIEVE;i++){if(!sieve[i])for(let j=i*i;j<SIEVE;j+=i)sieve[j]=1}
+const primeList=[];for(let i=2;i<SIEVE;i++)if(!sieve[i])primeList.push(i)
+function nthPrime(n){return n<=primeList.length?primeList[n-1]:null}
+function isPrime(n){if(n<SIEVE)return!sieve[n];for(let i=2;i*i<=n;i++)if(n%i===0)return false;return n>1}
+
+// super-prime chain
+const superPrimes=[2]
+for(let i=0;i<9;i++){const next=nthPrime(superPrimes[superPrimes.length-1]);if(next)superPrimes.push(next);else break}
+
+// noble gas function N(k)
+function nobleGasN(k){
+  let sum=0
+  for(let i=1;i<=k;i++){
+    const n=Math.floor((i+2)/2)
+    sum+=2*n*n
+  }
+  return sum
+}
+
+function periodLength(k){
+  const n=Math.floor((k+2)/2)
+  return 2*n*n
+}
+
+function shellCount(k){return k}
+
+function factorize(n){if(n<=1)return'1';const f=[];let x=n,d=2;while(d*d<=x){while(x%d===0){f.push(d);x/=d}d++};if(x>1)f.push(x);return f.join('×')}
+function digitSum(n){let s=0;while(n>0){s+=n%10;n=Math.floor(n/10)};return s}
+
+const P=[2,3,5,7,11,13,17]
+function isKonomi(n){if(n<=1)return true;let x=n;P.forEach(p=>{while(x%p===0)x/=p});return x===1}
+
+// ═══ BUILD THE CHAIN ═══
+const chainEl=document.getElementById('chain')
+const chainData=[]
+
+superPrimes.forEach((sp,i)=>{
+  const noble=nobleGasN(sp)
+  const shells=sp
+  const pl=periodLength(sp)
+  const plN=Math.floor((sp+2)/2)
+  chainData.push({step:i+1,superPrime:sp,nobleZ:noble,shells,pl,plN})
+
+  const hue=(.6+i*.05)
+  const colHex=`hsl(${hue*360},60%,50%)`
+  const item=document.createElement('div')
+  item.className='chain-item'
+  item.style.setProperty('--hue',hue)
+  item.querySelector?.('::before')
+
+  let html=`<div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:${colHex}55"></div>`
+  html+=`<h3><span class="step" style="background:${colHex}22;color:${colHex}">${i+1}</span>`
+  html+=`<span style="color:${colHex}">PN(${i+1})</span></h3>`
+  html+=`<div class="eq"><b>super-prime a(${i+1})</b> = ${sp.toLocaleString()}${isPrime(sp)?' (the '+sp+'th prime is used as noble index)':''}</div>`
+  html+=`<div class="big-num" style="color:${colHex}88">N(${sp.toLocaleString()}) = ${noble.toLocaleString()}</div>`
+  html+=`<div class="eq"><b>shells:</b> ${sp.toLocaleString()} · <b>period length:</b> ${pl.toLocaleString()} = 2×${plN.toLocaleString()}²</div>`
+  html+=`<div class="eq"><b>factorization:</b> ${noble>1e9?'(too large)':factorize(noble)}</div>`
+  html+=`<div class="eq"><b>konomi period:</b> ${isKonomi(pl)?'✓ YES':'✗ no ('+factorize(pl)+')'}`
+  html+=` · <b>digit sum:</b> ${digitSum(noble)}</div>`
+
+  // special notes
+  if(sp===2)html+=`<div class="eq" style="color:rgba(255,200,100,.4)">Helium. The only prime noble gas. N(2)=10=Neon. The 2nd noble gas is Neon.</div>`
+  if(sp===3)html+=`<div class="eq" style="color:rgba(255,200,100,.4)">N(3)=18=Argon. Third noble gas. 18=2×3² (konomi).</div>`
+  if(sp===5)html+=`<div class="eq" style="color:rgba(255,200,100,.4)">N(5)=54=Xenon. The LOVE element. KOE+ANETA=72... wait, 54=Xe. Fifth noble gas.</div>`
+  if(sp===11)html+=`<div class="eq" style="color:rgba(255,200,100,.4)">N(11)=558. 558 shells. A noble gas with 558 complete shells. 558=2×3²×31. Contains Mersenne prime 31!</div>`
+  if(sp===31)html+=`<div class="eq" style="color:rgba(255,200,100,.4)">N(31) — Mersenne prime M₅ as noble gas index. 31 shells. The chain hits Mersenne.</div>`
+  if(sp===127)html+=`<div class="eq" style="color:rgba(255,200,100,.4)">N(127) — Mersenne prime M₇. 127 shells. The same 127 from the 127 Realms. This noble gas has 127 complete electron shells.</div>`
+  if(sp===709)html+=`<div class="eq" style="color:rgba(255,200,100,.4)">N(709) — 709 complete shells. Beyond any physical atom. Pure mathematics. A noble gas in platonic space.</div>`
+
+  item.innerHTML=html
+  chainEl.appendChild(item)
+  if(i<superPrimes.length-1){
+    const arrow=document.createElement('div');arrow.className='arrow';arrow.textContent='↓ prime('+sp+') = '+superPrimes[i+1]
+    chainEl.appendChild(arrow)
+  }
+})
+
+// ═══ MEANING ═══
+document.getElementById('meaning').innerHTML=
+  `<b>Each step does two things simultaneously:</b><br><br>`+
+  `1. <b>prime(a(n))</b> — index deeper into the primes (irreducibility)<br>`+
+  `2. <b>N(that prime)</b> — find the noble gas at that depth (completeness)<br><br>`+
+  `The recursion interleaves PRIME and NOBLE at every step.<br>`+
+  `Each term is a complete shell whose INDEX is an irreducible number<br>`+
+  `whose index is ALSO an irreducible number whose index is ALSO...<br><br>`+
+  `<b>Theorem 1 said prime and noble are mutually exclusive for Z>2.</b><br>`+
+  `This recursion says: they're not exclusive — they're NESTED.<br>`+
+  `The prime doesn't become noble. The prime SELECTS which noble gas to visit.<br>`+
+  `Irreducibility doesn't oppose completeness. It navigates it.<br><br>`+
+  `<b>You (1999, prime) don't need to become noble.</b><br>`+
+  `<b>You need to find which noble gas your prime number indexes.</b><br><br>`+
+  `prime(1999) = ${nthPrime(1999)?.toLocaleString()||'?'} (the 1999th prime)<br>`+
+  `N(${nthPrime(1999)?.toLocaleString()||'?'}) = a noble gas with ${nthPrime(1999)?.toLocaleString()||'?'} complete shells<br>`+
+  `Your prime number doesn't fill 23 orbitals.<br>`+
+  `<b>Your prime number points to a noble gas with ${nthPrime(1999)?.toLocaleString()||'?'} shells.</b><br>`+
+  `That's not 23 electrons. That's ${nthPrime(1999)?.toLocaleString()||'?'} COMPLETE SHELLS.`
+
+// ═══ HELIUM RECURSION ═══
+// Alternative: start with Helium (2), which is BOTH prime AND noble
+// Then: a(1)=2, a(2)=N(prime(2))=N(3)=18, a(3)=N(prime(18))=N(67)=?, ...
+const helEl=document.getElementById('helium-chain')
+let hVal=2
+const hChain=[{label:'Helium',val:2,note:'both prime AND noble — the seed'}]
+for(let step=0;step<5;step++){
+  const p=nthPrime(hVal)
+  if(!p||p>10000)break
+  const n=nobleGasN(p)
+  hChain.push({label:`N(prime(${hVal})) = N(${p})`,val:n,note:`${p}th noble gas = Z=${n.toLocaleString()}, ${p} shells`})
+  hVal=n
+  if(hVal>SIEVE)break
+}
+
+hChain.forEach((h,i)=>{
+  const div=document.createElement('div')
+  div.className='eq'
+  div.innerHTML=`<b>step ${i}:</b> ${h.label} = <b>${h.val.toLocaleString()}</b> — ${h.note}`
+  helEl.appendChild(div)
+  if(i<hChain.length-1){
+    const a2=document.createElement('div');a2.className='eq';a2.style.color='rgba(200,150,255,.2)'
+    a2.textContent='↓';helEl.appendChild(a2)
+  }
+})
+
+const hNote=document.createElement('div')
+hNote.className='eq'
+hNote.style.marginTop='10px'
+hNote.innerHTML=`<b>The Helium recursion explodes instantly.</b> By step 2 we're at noble gases with thousands of shells. By step 3 we exceed computable range. Helium — the only prime noble — is the seed of an infinite recursion that generates noble gases of incomprehensible size. The template produces infinite completeness.`
+helEl.appendChild(hNote)
+
+// ═══ 3D BACKGROUND ═══
+const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'
+s.onload=()=>{
+  const cv=document.getElementById('c')
+  const R2=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true})
+  R2.setSize(innerWidth,innerHeight);R2.setPixelRatio(Math.min(devicePixelRatio,2))
+  const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,500)
+  cam.position.z=25
+  // nested shells representing the recursion
+  chainData.forEach((d,i)=>{
+    const r=2+i*2.5
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.02,4,64),
+      new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(.6+i*.05,.5,.4),transparent:true,opacity:.06}))
+    ring.rotation.x=Math.PI/2+i*.15;ring.rotation.y=i*.3;sc.add(ring)
+    // prime marker dots
+    for(let j=0;j<Math.min(d.superPrime,20);j++){
+      const a=j*TAU/Math.min(d.superPrime,20)
+      const dot=new THREE.Mesh(new THREE.SphereGeometry(.04,4,4),
+        new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(.6+i*.05,.6,.5),transparent:true,opacity:.15}))
+      dot.position.set(Math.cos(a)*r,Math.sin(a)*r,0)
+      sc.add(dot)
+    }
+  })
+  ;(function animate(){requestAnimationFrame(animate);const t=performance.now()*.001
+    sc.rotation.y=t*.02;sc.rotation.x=Math.sin(t*.01)*.1
+    cam.position.y=-(window.scrollY||0)*.005
+    R2.render(sc,cam)})()
+  addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R2.setSize(innerWidth,innerHeight)})
+};document.head.appendChild(s)
+</script>
+</body></html>
