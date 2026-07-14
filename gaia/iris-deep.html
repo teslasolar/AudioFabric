@@ -3,27 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>IRIS DEEP — 3D Dual-Eye Biofeedback</title>
+<title>IRIS DEEP — Metatron's Cube Biofeedback</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#000;overflow:hidden;cursor:none}
 #gl{position:fixed;inset:0;z-index:0}
-#overlay{position:fixed;inset:0;z-index:1;pointer-events:none}
+#ov{position:fixed;inset:0;z-index:1;pointer-events:none}
 #start{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#000;cursor:pointer;gap:8px}
 #start span{font:14px/1 monospace;color:rgba(255,100,50,.4);letter-spacing:6px;border:1px solid rgba(255,100,50,.15);padding:14px 30px;border-radius:6px}
 #start span:hover{color:rgba(255,100,50,.7);border-color:rgba(255,100,50,.4);box-shadow:0 0 30px rgba(255,60,20,.15)}
 #start small{font:8px monospace;color:rgba(255,100,50,.2);letter-spacing:2px}
 #hud{position:fixed;top:6px;left:8px;z-index:10;font:7px/1.5 monospace;color:rgba(200,180,220,.2);pointer-events:none;white-space:pre}
-#keys{position:fixed;top:6px;right:8px;z-index:10;font:7px/1.5 monospace;color:rgba(200,180,220,.15);pointer-events:none;white-space:pre;text-align:right}
+#keys{position:fixed;top:6px;right:8px;z-index:10;font:7px/1.5 monospace;color:rgba(200,180,220,.12);pointer-events:none;white-space:pre;text-align:right}
 </style>
 </head>
 <body>
 <canvas id="gl"></canvas>
-<canvas id="overlay"></canvas>
+<canvas id="ov"></canvas>
 <div id="start" onclick="init()">
   <span>IRIS DEEP</span>
-  <small>3D · VOICE · GATES · EYE EXERCISES</small>
-  <small style="margin-top:12px;color:rgba(255,100,50,.15)">keys: 1-7 gates · arrows: eye exercises · space: pulse</small>
+  <small>METATRON'S CUBE · VOICE · GATES · COLOR THEORY</small>
+  <small style="margin-top:12px;color:rgba(255,100,50,.12)">1-7 gates · arrows eye exercise · E sweep · C circle · space pulse</small>
 </div>
 <div id="hud"></div>
 <div id="keys"></div>
@@ -33,414 +33,341 @@ body{background:#000;overflow:hidden;cursor:none}
 const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
 
 const params=new URLSearchParams(location.search)
-const USER=params.get('user')||'thomas'
-const GW=params.get('gw')||'http://localhost:5540'
+const USER=params.get('user')||'thomas',GW=params.get('gw')||'http://localhost:5540'
 
 let W=innerWidth,H=innerHeight
-
-// ═══ WebGL (Three.js) ═══
 const glCv=document.getElementById('gl')
 const R=new THREE.WebGLRenderer({canvas:glCv,antialias:true})
 R.setSize(W,H);R.setPixelRatio(Math.min(devicePixelRatio,2))
-R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.5
-R.setScissorTest(true)
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.5;R.setScissorTest(true)
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x000000)
-const cam=new THREE.PerspectiveCamera(50,1,.1,500)
-cam.position.set(0,0,22)
+const cam=new THREE.PerspectiveCamera(50,1,.1,500);cam.position.set(0,0,20)
 
-// ═══ 2D overlay ═══
-const ov=document.getElementById('overlay')
-const ox=ov.getContext('2d')
-ov.width=W;ov.height=H
+const ovCv=document.getElementById('ov'),ox=ovCv.getContext('2d')
+ovCv.width=W;ovCv.height=H
+
+// ═══ GATE COLORS + COMPLEMENTS ═══
+const GC=['#ff1111','#ff4488','#ff8800','#44aa44','#ffcc00','#44aaff','#aa44ff']
+const GN=['WRATH','LUST','GLUTTONY','SLOTH','GREED','ENVY','PRIDE']
+// complementary: opposite on color wheel for afterimage illusion
+const GCC=['#11ffff','#44ff88','#0088ff','#aa44aa','#0044ff','#ff8844','#44ff11']
 
 // ═══ AUDIO ═══
-let actx,master,analyser,fftData,tdData
+let actx,master,analyser,fftData,tdData,drones=[]
 let bass=0,mid=0,high=0,vol=0,pitch=0
-let drones=[]
 
 function initAudio(){
   actx=new(window.AudioContext||window.webkitAudioContext)()
   master=actx.createGain();master.gain.value=.18
-  const delay=actx.createDelay(.5);delay.delayTime.value=.12
-  const fb=actx.createGain();fb.gain.value=.25
-  delay.connect(fb);fb.connect(delay)
-  const wet=actx.createGain();wet.gain.value=.35
-  delay.connect(wet);wet.connect(actx.destination)
-  master.connect(actx.destination);master.connect(delay)
+  const del=actx.createDelay(.5);del.delayTime.value=.12
+  const fb=actx.createGain();fb.gain.value=.25;del.connect(fb);fb.connect(del)
+  const wet=actx.createGain();wet.gain.value=.3;del.connect(wet);wet.connect(actx.destination)
+  master.connect(actx.destination);master.connect(del)
   analyser=actx.createAnalyser();analyser.fftSize=4096;analyser.smoothingTimeConstant=.75
-  fftData=new Uint8Array(analyser.frequencyBinCount)
-  tdData=new Uint8Array(analyser.fftSize)
-  // drones
-  const voices=[{hz:55,t:'sine',v:.04},{hz:82.4,t:'triangle',v:.025},{hz:110,t:'sine',v:.03},
-    {hz:146.8,t:'sine',v:.02},{hz:220,t:'triangle',v:.015},{hz:55.5,t:'sine',v:.025}]
-  voices.forEach(vo=>{
-    const o=actx.createOscillator(),g=actx.createGain()
-    o.type=vo.t;o.frequency.value=vo.hz;g.gain.value=0
-    o.connect(g);g.connect(master);o.start()
-    drones.push({o,g,bv:vo.v})
-  })
+  fftData=new Uint8Array(analyser.frequencyBinCount);tdData=new Uint8Array(analyser.fftSize)
+  ;[{hz:55,t:'sine',v:.04},{hz:82.4,t:'triangle',v:.02},{hz:110,t:'sine',v:.03},{hz:146.8,t:'sine',v:.018},{hz:220,t:'triangle',v:.012},{hz:55.5,t:'sine',v:.025}].forEach(vo=>{
+    const o=actx.createOscillator(),g=actx.createGain();o.type=vo.t;o.frequency.value=vo.hz;g.gain.value=0;o.connect(g);g.connect(master);o.start();drones.push({o,g,bv:vo.v})})
 }
+async function initMic(){try{const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});actx.createMediaStreamSource(s).connect(analyser)}catch(e){}}
+function getAudio(){if(!analyser)return;analyser.getByteFrequencyData(fftData);analyser.getByteTimeDomainData(tdData);const n=fftData.length;let b=0,m=0,h=0,total=0;const bE=Math.floor(n*.05),mE=Math.floor(n*.25),hE=Math.floor(n*.6);for(let i=0;i<n;i++){const v=fftData[i]/255;total+=v;if(i<bE)b+=v;else if(i<mE)m+=v;else if(i<hE)h+=v}bass=b/bE;mid=m/(mE-bE);high=h/(hE-mE);vol=total/n;let maxC=-1,maxL=0;const half=tdData.length/2;let rms=0;for(let i=0;i<tdData.length;i++){const v=tdData[i]-128;rms+=v*v}rms=Math.sqrt(rms/tdData.length);if(rms>3){let dip=false;for(let lag=20;lag<half;lag++){let s2=0;for(let i=0;i<half;i++)s2+=(tdData[i]-128)*(tdData[i+lag]-128);if(!dip&&s2<0)dip=true;if(dip&&s2>maxC){maxC=s2;maxL=lag}if(dip&&s2<maxC*.7&&maxL>20)break}pitch=maxL>20?actx.sampleRate/maxL:0}else pitch=0}
 
-async function initMic(){
-  try{
-    const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})
-    actx.createMediaStreamSource(s).connect(analyser)
-  }catch(e){}
-}
-
-function getAudio(){
-  if(!analyser)return
-  analyser.getByteFrequencyData(fftData);analyser.getByteTimeDomainData(tdData)
-  const n=fftData.length;let b=0,m=0,h=0,total=0
-  const bE=Math.floor(n*.05),mE=Math.floor(n*.25),hE=Math.floor(n*.6)
-  for(let i=0;i<n;i++){const v=fftData[i]/255;total+=v;if(i<bE)b+=v;else if(i<mE)m+=v;else if(i<hE)h+=v}
-  bass=b/bE;mid=m/(mE-bE);high=h/(hE-mE);vol=total/n
-  let maxC=-1,maxL=0;const half=tdData.length/2
-  let rms=0;for(let i=0;i<tdData.length;i++){const v=tdData[i]-128;rms+=v*v}
-  rms=Math.sqrt(rms/tdData.length)
-  if(rms>3){let dip=false;for(let lag=20;lag<half;lag++){let s2=0;for(let i=0;i<half;i++)s2+=(tdData[i]-128)*(tdData[i+lag]-128);if(!dip&&s2<0)dip=true;if(dip&&s2>maxC){maxC=s2;maxL=lag}if(dip&&s2<maxC*.7&&maxL>20)break}pitch=maxL>20?actx.sampleRate/maxL:0}else pitch=0
-}
-
-// ═══ WATCH ═══
 let watchData=null,watchOn=false
 async function pollWatch(){try{const r=await fetch(`${GW}/wearer/${USER}`,{signal:AbortSignal.timeout(3000)});watchData=await r.json();watchOn=watchData?.online||false}catch(e){watchOn=false}}
 
-// ═══ GATES ═══
-const gateNames=['WRATH','LUST','GLUTTONY','SLOTH','GREED','ENVY','PRIDE']
-const gateColors=['#ff1111','#ff4488','#ff8800','#44aa44','#ffcc00','#44aaff','#aa44ff']
-const gateKeys=['clench','fixate','devour','glaze','hoard','measure','project']
-let activeGate=-1,gateFlash=0,stuckGate=2 // default stuck at R2 (the gate)
-let eyeTarget={x:0,y:0},eyeExercise=false,exercisePhase=0
+// ═══ STATE ═══
+let heart=null,running=false,t=0,lastPoll=0
+let stuckGate=2,activeGate=-1,gateFlash=0
+let eyeTarget={x:0,y:0},exercisePhase=0
+const keysDown=new Set()
+addEventListener('keydown',e=>{keysDown.add(e.code);if(e.key>='1'&&e.key<='7'){stuckGate=parseInt(e.key)-1;activeGate=stuckGate;gateFlash=1}if(e.code==='Space'){e.preventDefault();gateFlash=1}})
+addEventListener('keyup',e=>keysDown.delete(e.code))
 
-// ═══ 3D IRIS GEOMETRY ═══
-let heart=null
+// ═══ BUILD SCENE ═══
 function buildScene(){
-  // petal layers at different depths
-  const petalCounts=[5,8,13,21,34]
-  for(let li=0;li<5;li++){
-    const g=new THREE.Group();g.position.z=-8-li*4
+  // ── Metatron's Cube at deep Z ──
+  const metaG=new THREE.Group();metaG.position.z=-10;metaG.userData={type:'metatron'}
+  // 13 circles of the Fruit of Life
+  const metaR=5,metaPts=[]
+  metaPts.push([0,0]) // center
+  for(let i=0;i<6;i++){const a=i*TAU/6;metaPts.push([Math.cos(a)*metaR,Math.sin(a)*metaR])} // inner 6
+  for(let i=0;i<6;i++){const a=i*TAU/6+TAU/12;metaPts.push([Math.cos(a)*metaR*Math.sqrt(3),Math.sin(a)*metaR*Math.sqrt(3)])} // outer 6
+  // circles
+  metaPts.forEach(([x,y],i)=>{
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(metaR*.4,.025,4,48),
+      new THREE.MeshBasicMaterial({color:0xaa44ff,transparent:true,opacity:.06,blending:THREE.AdditiveBlending}))
+    ring.position.set(x,y,0);metaG.add(ring)
+  })
+  // connect all 13 points
+  for(let i=0;i<metaPts.length;i++){
+    for(let j=i+1;j<metaPts.length;j++){
+      const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...metaPts[i],0),new THREE.Vector3(...metaPts[j],0)])
+      metaG.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xaa44ff,transparent:true,opacity:.05,blending:THREE.AdditiveBlending})))
+    }
+  }
+  scene.add(metaG)
+
+  // ── 7 gate-colored petal layers ──
+  const petalCounts=[5,8,13,21,34,8,13]
+  for(let li=0;li<7;li++){
+    const g=new THREE.Group();g.position.z=-6-li*2.5
     const count=petalCounts[li]
     for(let p=0;p<count;p++){
       const shape=new THREE.Shape()
-      const len=2.5+li*1,w=len*.35
+      const len=2+li*.5,w=len*.35
       shape.moveTo(0,0)
       shape.bezierCurveTo(len*.35,w*.8,len*.7,w,len,0)
       shape.bezierCurveTo(len*.7,-w,len*.35,-w*.8,0,0)
       const geo=new THREE.ShapeGeometry(shape)
-      const mat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.05,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
-      const mesh=new THREE.Mesh(geo,mat)
-      mesh.rotation.z=p*TAU/count
-      mesh.userData={petal:true,li,idx:p,count,mat}
-      g.add(mesh)
+      const mat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.08,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
+      const mesh=new THREE.Mesh(geo,mat);mesh.rotation.z=p*TAU/count
+      mesh.userData={petal:true,li,idx:p,count,mat};g.add(mesh)
     }
     scene.add(g);g.userData={type:'petals',li}
   }
 
-  // iris shutters
+  // ── 3 iris shutters ──
   for(let si=0;si<3;si++){
-    const g=new THREE.Group();g.position.z=-2-si*2
+    const g=new THREE.Group();g.position.z=-1-si*1.5
     const blades=[16,12,8][si]
     for(let b=0;b<blades;b++){
       const shape=new THREE.Shape()
-      const r=[5,6.5,8][si],ww=TAU/blades*.3
-      shape.moveTo(1,0);shape.bezierCurveTo(r*.4,r*ww,r*.75,r*ww*.4,r,0)
-      shape.bezierCurveTo(r*.75,-r*ww*.4,r*.4,-r*ww,1,0)
+      const r=[4,5.5,7][si],ww=TAU/blades*.3
+      shape.moveTo(.8,0);shape.bezierCurveTo(r*.4,r*ww,r*.75,r*ww*.4,r,0)
+      shape.bezierCurveTo(r*.75,-r*ww*.4,r*.4,-r*ww,.8,0)
       const geo=new THREE.ShapeGeometry(shape)
-      const mat=new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.06,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
+      const mat=new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.05,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
       const mesh=new THREE.Mesh(geo,mat);mesh.rotation.z=b*TAU/blades
       mesh.userData={blade:true,si,idx:b,mat};g.add(mesh)
     }
     scene.add(g);g.userData={type:'shutter',si}
   }
 
-  // halo rings
+  // ── 7 halo rings (one per gate color) ──
   for(let h=0;h<7;h++){
-    const ring=new THREE.Mesh(new THREE.TorusGeometry(2+h*1.2,.025,4,96),
-      new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.03,blending:THREE.AdditiveBlending}))
-    ring.position.z=-1+h*1.2
-    ring.userData={type:'halo',idx:h}
-    scene.add(ring)
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(1.5+h*1,.02,4,96),
+      new THREE.MeshBasicMaterial({color:new THREE.Color(GC[h]),transparent:true,opacity:.06,blending:THREE.AdditiveBlending}))
+    ring.position.z=h*.8;ring.userData={type:'halo',idx:h};scene.add(ring)
   }
 
-  // dust
-  const dC=500,dG=new THREE.BufferGeometry(),dP=new Float32Array(dC*3),dCol=new Float32Array(dC*3)
-  for(let i=0;i<dC;i++){const a=Math.random()*TAU,r=1+Math.random()*10
-    dP[i*3]=Math.cos(a)*r;dP[i*3+1]=Math.sin(a)*r;dP[i*3+2]=(Math.random()-.5)*30
-    const c=new THREE.Color().setHSL(Math.random(),.7,.5);dCol[i*3]=c.r;dCol[i*3+1]=c.g;dCol[i*3+2]=c.b}
-  dG.setAttribute('position',new THREE.BufferAttribute(dP,3))
-  dG.setAttribute('color',new THREE.BufferAttribute(dCol,3))
-  const dust=new THREE.Points(dG,new THREE.PointsMaterial({size:.1,transparent:true,opacity:.25,vertexColors:true,blending:THREE.AdditiveBlending,sizeAttenuation:true}))
-  dust.userData={type:'dust'};scene.add(dust)
+  // ── Purple swirl trails (afterimage → green) ──
+  for(let sw=0;sw<3;sw++){
+    const count=80
+    const geo=new THREE.BufferGeometry(),pos=new Float32Array(count*3)
+    for(let i=0;i<count;i++){const a=i*.15+sw*TAU/3;const r=3+i*.06;pos[i*3]=Math.cos(a)*r;pos[i*3+1]=Math.sin(a)*r;pos[i*3+2]=-2+sw*2}
+    geo.setAttribute('position',new THREE.BufferAttribute(pos,3))
+    const mat=new THREE.PointsMaterial({color:0xaa44ff,size:.15,transparent:true,opacity:.15,blending:THREE.AdditiveBlending,sizeAttenuation:true})
+    const pts=new THREE.Points(geo,mat);pts.userData={type:'swirl',idx:sw};scene.add(pts)
+  }
 
-  // heart sprite
-  const hc=document.createElement('canvas');hc.width=64;hc.height=64
-  const hx=hc.getContext('2d');hx.font='48px serif';hx.textAlign='center';hx.textBaseline='middle';hx.fillText('❤️',32,36)
-  const hTex=new THREE.CanvasTexture(hc)
-  heart=new THREE.Sprite(new THREE.SpriteMaterial({map:hTex,transparent:true,opacity:.35,blending:THREE.AdditiveBlending}))
-  heart.scale.set(1.5,1.5,1);heart.position.z=2;scene.add(heart)
+  // ── Complement color swirl trails (one per gate) ──
+  for(let g=0;g<7;g++){
+    const count=50
+    const geo=new THREE.BufferGeometry(),pos=new Float32Array(count*3)
+    for(let i=0;i<count;i++){const a=i*.2+g*TAU/7;const r=2+i*.08;pos[i*3]=Math.cos(a)*r;pos[i*3+1]=Math.sin(a)*r;pos[i*3+2]=g*.5-1}
+    geo.setAttribute('position',new THREE.BufferAttribute(pos,3))
+    const mat=new THREE.PointsMaterial({color:new THREE.Color(GCC[g]),size:.1,transparent:true,opacity:.07,blending:THREE.AdditiveBlending,sizeAttenuation:true})
+    const pts=new THREE.Points(geo,mat);pts.userData={type:'complement',idx:g};scene.add(pts)
+  }
+
+  // ── Dust cloud ──
+  const dC=600,dG=new THREE.BufferGeometry(),dP=new Float32Array(dC*3),dCol=new Float32Array(dC*3)
+  for(let i=0;i<dC;i++){const a=Math.random()*TAU,r=1+Math.random()*10;dP[i*3]=Math.cos(a)*r;dP[i*3+1]=Math.sin(a)*r;dP[i*3+2]=(Math.random()-.5)*25;const c=new THREE.Color().setHSL(Math.random(),.7,.5);dCol[i*3]=c.r;dCol[i*3+1]=c.g;dCol[i*3+2]=c.b}
+  dG.setAttribute('position',new THREE.BufferAttribute(dP,3));dG.setAttribute('color',new THREE.BufferAttribute(dCol,3))
+  scene.add(new THREE.Points(dG,new THREE.PointsMaterial({size:.1,transparent:true,opacity:.2,vertexColors:true,blending:THREE.AdditiveBlending,sizeAttenuation:true})))
+
+  // ── Heart sprite (at z=0, dead center) ──
+  const hc=document.createElement('canvas');hc.width=128;hc.height=128
+  const hx=hc.getContext('2d');hx.font='96px serif';hx.textAlign='center';hx.textBaseline='middle';hx.fillText('❤️',64,68)
+  heart=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(hc),transparent:true,opacity:.4,blending:THREE.AdditiveBlending,depthTest:false}))
+  heart.scale.set(1.8,1.8,1);heart.position.set(0,0,4);heart.renderOrder=999;scene.add(heart)
 }
-
-// ═══ KEYBOARD ═══
-const keysDown=new Set()
-addEventListener('keydown',e=>{
-  keysDown.add(e.code)
-  if(e.key>='1'&&e.key<='7'){activeGate=parseInt(e.key)-1;gateFlash=1;stuckGate=activeGate}
-  if(e.code==='Space'){e.preventDefault();gateFlash=1}
-})
-addEventListener('keyup',e=>keysDown.delete(e.code))
 
 // ═══ ANIMATE ═══
-let running=false,t=0,lastPoll=0
-
-async function init(){
-  document.getElementById('start').style.display='none'
-  initAudio();await initMic();buildScene()
-  running=true;document.documentElement.requestFullscreen?.().catch(()=>{})
-  animate()
-}
-window.init=init
-
 function animate(){
-  if(!running)return
-  requestAnimationFrame(animate)
-  t+=1/60
-  getAudio()
+  if(!running)return;requestAnimationFrame(animate);t+=1/60;getAudio()
   if(t-lastPoll>8){lastPoll=t;pollWatch()}
-
-  const voiceE=Math.min(1,vol*6)
-  const baseHue=(t*15)%360
+  const voiceE=Math.min(1,vol*6),baseHue=(t*15)%360
   gateFlash*=.95
+  drones.forEach(d=>{d.g.gain.linearRampToValueAtTime(d.bv*(.2+voiceE*.5),actx.currentTime+.3)})
 
-  // drone volumes
-  drones.forEach((d,i)=>{d.g.gain.linearRampToValueAtTime(d.bv*(.2+voiceE*.5),actx.currentTime+.3)})
+  // eye exercises
+  if(keysDown.has('ArrowLeft'))eyeTarget.x-=.06;if(keysDown.has('ArrowRight'))eyeTarget.x+=.06
+  if(keysDown.has('ArrowUp'))eyeTarget.y+=.06;if(keysDown.has('ArrowDown'))eyeTarget.y-=.06
+  eyeTarget.x*=.97;eyeTarget.y*=.97
+  if(keysDown.has('KeyE')){exercisePhase+=.02;eyeTarget.x=Math.sin(exercisePhase)*3;eyeTarget.y=Math.cos(exercisePhase*PHI)*.5}
+  if(keysDown.has('KeyC')){exercisePhase+=.015;eyeTarget.x=Math.cos(exercisePhase)*2;eyeTarget.y=Math.sin(exercisePhase)*2}
 
-  // eye exercise — arrow keys move target
-  const exSpeed=.06
-  if(keysDown.has('ArrowLeft'))eyeTarget.x-=exSpeed
-  if(keysDown.has('ArrowRight'))eyeTarget.x+=exSpeed
-  if(keysDown.has('ArrowUp'))eyeTarget.y+=exSpeed
-  if(keysDown.has('ArrowDown'))eyeTarget.y-=exSpeed
-  eyeTarget.x*=.98;eyeTarget.y*=.98 // spring back
-
-  // auto eye exercise patterns
-  if(keysDown.has('KeyE')){
-    exercisePhase+=.02
-    eyeTarget.x=Math.sin(exercisePhase)*3
-    eyeTarget.y=Math.cos(exercisePhase*PHI)*.5
-  }
-  if(keysDown.has('KeyC')){
-    exercisePhase+=.015
-    eyeTarget.x=Math.cos(exercisePhase)*2
-    eyeTarget.y=Math.sin(exercisePhase)*2
-  }
-
-  // ═══ UPDATE 3D ═══
-  const camZ=22-voiceE*8-bass*4
+  // camera — always centered on origin, eye exercises shift lookAt slightly
+  const camZ=20-voiceE*6-bass*3
   cam.position.z+=(camZ-cam.position.z)*.05
-  cam.position.x=eyeTarget.x*.5
-  cam.position.y=eyeTarget.y*.5
-  cam.lookAt(eyeTarget.x*.3,eyeTarget.y*.3,-5)
+  cam.position.x=0;cam.position.y=0
+  cam.lookAt(eyeTarget.x*.15,eyeTarget.y*.15,0)
 
+  // ═══ UPDATE SCENE ═══
   scene.traverse(obj=>{
-    const u=obj.userData
-    if(u.petal){
-      const hue=((baseHue+u.li*35+u.idx*(360/u.count))%360)/360
-      u.mat.color.setHSL(hue,.75,.4+voiceE*.2)
-      u.mat.opacity=.03+voiceE*.07+bass*.04+gateFlash*.1
-    }
+    const u=obj.userData;if(!u.type&&!u.petal&&!u.blade)return
+
+    if(u.type==='metatron'){obj.rotation.z=t*.03;obj.rotation.x=Math.sin(t*.02)*.1
+      obj.children.forEach(c=>{if(c.material)c.material.opacity=.015+voiceE*.03+gateFlash*.02})}
+
     if(u.type==='petals'){
       obj.rotation.z+=(u.li%2?-.002:.002)*(1+voiceE*3)
-      obj.position.z=-8-u.li*4+voiceE*3+Math.sin(t*.3+u.li)*1.5
+      obj.position.z=-6-u.li*2.5+voiceE*2+Math.sin(t*.3+u.li)*1
     }
+    if(u.petal){
+      // color from gate assignment
+      const gateIdx=u.li%7
+      const h=new THREE.Color(GC[gateIdx])
+      u.mat.color.lerp(h,.05)
+      const isStuck=gateIdx===stuckGate
+      u.mat.opacity=(isStuck?.1:.06)+voiceE*.08+bass*.04+gateFlash*(isStuck?.15:.05)
+    }
+
+    if(u.type==='shutter'){obj.rotation.z+=(u.si%2?1:-1)*(.003+voiceE*.02)}
     if(u.blade){
-      const dir=u.si%2?1:-1
       const hue=((baseHue+80+u.idx*12)%360)/360
       u.mat.color.setHSL(hue,.7,.35+high*.2)
-      u.mat.opacity=.04+voiceE*.08+high*.05+gateFlash*.08
+      u.mat.opacity=.04+voiceE*.07+high*.04+gateFlash*.06
     }
-    if(u.type==='shutter')obj.rotation.z+=(u.si%2?1:-1)*(.003+voiceE*.025)
+
     if(u.type==='halo'){
-      const hue=((baseHue+u.idx*50)%360)/360
-      obj.material.color.setHSL(hue,.8,.55)
-      obj.material.opacity=.02+voiceE*.05+gateFlash*.03
-      obj.position.z=-1+u.idx*1.2+Math.sin(t*.5+u.idx)*(1+voiceE*2)
-      obj.rotation.x=Math.sin(t*.15+u.idx)*.15
+      const ring=obj
+      ring.material.opacity=.02+voiceE*.04+(u.idx===stuckGate?.04:0)+gateFlash*.02
+      ring.position.z=u.idx*.8+Math.sin(t*.4+u.idx)*(1+voiceE*1.5)
+      ring.rotation.x=Math.sin(t*.12+u.idx)*.12
+      ring.rotation.y=Math.cos(t*.1+u.idx)*.1
     }
-    if(u.type==='dust'){
+
+    if(u.type==='swirl'){
+      obj.rotation.z+=.008*(1+voiceE*2)
+      obj.rotation.x=Math.sin(t*.3+u.idx)*.15
       const pp=obj.geometry.attributes.position.array
-      const pc=obj.geometry.attributes.color.array
       for(let i=0;i<pp.length/3;i++){
-        pp[i*3+2]+=.015+voiceE*.08
-        if(pp[i*3+2]>20)pp[i*3+2]=-20
-        const hue=((baseHue+i)%360)/360
-        const c=new THREE.Color().setHSL(hue,.7,.5)
-        pc[i*3]=c.r;pc[i*3+1]=c.g;pc[i*3+2]=c.b
+        const a=i*.15+u.idx*TAU/3+t*.5
+        const r=3+i*.06+Math.sin(t+i*.1)*.3*voiceE
+        pp[i*3]=Math.cos(a)*r;pp[i*3+1]=Math.sin(a)*r
       }
       obj.geometry.attributes.position.needsUpdate=true
-      obj.geometry.attributes.color.needsUpdate=true
-      obj.material.opacity=.15+voiceE*.25
+      obj.material.opacity=.06+voiceE*.1+gateFlash*.08
+    }
+
+    if(u.type==='complement'){
+      obj.rotation.z-=.005*(1+voiceE)
+      const isStuckComp=u.idx===stuckGate
+      obj.material.opacity=isStuckComp?.06+voiceE*.08:.02+voiceE*.03
+      const pp=obj.geometry.attributes.position.array
+      for(let i=0;i<pp.length/3;i++){
+        const a=i*.2+u.idx*TAU/7-t*.3
+        const r=2+i*.08+Math.sin(t*.7+i*.15)*.4
+        pp[i*3]=Math.cos(a)*r;pp[i*3+1]=Math.sin(a)*r
+      }
+      obj.geometry.attributes.position.needsUpdate=true
     }
   })
 
   if(heart){
-    const hp=1+Math.sin(t*3)*.1+voiceE*.3+gateFlash*.5
-    heart.scale.set(hp*1.5,hp*1.5,1)
-    heart.material.opacity=.25+voiceE*.3+gateFlash*.3
+    const hp=1+Math.sin(t*3)*.08+voiceE*.25+gateFlash*.4
+    heart.scale.set(hp*1.8,hp*1.8,1)
+    heart.material.opacity=.3+voiceE*.3+gateFlash*.3
   }
 
-  const bgL=.003+voiceE*.01
-  scene.background.setHSL(baseHue/360,.3,bgL)
-  cam.fov=50+Math.sin(t*TAU/5)*2;cam.updateProjectionMatrix()
+  scene.background.setHSL(baseHue/360,.2,.003+voiceE*.008)
+  cam.fov=50+Math.sin(t*TAU/5)*1.5
 
-  // ═══ RENDER TWO EYES ═══
-  const halfW=Math.floor(W/2)
-  const eyeGap=12
-  const vw=halfW-eyeGap
+  // ═══ RENDER TWO EYES (centered) ═══
+  const halfW=Math.floor(W/2),gap=8,vw=halfW-gap
   cam.aspect=vw/H;cam.updateProjectionMatrix()
+  // left eye — tiny offset for parallax only
+  cam.position.x=-.6;R.setViewport(0,0,vw,H);R.setScissor(0,0,vw,H);R.render(scene,cam)
+  // right eye
+  cam.position.x=.6;R.setViewport(halfW+gap,0,vw,H);R.setScissor(halfW+gap,0,vw,H);R.render(scene,cam)
+  cam.position.x=0
 
-  const cx0=cam.position.x
-  cam.position.x=cx0-.8
-  R.setViewport(0,0,vw,H);R.setScissor(0,0,vw,H);R.render(scene,cam)
-  cam.position.x=cx0+.8
-  R.setViewport(halfW+eyeGap,0,vw,H);R.setScissor(halfW+eyeGap,0,vw,H);R.render(scene,cam)
-  cam.position.x=cx0
+  // ═══ 2D OVERLAY ═══
+  // fading trail for afterimage effect
+  ox.fillStyle='rgba(0,0,0,.06)';ox.fillRect(0,0,W,H)
+  const lx=vw/2,rx=halfW+gap+vw/2,ey=H/2
+  const irisR=Math.min(vw,H)*.38
 
-  // ═══ 2D OVERLAY — resonance bridge, gates, exercises ═══
-  ox.clearRect(0,0,W,H)
-  const lx=W/4,rx=W*3/4,ey=H/2
-  const irisR=Math.min(vw,H)*.35
-
-  // resonance waves between eyes
-  const bridgeX1=halfW-eyeGap,bridgeX2=halfW+eyeGap
-  const bridgeMid=W/2
-  ox.save()
-  for(let w=0;w<8;w++){
-    const phase=t*2+w*.4
-    const amp=5+voiceE*15+Math.sin(t+w)*3
-    const freq=3+w*.5
+  // resonance bridge — sine waves between eyes
+  for(let w=0;w<10;w++){
+    const phase=t*2+w*.35,amp=4+voiceE*12+Math.sin(t+w)*2,freq=3+w*.4
     ox.beginPath()
-    for(let y=ey-irisR;y<=ey+irisR;y+=2){
-      const yNorm=(y-ey)/irisR
-      const env=1-yNorm*yNorm
-      const wave=Math.sin(yNorm*freq+phase)*amp*env
-      const x=bridgeMid+wave
-      y===ey-irisR?ox.moveTo(x,y):ox.lineTo(x,y)
+    for(let y=ey-irisR*.8;y<=ey+irisR*.8;y+=2){
+      const yn=(y-ey)/(irisR*.8),env=1-yn*yn
+      const x=W/2+Math.sin(yn*freq+phase)*amp*env
+      y===ey-irisR*.8?ox.moveTo(x,y):ox.lineTo(x,y)
     }
-    const hue=(baseHue+w*45)%360
-    ox.strokeStyle=`hsla(${hue},70%,55%,${.04+voiceE*.08+gateFlash*.1})`
-    ox.lineWidth=1.5+voiceE*2
-    ox.stroke()
-  }
-  ox.restore()
-
-  // resonance circles expanding from bridge center
-  for(let rc=0;rc<5;rc++){
-    const rPhase=(t*.5+rc*.2)%1
-    const rr=rPhase*irisR*.6
-    const rAlpha=(1-rPhase)*(.05+voiceE*.1)
-    ox.beginPath();ox.arc(bridgeMid,ey,rr,0,TAU)
-    ox.strokeStyle=`hsla(${(baseHue+rc*72)%360},70%,55%,${rAlpha})`
-    ox.lineWidth=2*(1-rPhase)
-    ox.stroke()
+    ox.strokeStyle=`hsla(${(baseHue+w*36)%360},70%,55%,${.03+voiceE*.06})`
+    ox.lineWidth=1.5+voiceE*1.5;ox.stroke()
   }
 
-  // ═══ GATE NUMBERS as optical illusions ═══
-  const gateR=irisR*.85
+  // resonance expand circles
+  for(let rc=0;rc<4;rc++){
+    const rp=(t*.4+rc*.25)%1,rr=rp*irisR*.5
+    ox.beginPath();ox.arc(W/2,ey,rr,0,TAU)
+    ox.strokeStyle=`hsla(${(baseHue+rc*90)%360},60%,50%,${(1-rp)*(.03+voiceE*.06)})`
+    ox.lineWidth=1.5*(1-rp);ox.stroke()
+  }
+
+  // gate numbers around both irises
   for(let g=0;g<7;g++){
     const angle=g*TAU/7-Math.PI/2
     const isStuck=g===stuckGate
-    const isActive=g===activeGate
-
-    // draw on both eyes
     ;[lx,rx].forEach(ex=>{
-      const gx=ex+Math.cos(angle)*gateR*(isActive?.9+Math.sin(t*8)*.1:.9)
-      const gy=ey+Math.sin(angle)*gateR*(isActive?.9+Math.cos(t*8)*.1:.9)
+      const gr=irisR*.88
+      const gx=ex+Math.cos(angle)*gr,gy=ey+Math.sin(angle)*gr
 
-      // gate ring segment
-      ox.beginPath()
-      ox.arc(ex,ey,gateR,angle-.15,angle+.15)
-      ox.strokeStyle=isStuck?gateColors[g]+'cc':gateColors[g]+'22'
-      ox.lineWidth=isStuck?3+Math.sin(t*4)*2:1
-      ox.stroke()
+      // gate arc
+      ox.beginPath();ox.arc(ex,ey,gr,angle-.12,angle+.12)
+      ox.strokeStyle=isStuck?GC[g]+'99':GC[g]+'15'
+      ox.lineWidth=isStuck?2.5+Math.sin(t*4)*.8:1;ox.stroke()
 
-      // gate number — illusion style (afterimage trick)
-      ox.save()
-      ox.translate(gx,gy)
-      ox.rotate(angle+Math.PI/2)
-
+      // complement arc (afterimage)
       if(isStuck){
-        // stuck gate: pulsing, larger, with glow
-        ox.shadowColor=gateColors[g]
-        ox.shadowBlur=10+Math.sin(t*3)*5
-        ox.font=`bold ${12+Math.sin(t*4)*3}px monospace`
-        ox.fillStyle=gateColors[g]+'aa'
-        ox.textAlign='center';ox.textBaseline='middle'
-        ox.fillText(g+1,0,0)
-        ox.font='6px monospace'
-        ox.fillStyle=gateColors[g]+'44'
-        ox.fillText(gateKeys[g],0,10)
-        ox.shadowBlur=0
+        ox.beginPath();ox.arc(ex,ey,gr+3,angle-.1,angle+.1)
+        ox.strokeStyle=GCC[g]+'25';ox.lineWidth=4;ox.stroke()
+      }
+
+      // number
+      ox.save();ox.translate(gx,gy);ox.rotate(angle+Math.PI/2)
+      if(isStuck){
+        ox.shadowColor=GC[g];ox.shadowBlur=8+Math.sin(t*3)*4
+        ox.font=`bold ${11+Math.sin(t*4)*2}px monospace`
+        ox.fillStyle=GC[g]+'bb';ox.textAlign='center';ox.textBaseline='middle'
+        ox.fillText(`R${g}`,0,0);ox.shadowBlur=0
       } else {
-        // other gates: faint, illusion-like
-        ox.font='9px monospace'
-        ox.fillStyle=gateColors[g]+'15'
-        ox.textAlign='center';ox.textBaseline='middle'
-        ox.fillText(g+1,0,0)
+        ox.font='8px monospace';ox.fillStyle=GC[g]+'18'
+        ox.textAlign='center';ox.textBaseline='middle';ox.fillText(g+1,0,0)
       }
       ox.restore()
     })
   }
 
-  // stuck gate indicator in bridge
+  // stuck gate label in bridge
   if(stuckGate>=0){
-    ox.save()
-    ox.translate(bridgeMid,ey-irisR*.5)
-    ox.font='8px monospace'
-    ox.fillStyle=gateColors[stuckGate]+'55'
-    ox.textAlign='center'
-    ox.fillText(`R${stuckGate} · ${gateNames[stuckGate]}`,0,0)
-    ox.font='6px monospace'
-    ox.fillStyle=gateColors[stuckGate]+'30'
-    ox.fillText(`stuck: ${gateKeys[stuckGate]}`,0,12)
-    ox.fillText('press 1-7 to change',0,22)
-    ox.restore()
+    ox.font='7px monospace';ox.fillStyle=GC[stuckGate]+'44';ox.textAlign='center'
+    ox.fillText(`R${stuckGate} · ${GN[stuckGate]}`,W/2,ey-irisR*.45)
+    ox.fillStyle=GCC[stuckGate]+'22';ox.fillText('complement: '+GCC[stuckGate],W/2,ey-irisR*.45+10)
   }
 
-  // eye exercise target dot
-  if(eyeTarget.x!==0||eyeTarget.y!==0){
+  // eye exercise target
+  if(Math.abs(eyeTarget.x)>.01||Math.abs(eyeTarget.y)>.01){
     ;[lx,rx].forEach(ex=>{
-      const tx=ex+eyeTarget.x*irisR*.3
-      const ty=ey-eyeTarget.y*irisR*.3
-      ox.beginPath();ox.arc(tx,ty,4+Math.sin(t*5)*2,0,TAU)
-      ox.fillStyle=`hsla(${baseHue},80%,60%,.4)`
-      ox.fill()
-      // trail
-      for(let tr=1;tr<=3;tr++){
-        const trx=ex+eyeTarget.x*irisR*.3*(.7+tr*.1)
-        const try2=ey-eyeTarget.y*irisR*.3*(.7+tr*.1)
-        ox.beginPath();ox.arc(trx,try2,2,0,TAU)
-        ox.fillStyle=`hsla(${baseHue},70%,50%,${.1/tr})`
-        ox.fill()
-      }
+      const tx=ex+eyeTarget.x*irisR*.25,ty=ey-eyeTarget.y*irisR*.25
+      ox.beginPath();ox.arc(tx,ty,3+Math.sin(t*5)*1.5,0,TAU)
+      ox.fillStyle=`hsla(${baseHue},80%,60%,.35)`;ox.fill()
     })
   }
 
   // HUD
   const hr=watchData?.hr,hrv=watchData?.hrv
-  document.getElementById('hud').textContent=
-    `IRIS DEEP\n`+
-    `vol:${(vol*100).toFixed(0)} b:${(bass*100).toFixed(0)} m:${(mid*100).toFixed(0)} h:${(high*100).toFixed(0)}\n`+
-    `pitch:${pitch>20?pitch.toFixed(0)+'Hz':'--'} z:${cam.position.z.toFixed(1)}\n`+
-    `HR:${hr!=null?hr.toFixed(0):'--'} HRV:${hrv!=null?hrv.toFixed(1):'--'} ${watchOn?'●':'○'}`
-
-  document.getElementById('keys').textContent=
-    `1-7: select gate\n`+
-    `arrows: eye exercise\n`+
-    `E: horizontal sweep\n`+
-    `C: circular sweep\n`+
-    `space: pulse`
+  document.getElementById('hud').textContent=`IRIS DEEP · METATRON\nvol:${(vol*100).toFixed(0)} b:${(bass*100).toFixed(0)} m:${(mid*100).toFixed(0)} h:${(high*100).toFixed(0)}\npitch:${pitch>20?pitch.toFixed(0)+'Hz':'--'} z:${cam.position.z.toFixed(1)}\nHR:${hr!=null?hr.toFixed(0):'--'} HRV:${hrv!=null?hrv.toFixed(1):'--'} ${watchOn?'●':'○'}`
+  document.getElementById('keys').textContent=`1-7: gate (R${stuckGate})\narrows: exercise\nE: sweep C: circle\nspace: pulse`
 }
 
-addEventListener('resize',()=>{W=innerWidth;H=innerHeight;R.setSize(W,H);ov.width=W;ov.height=H})
+async function init(){document.getElementById('start').style.display='none';initAudio();await initMic();buildScene();running=true;document.documentElement.requestFullscreen?.().catch(()=>{});animate()}
+window.init=init
+addEventListener('resize',()=>{W=innerWidth;H=innerHeight;R.setSize(W,H);ovCv.width=W;ovCv.height=H})
 </script>
 </body></html>
