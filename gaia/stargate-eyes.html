@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>STARGATE EYES — 7-Ring Lightning Iris</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#050510;overflow:hidden;cursor:none}
+canvas{display:block;position:fixed;top:0;left:0}
+#start{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#050510;cursor:pointer;gap:10px}
+#start span{font:16px/1 monospace;color:rgba(120,180,255,.5);letter-spacing:8px;border:1px solid rgba(100,160,255,.15);padding:16px 36px;border-radius:6px}
+#start span:hover{color:rgba(160,210,255,.8);border-color:rgba(100,160,255,.4);box-shadow:0 0 40px rgba(80,140,255,.15)}
+#start small{font:8px monospace;color:rgba(100,160,255,.15);letter-spacing:2px}
+#hud{position:fixed;top:8px;left:10px;z-index:10;font:7px/1.6 monospace;color:rgba(140,180,220,.2);pointer-events:none;white-space:pre}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start" onclick="go()">
+  <span>STARGATE EYES</span>
+  <small>7 RINGS · OPPOSING ROTATION · LIGHTNING FREQUENCY SPLIT</small>
+</div>
+<div id="hud"></div>
+
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H;function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight}
+resize();addEventListener('resize',resize)
+
+// 7 gate rings — colors from the spectrum, each a frequency band
+const rings=[
+  {name:'R0',color:'hsl(0,80%,50%)',glow:'hsl(0,90%,70%)',freq:55,prime:2,label:'ROOT'},
+  {name:'R1',color:'hsl(30,85%,50%)',glow:'hsl(30,90%,70%)',freq:82,prime:3,label:'VAGUS'},
+  {name:'R2',color:'hsl(55,90%,50%)',glow:'hsl(55,95%,70%)',freq:110,prime:5,label:'GATE'},
+  {name:'R3',color:'hsl(120,70%,45%)',glow:'hsl(120,80%,65%)',freq:147,prime:7,label:'HEART'},
+  {name:'R4',color:'hsl(200,80%,50%)',glow:'hsl(200,90%,70%)',freq:196,prime:11,label:'VOICE'},
+  {name:'R5',color:'hsl(260,75%,55%)',glow:'hsl(260,85%,70%)',freq:262,prime:13,label:'LENS'},
+  {name:'R6',color:'hsl(300,70%,55%)',glow:'hsl(300,80%,70%)',freq:330,prime:17,label:'CROWN'}
+]
+
+// ═══ AUDIO ═══
+let actx,analyser,fftData,tdData
+let bass=0,mid=0,high=0,vol=0
+let bands=new Float32Array(7) // energy per ring band
+
+async function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  analyser=actx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=.7
+  fftData=new Uint8Array(analyser.frequencyBinCount);tdData=new Uint8Array(analyser.fftSize)
+  try{const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});actx.createMediaStreamSource(s).connect(analyser)}catch(e){}
+}
+
+function getAudio(){
+  if(!analyser)return
+  analyser.getByteFrequencyData(fftData)
+  const n=fftData.length;let tot=0
+  const bE=Math.floor(n*.04),mE=Math.floor(n*.2),hE=Math.floor(n*.5)
+  let b=0,m=0,h=0
+  for(let i=0;i<n;i++){const v=fftData[i]/255;tot+=v;if(i<bE)b+=v;else if(i<mE)m+=v;else if(i<hE)h+=v}
+  bass=b/Math.max(1,bE);mid=m/Math.max(1,mE-bE);high=h/Math.max(1,hE-mE);vol=tot/n
+  // split into 7 bands for rings
+  const bandSize=Math.floor(n/7)
+  for(let i=0;i<7;i++){
+    let sum=0;for(let j=i*bandSize;j<(i+1)*bandSize&&j<n;j++)sum+=fftData[j]/255
+    bands[i]=sum/bandSize
+  }
+}
+
+// ═══ BLITZORTUNG ═══
+let lFlash=0,strikeRate=0,strikeCount=0,wsOk=false,strikeTimes=[]
+function lzwDec(b){try{const e={};let d=[...b],c=d[0],f=c,g=[c],h=256,o=h;for(let i=1;i<d.length;i++){let a=d[i].charCodeAt(0);a=h>a?d[i]:e[a]||f+c;g.push(a);c=a[0];e[o]=f+c;o++;f=a}return g.join('')}catch(x){return''}}
+function connectWS(){
+  try{const ws=new WebSocket('wss://ws1.blitzortung.org');ws.onopen=()=>{ws.send('{"a":111}');wsOk=true};ws.onmessage=e=>{try{let d;try{d=JSON.parse(e.data)}catch(x){try{d=JSON.parse(lzwDec(e.data))}catch(x2){return}};if(d.lat!==undefined){strikeCount++;lFlash=Math.min(lFlash+.5,1);strikeTimes.push(Date.now())}}catch(x){}};ws.onclose=()=>{wsOk=false;setTimeout(connectWS,5000)};ws.onerror=()=>wsOk=false}catch(e){}
+  setInterval(()=>{const now=Date.now();strikeTimes=strikeTimes.filter(s=>now-s<10000);strikeRate=strikeTimes.length/10},2000)
+}
+
+// ═══ LIGHTNING BOLT ═══
+function bolt(x1,y1,x2,y2,depth,jitter){
+  if(depth<=0)return[[x1,y1,x2,y2]]
+  const mx=(x1+x2)/2+(Math.random()-.5)*jitter,my=(y1+y2)/2+(Math.random()-.5)*jitter
+  const s=[...bolt(x1,y1,mx,my,depth-1,jitter*.55),...bolt(mx,my,x2,y2,depth-1,jitter*.55)]
+  if(depth>2&&Math.random()<.25){const bx=mx+(Math.random()-.5)*jitter*.7,by=my+(Math.random()-.5)*jitter*.7;s.push(...bolt(mx,my,bx,by,depth-2,jitter*.4))}
+  return s
+}
+
+function drawBolt(segs,color,w,a){
+  ctx.strokeStyle=color;ctx.lineWidth=w;ctx.globalAlpha=a;ctx.lineCap='round'
+  ctx.beginPath();segs.forEach(([x1,y1,x2,y2])=>{ctx.moveTo(x1,y1);ctx.lineTo(x2,y2)});ctx.stroke()
+}
+
+// ═══ DRAW ONE STARGATE EYE ═══
+function drawEye(cx,cy,maxR,t,mirror){
+  const dir=mirror?-1:1
+
+  // outer dark ring
+  ctx.beginPath();ctx.arc(cx,cy,maxR*1.05,0,TAU)
+  ctx.strokeStyle='rgba(20,20,40,.8)';ctx.lineWidth=maxR*.1;ctx.globalAlpha=1;ctx.stroke()
+
+  // 7 concentric rings — each with opposing rotation, ring-specific color, bolts at chevron points
+  for(let ri=6;ri>=0;ri--){
+    const r=rings[ri]
+    const innerR=maxR*(.15+ri*.11)
+    const outerR=innerR+maxR*.1
+    const midR=(innerR+outerR)/2
+    const ringWidth=outerR-innerR
+    const rotSpeed=(.02+ri*.008)*(ri%2?1:-1)*dir
+    const rot=t*rotSpeed
+    const bandEnergy=bands[ri]||0
+    const intensity=.3+bandEnergy*.7+lFlash*.2
+
+    // ring background arc
+    ctx.beginPath();ctx.arc(cx,cy,midR,0,TAU)
+    ctx.strokeStyle=r.color;ctx.lineWidth=ringWidth;ctx.globalAlpha=.08+intensity*.07
+    ctx.stroke()
+
+    // spinning segments with gaps (stargate chevrons)
+    const segments=r.prime
+    const segArc=TAU/segments*.7
+    const gapArc=TAU/segments*.3
+    for(let s=0;s<segments;s++){
+      const startA=s*TAU/segments+rot
+      // segment arc
+      ctx.beginPath();ctx.arc(cx,cy,midR,startA,startA+segArc)
+      ctx.strokeStyle=r.color;ctx.lineWidth=ringWidth*.8
+      ctx.globalAlpha=.15+intensity*.2+Math.sin(t*3+s+ri)*.03
+      ctx.stroke()
+
+      // glow on segment
+      ctx.beginPath();ctx.arc(cx,cy,midR,startA,startA+segArc)
+      ctx.strokeStyle=r.glow;ctx.lineWidth=ringWidth*.3
+      ctx.globalAlpha=.05+intensity*.1
+      ctx.stroke()
+
+      // chevron point (bolt origin)
+      const chevA=startA+segArc/2
+      const chevX=cx+Math.cos(chevA)*midR,chevY=cy+Math.sin(chevA)*midR
+
+      // lightning bolt from chevron toward center
+      if(intensity>.15){
+        const boltLen=midR*.3+bandEnergy*midR*.4
+        const boltEndX=cx+Math.cos(chevA)*(midR-boltLen)
+        const boltEndY=cy+Math.sin(chevA)*(midR-boltLen)
+        const boltSegs=bolt(chevX,chevY,boltEndX,boltEndY,4,boltLen*.35+lFlash*10)
+        drawBolt(boltSegs,r.glow,2,.06+intensity*.12)
+        drawBolt(boltSegs,'rgba(255,255,255,.9)',1,.04+intensity*.08)
+      }
+
+      // chevron marker dot
+      ctx.beginPath();ctx.arc(chevX,chevY,2+intensity*2,0,TAU)
+      ctx.fillStyle=r.glow;ctx.globalAlpha=.2+intensity*.3;ctx.fill()
+    }
+
+    // ring label (tiny, at 12 o'clock position)
+    const labelA=rot
+    const lx=cx+Math.cos(labelA)*(midR),ly=cy+Math.sin(labelA)*(midR)
+    ctx.save();ctx.translate(lx,ly);ctx.rotate(labelA+Math.PI/2)
+    ctx.font='5px monospace';ctx.fillStyle=r.glow;ctx.globalAlpha=.15+intensity*.1
+    ctx.textAlign='center';ctx.fillText(r.label,0,0)
+    ctx.restore()
+  }
+
+  // inner event horizon (dark center)
+  const ehR=maxR*.14
+  const ehGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,ehR*1.5)
+  ehGrad.addColorStop(0,'rgba(0,0,5,.98)')
+  ehGrad.addColorStop(.6,'rgba(0,0,10,.95)')
+  ehGrad.addColorStop(1,'rgba(10,15,30,.3)')
+  ctx.beginPath();ctx.arc(cx,cy,ehR*1.5,0,TAU)
+  ctx.fillStyle=ehGrad;ctx.globalAlpha=1;ctx.fill()
+
+  // ❤️ at absolute center
+  ctx.globalAlpha=.35+vol*.25+lFlash*.15
+  const heartSize=Math.floor(ehR*.8)+2
+  ctx.font=`${heartSize}px serif`;ctx.textAlign='center';ctx.textBaseline='middle'
+  ctx.fillText('❤️',cx,cy+1)
+
+  // central bolt burst (from center outward when active)
+  if(vol>.02||lFlash>.1){
+    const burstCount=7
+    for(let b=0;b<burstCount;b++){
+      const ba=b*TAU/burstCount+t*.5*dir
+      const bLen=ehR+vol*maxR*.3+lFlash*maxR*.15
+      const bSegs=bolt(cx,cy,cx+Math.cos(ba)*bLen,cy+Math.sin(ba)*bLen,4,bLen*.3)
+      const bHue=(b/burstCount*360)|0
+      drawBolt(bSegs,`hsla(${bHue},70%,70%,1)`,2,.08+vol*.15+lFlash*.1)
+      drawBolt(bSegs,`hsla(${bHue},80%,90%,1)`,1,.05+vol*.1+lFlash*.08)
+    }
+  }
+
+  // specular catchlight
+  ctx.beginPath();ctx.arc(cx-maxR*.1,cy-maxR*.12,maxR*.03,0,TAU)
+  ctx.fillStyle='rgba(200,220,255,.3)';ctx.globalAlpha=.4;ctx.fill()
+}
+
+// ═══ RESONANCE BRIDGE ═══
+function drawBridge(lx,rx,y,r,t2){
+  ctx.globalAlpha=.08+lFlash*.12+vol*.08
+  for(let h=0;h<7;h++){
+    const harmonic=h+1
+    ctx.beginPath()
+    for(let x=lx+r*.9;x<=rx-r*.9;x+=2){
+      const frac=(x-lx-r*.9)/(rx-lx-r*1.8)
+      const env=Math.sin(frac*Math.PI)
+      const wave=Math.sin(frac*Math.PI*harmonic+t2*7.83*.3)*r*.08*env*(1+bands[h]*.5)
+      const py=y+wave+(h-3)*4
+      x<=lx+r*.9+2?ctx.moveTo(x,py):ctx.lineTo(x,py)
+    }
+    const hsl=rings[h].color
+    ctx.strokeStyle=rings[h].glow;ctx.lineWidth=1.5+bands[h]*2+lFlash;ctx.stroke()
+  }
+  // connecting bolts between eyes on flash
+  if(lFlash>.3){
+    const bSegs=bolt(lx+r*.7,y,rx-r*.7,y,5,(rx-lx-r*1.4)*.2)
+    drawBolt(bSegs,'rgba(180,200,255,.8)',2,lFlash*.15)
+    drawBolt(bSegs,'rgba(240,245,255,.9)',1,lFlash*.2)
+  }
+}
+
+// ═══ MAIN LOOP ═══
+let running=false,t=0
+
+function go(){
+  document.getElementById('start').style.display='none'
+  initAudio();connectWS();running=true
+  document.documentElement.requestFullscreen?.().catch(()=>{})
+  loop()
+}
+window.go=go
+
+function loop(){
+  if(!running)return
+  requestAnimationFrame(loop)
+  t+=1/60;getAudio();lFlash*=.92
+
+  // background — dark blue-black with lightning flash
+  ctx.globalAlpha=.2+lFlash*.2
+  ctx.fillStyle=`hsl(225,25%,${3+lFlash*6}%)`
+  ctx.fillRect(0,0,W,H)
+
+  const eyeR=Math.min(W*.19,H*.38)
+  const spacing=eyeR*2.7
+  const lx=W/2-spacing/2,rx=W/2+spacing/2,ey=H/2
+
+  // radial gradient backdrop per eye
+  ;[lx,rx].forEach((ex,ei)=>{
+    const grad=ctx.createRadialGradient(ex,ey,eyeR*.1,ex,ey,eyeR*1.3)
+    grad.addColorStop(0,`hsla(${ei?270:210},30%,20%,.15)`)
+    grad.addColorStop(.5,`hsla(${ei?270:210},20%,10%,.1)`)
+    grad.addColorStop(1,'rgba(0,0,0,0)')
+    ctx.fillStyle=grad;ctx.globalAlpha=1;ctx.fillRect(ex-eyeR*1.5,ey-eyeR*1.5,eyeR*3,eyeR*3)
+  })
+
+  // resonance bridge
+  drawBridge(lx,rx,ey,eyeR,t)
+
+  // eyes — left normal, right mirrored rotation
+  drawEye(lx,ey,eyeR,t,false)
+  drawEye(rx,ey,eyeR,t,true)
+
+  // lightning flash full-screen overlay
+  if(lFlash>.15){
+    ctx.globalAlpha=lFlash*.06
+    ctx.fillStyle='hsl(210,40%,80%)';ctx.fillRect(0,0,W,H)
+  }
+
+  // vignette
+  ctx.globalAlpha=1
+  const vig=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.35,W/2,H/2,Math.max(W,H)*.65)
+  vig.addColorStop(0,'rgba(0,0,0,0)');vig.addColorStop(1,'rgba(0,0,10,.75)')
+  ctx.fillStyle=vig;ctx.fillRect(0,0,W,H)
+
+  // HUD
+  document.getElementById('hud').textContent=
+    `STARGATE EYES · 7 RINGS\n`+
+    `vol:${(vol*100).toFixed(0)} bass:${(bass*100).toFixed(0)} mid:${(mid*100).toFixed(0)}\n`+
+    `⚡ ${wsOk?'LIVE':'...'} ${strikeRate.toFixed(1)}/s ${strikeCount} strikes\n`+
+    `bands: ${[...bands].map(b=>'█'.repeat(Math.min(5,Math.floor(b*5)))).join(' ')}`
+}
+</script>
+</body></html>
