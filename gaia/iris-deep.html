@@ -40,7 +40,7 @@ const glCv=document.getElementById('gl')
 const R=new THREE.WebGLRenderer({canvas:glCv,antialias:true})
 R.setSize(W,H);R.setPixelRatio(Math.min(devicePixelRatio,2))
 R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.5;R.setScissorTest(true)
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x000000)
+const scene=new THREE.Scene()
 const cam=new THREE.PerspectiveCamera(50,1,.1,500);cam.position.set(0,0,20)
 
 const ovCv=document.getElementById('ov'),ox=ovCv.getContext('2d')
@@ -84,8 +84,26 @@ addEventListener('keyup',e=>keysDown.delete(e.code))
 
 // ═══ BUILD SCENE ═══
 function buildScene(){
-  // ── Metatron's Cube at deep Z ──
-  const metaG=new THREE.Group();metaG.position.z=-10;metaG.userData={type:'metatron'}
+  // ── Dynamic background sphere (radial gradient) ──
+  const bgGeo=new THREE.SphereGeometry(80,32,32)
+  const bgMat=new THREE.ShaderMaterial({
+    side:THREE.BackSide,transparent:false,
+    uniforms:{time:{value:0},gate:{value:2},gateColor:{value:new THREE.Color(GC[2])}},
+    vertexShader:`varying vec3 vPos;void main(){vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`varying vec3 vPos;uniform float time;uniform int gate;uniform vec3 gateColor;
+      void main(){
+        float d=length(vPos.xy)/80.;
+        float pulse=sin(time*.3)*.02;
+        vec3 center=gateColor*.08+pulse;
+        vec3 edge=vec3(.01,.01,.02);
+        vec3 col=mix(center,edge,smoothstep(0.,.8,d));
+        col+=vec3(.015,.01,.025)*sin(d*20.+time*.5)*.5;
+        gl_FragColor=vec4(col,1.);}`
+  })
+  const bgSphere=new THREE.Mesh(bgGeo,bgMat);bgSphere.userData={type:'bg',mat:bgMat};scene.add(bgSphere)
+
+  // ── Metatron's Cube ──
+  const metaG=new THREE.Group();metaG.position.z=-5;metaG.userData={type:'metatron'}
   // 13 circles of the Fruit of Life
   const metaR=5,metaPts=[]
   metaPts.push([0,0]) // center
@@ -93,15 +111,15 @@ function buildScene(){
   for(let i=0;i<6;i++){const a=i*TAU/6+TAU/12;metaPts.push([Math.cos(a)*metaR*Math.sqrt(3),Math.sin(a)*metaR*Math.sqrt(3)])} // outer 6
   // circles
   metaPts.forEach(([x,y],i)=>{
-    const ring=new THREE.Mesh(new THREE.TorusGeometry(metaR*.4,.025,4,48),
-      new THREE.MeshBasicMaterial({color:0xaa44ff,transparent:true,opacity:.06,blending:THREE.AdditiveBlending}))
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(metaR*.4,.03,6,48),
+      new THREE.MeshBasicMaterial({color:0xaa44ff,transparent:true,opacity:.12,blending:THREE.AdditiveBlending}))
     ring.position.set(x,y,0);metaG.add(ring)
   })
   // connect all 13 points
   for(let i=0;i<metaPts.length;i++){
     for(let j=i+1;j<metaPts.length;j++){
       const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...metaPts[i],0),new THREE.Vector3(...metaPts[j],0)])
-      metaG.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xaa44ff,transparent:true,opacity:.05,blending:THREE.AdditiveBlending})))
+      metaG.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xaa44ff,transparent:true,opacity:.1})))
     }
   }
   scene.add(metaG)
@@ -109,7 +127,7 @@ function buildScene(){
   // ── 7 gate-colored petal layers ──
   const petalCounts=[5,8,13,21,34,8,13]
   for(let li=0;li<7;li++){
-    const g=new THREE.Group();g.position.z=-6-li*2.5
+    const g=new THREE.Group();g.position.z=-2-li*1.5
     const count=petalCounts[li]
     for(let p=0;p<count;p++){
       const shape=new THREE.Shape()
@@ -118,7 +136,7 @@ function buildScene(){
       shape.bezierCurveTo(len*.35,w*.8,len*.7,w,len,0)
       shape.bezierCurveTo(len*.7,-w,len*.35,-w*.8,0,0)
       const geo=new THREE.ShapeGeometry(shape)
-      const mat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.08,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
+      const mat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.15,side:THREE.DoubleSide})
       const mesh=new THREE.Mesh(geo,mat);mesh.rotation.z=p*TAU/count
       mesh.userData={petal:true,li,idx:p,count,mat};g.add(mesh)
     }
@@ -127,7 +145,7 @@ function buildScene(){
 
   // ── 3 iris shutters ──
   for(let si=0;si<3;si++){
-    const g=new THREE.Group();g.position.z=-1-si*1.5
+    const g=new THREE.Group();g.position.z=-.5-si*1
     const blades=[16,12,8][si]
     for(let b=0;b<blades;b++){
       const shape=new THREE.Shape()
@@ -135,7 +153,7 @@ function buildScene(){
       shape.moveTo(.8,0);shape.bezierCurveTo(r*.4,r*ww,r*.75,r*ww*.4,r,0)
       shape.bezierCurveTo(r*.75,-r*ww*.4,r*.4,-r*ww,.8,0)
       const geo=new THREE.ShapeGeometry(shape)
-      const mat=new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.05,side:THREE.DoubleSide,blending:THREE.AdditiveBlending})
+      const mat=new THREE.MeshBasicMaterial({color:0xff4422,transparent:true,opacity:.12,side:THREE.DoubleSide})
       const mesh=new THREE.Mesh(geo,mat);mesh.rotation.z=b*TAU/blades
       mesh.userData={blade:true,si,idx:b,mat};g.add(mesh)
     }
@@ -145,7 +163,7 @@ function buildScene(){
   // ── 7 halo rings (one per gate color) ──
   for(let h=0;h<7;h++){
     const ring=new THREE.Mesh(new THREE.TorusGeometry(1.5+h*1,.02,4,96),
-      new THREE.MeshBasicMaterial({color:new THREE.Color(GC[h]),transparent:true,opacity:.06,blending:THREE.AdditiveBlending}))
+      new THREE.MeshBasicMaterial({color:new THREE.Color(GC[h]),transparent:true,opacity:.12,blending:THREE.AdditiveBlending}))
     ring.position.z=h*.8;ring.userData={type:'halo',idx:h};scene.add(ring)
   }
 
@@ -155,7 +173,7 @@ function buildScene(){
     const geo=new THREE.BufferGeometry(),pos=new Float32Array(count*3)
     for(let i=0;i<count;i++){const a=i*.15+sw*TAU/3;const r=3+i*.06;pos[i*3]=Math.cos(a)*r;pos[i*3+1]=Math.sin(a)*r;pos[i*3+2]=-2+sw*2}
     geo.setAttribute('position',new THREE.BufferAttribute(pos,3))
-    const mat=new THREE.PointsMaterial({color:0xaa44ff,size:.15,transparent:true,opacity:.15,blending:THREE.AdditiveBlending,sizeAttenuation:true})
+    const mat=new THREE.PointsMaterial({color:0xaa44ff,size:.2,transparent:true,opacity:.25,blending:THREE.AdditiveBlending,sizeAttenuation:true})
     const pts=new THREE.Points(geo,mat);pts.userData={type:'swirl',idx:sw};scene.add(pts)
   }
 
@@ -165,7 +183,7 @@ function buildScene(){
     const geo=new THREE.BufferGeometry(),pos=new Float32Array(count*3)
     for(let i=0;i<count;i++){const a=i*.2+g*TAU/7;const r=2+i*.08;pos[i*3]=Math.cos(a)*r;pos[i*3+1]=Math.sin(a)*r;pos[i*3+2]=g*.5-1}
     geo.setAttribute('position',new THREE.BufferAttribute(pos,3))
-    const mat=new THREE.PointsMaterial({color:new THREE.Color(GCC[g]),size:.1,transparent:true,opacity:.07,blending:THREE.AdditiveBlending,sizeAttenuation:true})
+    const mat=new THREE.PointsMaterial({color:new THREE.Color(GCC[g]),size:.14,transparent:true,opacity:.12,blending:THREE.AdditiveBlending,sizeAttenuation:true})
     const pts=new THREE.Points(geo,mat);pts.userData={type:'complement',idx:g};scene.add(pts)
   }
 
@@ -207,12 +225,14 @@ function animate(){
   scene.traverse(obj=>{
     const u=obj.userData;if(!u.type&&!u.petal&&!u.blade)return
 
+    if(u.type==='bg'){u.mat.uniforms.time.value=t;u.mat.uniforms.gate.value=stuckGate;u.mat.uniforms.gateColor.value.set(GC[stuckGate])}
+
     if(u.type==='metatron'){obj.rotation.z=t*.03;obj.rotation.x=Math.sin(t*.02)*.1
-      obj.children.forEach(c=>{if(c.material)c.material.opacity=.015+voiceE*.03+gateFlash*.02})}
+      obj.children.forEach(c=>{if(c.material)c.material.opacity=.06+voiceE*.08+gateFlash*.05})}
 
     if(u.type==='petals'){
       obj.rotation.z+=(u.li%2?-.002:.002)*(1+voiceE*3)
-      obj.position.z=-6-u.li*2.5+voiceE*2+Math.sin(t*.3+u.li)*1
+      obj.position.z=-2-u.li*1.5+voiceE*1.5+Math.sin(t*.3+u.li)*.8
     }
     if(u.petal){
       // color from gate assignment
@@ -220,19 +240,19 @@ function animate(){
       const h=new THREE.Color(GC[gateIdx])
       u.mat.color.lerp(h,.05)
       const isStuck=gateIdx===stuckGate
-      u.mat.opacity=(isStuck?.1:.06)+voiceE*.08+bass*.04+gateFlash*(isStuck?.15:.05)
+      u.mat.opacity=(isStuck?.2:.1)+voiceE*.1+bass*.06+gateFlash*(isStuck?.2:.08)
     }
 
     if(u.type==='shutter'){obj.rotation.z+=(u.si%2?1:-1)*(.003+voiceE*.02)}
     if(u.blade){
       const hue=((baseHue+80+u.idx*12)%360)/360
       u.mat.color.setHSL(hue,.7,.35+high*.2)
-      u.mat.opacity=.04+voiceE*.07+high*.04+gateFlash*.06
+      u.mat.opacity=.08+voiceE*.1+high*.06+gateFlash*.08
     }
 
     if(u.type==='halo'){
       const ring=obj
-      ring.material.opacity=.02+voiceE*.04+(u.idx===stuckGate?.04:0)+gateFlash*.02
+      ring.material.opacity=.06+voiceE*.08+(u.idx===stuckGate?.08:0)+gateFlash*.05
       ring.position.z=u.idx*.8+Math.sin(t*.4+u.idx)*(1+voiceE*1.5)
       ring.rotation.x=Math.sin(t*.12+u.idx)*.12
       ring.rotation.y=Math.cos(t*.1+u.idx)*.1
@@ -248,7 +268,7 @@ function animate(){
         pp[i*3]=Math.cos(a)*r;pp[i*3+1]=Math.sin(a)*r
       }
       obj.geometry.attributes.position.needsUpdate=true
-      obj.material.opacity=.06+voiceE*.1+gateFlash*.08
+      obj.material.opacity=.12+voiceE*.15+gateFlash*.1
     }
 
     if(u.type==='complement'){
@@ -271,21 +291,38 @@ function animate(){
     heart.material.opacity=.3+voiceE*.3+gateFlash*.3
   }
 
-  scene.background.setHSL(baseHue/360,.2,.003+voiceE*.008)
+  // background handled by bg sphere shader
   cam.fov=50+Math.sin(t*TAU/5)*1.5
 
-  // ═══ RENDER TWO EYES (centered) ═══
+  // ═══ RENDER TWO EYES ═══
   const halfW=Math.floor(W/2),gap=8,vw=halfW-gap
   cam.aspect=vw/H;cam.updateProjectionMatrix()
-  // left eye — tiny offset for parallax only
+
+  // left eye
   cam.position.x=-.6;R.setViewport(0,0,vw,H);R.setScissor(0,0,vw,H);R.render(scene,cam)
-  // right eye
+
+  // right eye — mirror colors (shift hues)
+  scene.traverse(obj=>{
+    if(obj.material&&obj.material.color&&obj.userData.petal){
+      obj.material._savedColor=obj.material.color.clone()
+      const hsl={};obj.material.color.getHSL(hsl)
+      obj.material.color.setHSL((hsl.h+.5)%1,hsl.s,hsl.l)
+    }
+  })
   cam.position.x=.6;R.setViewport(halfW+gap,0,vw,H);R.setScissor(halfW+gap,0,vw,H);R.render(scene,cam)
+  // restore colors
+  scene.traverse(obj=>{if(obj.material&&obj.material._savedColor){obj.material.color.copy(obj.material._savedColor);delete obj.material._savedColor}})
   cam.position.x=0
 
   // ═══ 2D OVERLAY ═══
-  // fading trail for afterimage effect
-  ox.fillStyle='rgba(0,0,0,.06)';ox.fillRect(0,0,W,H)
+  // fading trail for afterimage effect — slow fade = long trails
+  ox.fillStyle='rgba(0,0,0,.04)';ox.fillRect(0,0,W,H)
+
+  // auto-rotation — gentle constant sway
+  if(!keysDown.has('ArrowLeft')&&!keysDown.has('ArrowRight')&&!keysDown.has('KeyE')&&!keysDown.has('KeyC')){
+    eyeTarget.x+=Math.sin(t*.15)*.003
+    eyeTarget.y+=Math.cos(t*.11)*.002
+  }
   const lx=vw/2,rx=halfW+gap+vw/2,ey=H/2
   const irisR=Math.min(vw,H)*.38
 
