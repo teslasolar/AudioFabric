@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>127 REALMS — M₇ · Every Element Is A World</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Courier New',monospace}
+canvas{display:block}
+#hud{position:fixed;top:8px;left:10px;z-index:10;font:8px/1.6 monospace;color:rgba(200,200,220,.25);pointer-events:none;white-space:pre}
+#elem{position:fixed;top:50%;right:16px;transform:translateY(-50%);z-index:10;text-align:right;pointer-events:none}
+#elem .z{font-size:36px;font-weight:bold;letter-spacing:-2px}
+#elem .sym{font-size:20px;letter-spacing:3px;margin-top:-4px}
+#elem .name{font-size:9px;letter-spacing:2px;margin-top:2px}
+#elem .info{font-size:7px;color:rgba(255,255,255,.15);margin-top:8px;line-height:1.6}
+#nav{position:fixed;bottom:6px;left:0;right:0;z-index:10;overflow-x:auto;white-space:nowrap;padding:0 8px;scrollbar-width:thin}
+#nav::-webkit-scrollbar{height:3px}
+#nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1)}
+.ne{display:inline-block;width:14px;height:14px;margin:1px;border-radius:2px;cursor:pointer;border:1px solid rgba(255,255,255,.05);transition:all .15s;font-size:5px;line-height:14px;text-align:center;color:rgba(255,255,255,.2);vertical-align:middle}
+.ne:hover,.ne.on{border-color:currentColor;box-shadow:0 0 6px currentColor;transform:scale(1.3)}
+#status{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10;font:9px monospace;color:rgba(255,255,255,.2);pointer-events:none;letter-spacing:2px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<div id="elem"></div>
+<div id="nav"></div>
+<div id="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+// ═══ ALL 127 ELEMENTS ═══
+const SYM=['','H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si','P','S','Cl','Ar','K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe','Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th','Pa','U','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr','Rf','Db','Sg','Bh','Hs','Mt','Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og',
+  'Uue','Ubn','Ubu','Ubb','Ubt','Ubq','Ubp','Ubh','Ubs']
+const NAMES=['','Hydrogen','Helium','Lithium','Beryllium','Boron','Carbon','Nitrogen','Oxygen','Fluorine','Neon','Sodium','Magnesium','Aluminum','Silicon','Phosphorus','Sulfur','Chlorine','Argon','Potassium','Calcium','Scandium','Titanium','Vanadium','Chromium','Manganese','Iron','Cobalt','Nickel','Copper','Zinc','Gallium','Germanium','Arsenic','Selenium','Bromine','Krypton','Rubidium','Strontium','Yttrium','Zirconium','Niobium','Molybdenum','Technetium','Ruthenium','Rhodium','Palladium','Silver','Cadmium','Indium','Tin','Antimony','Tellurium','Iodine','Xenon','Cesium','Barium','Lanthanum','Cerium','Praseodymium','Neodymium','Promethium','Samarium','Europium','Gadolinium','Terbium','Dysprosium','Holmium','Erbium','Thulium','Ytterbium','Lutetium','Hafnium','Tantalum','Tungsten','Rhenium','Osmium','Iridium','Platinum','Gold','Mercury','Thallium','Lead','Bismuth','Polonium','Astatine','Radon','Francium','Radium','Actinium','Thorium','Protactinium','Uranium','Neptunium','Plutonium','Americium','Curium','Berkelium','Californium','Einsteinium','Fermium','Mendelevium','Nobelium','Lawrencium','Rutherfordium','Dubnium','Seaborgium','Bohrium','Hassium','Meitnerium','Darmstadtium','Roentgenium','Copernicium','Nihonium','Flerovium','Moscovium','Livermorium','Tennessine','Oganesson',
+  'Ununennium','Unbinilium','Unbiunium','Unbibium','Unbitrium','Unbiquadium','Unbipentium','Unbihexium','Unbiseptium']
+
+// element categories → colors
+const CAT_COLORS={
+  alkali:0xff4444, alkalineEarth:0xff8844, transition:0xffcc44,
+  lanthanide:0x44cc88, actinide:0x44aacc, postTransition:0x4488ff,
+  metalloid:0x8844ff, nonmetal:0x44ff88, halogen:0x44ffcc,
+  noble:0xcc44ff, superactinide:0xff44aa, unknown:0x888888
+}
+
+function getCategory(z){
+  if([1,6,7,8,15,16,34].includes(z))return'nonmetal'
+  if([9,17,35,53,85,117].includes(z))return'halogen'
+  if([2,10,18,36,54,86,118].includes(z))return'noble'
+  if([3,11,19,37,55,87,119].includes(z))return'alkali'
+  if([4,12,20,38,56,88,120].includes(z))return'alkalineEarth'
+  if([5,14,32,33,51,52,84].includes(z))return'metalloid'
+  if(z>=57&&z<=71)return'lanthanide'
+  if(z>=89&&z<=103)return'actinide'
+  if(z>=121&&z<=127)return'superactinide'
+  if(z>=21&&z<=30||z>=39&&z<=48||z>=72&&z<=80||z>=104&&z<=112)return'transition'
+  return'postTransition'
+}
+
+function getShells(z){
+  if(z<=2)return 1;if(z<=10)return 2;if(z<=18)return 3;if(z<=36)return 4
+  if(z<=54)return 5;if(z<=86)return 6;if(z<=118)return 7;return 8
+}
+
+function getColor(z){return CAT_COLORS[getCategory(z)]||0x888888}
+
+// ═══ THREE.JS ═══
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.4
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x020204)
+const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,500)
+cam.position.set(0,0,8)
+scene.add(new THREE.AmbientLight(0x222233,.4))
+const dLight=new THREE.DirectionalLight(0xffffff,.5);dLight.position.set(3,3,5);scene.add(dLight)
+const pLight=new THREE.PointLight(0xffffff,.3,20);scene.add(pLight)
+
+// stars
+const sG=new THREE.BufferGeometry(),sP=new Float32Array(3000*3)
+for(let i=0;i<3000;i++){const a=Math.random()*TAU,b=Math.acos(2*Math.random()-1),r=30+Math.random()*150
+  sP[i*3]=r*Math.sin(b)*Math.cos(a);sP[i*3+1]=r*Math.sin(b)*Math.sin(a);sP[i*3+2]=r*Math.cos(b)}
+sG.setAttribute('position',new THREE.BufferAttribute(sP,3))
+scene.add(new THREE.Points(sG,new THREE.PointsMaterial({color:0x555566,size:.2,transparent:true,opacity:.3})))
+
+// ═══ REALM BUILDER — procedural per element ═══
+let currentGroup=null
+
+function buildRealm(z){
+  if(currentGroup){scene.remove(currentGroup)}
+  const g=new THREE.Group()
+  const col=getColor(z)
+  const shells=getShells(z)
+  const cat=getCategory(z)
+
+  // main body — complexity scales with Z
+  const detail=Math.min(5,1+Math.floor(z/20))
+  const bodyGeo=new THREE.IcosahedronGeometry(2.5,detail)
+
+  // deform based on category
+  const pos=bodyGeo.attributes.position
+  for(let i=0;i<pos.count;i++){
+    const v=new THREE.Vector3(pos.getX(i),pos.getY(i),pos.getZ(i))
+    const r=v.length()
+    let nr=r
+    if(cat==='noble')nr=r // perfect sphere — noble gases are symmetric
+    else if(cat==='alkali'||cat==='alkalineEarth')nr=r+Math.sin(v.y*3+z)*.15 // slight wobble
+    else if(cat==='transition')nr=r+Math.sin(v.x*z*.1)*Math.cos(v.z*z*.1)*.2 // crystalline
+    else if(cat==='lanthanide'||cat==='actinide')nr=r+Math.sin(v.x*4+v.y*3)*.25 // magnetic texture
+    else if(cat==='superactinide')nr=r+Math.sin(v.x*5)*Math.sin(v.y*5)*Math.sin(v.z*5)*.3 // chaotic
+    else if(cat==='nonmetal')nr=r*(1+Math.sin(v.y*2)*.1) // organic
+    else if(cat==='halogen')nr=r+Math.abs(Math.sin(v.y*6))*.15 // reactive spikes
+    else nr=r+Math.sin(i*.5)*.1 // default texture
+    v.normalize().multiplyScalar(nr)
+    pos.setXYZ(i,v.x,v.y,v.z)
+  }
+  bodyGeo.computeVertexNormals()
+
+  const bodyMat=new THREE.MeshPhongMaterial({
+    color:col,emissive:col,emissiveIntensity:.15,
+    transparent:true,opacity:cat==='noble'?.3:cat==='superactinide'?.5:.7,
+    flatShading:detail<4,side:THREE.DoubleSide,
+    shininess:cat==='transition'?100:cat==='noble'?200:30
+  })
+  g.add(new THREE.Mesh(bodyGeo,bodyMat))
+
+  // wireframe overlay
+  g.add(new THREE.Mesh(bodyGeo.clone(),new THREE.MeshBasicMaterial({
+    color:col,wireframe:true,transparent:true,opacity:.08
+  })))
+
+  // electron shell rings
+  for(let s=0;s<shells;s++){
+    const sr=3+s*.5
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(sr,.015,4,64),
+      new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.06,blending:THREE.AdditiveBlending}))
+    ring.rotation.x=Math.PI/2+s*.25;ring.rotation.y=s*.4
+    g.add(ring)
+  }
+
+  // electron dots
+  const eCount=Math.min(z,40) // cap visual electrons
+  for(let e=0;e<eCount;e++){
+    const shell=Math.floor(e*shells/eCount)
+    const sr=3+shell*.5
+    const dot=new THREE.Mesh(new THREE.SphereGeometry(.04,4,4),
+      new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.3,blending:THREE.AdditiveBlending}))
+    dot.userData={electron:true,shell,sr,speed:.3+e*.02,offset:e*TAU/Math.max(1,eCount)}
+    g.add(dot)
+  }
+
+  // nucleus glow
+  const nucR=.15+Math.log(z+1)*.08
+  const nucGlow=new THREE.Mesh(new THREE.SphereGeometry(nucR,12,12),
+    new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.2,blending:THREE.AdditiveBlending}))
+  g.add(nucGlow)
+
+  // special features for notable elements
+  if(z===1){// hydrogen — simplest, just the proton+electron
+    bodyMat.opacity=.15;bodyMat.emissiveIntensity=.3}
+  if(z===79){// gold — extra shine
+    bodyMat.color.set(0xffd700);bodyMat.emissive.set(0xaa8800);bodyMat.shininess=200}
+  if(z===92){// uranium — radioactive glow
+    bodyMat.emissiveIntensity=.4
+    for(let r=0;r<8;r++){const ray=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,2,3),
+      new THREE.MeshBasicMaterial({color:0x44ff44,transparent:true,opacity:.05,blending:THREE.AdditiveBlending}))
+      ray.position.y=1;ray.rotation.z=r*TAU/8;g.add(ray)}}
+  if(z===77){// iridium — rainbow
+    bodyMat.emissiveIntensity=.3;bodyMat.color.set(0xffffff)}
+  if(z>=119){// predicted — shimmer
+    bodyMat.emissiveIntensity=.25+Math.random()*.15}
+  if(z===127){// the last — M₇ — special
+    bodyMat.color.set(0xffffff);bodyMat.emissive.set(0x8844ff);bodyMat.emissiveIntensity=.4;bodyMat.opacity=.4}
+
+  scene.add(g);currentGroup=g
+}
+
+// ═══ AUDIO ═══
+let actx,master,currentTone=null
+function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.08;master.connect(actx.destination)
+  const del=actx.createDelay(.4);del.delayTime.value=.15;const fb=actx.createGain();fb.gain.value=.15
+  del.connect(fb);fb.connect(del);const wet=actx.createGain();wet.gain.value=.2
+  del.connect(wet);wet.connect(actx.destination);master.connect(del)
+}
+
+function playTone(z){
+  if(!actx)initAudio()
+  if(currentTone){try{currentTone.forEach(d=>{d.g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+1.5);setTimeout(()=>d.o.stop(),1600)})}catch(e){}}
+  currentTone=[]
+  // frequency from atomic number — map to audible range
+  const baseHz=55*Math.pow(2,(z-1)/12) // chromatic scale starting at A1
+  const hz=baseHz%880+55 // keep in audible range
+  ;[hz,hz*2,hz*3].forEach((f,i)=>{
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type=i===0?'sine':i===1?'triangle':'sine'
+    o.frequency.value=f;g.gain.setValueAtTime(0,actx.currentTime)
+    g.gain.linearRampToValueAtTime([.04,.015,.008][i],actx.currentTime+1.5)
+    o.connect(g);g.connect(master);o.start()
+    currentTone.push({o,g})
+  })
+}
+
+// ═══ NAV ═══
+let current=1
+const navEl=document.getElementById('nav')
+for(let z=1;z<=127;z++){
+  const btn=document.createElement('div');btn.className='ne'+(z===1?' on':'')
+  const col=getColor(z)
+  btn.style.color=`#${col.toString(16).padStart(6,'0')}`
+  btn.style.background=`#${col.toString(16).padStart(6,'0')}15`
+  btn.textContent=SYM[z]||z
+  btn.title=`${z} ${NAMES[z]||'?'}`
+  btn.onclick=()=>goTo(z)
+  btn.id='ne'+z
+  navEl.appendChild(btn)
+}
+
+function goTo(z){
+  if(z<1||z>127||z===current)return
+  document.getElementById('ne'+current)?.classList.remove('on')
+  current=z
+  document.getElementById('ne'+current)?.classList.add('on')
+  buildRealm(z);playTone(z)
+  // scroll nav to show current
+  const btn=document.getElementById('ne'+z)
+  if(btn)btn.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'})
+}
+
+addEventListener('keydown',e=>{
+  if(e.code==='ArrowRight')goTo(Math.min(127,current+1))
+  if(e.code==='ArrowLeft')goTo(Math.max(1,current-1))
+  if(e.code==='ArrowUp')goTo(Math.min(127,current+10))
+  if(e.code==='ArrowDown')goTo(Math.max(1,current-10))
+  if(e.code==='Home')goTo(1)
+  if(e.code==='End')goTo(127)
+})
+
+// ═══ ANIMATE ═══
+let t=0
+function animate(){
+  requestAnimationFrame(animate);t+=1/60
+  if(!currentGroup)return
+
+  currentGroup.rotation.y=t*.12
+
+  // animate electrons
+  currentGroup.children.forEach(c=>{
+    if(c.userData.electron){
+      const u=c.userData
+      const a=u.offset+t*u.speed
+      const ph=Math.PI/3+Math.sin(t*.3+u.shell)*.3
+      c.position.set(Math.cos(a)*Math.sin(ph)*u.sr,Math.cos(ph)*u.sr,Math.sin(a)*Math.sin(ph)*u.sr)
+    }
+  })
+
+  // camera orbit
+  cam.position.x=Math.sin(t*.06)*7;cam.position.z=Math.cos(t*.06)*7
+  cam.position.y=Math.sin(t*.04)*2;cam.lookAt(0,0,0)
+
+  // lighting
+  const col=getColor(current)
+  dLight.color.set(col);pLight.color.set(col)
+  pLight.intensity=.3+Math.sin(t*2)*.05
+  scene.background.setHSL(0,.0,.01)
+
+  // UI
+  const cat=getCategory(current)
+  const colHex='#'+col.toString(16).padStart(6,'0')
+  const predicted=current>118
+  document.getElementById('elem').innerHTML=
+    `<div class="z" style="color:${colHex}55">${current}</div>`+
+    `<div class="sym" style="color:${colHex}88">${SYM[current]||'?'}</div>`+
+    `<div class="name" style="color:${colHex}44">${NAMES[current]||'UNKNOWN'}${predicted?' (predicted)':''}</div>`+
+    `<div class="info">${cat.toUpperCase()}<br>shells: ${getShells(current)}<br>${predicted?'beyond Oganesson<br>superactinide — 5g/6f/7d/8p':'period '+getShells(current)}</div>`
+
+  document.getElementById('status').textContent=
+    `${current} / 127 · M₇ = 2⁷-1 · ${NAMES[current]||'?'}`
+
+  document.getElementById('hud').textContent=
+    `127 REALMS · ${SYM[current]} (${current})\n`+
+    `← → navigate · ↑↓ skip 10\n`+
+    `Home: H(1) · End: Ubs(127)`
+
+  R.render(scene,cam)
+}
+
+// boot
+buildRealm(1);initAudio();playTone(1);animate()
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+</script>
+</body></html>
