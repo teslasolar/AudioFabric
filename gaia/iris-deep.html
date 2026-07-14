@@ -74,6 +74,38 @@ function getAudio(){if(!analyser)return;analyser.getByteFrequencyData(fftData);a
 let watchData=null,watchOn=false
 async function pollWatch(){try{const r=await fetch(`${GW}/wearer/${USER}`,{signal:AbortSignal.timeout(3000)});watchData=await r.json();watchOn=watchData?.online||false}catch(e){watchOn=false}}
 
+// ═══ BLITZORTUNG LIGHTNING WebSocket ═══
+let lightningVal=0,strikeRate=0,strikeCount=0,wsConnected=false,lastStrikes=[]
+function lzwDecode(b){const e={};let d=[...b],c=d[0],f=c,g=[c],h=256,o=h;for(let i=1;i<d.length;i++){let a=d[i].charCodeAt(0);a=h>a?d[i]:e[a]||f+c;g.push(a);c=a[0];e[o]=f+c;o++;f=a}return g.join('')}
+function connectLightning(){
+  try{
+    const ws=new WebSocket('wss://ws1.blitzortung.org')
+    ws.onopen=()=>{ws.send('{"a":111}');wsConnected=true}
+    ws.onmessage=e=>{
+      try{
+        let data;
+        try{data=JSON.parse(e.data)}catch(x){
+          try{data=JSON.parse(lzwDecode(e.data))}catch(x2){return}
+        }
+        if(data.lat!==undefined){
+          strikeCount++;lightningVal=1
+          lastStrikes.push({lat:data.lat,lon:data.lon,t:performance.now()})
+          if(lastStrikes.length>50)lastStrikes.shift()
+        }
+      }catch(x){}
+    }
+    ws.onclose=()=>{wsConnected=false;setTimeout(connectLightning,5000)}
+    ws.onerror=()=>{wsConnected=false}
+  }catch(e){wsConnected=false}
+  // compute strike rate every 2s
+  setInterval(()=>{
+    const now=performance.now()
+    lastStrikes=lastStrikes.filter(s=>now-s.t<10000)
+    strikeRate=lastStrikes.length/10
+  },2000)
+}
+
+
 // ═══ STATE ═══
 let heart=null,running=false,t=0,lastPoll=0
 let stuckGate=2,activeGate=-1,gateFlash=0
@@ -84,23 +116,24 @@ addEventListener('keyup',e=>keysDown.delete(e.code))
 
 // ═══ BUILD SCENE ═══
 function buildScene(){
-  // ── Dynamic background sphere (radial gradient) ──
+  // ── Dynamic background sphere — lightning-reactive ──
   const bgGeo=new THREE.SphereGeometry(80,32,32)
   const bgMat=new THREE.ShaderMaterial({
-    side:THREE.BackSide,transparent:false,
-    uniforms:{time:{value:0},gate:{value:2},gateColor:{value:new THREE.Color(GC[2])}},
+    side:THREE.BackSide,depthWrite:false,
+    uniforms:{time:{value:0},gateColor:{value:new THREE.Color(GC[2])},lightning:{value:0}},
     vertexShader:`varying vec3 vPos;void main(){vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-    fragmentShader:`varying vec3 vPos;uniform float time;uniform int gate;uniform vec3 gateColor;
+    fragmentShader:`varying vec3 vPos;uniform float time,lightning;uniform vec3 gateColor;
       void main(){
         float d=length(vPos.xy)/80.;
-        float pulse=sin(time*.3)*.02;
-        vec3 center=gateColor*.08+pulse;
-        vec3 edge=vec3(.01,.01,.02);
-        vec3 col=mix(center,edge,smoothstep(0.,.8,d));
-        col+=vec3(.015,.01,.025)*sin(d*20.+time*.5)*.5;
+        float pulse=sin(time*.3)*.015+lightning*.08;
+        vec3 center=gateColor*.1+pulse;
+        vec3 edge=vec3(.008,.008,.015);
+        vec3 col=mix(center,edge,smoothstep(0.,.7,d));
+        col+=vec3(.01,.008,.02)*sin(d*15.+time*.4)*.4;
+        col+=vec3(.6,.7,1.)*lightning*.05*(1.-d);
         gl_FragColor=vec4(col,1.);}`
   })
-  const bgSphere=new THREE.Mesh(bgGeo,bgMat);bgSphere.userData={type:'bg',mat:bgMat};scene.add(bgSphere)
+  const bgSphere=new THREE.Mesh(bgGeo,bgMat);bgSphere.renderOrder=-1;bgSphere.userData={type:'bg',mat:bgMat};scene.add(bgSphere)
 
   // ── Metatron's Cube ──
   const metaG=new THREE.Group();metaG.position.z=-5;metaG.userData={type:'metatron'}
@@ -205,7 +238,7 @@ function animate(){
   if(!running)return;requestAnimationFrame(animate);t+=1/60;getAudio()
   if(t-lastPoll>8){lastPoll=t;pollWatch()}
   const voiceE=Math.min(1,vol*6),baseHue=(t*15)%360
-  gateFlash*=.95
+  gateFlash*=.95;lightningVal*=.92
   drones.forEach(d=>{d.g.gain.linearRampToValueAtTime(d.bv*(.2+voiceE*.5),actx.currentTime+.3)})
 
   // eye exercises
@@ -225,7 +258,7 @@ function animate(){
   scene.traverse(obj=>{
     const u=obj.userData;if(!u.type&&!u.petal&&!u.blade)return
 
-    if(u.type==='bg'){u.mat.uniforms.time.value=t;u.mat.uniforms.gate.value=stuckGate;u.mat.uniforms.gateColor.value.set(GC[stuckGate])}
+    if(u.type==='bg'){u.mat.uniforms.time.value=t;u.mat.uniforms.gateColor.value.set(GC[stuckGate]);u.mat.uniforms.lightning.value=lightningVal}
 
     if(u.type==='metatron'){obj.rotation.z=t*.08;obj.rotation.x=Math.sin(t*.05)*.15
       obj.children.forEach(c=>{if(c.material)c.material.opacity=.06+voiceE*.08+gateFlash*.05})}
@@ -237,19 +270,17 @@ function animate(){
       obj.position.z=-2-u.li*1.5+voiceE*1.5+Math.sin(t*.3+u.li)*.8
     }
     if(u.petal){
-      // color from gate assignment
       const gateIdx=u.li%7
-      const h=new THREE.Color(GC[gateIdx])
-      u.mat.color.lerp(h,.05)
       const isStuck=gateIdx===stuckGate
-      u.mat.opacity=(isStuck?.2:.1)+voiceE*.1+bass*.06+gateFlash*(isStuck?.2:.08)
+      u.mat.color.set(GC[gateIdx])
+      u.mat.opacity=(isStuck?.3:.15)+voiceE*.12+bass*.06+gateFlash*(isStuck?.2:.08)
     }
 
     if(u.type==='shutter'){obj.rotation.z+=(u.si%2?1:-1)*(.012+voiceE*.04)}
     if(u.blade){
-      const hue=((baseHue+80+u.idx*12)%360)/360
-      u.mat.color.setHSL(hue,.7,.35+high*.2)
-      u.mat.opacity=.08+voiceE*.1+high*.06+gateFlash*.08
+      const hue=((baseHue+80+u.idx*15)%360)/360
+      u.mat.color.setHSL(hue,.75,.4+high*.15)
+      u.mat.opacity=.15+voiceE*.12+high*.08+gateFlash*.1
     }
 
     if(u.type==='halo'){
@@ -304,17 +335,18 @@ function animate(){
   // left eye
   cam.position.x=-.6;R.setViewport(0,0,vw,H);R.setScissor(0,0,vw,H);R.render(scene,cam)
 
-  // right eye — mirror colors (shift hues)
+  // right eye — shift hue for petals
+  const savedColors=[]
   scene.traverse(obj=>{
-    if(obj.material&&obj.material.color&&obj.userData.petal){
-      obj.material._savedColor=obj.material.color.clone()
-      const hsl={};obj.material.color.getHSL(hsl)
-      obj.material.color.setHSL((hsl.h+.5)%1,hsl.s,hsl.l)
+    if(obj.userData.petal&&obj.material){
+      const c=obj.material.color.clone()
+      savedColors.push({obj,c})
+      const gateIdx=obj.userData.li%7
+      obj.material.color.set(GCC[gateIdx])
     }
   })
   cam.position.x=.6;R.setViewport(halfW+gap,0,vw,H);R.setScissor(halfW+gap,0,vw,H);R.render(scene,cam)
-  // restore colors
-  scene.traverse(obj=>{if(obj.material&&obj.material._savedColor){obj.material.color.copy(obj.material._savedColor);delete obj.material._savedColor}})
+  savedColors.forEach(({obj,c})=>obj.material.color.copy(c))
   cam.position.x=0
 
   // ═══ 2D OVERLAY ═══
@@ -402,11 +434,11 @@ function animate(){
 
   // HUD
   const hr=watchData?.hr,hrv=watchData?.hrv
-  document.getElementById('hud').textContent=`IRIS DEEP · METATRON\nvol:${(vol*100).toFixed(0)} b:${(bass*100).toFixed(0)} m:${(mid*100).toFixed(0)} h:${(high*100).toFixed(0)}\npitch:${pitch>20?pitch.toFixed(0)+'Hz':'--'} z:${cam.position.z.toFixed(1)}\nHR:${hr!=null?hr.toFixed(0):'--'} HRV:${hrv!=null?hrv.toFixed(1):'--'} ${watchOn?'●':'○'}`
+  document.getElementById('hud').textContent=`IRIS DEEP · METATRON\nvol:${(vol*100).toFixed(0)} b:${(bass*100).toFixed(0)} m:${(mid*100).toFixed(0)} h:${(high*100).toFixed(0)}\npitch:${pitch>20?pitch.toFixed(0)+'Hz':'--'} z:${cam.position.z.toFixed(1)}\nHR:${hr!=null?hr.toFixed(0):'--'} HRV:${hrv!=null?hrv.toFixed(1):'--'} ${watchOn?'●':'○'}\n⚡ ${wsConnected?'LIVE':'--'} ${strikeRate.toFixed(1)}/s ${strikeCount} total`
   document.getElementById('keys').textContent=`1-7: gate (R${stuckGate})\narrows: exercise\nE: sweep C: circle\nspace: pulse`
 }
 
-async function init(){document.getElementById('start').style.display='none';initAudio();await initMic();buildScene();running=true;document.documentElement.requestFullscreen?.().catch(()=>{});animate()}
+async function init(){document.getElementById('start').style.display='none';initAudio();await initMic();buildScene();connectLightning();running=true;document.documentElement.requestFullscreen?.().catch(()=>{});animate()}
 window.init=init
 addEventListener('resize',()=>{W=innerWidth;H=innerHeight;R.setSize(W,H);ovCv.width=W;ovCv.height=H})
 </script>
