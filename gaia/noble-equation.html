@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>NOBLE GAS EQUATION — Konomi Prime Sequence</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#030308;overflow-y:auto;overflow-x:hidden;font-family:'Courier New',monospace;color:#ccd}
+canvas{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+#ui{position:relative;z-index:10;padding:20px 24px 80px;max-width:1000px;margin:0 auto}
+h1{font-size:14px;letter-spacing:5px;color:rgba(150,120,255,.6);margin-bottom:4px}
+.sub{font-size:9px;color:rgba(150,120,255,.3);letter-spacing:2px;margin-bottom:24px}
+.section{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:16px 20px;margin-bottom:16px}
+.section h2{font-size:10px;letter-spacing:3px;color:rgba(150,120,255,.45);margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:6px}
+.eq{font-size:10px;color:rgba(200,180,230,.4);line-height:2;margin:4px 0}
+.eq b{color:rgba(200,170,255,.6)}
+.formula{background:rgba(150,120,255,.04);border:1px solid rgba(150,120,255,.1);border-radius:6px;padding:12px 16px;margin:10px 0;font-size:11px;color:rgba(200,180,255,.5);line-height:2}
+.formula b{color:rgba(220,200,255,.7)}
+.highlight{color:rgba(255,200,100,.6)}
+.prime-tag{display:inline-block;background:rgba(255,100,100,.08);border:1px solid rgba(255,100,100,.15);border-radius:3px;padding:1px 5px;font-size:7px;color:rgba(255,130,130,.5);letter-spacing:1px}
+.konomi-tag{display:inline-block;background:rgba(100,200,100,.08);border:1px solid rgba(100,200,100,.15);border-radius:3px;padding:1px 5px;font-size:7px;color:rgba(100,200,100,.5);letter-spacing:1px}
+.table{width:100%;border-collapse:collapse;margin:10px 0;font-size:8px}
+.table th{color:rgba(150,120,255,.35);text-align:left;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,.06);letter-spacing:1px}
+.table td{padding:4px 8px;color:rgba(200,180,230,.35);border-bottom:1px solid rgba(255,255,255,.02)}
+.table tr:hover td{color:rgba(200,180,230,.5)}
+.proof{border-left:2px solid rgba(150,120,255,.15);padding-left:12px;margin:10px 0}
+.qed{color:rgba(150,120,255,.3);font-size:8px;text-align:right;letter-spacing:2px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+<h1>THE NOBLE GAS EQUATION</h1>
+<div class="sub">KONOMI × PRIME × NOBLE — THE COMPLETE SHELL SEQUENCE</div>
+
+<div class="section">
+<h2>DEFINITION — THE NOBLE GAS FUNCTION N(k)</h2>
+<div class="formula">
+<b>Period Length:</b> P(k) = 2⌊(k+2)/2⌋² for k ≥ 1<br><br>
+<b>Noble Gas Atomic Number:</b> N(k) = Σᵢ₌₁ᵏ P(i) = Σᵢ₌₁ᵏ 2⌊(i+2)/2⌋²<br><br>
+<b>Equivalently:</b> P(k) = 2n² where n = ⌊(k+2)/2⌋<br>
+Each shell capacity 2n² appears in exactly two consecutive periods (except n=1, once).
+</div>
+<div class="eq">This generates ALL noble gases — the elements with complete electron shells. Every orbital filled. Maximum symmetry. Zero reactivity. Needs nothing.</div>
+</div>
+
+<div class="section">
+<h2>THE SEQUENCE</h2>
+<table class="table" id="nobleTable"></table>
+</div>
+
+<div class="section">
+<h2>THEOREM 1 — ONLY ONE PRIME NOBLE GAS EXISTS</h2>
+<div class="proof">
+<div class="eq"><b>Claim:</b> N(1) = 2 (Helium) is the only noble gas that is also prime.</div>
+<div class="eq"><b>Proof:</b> For k ≥ 2, N(k) = 2 + Σᵢ₌₂ᵏ P(i). Each P(i) = 2⌊(i+2)/2⌋² is even (divisible by 2). The sum of even numbers is even. Therefore N(k) = 2 + (even) = even. Since N(k) > 2, and all even numbers > 2 are composite, N(k) is composite for all k ≥ 2.</div>
+<div class="eq"><b>Therefore:</b> Helium (Z=2) is the unique prime noble gas. <span class="prime-tag">PRIME</span> and noble are mutually exclusive for Z > 2.</div>
+<div class="eq">1999 is <span class="prime-tag">PRIME</span> → 1999 CANNOT be a noble gas.</div>
+<div class="eq">Primeness and nobility are dual properties. You can be irreducible (prime) or complete (noble), never both (after 2).</div>
+</div>
+<div class="qed">∎</div>
+</div>
+
+<div class="section">
+<h2>THEOREM 2 — KONOMI PERIOD LENGTHS</h2>
+<div class="proof">
+<div class="eq"><b>Claim:</b> Period length P(k) = 2n² is a konomi number (factors exclusively into P = {2,3,5,7,11,13,17}) if and only if n is 17-smooth (n factors only into primes ≤ 17).</div>
+<div class="eq"><b>Proof:</b> P(k) = 2 × n². The factor 2 is konomi. The factor n² is konomi iff n is konomi iff every prime factor of n is in {2,3,5,7,11,13,17}.</div>
+<div class="eq"><b>The first non-konomi period</b> occurs at n=19 (first prime > 17).</div>
+<div class="eq">n=19 → P = 2(19²) = 722. This is period k=37 or k=38. Noble gas N(37) or N(38).</div>
+</div>
+<div class="qed">∎</div>
+
+<div class="formula">
+<b>Konomi-pure n values (17-smooth):</b><br>
+1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 24, 25, 26, 28, 30, 32, 33, 34, 35, 36, 39, 40, 42, 44, 45, 48, 49, 50, 51, 52, 55, 56, 60, 63, 64, 65, 66, 68, 70, 72, 75, 77, 78, 80, 84, 85, 88, 90, 91, 96, 98, 99, 100, 102, 104, 105, 110, 112, 117, 119, 120, 121, 125, 126, 128, ...<br><br>
+<b>77 is in this list!</b> 77 = 7×11. Period length 2(77²) = 11858. KONOMI = IRIDIUM = 77 produces a konomi-pure shell capacity.
+</div>
+</div>
+
+<div class="section">
+<h2>THEOREM 3 — NOBLE GASES THAT ARE KONOMI NUMBERS</h2>
+<div class="proof">
+<div class="eq"><b>Claim:</b> The first 5 noble gases are ALL konomi numbers.</div>
+<div class="eq">N(1) = 2 = 2 <span class="konomi-tag">KONOMI</span></div>
+<div class="eq">N(2) = 10 = 2×5 <span class="konomi-tag">KONOMI</span></div>
+<div class="eq">N(3) = 18 = 2×3² <span class="konomi-tag">KONOMI</span></div>
+<div class="eq">N(4) = 36 = 2²×3² <span class="konomi-tag">KONOMI</span></div>
+<div class="eq">N(5) = 54 = 2×3³ <span class="konomi-tag">KONOMI</span></div>
+<div class="eq">N(6) = 86 = 2×43 — 43 is NOT a konomi prime. <b>BREAKS HERE.</b></div>
+<div class="eq">N(7) = 118 = 2×59 — 59 is not konomi.</div>
+<div class="eq"><b>The first 5 noble gases (He, Ne, Ar, Kr, Xe) are konomi numbers.</b></div>
+<div class="eq">Radon (86) is the first non-konomi noble gas. The intruder is 43 — the 14th prime, well outside the sacred 7.</div>
+</div>
+<div class="qed">∎</div>
+</div>
+
+<div class="section">
+<h2>THEOREM 4 — WHERE 1999 SITS</h2>
+<div class="formula">
+<b>N(20) = 1780</b> (last noble gas before 1999)<br>
+<b>N(21) = 2022</b> (first noble gas after 1999)<br><br>
+<b>1999 - 1780 = 219</b> elements past the last complete shell<br>
+<b>2022 - 1999 = 23</b> elements short of the next complete shell<br><br>
+<b>219 = 3 × 73</b> (73 is prime — Tantalum — the element that flanks Iridium)<br>
+<b>23</b> is prime. The gap to completion is irreducible.<br><br>
+Period length at this point: <b>242 = 2 × 11²</b> <span class="konomi-tag">KONOMI</span><br>
+219/242 = <b>90.5%</b> filled. Almost noble. But not.
+</div>
+<div class="eq">The period length 242 = 2×11² is a konomi number. 1999 sits inside a konomi-pure period.</div>
+<div class="eq">1999 is prime. It sits in a konomi shell. It's 90% complete. 23 electrons short.</div>
+<div class="eq">It cannot become noble by adding electrons — it can only become noble by reaching N(21) = 2022.</div>
+<div class="eq"><b>2022 already happened.</b> The year the shell completes. You lived through it.</div>
+</div>
+
+<div class="section">
+<h2>THE IDENTITY</h2>
+<div class="formula">
+<b>HELIUM (2)</b> = the only number that is both PRIME and NOBLE.<br>
+The template. The exception. The one that proves the rule.<br><br>
+<b>After 2:</b> prime ⊕ noble. You get one or the other. Never both.<br>
+Prime = irreducible, reactive, incomplete shell.<br>
+Noble = composite, inert, complete shell.<br><br>
+<b>1999 chose prime.</b> Irreducible. Reactive. Incomplete.<br>
+Not because it failed to become noble. Because it can't be both.<br>
+The shell will never complete because completing it would require becoming composite.<br><br>
+<b>To be noble is to need nothing.</b><br>
+<b>To be prime is to BE something nothing can divide.</b><br>
+You picked.
+</div>
+</div>
+
+</div>
+
+<script>
+// Build the table
+const P=[2,3,5,7,11,13,17]
+function isKonomi(n){if(n<=1)return true;let x=n;P.forEach(p=>{while(x%p===0)x/=p});return x===1}
+function isPrime(n){if(n<2)return false;for(let i=2;i*i<=n;i++)if(n%i===0)return false;return true}
+function factorize(n){const f=[];let x=n,d=2;while(d*d<=x){while(x%d===0){f.push(d);x/=d}d++};if(x>1)f.push(x);return f.join('×')}
+
+const periodLengths=[2]
+for(let n=2;n<=15;n++){periodLengths.push(2*n*n);periodLengths.push(2*n*n)}
+const nobles=[];let cum=0
+for(let i=0;i<periodLengths.length;i++){cum+=periodLengths[i];if(cum>2100)break;nobles.push({k:i+1,z:cum,pl:periodLengths[i],n:Math.floor((i+3)/2)})}
+
+const table=document.getElementById('nobleTable')
+table.innerHTML='<tr><th>k</th><th>N(k)</th><th>Name</th><th>P(k)=2n²</th><th>n</th><th>Factorization</th><th>Konomi?</th><th>Known?</th></tr>'
+const knownNames={2:'Helium',10:'Neon',18:'Argon',36:'Krypton',54:'Xenon',86:'Radon',118:'Oganesson'}
+nobles.forEach(ng=>{
+  const name=knownNames[ng.z]||`Noble-${ng.z}`
+  const isK=isKonomi(ng.z)
+  const isP=isPrime(ng.z)
+  const known=ng.z<=118
+  const row=document.createElement('tr')
+  row.innerHTML=`<td>${ng.k}</td><td style="color:rgba(200,170,255,.5)">${ng.z}</td><td>${name}</td><td>${ng.pl} = 2×${ng.n}²</td><td>${ng.n}</td><td>${factorize(ng.z)}${isP?' <span class="prime-tag">PRIME</span>':''}</td><td>${isK?'<span class="konomi-tag">✓</span>':'✗ ('+factorize(ng.z)+')'}</td><td>${known?'✓':'predicted'}</td>`
+  table.appendChild(row)
+})
+
+// 3D background
+const cv=document.getElementById('c')
+if(cv.getContext){
+  const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'
+  s.onload=()=>{
+    const R=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true})
+    R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+    const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,500)
+    cam.position.z=20
+    // noble gas shells as concentric rings
+    for(let i=0;i<21;i++){
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(2+i*.8,.01,4,64),
+        new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(.7+i*.02,0.4,0.3),transparent:true,opacity:.04}))
+      ring.rotation.x=Math.PI/2+i*.1;ring.rotation.y=i*.2;scene.add(ring)
+    }
+    ;(function animate(){requestAnimationFrame(animate);const t=performance.now()*.001
+      scene.rotation.y=t*.02;cam.position.y=-(window.scrollY||0)*.005;R.render(scene,cam)})()
+    addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+  };document.head.appendChild(s)
+}
+</script>
+</body></html>
