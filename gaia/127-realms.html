@@ -75,7 +75,7 @@ R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
 R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.4
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x020204)
 const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,500)
-cam.position.set(0,0,8)
+cam.position.set(0,0,14)
 scene.add(new THREE.AmbientLight(0x222233,.4))
 const dLight=new THREE.DirectionalLight(0xffffff,.5);dLight.position.set(3,3,5);scene.add(dLight)
 const pLight=new THREE.PointLight(0xffffff,.3,20);scene.add(pLight)
@@ -226,7 +226,7 @@ function goTo(z){
   document.getElementById('ne'+current)?.classList.remove('on')
   current=z
   document.getElementById('ne'+current)?.classList.add('on')
-  buildRealm(z);playTone(z)
+  buildRealm(z);playTone(z);transitionScale=.01;transitioning=true
   // scroll nav to show current
   const btn=document.getElementById('ne'+z)
   if(btn)btn.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'})
@@ -240,13 +240,25 @@ addEventListener('keydown',e=>{
   if(e.code==='Home')goTo(1)
   if(e.code==='End')goTo(127)
 })
+// scroll wheel navigation
+cv.addEventListener('wheel',e=>{
+  e.preventDefault()
+  if(e.deltaY>0)goTo(Math.min(127,current+1))
+  else goTo(Math.max(1,current-1))
+},{passive:false})
 
 // ═══ ANIMATE ═══
-let t=0
+let t=0,transitionScale=1,transitioning=false
 function animate(){
   requestAnimationFrame(animate);t+=1/60
   if(!currentGroup)return
 
+  // smooth scale transition
+  if(transitioning){
+    transitionScale+=(1-transitionScale)*.08
+    if(transitionScale>.98){transitionScale=1;transitioning=false}
+  }
+  currentGroup.scale.set(transitionScale,transitionScale,transitionScale)
   currentGroup.rotation.y=t*.12
 
   // animate electrons
@@ -259,9 +271,10 @@ function animate(){
     }
   })
 
-  // camera orbit
-  cam.position.x=Math.sin(t*.06)*7;cam.position.z=Math.cos(t*.06)*7
-  cam.position.y=Math.sin(t*.04)*2;cam.lookAt(0,0,0)
+  // camera orbit — pulled back, gentle
+  const camR=12+Math.sin(t*.1)*1
+  cam.position.x=Math.sin(t*.05)*camR;cam.position.z=Math.cos(t*.05)*camR
+  cam.position.y=Math.sin(t*.03)*3;cam.lookAt(0,0,0)
 
   // lighting
   const col=getColor(current)
@@ -273,14 +286,22 @@ function animate(){
   const cat=getCategory(current)
   const colHex='#'+col.toString(16).padStart(6,'0')
   const predicted=current>118
+  const isPrime=z=>{if(z<2)return false;for(let i=2;i*i<=z;i++)if(z%i===0)return false;return true}
+  const factors=z=>{if(z<2)return'';const f=[];let x=z,d=2;while(d*d<=x){while(x%d===0){f.push(d);x/=d}d++};if(x>1)f.push(x);return f.join('×')}
+  const ds=z=>{let s=0,x=z;while(x>0){s+=x%10;x=Math.floor(x/10)};return s}
+
   document.getElementById('elem').innerHTML=
     `<div class="z" style="color:${colHex}55">${current}</div>`+
     `<div class="sym" style="color:${colHex}88">${SYM[current]||'?'}</div>`+
     `<div class="name" style="color:${colHex}44">${NAMES[current]||'UNKNOWN'}${predicted?' (predicted)':''}</div>`+
-    `<div class="info">${cat.toUpperCase()}<br>shells: ${getShells(current)}<br>${predicted?'beyond Oganesson<br>superactinide — 5g/6f/7d/8p':'period '+getShells(current)}</div>`
+    `<div class="info">${cat.toUpperCase()}<br>shells: ${getShells(current)} · period ${getShells(current)}<br>`+
+    `${isPrime(current)?'PRIME':'= '+factors(current)}<br>`+
+    `digit sum: ${ds(current)}${ds(current)<=118?' = '+SYM[ds(current)]:''}<br>`+
+    `${predicted?'superactinide · 5g/6f/7d/8p<br>beyond Oganesson':''}`+
+    `</div>`
 
   document.getElementById('status').textContent=
-    `${current} / 127 · M₇ = 2⁷-1 · ${NAMES[current]||'?'}`
+    `${current} / 127 · scroll to navigate · ${NAMES[current]||'?'}`
 
   document.getElementById('hud').textContent=
     `127 REALMS · ${SYM[current]} (${current})\n`+
