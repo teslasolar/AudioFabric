@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>QUASAR — Z=77 · KONOMI · The Brightest Thing</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block}
+#start{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse,#080412,#000);cursor:pointer;gap:10px}
+#start span{font:18px/1 monospace;color:rgba(200,150,255,.4);letter-spacing:10px;border:1px solid rgba(200,150,255,.1);padding:16px 40px;border-radius:6px}
+#start span:hover{color:rgba(220,180,255,.7);box-shadow:0 0 60px rgba(150,100,255,.12)}
+#start small{font:8px monospace;color:rgba(200,150,255,.12);letter-spacing:2px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start" onclick="go()">
+  <span>QUASAR</span>
+  <small>Z=77 · KONOMI · consumption → light · the brightest thing in the universe</small>
+</div>
+
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+// quasar harmonics — redshifted Lyman series of hydrogen (what quasars actually emit)
+const harmonics=[
+  {name:'Lyα',hz:121.6,audioHz:55,color:[180,120,255]},     // Lyman alpha
+  {name:'Lyβ',hz:102.5,audioHz:82.4,color:[140,100,255]},   // Lyman beta
+  {name:'Hα',hz:656.3,audioHz:110,color:[255,60,60]},       // Balmer alpha (red)
+  {name:'Hβ',hz:486.1,audioHz:146.8,color:[60,255,200]},    // Balmer beta (cyan)
+  {name:'Hγ',hz:434.0,audioHz:196,color:[80,80,255]},       // Balmer gamma (blue)
+  {name:'OIII',hz:500.7,audioHz:261.6,color:[60,255,120]},  // Oxygen III (green)
+  {name:'MgII',hz:279.6,audioHz:329.6,color:[255,200,100]}, // Magnesium II
+]
+
+let actx,master,running=false,t=0,oscs=[]
+let accretionRate=0 // simulated consumption rate
+
+function go(){
+  document.getElementById('start').style.display='none'
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.25;master.connect(actx.destination)
+
+  // deep space reverb
+  ;[[.19,.17,.25],[.31,.13,.2],[.47,.09,.14],[.67,.06,.1]].forEach(([dt,fbv,wv])=>{
+    const d=actx.createDelay(.8);d.delayTime.value=dt
+    const f=actx.createGain();f.gain.value=fbv;d.connect(f);f.connect(d)
+    const w=actx.createGain();w.gain.value=wv;d.connect(w);w.connect(actx.destination)
+    master.connect(d)
+  })
+
+  // quasar emission lines — each harmonic gets rich voicing
+  harmonics.forEach((h,i)=>{
+    const v=[]
+    ;[
+      ['sine',h.audioHz,.05],['sine',h.audioHz*1.001,.04],['sine',h.audioHz*.999,.035],
+      ['triangle',h.audioHz*2,.02],['sine',h.audioHz*1.5,.015],['sine',h.audioHz*.5,.03],
+      ['sine',h.audioHz*3,.008],['sawtooth',h.audioHz*.25,.006]
+    ].forEach(([type,hz,vol])=>{
+      const o=actx.createOscillator(),ga=actx.createGain()
+      o.type=type;o.frequency.value=hz;ga.gain.value=vol*.3
+      o.connect(ga);ga.connect(master);o.start()
+      v.push({o,ga,bv:vol,hz})
+    })
+    oscs.push(v)
+  })
+
+  // slowly bring all voices up
+  let rampT=0
+  const ramp=setInterval(()=>{
+    rampT+=.01;if(rampT>1){clearInterval(ramp);rampT=1}
+    oscs.forEach(voices=>{voices.forEach(v=>{v.ga.gain.linearRampToValueAtTime(v.bv*rampT,actx.currentTime+.1)})})
+  },100)
+
+  running=true;document.documentElement.requestFullscreen?.().catch(()=>{});loop()
+}
+window.go=go
+
+// ═══ ACCRETION DISK PARTICLES ═══
+const diskParticles=[]
+for(let i=0;i<600;i++){
+  const angle=Math.random()*TAU
+  const r=50+Math.random()*250
+  const speed=200/(r+50) // Keplerian — inner orbits faster
+  const z2=(Math.random()-.5)*10*(r/300) // disk thins toward center
+  const hue=Math.random()
+  diskParticles.push({angle,r,speed,z:z2,hue,size:1+Math.random()*2,brightness:.3+Math.random()*.7})
+}
+
+// ═══ JET PARTICLES ═══
+const jetParticles=[]
+for(let i=0;i<200;i++){
+  const y=Math.random()*500-250
+  const spread=Math.abs(y)*.05+5
+  const x=(Math.random()-.5)*spread
+  const z2=(Math.random()-.5)*spread
+  jetParticles.push({x,y,z:z2,speed:2+Math.random()*4,hue:.7+Math.random()*.15,age:Math.random()})
+}
+
+function loop(){
+  if(!running)return
+  requestAnimationFrame(loop)
+  t+=1/60
+
+  accretionRate=.5+Math.sin(t*.3)*.2+Math.sin(t*1.7)*.1
+
+  // modulate harmonics with accretion rate
+  oscs.forEach((voices,i)=>{
+    const mod=.5+accretionRate*.5+Math.sin(t*2+i)*.15
+    voices.forEach(v=>{
+      const target=v.bv*mod
+      v.ga.gain.linearRampToValueAtTime(target,actx.currentTime+.05)
+      // frequency wobble — gravitational redshift simulation
+      const shift=Math.sin(t*.5+i*.7)*v.hz*.002
+      v.o.frequency.linearRampToValueAtTime(v.hz+shift,actx.currentTime+.05)
+    })
+  })
+
+  const maxR=Math.min(W,H)*.45
+
+  // ═══ BACKGROUND — deep space ═══
+  ctx.globalAlpha=.04
+  ctx.fillStyle='#000005'
+  ctx.fillRect(0,0,W,H)
+
+  // ═══ RELATIVISTIC JETS (top and bottom) ═══
+  jetParticles.forEach(jp=>{
+    jp.age+=jp.speed*.003
+    if(jp.age>1)jp.age-=1
+    const jy=cy+(jp.y>0?1:-1)*(jp.age*maxR*1.2)
+    const spread=jp.age*maxR*.08
+    const jx=cx+jp.x*(1+jp.age*2)
+    if(Math.abs(jy-cy)>maxR*1.3)return
+    const alpha=Math.sin(jp.age*Math.PI)*.08*accretionRate
+    ctx.beginPath();ctx.arc(jx,jy,jp.hue*2+1,0,TAU)
+    ctx.fillStyle=`hsla(${260+jp.hue*40},70%,${60+jp.age*20}%,${alpha})`
+    ctx.globalAlpha=1;ctx.fill()
+  })
+
+  // jet core beams
+  ;[-1,1].forEach(dir=>{
+    const grad=ctx.createLinearGradient(cx,cy,cx,cy+dir*maxR*1.2)
+    grad.addColorStop(0,`rgba(180,150,255,${.06*accretionRate})`)
+    grad.addColorStop(.3,`rgba(120,100,255,${.03*accretionRate})`)
+    grad.addColorStop(1,'rgba(0,0,0,0)')
+    ctx.globalAlpha=1;ctx.fillStyle=grad
+    ctx.beginPath();ctx.moveTo(cx-3,cy);ctx.lineTo(cx-maxR*.06,cy+dir*maxR*1.2)
+    ctx.lineTo(cx+maxR*.06,cy+dir*maxR*1.2);ctx.lineTo(cx+3,cy);ctx.closePath();ctx.fill()
+  })
+
+  // ═══ ACCRETION DISK ═══
+  // sort by z for pseudo-3D
+  diskParticles.sort((a,b)=>a.z-b.z)
+
+  diskParticles.forEach(dp=>{
+    dp.angle+=dp.speed*.004*(1+accretionRate*.5)
+    // keplerian orbit — tilted 70° for side view
+    const tilt=.3 // disk tilt
+    const px=cx+Math.cos(dp.angle)*dp.r
+    const rawY=Math.sin(dp.angle)*dp.r*tilt+dp.z
+    const py=cy+rawY
+
+    // color shifts: inner=hot blue/white, outer=cool red
+    const tempFrac=1-dp.r/300
+    const hue=tempFrac>.7?240+tempFrac*60:tempFrac>.3?40-tempFrac*30:0+tempFrac*20
+    const lum=40+tempFrac*35
+    const alpha=dp.brightness*(.04+accretionRate*.04)*(tempFrac*.5+.5)
+
+    // behind the center = dimmer (occluded)
+    const behind=rawY>0&&dp.r<100?.3:1
+
+    ctx.beginPath();ctx.arc(px,py,dp.size*(1+tempFrac),0,TAU)
+    ctx.fillStyle=`hsla(${hue},${60+tempFrac*30}%,${lum}%,${alpha*behind})`
+    ctx.globalAlpha=1;ctx.fill()
+
+    // hot particles emit trails
+    if(tempFrac>.6){
+      const tx=cx+Math.cos(dp.angle-.05)*dp.r
+      const ty=cy+(Math.sin(dp.angle-.05)*dp.r*tilt+dp.z)
+      ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(tx,ty)
+      ctx.strokeStyle=`hsla(${hue},70%,${lum+10}%,${alpha*.3*behind})`
+      ctx.lineWidth=dp.size*.5;ctx.stroke()
+    }
+  })
+
+  // ═══ BLACK HOLE CENTER ═══
+  // event horizon
+  const ehR=maxR*.06+Math.sin(t*2)*.002*maxR
+  ctx.beginPath();ctx.arc(cx,cy,ehR,0,TAU)
+  ctx.fillStyle='#000';ctx.globalAlpha=1;ctx.fill()
+
+  // photon sphere glow (light orbiting the event horizon)
+  const psR=ehR*1.5
+  for(let ring=0;ring<5;ring++){
+    const rr=psR+ring*2
+    ctx.beginPath();ctx.arc(cx,cy,rr,0,TAU)
+    ctx.strokeStyle=`hsla(${270+ring*15},60%,${50+ring*5}%,${.06-ring*.01})`
+    ctx.lineWidth=1.5;ctx.globalAlpha=1;ctx.stroke()
+  }
+
+  // gravitational lensing ring (Einstein ring)
+  ctx.beginPath();ctx.arc(cx,cy,ehR*2.5,0,TAU)
+  ctx.strokeStyle=`hsla(45,50%,70%,${.03+accretionRate*.02})`
+  ctx.lineWidth=2+accretionRate*2;ctx.globalAlpha=1;ctx.stroke()
+
+  // ═══ EMISSION LINE MARKERS ═══
+  harmonics.forEach((h,i)=>{
+    const angle=i*TAU/harmonics.length+t*.05
+    const lineR=maxR*(.3+i*.08)
+    const lx=cx+Math.cos(angle)*lineR,ly=cy+Math.sin(angle)*lineR*.3 // compressed y for disk tilt
+
+    // emission glow
+    ctx.beginPath();ctx.arc(lx,ly,3+accretionRate*3+Math.sin(t*3+i)*1.5,0,TAU)
+    ctx.fillStyle=`rgba(${h.color[0]},${h.color[1]},${h.color[2]},${.06+accretionRate*.04})`
+    ctx.globalAlpha=1;ctx.fill()
+
+    // label
+    ctx.font='5px monospace';ctx.textAlign='center';ctx.globalAlpha=.04+accretionRate*.02
+    ctx.fillStyle=`rgba(${h.color[0]},${h.color[1]},${h.color[2]},.6)`
+    ctx.fillText(`${h.name} ${h.hz}nm`,lx,ly+8)
+  })
+
+  // ═══ KONOMI CONNECTION ═══
+  // 77 = 7 × 11 — show the prime factorization as structure
+  // 7 inner spokes, 11 outer spokes
+  ctx.globalAlpha=.015+accretionRate*.01
+  for(let i=0;i<7;i++){
+    const a=i*TAU/7+t*.02
+    ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*ehR*3,cy+Math.sin(a)*ehR*3*.3)
+    ctx.lineTo(cx+Math.cos(a)*maxR*.25,cy+Math.sin(a)*maxR*.25*.3)
+    ctx.strokeStyle='rgba(200,150,255,.3)';ctx.lineWidth=.5;ctx.stroke()
+  }
+  for(let i=0;i<11;i++){
+    const a=i*TAU/11-t*.015
+    ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*maxR*.25,cy+Math.sin(a)*maxR*.25*.3)
+    ctx.lineTo(cx+Math.cos(a)*maxR*.5,cy+Math.sin(a)*maxR*.5*.3)
+    ctx.strokeStyle='rgba(200,150,255,.2)';ctx.lineWidth=.5;ctx.stroke()
+  }
+
+  // ═══ HUD ═══
+  ctx.globalAlpha=.12
+  ctx.font='7px monospace';ctx.textAlign='left';ctx.fillStyle='rgba(180,150,255,.5)'
+  const lines=[
+    'QUASAR · Z=77 · Ir · KONOMI',
+    `accretion: ${(accretionRate*100).toFixed(0)}%`,
+    'emission: Lyα Lyβ Hα Hβ Hγ OIII MgII',
+    '77 = 7 × 11 · both konomi primes',
+    'the brightest thing in the universe',
+    'consumption → light',
+    '',
+    'a black hole so hungry',
+    'the food becomes light',
+    'before it can be swallowed'
+  ]
+  lines.forEach((l,i)=>ctx.fillText(l,12,16+i*12))
+}
+</script>
+</body></html>
