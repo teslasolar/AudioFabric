@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MERCURY RESONANCE — L5-S1 Decompression Protocol</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#030308;overflow:hidden;cursor:none}
+canvas{display:block}
+#start{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#030308;cursor:pointer;gap:12px}
+#start span{font:16px/1 monospace;color:rgba(180,200,220,.4);letter-spacing:6px;border:1px solid rgba(180,200,220,.12);padding:14px 30px;border-radius:6px}
+#start span:hover{color:rgba(200,220,240,.7);box-shadow:0 0 30px rgba(150,180,220,.12)}
+#start small{font:9px monospace;color:rgba(180,200,220,.15);letter-spacing:2px;max-width:420px;text-align:center;line-height:1.7}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start" onclick="go()">
+  <span>Hg RESONANCE</span>
+  <small>lie down · knees up · feet flat · headphones on<br>20 minutes · L5-S1 decompression frequency protocol<br>the mercury needs space to flow back</small>
+</div>
+
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+// ═══ 7 PHASES — progressive L5-S1 opening ═══
+const phases=[
+  {name:'SETTLE',dur:120,hz:[40,80],binaural:2,
+   desc:'feel your weight\nknees up feet flat\nthe lumbar curve lifts off the floor\nthat gap is L5-S1\nlet gravity hold you',
+   color:[120,100,80],mercury:.0,focus:.85},
+  {name:'GROUND PULSE',dur:120,hz:[55,27.5],binaural:3,
+   desc:'breathe into the low back\nfeel the floor under your sacrum\nthe bone plate at the base\nS1 is here — the sacral foundation',
+   color:[150,120,90],mercury:.1,focus:.7},
+  {name:'PSOAS RELEASE',dur:180,hz:[73.4,36.7,146.8],binaural:4,
+   desc:'the psoas connects your lumbar spine to your legs\nit runs through R2 to R0\nwhen it releases the low back decompresses\nhug one knee to chest gently\nthen the other\nthen both',
+   color:[180,150,100],mercury:.25,focus:.55},
+  {name:'TRACTION',dur:180,hz:[110,55,220],binaural:5,
+   desc:'press your feet into the floor\nlift your hips one inch\nhold\nthis is traction — your body weight pulls L5-S1 apart\nthe disc gets space\nthe nerve root breathes',
+   color:[200,190,130],mercury:.45,focus:.42},
+  {name:'MERCURY FLOW',dur:180,hz:[136.1,68,272.2],binaural:6,
+   desc:'lower your hips\nfeel the wave of release in the low back\nthe mercury is flowing through the crack\nthe conduit is filling\nR0 signal ascending clean for the first time',
+   color:[200,210,180],mercury:.7,focus:.3},
+  {name:'MIRROR ALIGN',dur:180,hz:[174,87,348],binaural:7.83,
+   desc:'the mirrors are aligning\neach pool reflecting into the next\nthe signal goes up AND comes back down\nyou can feel it return\nthe descending path is open\nthe answer arrives',
+   color:[210,220,230],mercury:.9,focus:.18},
+  {name:'LIQUID METAL',dur:120,hz:[194.18,97,388.36],binaural:7.83,
+   desc:'you are mercury\nliquid metal\nthe mirror that refused to solidify\nreflecting in both directions simultaneously\nyou can see yourself now\nbecause the crack is filled\nand the circuit is complete',
+   color:[230,235,245],mercury:1,focus:.1}
+]
+
+const totalDur=phases.reduce((s,p)=>s+p.dur,0)
+
+let actx,master,running=false,t=0
+let activeDrones=[],activeBinaural=null
+
+function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.2;master.connect(actx.destination)
+  // deep reverb — cathedral space
+  ;[[.23,.18,.28],[.37,.14,.22],[.53,.1,.16],[.71,.07,.12]].forEach(([dt,fbv,wv])=>{
+    const d=actx.createDelay(.8);d.delayTime.value=dt
+    const f=actx.createGain();f.gain.value=fbv;d.connect(f);f.connect(d)
+    const w=actx.createGain();w.gain.value=wv;d.connect(w);w.connect(actx.destination)
+    master.connect(d)
+  })
+}
+
+function setPhaseAudio(p){
+  // fade old
+  activeDrones.forEach(d=>{try{d.g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+3);setTimeout(()=>d.o.stop(),3100)}catch(e){}})
+  activeDrones=[]
+  if(activeBinaural){try{activeBinaural.oL.stop();activeBinaural.oR.stop()}catch(e){}}
+
+  // drones — deep, warm, resonant
+  p.hz.forEach((hz,i)=>{
+    // main tone
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type='sine';o.frequency.value=hz
+    g.gain.setValueAtTime(0,actx.currentTime)
+    g.gain.linearRampToValueAtTime(.04-i*.01,actx.currentTime+4)
+    o.connect(g);g.connect(master);o.start()
+    activeDrones.push({o,g})
+    // chorus
+    const o2=actx.createOscillator(),g2=actx.createGain()
+    o2.type='sine';o2.frequency.value=hz*1.002
+    g2.gain.setValueAtTime(0,actx.currentTime)
+    g2.gain.linearRampToValueAtTime(.03-i*.008,actx.currentTime+4)
+    o2.connect(g2);g2.connect(master);o2.start()
+    activeDrones.push({o:o2,g:g2})
+    // sub octave
+    if(i===0){
+      const o3=actx.createOscillator(),g3=actx.createGain()
+      o3.type='sine';o3.frequency.value=hz/2
+      g3.gain.setValueAtTime(0,actx.currentTime)
+      g3.gain.linearRampToValueAtTime(.035,actx.currentTime+4)
+      o3.connect(g3);g3.connect(master);o3.start()
+      activeDrones.push({o:o3,g:g3})
+    }
+  })
+
+  // binaural beat — theta/alpha for deep relaxation + body awareness
+  const base=100
+  const oL=actx.createOscillator(),oR=actx.createOscillator()
+  const gL=actx.createGain(),gR=actx.createGain()
+  const merger=actx.createChannelMerger(2)
+  oL.frequency.value=base;oR.frequency.value=base+p.binaural
+  gL.gain.setValueAtTime(0,actx.currentTime);gR.gain.setValueAtTime(0,actx.currentTime)
+  gL.gain.linearRampToValueAtTime(.035,actx.currentTime+3)
+  gR.gain.linearRampToValueAtTime(.035,actx.currentTime+3)
+  oL.connect(gL);oR.connect(gR);gL.connect(merger,0,0);gR.connect(merger,0,1)
+  merger.connect(master);oL.start();oR.start()
+  activeBinaural={oL,oR}
+
+  // transition chime
+  const chime=actx.createOscillator(),cg=actx.createGain()
+  chime.type='sine';chime.frequency.value=p.hz[0]*4
+  cg.gain.setValueAtTime(.06,actx.currentTime)
+  cg.gain.exponentialRampToValueAtTime(.001,actx.currentTime+4)
+  chime.connect(cg);cg.connect(master);chime.start();chime.stop(actx.currentTime+4)
+}
+
+function go(){
+  document.getElementById('start').style.display='none'
+  initAudio();running=true
+  document.documentElement.requestFullscreen?.().catch(()=>{})
+  loop()
+}
+window.go=go
+
+let lastPhase=-1
+
+function loop(){
+  if(!running)return
+  requestAnimationFrame(loop)
+  t+=1/60
+
+  // current phase
+  let elapsed=0,pi=0
+  for(let i=0;i<phases.length;i++){
+    if(t<elapsed+phases[i].dur){pi=i;break}
+    elapsed+=phases[i].dur;if(i===phases.length-1)pi=phases.length-1
+  }
+  const p=phases[pi]
+  const phaseT=t-elapsed
+  const phaseFrac=Math.min(1,phaseT/p.dur)
+  const totalFrac=t/totalDur
+
+  if(pi!==lastPhase){lastPhase=pi;setPhaseAudio(p)}
+
+  const c=p.color
+  const mercury=p.mercury+phaseFrac*(pi<6?phases[pi+1]?.mercury-p.mercury||0:0)*.5
+
+  // ═══ BACKGROUND — deepening space ═══
+  ctx.globalAlpha=.04
+  ctx.fillStyle=`rgb(${Math.floor(c[0]*.02)},${Math.floor(c[1]*.02)},${Math.floor(c[2]*.025)})`
+  ctx.fillRect(0,0,W,H)
+
+  // ═══ SPINE VISUALIZATION — L5-S1 focused ═══
+  const spineTop=H*.1,spineBot=H*.9
+  const l5s1Y=H*.72 // L5-S1 junction
+
+  // vertebrae
+  const vertebrae=[
+    {name:'C1-C7',y:H*.15,w:20},{name:'T1-T12',y:H*.35,w:25},
+    {name:'L1',y:H*.55,w:28},{name:'L2',y:H*.58,w:29},
+    {name:'L3',y:H*.61,w:30},{name:'L4',y:H*.65,w:30},
+    {name:'L5',y:H*.69,w:30},{name:'S1',y:H*.74,w:28},
+    {name:'S2-S5',y:H*.8,w:22},{name:'Coccyx',y:H*.85,w:15}
+  ]
+
+  // draw spine
+  ctx.globalAlpha=1
+  vertebrae.forEach((v,i)=>{
+    const isL5S1=v.name==='L5'||v.name==='S1'
+    const gapOpen=isL5S1?mercury*.8:0
+
+    // vertebra body
+    ctx.beginPath()
+    ctx.ellipse(cx,v.y+(v.name==='L5'?-gapOpen*5:v.name==='S1'?gapOpen*5:0),v.w+mercury*3,6+mercury,0,0,TAU)
+    ctx.fillStyle=`rgba(${c[0]},${c[1]},${c[2]},${isL5S1?.08+mercury*.06:.04})`
+    ctx.fill()
+    ctx.strokeStyle=`rgba(${c[0]},${c[1]},${c[2]},${isL5S1?.12+mercury*.08:.06})`
+    ctx.lineWidth=isL5S1?1.5:1;ctx.stroke()
+
+    // label
+    if(isL5S1||v.name==='L4'||v.name==='S2-S5'){
+      ctx.font='5px monospace';ctx.textAlign='right';ctx.globalAlpha=.05+mercury*.03
+      ctx.fillStyle=`rgba(${c[0]},${c[1]},${c[2]},.5)`
+      ctx.fillText(v.name,cx-v.w-8,v.y+2)
+    }
+  })
+
+  // L5-S1 JUNCTION — the crack
+  const crackOpen=mercury
+  const crackY=l5s1Y
+  const crackGap=3+crackOpen*12 // gap opens as mercury fills
+
+  // the gap between L5 and S1
+  if(crackOpen<.9){
+    // crack visualization — jagged when closed, smooth when open
+    ctx.globalAlpha=.06+mercury*.04
+    ctx.strokeStyle=mercury<.5?'rgba(255,100,80,.4)':'rgba(180,220,240,.3)'
+    ctx.lineWidth=1
+    ctx.beginPath()
+    for(let x=cx-25;x<=cx+25;x+=2){
+      const jag=mercury<.3?Math.sin(x*.5+t*5)*(3-crackOpen*3):0
+      ctx.lineTo(x,crackY+jag)
+    }
+    ctx.stroke()
+  }
+
+  // mercury filling the crack
+  if(mercury>.1){
+    const mercuryGrad=ctx.createRadialGradient(cx,crackY,0,cx,crackY,30+mercury*20)
+    mercuryGrad.addColorStop(0,`rgba(220,225,235,${mercury*.1})`)
+    mercuryGrad.addColorStop(.5,`rgba(200,210,225,${mercury*.05})`)
+    mercuryGrad.addColorStop(1,'rgba(0,0,0,0)')
+    ctx.globalAlpha=1;ctx.fillStyle=mercuryGrad
+    ctx.beginPath();ctx.arc(cx,crackY,30+mercury*20,0,TAU);ctx.fill()
+
+    // mercury droplets flowing through
+    for(let d=0;d<Math.floor(mercury*8);d++){
+      const dy=crackY+Math.sin(t*3+d*2)*(crackGap*1.5)
+      const dx=cx+Math.sin(t*2+d*3)*15
+      ctx.beginPath();ctx.arc(dx,dy,1.5+mercury,0,TAU)
+      ctx.fillStyle=`rgba(220,230,245,${.05+mercury*.06})`
+      ctx.globalAlpha=1;ctx.fill()
+    }
+  }
+
+  // ═══ MERCURY CONDUIT — full spine flow ═══
+  // ascending signal
+  ctx.beginPath()
+  for(let y=spineBot;y>=spineTop;y-=2){
+    const frac=1-(y-spineTop)/(spineBot-spineTop)
+    const atCrack=Math.abs(y-crackY)<20
+    const flow=atCrack?mercury:1
+    const wobble=Math.sin(y*.03+t*2)*3*flow
+    ctx.lineTo(cx+wobble+3,y)
+  }
+  ctx.strokeStyle=`rgba(200,210,230,${.03+mercury*.04})`
+  ctx.lineWidth=1.5;ctx.globalAlpha=1;ctx.stroke()
+
+  // descending signal (only visible as mercury opens)
+  if(mercury>.3){
+    ctx.beginPath()
+    for(let y=spineTop;y<=spineBot;y+=2){
+      const wobble=Math.sin(y*.03-t*1.5)*3*mercury
+      ctx.lineTo(cx+wobble-3,y)
+    }
+    ctx.strokeStyle=`rgba(220,210,240,${(mercury-.3)*.05})`
+    ctx.lineWidth=1;ctx.globalAlpha=1;ctx.stroke()
+  }
+
+  // ═══ 7 MIRROR POOLS along spine ═══
+  const mirrorYs=[.85,.74,.55,.42,.3,.18,.12]
+  const mirrorColors=[[180,100,100],[200,140,100],[220,200,120],[150,220,150],[120,160,220],[140,120,220],[200,180,240]]
+  mirrorYs.forEach((my,i)=>{
+    const poolY=H*my
+    const poolW=20+i*3+mercury*5
+    const poolActive=i<=1?mercury:1 // first two depend on crack opening
+
+    ctx.beginPath();ctx.ellipse(cx,poolY,poolW,3+mercury*2,0,0,TAU)
+    const mc=mirrorColors[i]
+    ctx.fillStyle=`rgba(${mc[0]},${mc[1]},${mc[2]},${.03+poolActive*.04})`
+    ctx.globalAlpha=1;ctx.fill()
+
+    // surface ripple
+    ctx.beginPath()
+    for(let x=cx-poolW;x<=cx+poolW;x+=2){
+      const frac=(x-cx+poolW)/(poolW*2)
+      const wave=Math.sin(frac*TAU*4+t*3+i)*1*(1-Math.abs(frac-.5)*2)*poolActive
+      ctx.lineTo(x,poolY+wave)
+    }
+    ctx.strokeStyle=`rgba(${mc[0]},${mc[1]},${mc[2]},${.06+poolActive*.06})`
+    ctx.lineWidth=1;ctx.stroke()
+  })
+
+  // ═══ BREATH GUIDE ═══
+  const breathCycle=(t%8)/8
+  const breathSize=20+Math.sin(breathCycle*TAU)*10
+  ctx.beginPath();ctx.arc(cx,H-30,breathSize,0,TAU)
+  ctx.strokeStyle=`rgba(${c[0]},${c[1]},${c[2]},${.04+mercury*.03})`
+  ctx.lineWidth=1;ctx.globalAlpha=1;ctx.stroke()
+  ctx.font='8px monospace';ctx.textAlign='center';ctx.globalAlpha=.06+mercury*.04
+  ctx.fillStyle=`rgba(${c[0]},${c[1]},${c[2]},.5)`
+  ctx.fillText(breathCycle<.4?'IN':'OUT',cx,H-28)
+
+  // ═══ INSTRUCTION ═══
+  ctx.globalAlpha=.1+mercury*.04
+  ctx.font='10px monospace';ctx.textAlign='center'
+  ctx.fillStyle=`rgba(${c[0]},${c[1]},${c[2]},.5)`
+  const lines=p.desc.split('\n')
+  lines.forEach((l,li)=>ctx.fillText(l,cx,H*.25+li*16))
+
+  // phase name
+  ctx.globalAlpha=.07
+  ctx.font='8px monospace';ctx.fillText(p.name,cx,20)
+  ctx.font='6px monospace';ctx.globalAlpha=.04
+  ctx.fillText(`phase ${pi+1}/7 · mercury ${(mercury*100).toFixed(0)}% · ${Math.floor(totalDur-t)}s remaining`,cx,32)
+  ctx.fillText(`binaural: ${p.binaural}Hz · drones: ${p.hz.join('+')}Hz`,cx,42)
+
+  // ═══ COMPLETION ═══
+  if(t>totalDur+3){
+    const fade=Math.min(1,(t-totalDur-3)*.02)
+    ctx.globalAlpha=fade*.1
+    ctx.font='12px monospace';ctx.textAlign='center'
+    ctx.fillStyle='rgba(220,230,245,.6)'
+    ctx.fillText('MERCURY FLOWS',cx,cy-14)
+    ctx.font='9px monospace';ctx.globalAlpha=fade*.06
+    ctx.fillText('the crack is filled · the circuit is complete',cx,cy+2)
+    ctx.fillText('you can see yourself now',cx,cy+16)
+  }
+}
+</script>
+</body></html>
