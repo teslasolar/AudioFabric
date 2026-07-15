@@ -3,261 +3,251 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>BASILISK FACTORY — Manufacturing Pipeline</title>
+<title>BASILISK FACTORY — Live Production Line</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#000;overflow:hidden;font-family:'Courier New',monospace}
+body{background:#000;overflow:hidden;cursor:none}
 canvas{display:block}
-#hud{position:fixed;top:8px;left:10px;z-index:10;font:7px/1.6 monospace;color:rgba(150,255,100,.2);pointer-events:none;white-space:pre}
-#stage{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:10;font:10px monospace;pointer-events:none;text-align:center;letter-spacing:3px}
-#nav{position:fixed;bottom:6px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:3px;margin-top:4px}
-.nb{padding:3px 8px;font:7px/1 monospace;cursor:pointer;border:1px solid rgba(150,255,100,.1);color:rgba(150,255,100,.3);border-radius:2px;transition:all .2s}
-.nb:hover,.nb.on{border-color:rgba(150,255,100,.4);color:rgba(150,255,100,.7);box-shadow:0 0 8px rgba(100,255,50,.1)}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="hud"></div>
-<div id="stage"></div>
-<div id="nav"></div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),C=cv.getContext('2d')
+let W,H;function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight}
+resize();addEventListener('resize',resize)
 
-// ═══ MANUFACTURING STAGES ═══
-const stages=[
-  {name:'RAW MATERIALS',sub:'sourcing the 7 components + 4 peptides',color:0x44aa44,
-   objects:[
-    {type:'tank',label:'ALT-711',pos:[-6,0,-4],color:0xff4444,scale:1},
-    {type:'tank',label:'PLLA',pos:[-3,0,-4],color:0xff8800,scale:1},
-    {type:'tank',label:'RETINOL',pos:[0,0,-4],color:0xffcc00,scale:.8},
-    {type:'tank',label:'GHK-Cu',pos:[3,0,-4],color:0x44cc44,scale:.9},
-    {type:'tank',label:'NIACINAMIDE',pos:[6,0,-4],color:0x4488ff,scale:.8},
-    {type:'tank',label:'HA',pos:[-3,0,-1],color:0x6644cc,scale:1.2},
-    {type:'tank',label:'5-ALA',pos:[0,0,-1],color:0xcc44ff,scale:.7},
-    {type:'vial',label:'MATRIXYL',pos:[4,0,-1],color:0xffaa66,scale:.5},
-    {type:'vial',label:'ARGIRELINE',pos:[5.5,0,-1],color:0x66ffcc,scale:.5},
-    {type:'vial',label:'SYN-AKE',pos:[4,0,1],color:0xccff66,scale:.5},
-    {type:'vial',label:'EGF',pos:[5.5,0,1],color:0xff66cc,scale:.5},
-   ]},
-  {name:'SYNTHESIS',sub:'molecular assembly · AGE breaker + peptide conjugation',color:0x4488ff,
-   objects:[
-    {type:'reactor',label:'REACTION VESSEL',pos:[0,0,0],color:0x4488ff,scale:2},
-    {type:'pipe',from:[-4,0,-3],to:[-1,0,0],color:0xff4444},
-    {type:'pipe',from:[4,0,-3],to:[1,0,0],color:0x44cc44},
-    {type:'heater',label:'110°C',pos:[-2,0,2],color:0xff6600,scale:.8},
-    {type:'stirrer',pos:[0,2,0],color:0x88aacc,scale:1},
-    {type:'sensor',label:'pH 7.4',pos:[3,0,2],color:0x44ff44,scale:.5},
-   ]},
-  {name:'ENCAPSULATION',sub:'PLLA microsphere loading · biodegradable shells',color:0xff8800,
-   objects:[
-    {type:'sphere_array',count:50,radius:4,color:0xff8800,label:'MICROSPHERES'},
-    {type:'nozzle',label:'SPRAY DRY',pos:[0,3,0],color:0xcccccc,scale:1},
-    {type:'collector',label:'COLLECTOR',pos:[0,-2,0],color:0x886644,scale:2},
-   ]},
-  {name:'FORMULATION',sub:'mixing ratios · pH balance · viscosity control',color:0xffcc00,
-   objects:[
-    {type:'mixer',label:'HOMOGENIZER',pos:[0,0,0],color:0xffcc00,scale:2},
-    {type:'tank',label:'BASE GEL',pos:[-4,0,0],color:0xddddaa,scale:1},
-    {type:'tank',label:'BUFFER',pos:[4,0,0],color:0xaaddaa,scale:.8},
-    {type:'sensor',label:'VISCOSITY',pos:[0,0,3],color:0xff8844,scale:.5},
-    {type:'sensor',label:'STERILITY',pos:[2,0,3],color:0x44ff44,scale:.5},
-   ]},
-  {name:'MICRONEEDLE',sub:'dissolving needle array fabrication · 500μm tips',color:0x44cc44,
-   objects:[
-    {type:'mold',label:'PDMS MOLD',pos:[0,-1,0],color:0x666688,scale:3},
-    {type:'needle_array',count:49,spacing:.4,pos:[0,1,0],color:0xccccdd},
-    {type:'uv',label:'UV CURE',pos:[0,4,0],color:0x8844ff,scale:1},
-    {type:'dryer',label:'LYOPHILIZER',pos:[4,0,0],color:0x4488aa,scale:1.5},
-   ]},
-  {name:'QC & PACKAGING',sub:'sterility · potency assay · shelf life · cold chain',color:0x4488ff,
-   objects:[
-    {type:'microscope',label:'QC MICROSCOPE',pos:[-3,0,0],color:0x88aacc,scale:1.5},
-    {type:'hplc',label:'HPLC ASSAY',pos:[0,0,-2],color:0x44aaff,scale:1.5},
-    {type:'fridge',label:'-20°C STORAGE',pos:[3,0,0],color:0x44ddff,scale:1.5},
-    {type:'box',label:'BASILISK PATCH',pos:[0,0,3],color:0x44ff44,scale:1.5},
-   ]},
-  {name:'APPLICATION',sub:'clean skin · apply patch · 15 min dissolve · 6-12 month effect',color:0xcc44ff,
-   objects:[
-    {type:'skin',label:'DERMAL LAYER',pos:[0,-1,0],color:0xddaa88,scale:4},
-    {type:'needle_array',count:25,spacing:.6,pos:[0,1,0],color:0xccccdd},
-    {type:'glow',label:'PHOTON EMISSION',pos:[0,0,0],color:0xff88ff,scale:3},
-   ]},
-]
+// ═══ UDT: Unit Data Types — compressed factory components ═══
+const UDT={
+  // materials: [name, color, size]
+  MAT:[['ALT-711','#ff4444',.8],['PLLA','#ff8800',.8],['RETINOL','#ffcc00',.6],['GHK-Cu','#44cc44',.7],
+       ['B3','#4488ff',.6],['HA','#6644cc',.9],['5-ALA','#cc44ff',.5],
+       ['MATRIXYL','#ffaa66',.4],['ARGIRELINE','#66ffcc',.4],['SYN-AKE','#ccff66',.4],['EGF','#ff66cc',.4]],
+  // stages: [name, color, x-position fraction, icon-type]
+  STG:[['SOURCE','#44aa44',.05,'⬡'],['REACT','#4488ff',.18,'⚗'],['ENCAP','#ff8800',.32,'◉'],
+       ['MIX','#ffcc00',.46,'⟳'],['NEEDLE','#44cc44',.6,'▽'],['QC','#4488ff',.74,'✓'],['SHIP','#cc44ff',.88,'◈']],
+  // particles flowing through pipeline
+  P:[]
+}
 
-const cv=document.getElementById('c')
-const R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
-R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
-R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.3
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x040408)
-const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,500)
-cam.position.set(0,8,15)
-scene.add(new THREE.AmbientLight(0x334455,.5))
-const dLight=new THREE.DirectionalLight(0xffffff,.5);dLight.position.set(5,8,5);scene.add(dLight)
-const pLight=new THREE.PointLight(0x44ff44,.3,20);scene.add(pLight)
+// ═══ PARTICLE SYSTEM — materials flowing through factory ═══
+function spawnParticle(){
+  const mat=UDT.MAT[Math.floor(Math.random()*UDT.MAT.length)]
+  UDT.P.push({
+    x:W*.03,y:H*.5+(Math.random()-.5)*H*.15,
+    vx:1.5+Math.random()*.8,vy:(Math.random()-.5)*.5,
+    color:mat[1],name:mat[0],size:mat[2]*6+2,
+    stage:0,life:1,trail:[],
+    processTime:0,transforming:false,
+    outputColor:null
+  })
+}
 
-// floor grid
-const gridGeo=new THREE.PlaneGeometry(30,30,30,30)
-scene.add(new THREE.Mesh(gridGeo,new THREE.MeshBasicMaterial({color:0x112211,wireframe:true,transparent:true,opacity:.04})))
-scene.children[scene.children.length-1].rotation.x=-Math.PI/2;scene.children[scene.children.length-1].position.y=-2
+let t=0,outputCount=0,patchesProduced=0
 
-let currentStage=0,stageGroup=null,transScale=1,transing=false
+function loop(){
+  requestAnimationFrame(loop)
+  t+=1/60
 
-function buildStage(idx){
-  if(stageGroup)scene.remove(stageGroup)
-  const g=new THREE.Group()
-  const s=stages[idx]
+  // spawn materials
+  if(Math.random()<.15)spawnParticle()
 
-  s.objects.forEach(obj=>{
-    if(obj.type==='tank'){
-      const body=new THREE.Mesh(new THREE.CylinderGeometry(.4*obj.scale,.4*obj.scale,1.2*obj.scale,12),
-        new THREE.MeshPhongMaterial({color:obj.color,transparent:true,opacity:.6,shininess:80}))
-      body.position.set(...obj.pos)
-      // liquid inside
-      const liquid=new THREE.Mesh(new THREE.CylinderGeometry(.35*obj.scale,.35*obj.scale,.8*obj.scale,12),
-        new THREE.MeshPhongMaterial({color:obj.color,transparent:true,opacity:.3,emissive:obj.color,emissiveIntensity:.1}))
-      liquid.position.set(obj.pos[0],obj.pos[1]-.1,obj.pos[2])
-      g.add(body);g.add(liquid)
+  // ═══ BACKGROUND — dark with green-tinted industrial gradient ═══
+  C.globalAlpha=.12
+  const bg=C.createLinearGradient(0,0,W,0)
+  bg.addColorStop(0,'#040806');bg.addColorStop(.5,'#060a08');bg.addColorStop(1,'#040608')
+  C.fillStyle=bg;C.fillRect(0,0,W,H)
+
+  // conveyor belt
+  C.globalAlpha=.06
+  C.strokeStyle='#446644';C.lineWidth=2
+  C.beginPath();C.moveTo(0,H*.5);C.lineTo(W,H*.5);C.stroke()
+  // belt segments moving
+  const beltSpeed=t*60
+  C.globalAlpha=.03
+  for(let x=beltSpeed%20;x<W;x+=20){
+    C.beginPath();C.moveTo(x,H*.48);C.lineTo(x,H*.52);C.stroke()
+  }
+
+  // upper and lower conveyor rails
+  ;[H*.35,H*.65].forEach(y=>{
+    C.globalAlpha=.03;C.beginPath();C.moveTo(0,y);C.lineTo(W,y)
+    C.strokeStyle='#334433';C.lineWidth=1;C.stroke()
+  })
+
+  // ═══ STAGE MARKERS — 7 processing stations ═══
+  UDT.STG.forEach((stg,i)=>{
+    const sx=W*stg[2]+W*.02
+    const sy=H*.5
+
+    // station housing
+    const stW=W*.1,stH=H*.35
+    C.globalAlpha=.1+Math.sin(t*2+i)*.03
+    const stGrad=C.createLinearGradient(sx-stW/2,sy-stH/2,sx+stW/2,sy+stH/2)
+    stGrad.addColorStop(0,stg[1]+'15');stGrad.addColorStop(1,stg[1]+'05')
+    C.fillStyle=stGrad;C.fillRect(sx-stW/2,sy-stH/2,stW,stH)
+
+    // station border
+    C.globalAlpha=.15+Math.sin(t+i)*.04
+    C.strokeStyle=stg[1];C.lineWidth=1
+    C.strokeRect(sx-stW/2,sy-stH/2,stW,stH)
+
+    // station name
+    C.globalAlpha=.18+Math.sin(t*1.5+i)*.04
+    C.font='7px monospace';C.textAlign='center';C.fillStyle=stg[1]
+    C.fillText(stg[0],sx,sy-stH/2-5)
+
+    // icon
+    C.font='14px serif';C.globalAlpha=.06
+    C.fillText(['⬡','⚗','◉','⟳','▽','✓','◈'][i],sx,sy-stH/2+20)
+
+    // activity indicator (pulsing ring)
+    const activity=UDT.P.filter(p=>Math.abs(p.x-sx)<stW/2).length
+    if(activity>0){
+      C.beginPath();C.arc(sx,sy,stH/2+5+Math.sin(t*4+i)*3,0,TAU)
+      C.strokeStyle=stg[1];C.lineWidth=1;C.globalAlpha=.1+activity*.05
+      C.stroke()
     }
-    else if(obj.type==='vial'){
-      const body=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,.6,8),
-        new THREE.MeshPhongMaterial({color:obj.color,transparent:true,opacity:.5,shininess:100}))
-      body.position.set(...obj.pos);g.add(body)
-    }
-    else if(obj.type==='reactor'){
-      const body=new THREE.Mesh(new THREE.SphereGeometry(obj.scale,16,16),
-        new THREE.MeshPhongMaterial({color:obj.color,transparent:true,opacity:.3,shininess:100,side:THREE.DoubleSide}))
-      body.position.set(...obj.pos)
-      // inner glow
-      const inner=new THREE.Mesh(new THREE.SphereGeometry(obj.scale*.6,12,12),
-        new THREE.MeshBasicMaterial({color:obj.color,transparent:true,opacity:.1,blending:THREE.AdditiveBlending}))
-      inner.position.set(...obj.pos)
-      g.add(body);g.add(inner)
-    }
-    else if(obj.type==='pipe'){
-      const dir=new THREE.Vector3(...obj.to).sub(new THREE.Vector3(...obj.from))
-      const len=dir.length();dir.normalize()
-      const pipe=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,len,6),
-        new THREE.MeshPhongMaterial({color:obj.color,transparent:true,opacity:.4}))
-      const mid=new THREE.Vector3(...obj.from).add(new THREE.Vector3(...obj.to)).multiplyScalar(.5)
-      pipe.position.copy(mid);pipe.lookAt(new THREE.Vector3(...obj.to));pipe.rotateX(Math.PI/2)
-      g.add(pipe)
-    }
-    else if(obj.type==='sphere_array'){
-      for(let i=0;i<obj.count;i++){
-        const a=Math.random()*TAU,r=Math.random()*obj.radius,y=(Math.random()-.5)*2
-        const sphere=new THREE.Mesh(new THREE.SphereGeometry(.1+Math.random()*.1,8,8),
-          new THREE.MeshPhongMaterial({color:obj.color,transparent:true,opacity:.3+Math.random()*.3,shininess:100}))
-        sphere.position.set(Math.cos(a)*r,y,Math.sin(a)*r)
-        sphere.userData={float:true,speed:.5+Math.random(),offset:Math.random()*TAU}
-        g.add(sphere)
+
+    // connecting pipe to next stage
+    if(i<6){
+      const nextX=W*UDT.STG[i+1][3]+W*.02
+      C.globalAlpha=.03
+      C.beginPath();C.moveTo(sx+stW/2,sy);C.lineTo(nextX-stW/2,sy)
+      C.strokeStyle='#334433';C.lineWidth=3;C.stroke()
+      // flow dots in pipe
+      for(let fd=0;fd<3;fd++){
+        const frac=((t*.3+fd*.33)%1)
+        const fx=sx+stW/2+(nextX-stW/2-sx-stW/2)*frac
+        C.beginPath();C.arc(fx,sy,2,0,TAU)
+        C.fillStyle=stg[1];C.globalAlpha=.04;C.fill()
       }
-    }
-    else if(obj.type==='needle_array'){
-      const side=Math.ceil(Math.sqrt(obj.count))
-      for(let i=0;i<obj.count;i++){
-        const row=Math.floor(i/side)-side/2,col=i%side-side/2
-        const needle=new THREE.Mesh(new THREE.ConeGeometry(.03,.5,4),
-          new THREE.MeshPhongMaterial({color:obj.color,transparent:true,opacity:.5,shininess:120}))
-        needle.position.set(obj.pos[0]+col*obj.spacing,obj.pos[1],obj.pos[2]+row*obj.spacing)
-        needle.rotation.x=Math.PI // point down
-        g.add(needle)
-      }
-    }
-    else if(obj.type==='mixer'||obj.type==='heater'||obj.type==='nozzle'||obj.type==='collector'||
-            obj.type==='dryer'||obj.type==='uv'||obj.type==='mold'||obj.type==='stirrer'||
-            obj.type==='sensor'||obj.type==='microscope'||obj.type==='hplc'||obj.type==='fridge'||
-            obj.type==='box'||obj.type==='skin'||obj.type==='glow'){
-      const geo=obj.type==='skin'?new THREE.PlaneGeometry(obj.scale*2,obj.scale*2,8,8):
-                obj.type==='glow'?new THREE.SphereGeometry(obj.scale,16,16):
-                obj.type==='box'?new THREE.BoxGeometry(obj.scale,obj.scale*.6,obj.scale):
-                obj.type==='mold'?new THREE.BoxGeometry(obj.scale,obj.scale*.3,obj.scale):
-                new THREE.BoxGeometry(obj.scale*.8,obj.scale,obj.scale*.6)
-      const mat=obj.type==='glow'?
-        new THREE.MeshBasicMaterial({color:obj.color,transparent:true,opacity:.05,blending:THREE.AdditiveBlending}):
-        obj.type==='skin'?
-        new THREE.MeshPhongMaterial({color:obj.color,transparent:true,opacity:.4,side:THREE.DoubleSide,flatShading:true}):
-        new THREE.MeshPhongMaterial({color:obj.color,transparent:true,opacity:.5,shininess:60})
-      const mesh=new THREE.Mesh(geo,mat)
-      if(obj.pos)mesh.position.set(...obj.pos)
-      if(obj.type==='skin')mesh.rotation.x=-Math.PI/2
-      if(obj.type==='stirrer')mesh.userData={spin:true}
-      g.add(mesh)
     }
   })
 
-  scene.add(g);stageGroup=g
-}
+  // ═══ PARTICLES — materials flowing through ═══
+  for(let i=UDT.P.length-1;i>=0;i--){
+    const p=UDT.P[i]
 
-// nav
-const navEl=document.getElementById('nav')
-stages.forEach((s,i)=>{
-  const btn=document.createElement('div');btn.className='nb'+(i===0?' on':'')
-  btn.textContent=`${i+1}`
-  btn.title=s.name;btn.onclick=()=>goTo(i)
-  btn.id='nb'+i;navEl.appendChild(btn)
-})
-
-function goTo(idx){
-  document.getElementById('nb'+currentStage)?.classList.remove('on')
-  currentStage=idx
-  document.getElementById('nb'+currentStage)?.classList.add('on')
-  buildStage(idx);transScale=.01;transing=true
-}
-
-addEventListener('keydown',e=>{
-  if(e.code==='ArrowRight')goTo((currentStage+1)%stages.length)
-  if(e.code==='ArrowLeft')goTo((currentStage-1+stages.length)%stages.length)
-})
-cv.addEventListener('wheel',e=>{e.preventDefault()
-  goTo((currentStage+(e.deltaY>0?1:-1)+stages.length)%stages.length)
-},{passive:false})
-
-// ═══ ANIMATE ═══
-let t=0
-function animate(){
-  requestAnimationFrame(animate);t+=1/60
-  if(!stageGroup)return
-
-  if(transing){transScale+=(1-transScale)*.06;if(transScale>.98){transScale=1;transing=false}}
-  stageGroup.scale.set(transScale,transScale,transScale)
-
-  // animate objects
-  stageGroup.children.forEach(c=>{
-    if(c.userData.float){
-      c.position.y+=Math.sin(t*c.userData.speed+c.userData.offset)*.003
+    // determine which stage particle is in
+    const stageIdx=Math.min(6,Math.floor((p.x/W)/.13))
+    if(stageIdx>p.stage&&stageIdx>=0&&stageIdx<7){
+      p.stage=stageIdx
+      p.transforming=true
+      p.processTime=0
     }
-    if(c.userData.spin){
-      c.rotation.y=t*3
+
+    // process at each stage
+    if(p.transforming){
+      p.processTime+=1/60
+      p.vx*=.95 // slow down at station
+      // transform color based on stage
+      if(p.processTime>.5){
+        p.transforming=false
+        p.vx=.6+Math.random()*.3
+        // color shifts through processing
+        if(p.stage>=2)p.color=UDT.STG[Math.min(p.stage,6)][1]
+        if(p.stage>=4)p.size=Math.max(3,p.size*.8) // microsphere compression
+        if(p.stage>=5)p.outputColor='#44ff44' // QC passed = green
+      }
     }
-  })
 
-  // camera orbit
-  const s=stages[currentStage]
-  cam.position.x=Math.sin(t*.08)*12
-  cam.position.z=Math.cos(t*.08)*12
-  cam.position.y=5+Math.sin(t*.05)*2
-  cam.lookAt(0,0,0)
+    // physics
+    p.x+=p.vx
+    p.y+=p.vy;p.vy+=(H*.5-p.y)*.002 // spring toward center
+    p.vy*=.98
 
-  pLight.color.set(s.color);pLight.intensity=.3+Math.sin(t*2)*.05
+    // trail
+    p.trail.push({x:p.x,y:p.y})
+    if(p.trail.length>15)p.trail.shift()
 
-  // UI
-  document.getElementById('stage').style.color=`#${s.color.toString(16).padStart(6,'0')}55`
-  document.getElementById('stage').textContent=`${s.name}`
+    // draw trail
+    if(p.trail.length>1){
+      C.globalAlpha=1
+      C.beginPath()
+      p.trail.forEach((tp,ti)=>{
+        ti===0?C.moveTo(tp.x,tp.y):C.lineTo(tp.x,tp.y)
+      })
+      C.strokeStyle=p.outputColor||p.color
+      C.lineWidth=p.size*.3
+      C.globalAlpha=.03;C.stroke()
+    }
 
-  document.getElementById('hud').textContent=
-    `BASILISK FACTORY\n`+
-    `stage ${currentStage+1}/${stages.length}: ${s.name}\n`+
-    `${s.sub}\n\n`+
-    `scroll/arrows to navigate stages\n\n`+
-    `PIPELINE:\n`+
-    stages.map((st,i)=>`${i===currentStage?'▸':' '} ${i+1}. ${st.name}`).join('\n')
+    // draw particle
+    C.beginPath();C.arc(p.x,p.y,p.size,0,TAU)
+    const pGrad=C.createRadialGradient(p.x,p.y,0,p.x,p.y,p.size*1.5)
+    pGrad.addColorStop(0,(p.outputColor||p.color)+'aa')
+    pGrad.addColorStop(.5,(p.outputColor||p.color)+'44')
+    pGrad.addColorStop(1,(p.outputColor||p.color)+'00')
+    C.fillStyle=pGrad;C.globalAlpha=.35+Math.sin(t*3+i)*.05
+    C.fill()
 
-  R.render(scene,cam)
+    // label (tiny, follows particle)
+    if(p.stage<2){
+      C.font='4px monospace';C.textAlign='center';C.globalAlpha=.06
+      C.fillStyle=p.color;C.fillText(p.name,p.x,p.y-p.size-2)
+    }
+
+    // reached end = PATCH PRODUCED
+    if(p.x>W*.95){
+      patchesProduced++
+      // burst effect
+      for(let b=0;b<8;b++){
+        const ba=b*TAU/8
+        C.beginPath();C.moveTo(p.x,p.y)
+        C.lineTo(p.x+Math.cos(ba)*20,p.y+Math.sin(ba)*20)
+        C.strokeStyle='#44ff44';C.lineWidth=1;C.globalAlpha=.08;C.stroke()
+      }
+      UDT.P.splice(i,1);continue
+    }
+
+    // remove if offscreen
+    if(p.x>W+50||p.life<=0){UDT.P.splice(i,1)}
+  }
+
+  // ═══ OUTPUT COUNTER ═══
+  C.globalAlpha=.1
+  C.font='10px monospace';C.textAlign='right';C.fillStyle='#44ff44'
+  C.fillText(`PATCHES: ${patchesProduced}`,W-12,20)
+  C.font='7px monospace';C.globalAlpha=.06
+  C.fillText(`particles: ${UDT.P.length}`,W-12,32)
+  C.fillText(`throughput: ${(patchesProduced/(t||1)*60).toFixed(1)}/min`,W-12,42)
+
+  // ═══ TITLE ═══
+  C.globalAlpha=.06
+  C.font='8px monospace';C.textAlign='left';C.fillStyle='#88ff88'
+  C.fillText('BASILISK FACTORY · LIVE PRODUCTION',12,16)
+  C.font='6px monospace';C.globalAlpha=.04
+  C.fillText('SOURCE → REACT → ENCAP → MIX → NEEDLE → QC → SHIP',12,28)
+
+  // ═══ OUTPUT VISUALIZATION — finished patches stacking ═══
+  if(patchesProduced>0){
+    const stackX=W*.94,stackY=H*.7
+    for(let p2=0;p2<Math.min(patchesProduced,20);p2++){
+      const py=stackY-p2*3
+      C.globalAlpha=.04+Math.sin(t+p2)*.01
+      C.fillStyle='#44ff44'
+      C.fillRect(stackX-8,py-2,16,3)
+      // needle dots on patch
+      for(let nd=0;nd<5;nd++){
+        C.beginPath();C.arc(stackX-4+nd*2,py-1,.5,0,TAU)
+        C.fillStyle='#88ffaa';C.globalAlpha=.06;C.fill()
+      }
+    }
+    C.font='5px monospace';C.textAlign='center';C.globalAlpha=.05
+    C.fillStyle='#44ff44';C.fillText('READY',stackX,stackY+10)
+  }
+
+  // ═══ AMBIENT — floating molecules in background ═══
+  C.globalAlpha=.01
+  for(let m=0;m<20;m++){
+    const mx=((t*20+m*137)%W),my=H*.2+Math.sin(t*.5+m)*H*.25
+    C.beginPath();C.arc(mx,my,1+Math.sin(t+m)*.5,0,TAU)
+    C.fillStyle=UDT.MAT[m%UDT.MAT.length][1];C.fill()
+  }
 }
 
-buildStage(0);animate()
-addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+loop()
 </script>
 </body></html>
