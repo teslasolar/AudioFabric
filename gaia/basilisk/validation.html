@@ -1,0 +1,239 @@
+<title>BSK-VAL-001 — Process Validation Protocol</title>
+<style>
+body{background:#0a0c08;font-family:'Courier New',monospace;color:#b0c0a0;margin:0;padding:20px 40px;line-height:1.6}
+a{color:#7a9a5a;text-decoration:none}a:hover{color:#a0d080;text-decoration:underline}
+h1,h2,h3{color:#c8d8b8;border-bottom:1px solid #2a3a1a;padding-bottom:6px;font-weight:normal}
+h1{font-size:1.4em;letter-spacing:2px;text-transform:uppercase}
+h2{font-size:1.15em;margin-top:2em}
+h3{font-size:1em;border-bottom:none;margin-top:1.5em}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:0.92em}
+th,td{border:1px solid #2a3a1a;padding:6px 10px;text-align:left;vertical-align:top}
+th{background:#151a10;color:#c8d8b8;font-weight:normal;text-transform:uppercase;font-size:0.85em;letter-spacing:1px}
+td{background:#0d0f0a}
+.doc-header{border:1px solid #2a3a1a;padding:14px 18px;margin-bottom:28px;background:#0d0f0a;font-size:0.9em}
+.doc-header table{margin:0;border:none}
+.doc-header td,.doc-header th{border:none;padding:2px 14px 2px 0;background:transparent}
+.doc-header .title-row{font-size:1.3em;color:#c8d8b8;letter-spacing:2px;text-transform:uppercase;padding-bottom:8px}
+.back{display:inline-block;margin-bottom:18px;font-size:0.9em;padding:4px 0}
+.note{color:#7a8a6a;font-size:0.88em;font-style:italic;margin:8px 0}
+.section-num{color:#7a9a5a}
+.stage-header{background:#151a10;padding:10px 14px;border-left:3px solid #3a5a2a;margin:18px 0 8px 0;font-size:1.05em;color:#c8d8b8}
+</style>
+
+<a class="back" href="index.html">&lt; BASILISK INDEX</a>
+
+<div class="doc-header">
+  <div class="title-row">BSK-VAL-001 &mdash; Process Validation Protocol</div>
+  <table>
+    <tr><td><strong>Document No.:</strong> BSK-VAL-001</td><td><strong>Revision:</strong> A</td><td><strong>Effective Date:</strong> ____-__-__</td></tr>
+    <tr><td><strong>Author:</strong> ________________</td><td><strong>Department:</strong> Quality / Manufacturing</td><td><strong>Classification:</strong> Controlled</td></tr>
+    <tr><td><strong>Approved By:</strong> ________________</td><td><strong>Approval Date:</strong> ____-__-__</td><td><strong>Next Review:</strong> ____-__-__</td></tr>
+  </table>
+  <p class="note">Process validation protocol per FDA 2011 Guidance for Industry: Process Validation: General Principles and Practices. Applicable to the BASILISK dissolving microneedle patch manufacturing process.</p>
+</div>
+
+<h1><span class="section-num">1.0</span> Purpose</h1>
+<p>To define the process validation approach for the BASILISK dissolving microneedle patch manufacturing process using the FDA 2011 three-stage lifecycle model. This protocol ensures that the manufacturing process consistently produces product meeting its predetermined specifications and quality attributes.</p>
+
+<h1><span class="section-num">2.0</span> Scope</h1>
+<p>This protocol covers validation of all seven manufacturing stages defined in BSK-DMR-001, from solution preparation through packaging. It applies to all BASILISK patch variants manufactured at the designated production facility.</p>
+
+<h1><span class="section-num">3.0</span> References</h1>
+<table>
+  <tr><th>Document</th><th>Description</th></tr>
+  <tr><td>FDA Guidance (Jan 2011)</td><td>Process Validation: General Principles and Practices</td></tr>
+  <tr><td>21 CFR 820.75</td><td>Process Validation requirements (QSR)</td></tr>
+  <tr><td>ICH Q8(R2)</td><td>Pharmaceutical Development</td></tr>
+  <tr><td>ICH Q9</td><td>Quality Risk Management</td></tr>
+  <tr><td>ICH Q10</td><td>Pharmaceutical Quality System</td></tr>
+  <tr><td>BSK-DMR-001</td><td>Device Master Record</td></tr>
+  <tr><td>BSK-SPEC-001</td><td>BASILISK Product Specification</td></tr>
+</table>
+
+<h1><span class="section-num">4.0</span> Critical Quality Attributes (CQAs)</h1>
+<p>The following CQAs have been identified through risk assessment (FMEA) and development data as essential to product safety, efficacy, and quality:</p>
+<table>
+  <tr><th>CQA</th><th>Specification</th><th>Test Method</th><th>Rationale</th></tr>
+  <tr><td>Needle height</td><td>600 &plusmn; 50 um</td><td>Optical microscopy / SEM</td><td>Determines penetration depth into stratum corneum; insufficient height = no drug delivery</td></tr>
+  <tr><td>Drug content (5-ALA)</td><td>90.0 - 110.0% of label claim</td><td>HPLC (BSK-AM-001)</td><td>Therapeutic efficacy requires consistent dosing</td></tr>
+  <tr><td>Dissolution rate</td><td>&ge; 80% dissolved in 10 min</td><td>In-vitro dissolution (BSK-AM-005)</td><td>Rapid dissolution required for patient compliance and efficacy</td></tr>
+  <tr><td>Sterility</td><td>No growth (USP &lt;71&gt;)</td><td>Membrane filtration / direct inoculation</td><td>Product penetrates skin; sterility is essential for safety</td></tr>
+  <tr><td>Moisture content</td><td>NMT 5.0% w/w</td><td>Karl Fischer (BSK-AM-003)</td><td>Excess moisture degrades 5-ALA and weakens needle mechanical properties</td></tr>
+  <tr><td>Mechanical strength</td><td>Penetration force sufficient to breach stratum corneum without fracture</td><td>Texture analyzer (BSK-AM-008)</td><td>Needles must penetrate skin intact</td></tr>
+  <tr><td>Degradation products</td><td>NMT 2.0% total</td><td>HPLC (BSK-AM-002)</td><td>Safety: degradants must remain within qualified limits</td></tr>
+</table>
+
+<h1><span class="section-num">5.0</span> Stage 1 &mdash; Process Design</h1>
+<p>Process design establishes the commercial manufacturing process based on knowledge gained through development and scale-up activities. Critical Process Parameters (CPPs) are identified for each manufacturing stage.</p>
+
+<div class="stage-header">Stage 1 &mdash; Solution Preparation</div>
+<table>
+  <tr><th>Critical Process Parameter</th><th>Target / Range</th><th>CQA Affected</th><th>Justification</th></tr>
+  <tr><td>Mixing speed</td><td>500-800 RPM</td><td>Drug content uniformity</td><td>Insufficient mixing = poor homogeneity; excessive = foaming/air entrainment</td></tr>
+  <tr><td>Mixing duration</td><td>30-60 min</td><td>Drug content uniformity</td><td>Ensures complete dissolution of polymers and 5-ALA</td></tr>
+  <tr><td>Solution temperature</td><td>20-25 C</td><td>Drug content, degradation</td><td>5-ALA degrades at elevated temperatures</td></tr>
+  <tr><td>Solution pH</td><td>3.5-4.5</td><td>Drug stability, dissolution</td><td>5-ALA stability is pH-dependent</td></tr>
+  <tr><td>Polymer concentration</td><td>Per formulation record (&plusmn; 2%)</td><td>Needle integrity, dissolution</td><td>Viscosity affects mold filling and needle formation</td></tr>
+  <tr><td>Light exposure</td><td>Amber light only (&lt; 100 lux white)</td><td>Drug content, degradation</td><td>5-ALA is photosensitive</td></tr>
+</table>
+
+<div class="stage-header">Stage 2 &mdash; Mold Filling</div>
+<table>
+  <tr><th>Critical Process Parameter</th><th>Target / Range</th><th>CQA Affected</th><th>Justification</th></tr>
+  <tr><td>Dispense volume per mold</td><td>Target &plusmn; 10%</td><td>Drug content</td><td>Determines dose per patch</td></tr>
+  <tr><td>Vacuum level</td><td>&le; -25 inHg</td><td>Needle height, integrity</td><td>Required to draw solution into needle cavities</td></tr>
+  <tr><td>Centrifuge speed</td><td>3000-4000 RPM</td><td>Needle height, integrity</td><td>Consolidates solution in needle tips</td></tr>
+  <tr><td>Centrifuge duration</td><td>10-20 min</td><td>Needle height, drug content</td><td>Ensures complete cavity fill</td></tr>
+</table>
+
+<div class="stage-header">Stage 3 &mdash; Tip Drying</div>
+<table>
+  <tr><th>Critical Process Parameter</th><th>Target / Range</th><th>CQA Affected</th><th>Justification</th></tr>
+  <tr><td>Drying temperature</td><td>25 &plusmn; 2 C</td><td>Needle integrity, drug stability</td><td>Elevated temperature degrades 5-ALA</td></tr>
+  <tr><td>Drying relative humidity</td><td>20-40% RH</td><td>Moisture content, dissolution</td><td>Controls drying rate; too fast = cracking</td></tr>
+  <tr><td>Drying duration</td><td>Per validated range</td><td>Moisture content, mechanical strength</td><td>Insufficient drying = weak needles; excessive = brittleness</td></tr>
+  <tr><td>Airflow rate</td><td>Laminar, 0.3-0.5 m/s</td><td>Drying uniformity</td><td>Uniform airflow prevents differential drying across array</td></tr>
+</table>
+
+<div class="stage-header">Stage 4 &mdash; Baseplate Casting</div>
+<table>
+  <tr><th>Critical Process Parameter</th><th>Target / Range</th><th>CQA Affected</th><th>Justification</th></tr>
+  <tr><td>Backing solution volume</td><td>Target &plusmn; 10%</td><td>Mechanical strength</td><td>Determines baseplate thickness and adhesion</td></tr>
+  <tr><td>Drying conditions</td><td>25 &plusmn; 2 C, 20-40% RH</td><td>Moisture, integrity</td><td>Same rationale as tip drying</td></tr>
+  <tr><td>Backing substrate application</td><td>Per WI: uniform contact, no air bubbles</td><td>Mechanical strength</td><td>Poor adhesion = delamination during use</td></tr>
+</table>
+
+<div class="stage-header">Stage 5 &mdash; Demolding and Inspection</div>
+<table>
+  <tr><th>Critical Process Parameter</th><th>Target / Range</th><th>CQA Affected</th><th>Justification</th></tr>
+  <tr><td>Demold force / technique</td><td>Per WI: controlled peel angle</td><td>Needle integrity</td><td>Excessive force breaks needles during demolding</td></tr>
+  <tr><td>Visual inspection criteria</td><td>Per BSK-AM-007</td><td>All CQAs (gating step)</td><td>100% inspection catches gross defects</td></tr>
+</table>
+
+<div class="stage-header">Stage 6 &mdash; Sterilization</div>
+<table>
+  <tr><th>Critical Process Parameter</th><th>Target / Range</th><th>CQA Affected</th><th>Justification</th></tr>
+  <tr><td>Radiation dose (e-beam/gamma)</td><td>Validated SAL 10<sup>-6</sup> dose</td><td>Sterility</td><td>Must achieve Sterility Assurance Level per ISO 11137</td></tr>
+  <tr><td>Dose uniformity ratio</td><td>&le; 1.5 (max/min)</td><td>Drug content, degradation</td><td>Excessive dose degrades 5-ALA; insufficient dose = non-sterile</td></tr>
+</table>
+
+<div class="stage-header">Stage 7 &mdash; Packaging</div>
+<table>
+  <tr><th>Critical Process Parameter</th><th>Target / Range</th><th>CQA Affected</th><th>Justification</th></tr>
+  <tr><td>Seal temperature</td><td>Per pouch supplier spec (&plusmn; 5 C)</td><td>Package integrity (moisture barrier)</td><td>Protects from moisture and light during shelf life</td></tr>
+  <tr><td>Seal pressure</td><td>Per validated range</td><td>Package integrity</td><td>Insufficient = channel leaks; excessive = thinning</td></tr>
+  <tr><td>Seal dwell time</td><td>Per validated range</td><td>Package integrity</td><td>Ensures complete seal formation</td></tr>
+</table>
+
+<h1><span class="section-num">6.0</span> Stage 2 &mdash; Process Qualification</h1>
+
+<h2><span class="section-num">6.1</span> Qualification Approach</h2>
+<p>Each unit operation and its associated equipment shall undergo Installation Qualification (IQ), Operational Qualification (OQ), and Performance Qualification (PQ) before commercial manufacturing begins.</p>
+
+<h2><span class="section-num">6.2</span> Equipment Qualification Summary</h2>
+<table>
+  <tr><th>Equipment</th><th>IQ Scope</th><th>OQ Scope</th><th>PQ Scope</th></tr>
+  <tr><td>Homogenizer / mixer</td><td>Installation per manufacturer specs, utilities, calibration</td><td>Speed range, accuracy, temperature control</td><td>Demonstrated homogeneity of drug-polymer solution</td></tr>
+  <tr><td>Vacuum system</td><td>Installation, leak rate, gauge calibration</td><td>Achievable vacuum level, hold time, ramp rate</td><td>Complete cavity fill across full mold load</td></tr>
+  <tr><td>Centrifuge</td><td>Installation, vibration check, speed calibration</td><td>Speed accuracy, temperature, timer accuracy</td><td>Uniform filling of needle cavities</td></tr>
+  <tr><td>Drying chamber</td><td>Installation, sensor calibration, HEPA filters</td><td>Temperature mapping (loaded/unloaded), RH uniformity, airflow</td><td>Uniform drying to target moisture across batch</td></tr>
+  <tr><td>Pouch sealer</td><td>Installation, thermocouple calibration</td><td>Temperature accuracy, pressure uniformity, dwell timer</td><td>100% seal integrity across operating range</td></tr>
+  <tr><td>Irradiation source</td><td>Per sterilization facility protocol</td><td>Dose mapping, dose uniformity, conveyor speed</td><td>SAL 10<sup>-6</sup> achieved at validated min dose</td></tr>
+</table>
+
+<h2><span class="section-num">6.3</span> Process Performance Qualification (PPQ)</h2>
+<p>PPQ shall demonstrate that the commercial manufacturing process performs as expected under routine conditions. The following requirements apply:</p>
+<table>
+  <tr><th>Requirement</th><th>Detail</th></tr>
+  <tr><td>Number of consecutive batches</td><td>Minimum 3 consecutive conforming batches</td></tr>
+  <tr><td>Batch size</td><td>Commercial scale (or justified smaller scale with scale-up rationale)</td></tr>
+  <tr><td>Sampling plan</td><td>Minimum n = 10 patches per batch per test (see Section 6.4)</td></tr>
+  <tr><td>Personnel</td><td>Production operators trained per SOPs; validation team oversees</td></tr>
+  <tr><td>Equipment</td><td>All equipment qualified (IQ/OQ complete) prior to PPQ</td></tr>
+  <tr><td>Raw materials</td><td>All materials tested and released per specifications</td></tr>
+  <tr><td>Documentation</td><td>Executed batch records with all IPC and test data</td></tr>
+</table>
+
+<h2><span class="section-num">6.4</span> PPQ Sampling Plan</h2>
+<table>
+  <tr><th>Test</th><th>Sample Size per Batch (n)</th><th>Sampling Locations</th><th>Acceptance Criterion</th></tr>
+  <tr><td>Needle height</td><td>n = 10</td><td>Beginning, middle, end of batch</td><td>600 &plusmn; 50 um; Cpk &ge; 1.33</td></tr>
+  <tr><td>Drug content (assay)</td><td>n = 10</td><td>Beginning, middle, end of batch</td><td>90.0-110.0% label claim; RSD &le; 5.0%</td></tr>
+  <tr><td>Content uniformity</td><td>n = 10 (per USP &lt;905&gt;)</td><td>Stratified across batch</td><td>AV &le; 15.0</td></tr>
+  <tr><td>Dissolution rate</td><td>n = 10</td><td>Beginning, middle, end</td><td>&ge; 80% dissolved in 10 min (all units)</td></tr>
+  <tr><td>Moisture content</td><td>n = 10</td><td>Across batch</td><td>NMT 5.0% w/w</td></tr>
+  <tr><td>Sterility</td><td>Per USP &lt;71&gt; requirements</td><td>Per sampling plan</td><td>No growth at 14 days</td></tr>
+  <tr><td>Needle integrity</td><td>n = 10</td><td>Across batch</td><td>&ge; 95% intact on each patch</td></tr>
+  <tr><td>Mechanical strength</td><td>n = 10</td><td>Across batch</td><td>Penetration force within &plusmn; 20% of target</td></tr>
+  <tr><td>Seal integrity</td><td>n = 10 pouches</td><td>Across batch run</td><td>No leaks detected</td></tr>
+  <tr><td>Degradation products</td><td>n = 10</td><td>Across batch</td><td>NMT 0.5% individual, NMT 2.0% total</td></tr>
+</table>
+
+<h2><span class="section-num">6.5</span> PPQ Acceptance Criteria</h2>
+<table>
+  <tr><th>Criterion</th><th>Requirement</th></tr>
+  <tr><td>All 3 batches meet specifications</td><td>Every individual result within specification limits</td></tr>
+  <tr><td>Process capability</td><td>Cpk &ge; 1.33 for measurable CQAs (needle height, drug content)</td></tr>
+  <tr><td>Content uniformity</td><td>Acceptance Value (AV) &le; 15.0 per USP &lt;905&gt;</td></tr>
+  <tr><td>No deviations or OOS results</td><td>Any deviation must be investigated and resolved before PPQ acceptance</td></tr>
+  <tr><td>Batch yield</td><td>&ge; 80% (of theoretical batch size)</td></tr>
+</table>
+
+<h1><span class="section-num">7.0</span> Stage 3 &mdash; Continued Process Verification</h1>
+
+<h2><span class="section-num">7.1</span> Objective</h2>
+<p>To provide ongoing assurance that the validated process remains in a state of control during routine commercial manufacturing. This stage continues throughout the product lifecycle.</p>
+
+<h2><span class="section-num">7.2</span> Statistical Monitoring Plan</h2>
+<table>
+  <tr><th>Parameter</th><th>Monitoring Method</th><th>Frequency</th><th>Action</th></tr>
+  <tr><td>Drug content (assay)</td><td>Control chart (X-bar, R)</td><td>Every batch</td><td>Investigate if out-of-control signals per Western Electric rules</td></tr>
+  <tr><td>Needle height</td><td>Control chart (X-bar, R)</td><td>Every batch</td><td>Investigate trends, shifts</td></tr>
+  <tr><td>Dissolution rate</td><td>Control chart (individuals, MR)</td><td>Every batch</td><td>Investigate if trend toward lower limit</td></tr>
+  <tr><td>Moisture content</td><td>Control chart (individuals, MR)</td><td>Every batch</td><td>Investigate upward trends</td></tr>
+  <tr><td>Batch yield</td><td>Control chart (p-chart)</td><td>Every batch</td><td>Investigate if yield drops below 80%</td></tr>
+  <tr><td>Environmental monitoring</td><td>Trend analysis</td><td>Monthly summary</td><td>Investigate excursions above alert limits</td></tr>
+  <tr><td>Complaint trends</td><td>Pareto analysis</td><td>Quarterly</td><td>Initiate CAPA if pattern identified</td></tr>
+</table>
+
+<h2><span class="section-num">7.3</span> Revalidation Triggers</h2>
+<p>The process shall be revalidated (partial or full PPQ) when any of the following occur:</p>
+<table>
+  <tr><th>Trigger</th><th>Revalidation Scope</th></tr>
+  <tr><td>Change in raw material supplier (critical)</td><td>PPQ for affected stages</td></tr>
+  <tr><td>Change in equipment (same type)</td><td>IQ/OQ + abbreviated PPQ</td></tr>
+  <tr><td>Change in equipment (different type)</td><td>Full IQ/OQ/PQ + PPQ (3 batches)</td></tr>
+  <tr><td>Change in manufacturing site</td><td>Full validation (all stages)</td></tr>
+  <tr><td>Change in batch size (&gt; 10x)</td><td>PPQ at new scale</td></tr>
+  <tr><td>Process parameter change outside validated range</td><td>OQ + PPQ for affected stage</td></tr>
+  <tr><td>Formulation change</td><td>Full validation</td></tr>
+  <tr><td>Sustained adverse trend in CPV data</td><td>Investigation first; PPQ if root cause is process-related</td></tr>
+</table>
+
+<h1><span class="section-num">8.0</span> Roles and Responsibilities</h1>
+<table>
+  <tr><th>Role</th><th>Responsibility</th></tr>
+  <tr><td>Quality Assurance</td><td>Protocol approval, deviation review, final validation report approval, CPV oversight</td></tr>
+  <tr><td>Manufacturing</td><td>Execute PPQ batches per SOPs, complete batch records, report deviations</td></tr>
+  <tr><td>Quality Control</td><td>Perform all testing per validated methods, report results</td></tr>
+  <tr><td>Validation Engineer</td><td>Author protocols, coordinate execution, compile data, author validation report</td></tr>
+  <tr><td>Regulatory Affairs</td><td>Ensure validation approach aligns with submission strategy</td></tr>
+  <tr><td>R&amp;D / Process Development</td><td>Provide process knowledge, CPP/CQA justification, support investigations</td></tr>
+</table>
+
+<h1><span class="section-num">9.0</span> Deliverables</h1>
+<table>
+  <tr><th>Document</th><th>Responsible</th><th>Timing</th></tr>
+  <tr><td>Equipment IQ/OQ/PQ protocols and reports</td><td>Validation Engineer</td><td>Prior to PPQ</td></tr>
+  <tr><td>PPQ protocol (this document)</td><td>Validation Engineer</td><td>Prior to PPQ execution</td></tr>
+  <tr><td>PPQ executed batch records (3 batches)</td><td>Manufacturing</td><td>During PPQ</td></tr>
+  <tr><td>PPQ analytical data packages</td><td>QC</td><td>During / after PPQ</td></tr>
+  <tr><td>Process Validation Summary Report</td><td>Validation Engineer</td><td>Within 30 days of PPQ completion</td></tr>
+  <tr><td>CPV plan and initial control charts</td><td>QA / Validation</td><td>Prior to commercial distribution</td></tr>
+</table>
+
+<h1><span class="section-num">10.0</span> Document History</h1>
+<table>
+  <tr><th>Revision</th><th>Date</th><th>Author</th><th>Description</th></tr>
+  <tr><td>A</td><td>--</td><td>--</td><td>Initial release</td></tr>
+</table>

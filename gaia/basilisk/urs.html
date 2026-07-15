@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>BSK-URS-001 — User Requirements Specification</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0c08;overflow-y:auto;font-family:'Courier New',monospace;color:#b0c0a0}
+#ui{max-width:1100px;margin:0 auto;padding:20px 24px 80px}
+h1{font-size:14px;letter-spacing:5px;color:rgba(150,255,100,.5);margin-bottom:2px}
+.sub{font-size:8px;color:rgba(150,255,100,.25);letter-spacing:2px;margin-bottom:4px}
+.doc-id{font-size:7px;color:rgba(255,255,255,.1);margin-bottom:16px}
+.back{display:inline-block;font-size:8px;color:rgba(150,255,100,.25);text-decoration:none;letter-spacing:1px;margin-bottom:14px;border:1px solid rgba(150,255,100,.08);padding:3px 8px;border-radius:3px}
+.back:hover{border-color:rgba(150,255,100,.25);color:rgba(150,255,100,.45)}
+.s{background:rgba(255,255,255,.02);border:1px solid rgba(150,255,100,.06);border-radius:6px;padding:14px 18px;margin-bottom:12px}
+.s h2{font-size:10px;letter-spacing:3px;color:rgba(150,255,100,.4);margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:5px}
+.s h3{font-size:9px;color:rgba(150,255,100,.3);margin:10px 0 4px;letter-spacing:1px}
+.s h4{font-size:8px;color:rgba(150,255,100,.25);margin:6px 0 3px;letter-spacing:1px}
+.eq{font-size:9px;color:rgba(200,220,180,.35);line-height:1.9;margin:3px 0}
+.eq b{color:rgba(180,255,120,.5)}
+table{width:100%;border-collapse:collapse;margin:8px 0;font-size:8px}
+th{color:rgba(150,255,100,.3);text-align:left;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.06);letter-spacing:1px}
+td{padding:3px 6px;color:rgba(200,220,180,.3);border-bottom:1px solid rgba(255,255,255,.02);vertical-align:top}
+.tag{display:inline-block;padding:1px 5px;border-radius:2px;font-size:7px;letter-spacing:1px;margin:1px}
+.tag-green{background:rgba(100,255,100,.08);border:1px solid rgba(100,255,100,.15);color:rgba(100,255,100,.5)}
+.tag-yellow{background:rgba(255,255,100,.08);border:1px solid rgba(255,255,100,.15);color:rgba(255,255,100,.5)}
+.tag-red{background:rgba(255,100,100,.08);border:1px solid rgba(255,100,100,.15);color:rgba(255,100,100,.5)}
+.tag-blue{background:rgba(100,150,255,.08);border:1px solid rgba(100,150,255,.15);color:rgba(100,150,255,.5)}
+.sig-block{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:10px 0}
+.sig{background:rgba(255,255,255,.015);border:1px solid rgba(150,255,100,.04);border-radius:4px;padding:8px 10px}
+.sig-label{font-size:6px;letter-spacing:2px;color:rgba(150,255,100,.2);margin-bottom:4px}
+.sig-line{border-top:1px solid rgba(150,255,100,.08);margin-top:18px;padding-top:4px;font-size:7px;color:rgba(200,220,180,.15)}
+.sig-date{font-size:6px;color:rgba(200,220,180,.1);margin-top:2px}
+.warn{background:rgba(255,200,50,.03);border:1px solid rgba(255,200,50,.08);border-radius:4px;padding:8px 12px;margin:6px 0;font-size:8px;color:rgba(255,220,100,.4)}
+.req-id{font-size:7px;color:rgba(100,150,255,.4);letter-spacing:1px;font-weight:bold}
+.trace-link{font-size:6px;color:rgba(150,255,100,.2);letter-spacing:1px}
+.rev-table{margin:8px 0}
+.rev-table td,.rev-table th{font-size:7px;padding:2px 6px}
+.watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:60px;letter-spacing:30px;color:rgba(255,255,255,.01);pointer-events:none;z-index:0;white-space:nowrap}
+.toc{margin:6px 0}
+.toc a{display:block;font-size:8px;color:rgba(200,220,180,.25);text-decoration:none;line-height:2;letter-spacing:1px}
+.toc a:hover{color:rgba(150,255,100,.45)}
+.toc-num{color:rgba(150,255,100,.2);margin-right:8px;display:inline-block;width:24px}
+</style>
+</head>
+<body>
+<div class="watermark">DRAFT</div>
+<div id="ui">
+
+<a class="back" href="index.html">&larr; DOCUMENT CONTROL CENTER</a>
+
+<h1>BASILISK&trade;</h1>
+<div class="sub">USER REQUIREMENTS SPECIFICATION</div>
+<div class="doc-id">DOC: BSK-URS-001 &middot; Rev A &middot; DRAFT &middot; EFFECTIVE DATE: PENDING APPROVAL</div>
+<div class="doc-id">CONFIDENTIAL &mdash; The AITistic Research Initiative &middot; Thomas Frumkin &middot; 2026</div>
+
+<!-- ═══ DOCUMENT CONTROL ═══ -->
+<div class="s">
+<h2>DOCUMENT CONTROL</h2>
+
+<h3>Revision History</h3>
+<table class="rev-table">
+<tr><th>Rev</th><th>Date</th><th>Author</th><th>Description</th><th>ECO#</th></tr>
+<tr><td>A</td><td>2026-07-15</td><td>T. Frumkin</td><td>Initial draft</td><td>ECO-BSK-001</td></tr>
+<tr><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+</table>
+
+<h3>Distribution List</h3>
+<table class="rev-table">
+<tr><th>Role</th><th>Name</th><th>Copy#</th><th>Format</th></tr>
+<tr><td>Project Lead / R&D</td><td>T. Frumkin</td><td>001</td><td>Electronic (21 CFR Part 11)</td></tr>
+<tr><td>Quality Assurance</td><td>TBD</td><td>002</td><td>Electronic</td></tr>
+<tr><td>Regulatory Affairs</td><td>TBD</td><td>003</td><td>Electronic</td></tr>
+<tr><td>Manufacturing</td><td>TBD</td><td>004</td><td>Electronic</td></tr>
+</table>
+
+<h3>Approval Signatures</h3>
+<div class="sig-block">
+<div class="sig">
+<div class="sig-label">AUTHORED BY</div>
+<div class="sig-line">Name: _________________________</div>
+<div class="sig-date">Title: R&D Lead</div>
+<div class="sig-date">Date: ____/____/________</div>
+<div class="sig-date">Signature: ______________________</div>
+</div>
+<div class="sig">
+<div class="sig-label">REVIEWED BY</div>
+<div class="sig-line">Name: _________________________</div>
+<div class="sig-date">Title: Quality Assurance</div>
+<div class="sig-date">Date: ____/____/________</div>
+<div class="sig-date">Signature: ______________________</div>
+</div>
+<div class="sig">
+<div class="sig-label">APPROVED BY</div>
+<div class="sig-line">Name: _________________________</div>
+<div class="sig-date">Title: Management Representative</div>
+<div class="sig-date">Date: ____/____/________</div>
+<div class="sig-date">Signature: ______________________</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ TABLE OF CONTENTS ═══ -->
+<div class="s">
+<h2>TABLE OF CONTENTS</h2>
+<div class="toc">
+<a href="#s1"><span class="toc-num">1</span>PURPOSE AND SCOPE</a>
+<a href="#s2"><span class="toc-num">2</span>INTENDED USE AND INDICATIONS</a>
+<a href="#s3"><span class="toc-num">3</span>USER NEEDS</a>
+<a href="#s4"><span class="toc-num">4</span>PERFORMANCE REQUIREMENTS</a>
+<a href="#s5"><span class="toc-num">5</span>FUNCTIONAL REQUIREMENTS</a>
+<a href="#s6"><span class="toc-num">6</span>SAFETY REQUIREMENTS</a>
+<a href="#s7"><span class="toc-num">7</span>ENVIRONMENTAL AND STORAGE REQUIREMENTS</a>
+<a href="#s8"><span class="toc-num">8</span>REGULATORY REQUIREMENTS</a>
+<a href="#s9"><span class="toc-num">9</span>ACCEPTANCE CRITERIA SUMMARY</a>
+<a href="#s10"><span class="toc-num">10</span>TRACEABILITY MATRIX</a>
+<a href="#s11"><span class="toc-num">11</span>REFERENCES</a>
+<a href="#s12"><span class="toc-num">12</span>GLOSSARY</a>
+</div>
+</div>
+
+<!-- ═══ 1. PURPOSE AND SCOPE ═══ -->
+<div class="s" id="s1">
+<h2>1. PURPOSE AND SCOPE</h2>
+
+<h3>1.1 Purpose</h3>
+<div class="eq">This User Requirements Specification (URS) defines the user needs, performance criteria, and acceptance requirements for the BASILISK&trade; dissolving microneedle patch system. This document serves as the foundational design input per 21 CFR 820.30(c) and ISO 13485:2016 clause 7.3.3.</div>
+
+<h3>1.2 Scope</h3>
+<div class="eq">This URS covers both product variants:</div>
+<div class="eq">&emsp;<b>V1 BASILISK CROWN</b> &mdash; 10-ingredient cosmetic microneedle device (Class II)</div>
+<div class="eq">&emsp;<b>V2 BASILISK RADIANT</b> &mdash; 11-ingredient combination drug-device product (with 5-ALA)</div>
+<div class="eq">Requirements applicable to specific versions are annotated accordingly. Unmarked requirements apply to both.</div>
+
+<h3>1.3 Applicable Standards</h3>
+<div class="eq"><b>21 CFR 820.30</b> &mdash; Design Controls</div>
+<div class="eq"><b>ISO 13485:2016</b> &mdash; Medical Devices, Quality Management Systems</div>
+<div class="eq"><b>GAMP 5</b> &mdash; Good Automated Manufacturing Practice (URS framework)</div>
+<div class="eq"><b>IEC 62366-1:2015</b> &mdash; Usability Engineering</div>
+<div class="eq"><b>ISO 14971:2019</b> &mdash; Risk Management for Medical Devices</div>
+</div>
+
+<!-- ═══ 2. INTENDED USE ═══ -->
+<div class="s" id="s2">
+<h2>2. INTENDED USE AND INDICATIONS</h2>
+
+<h3>2.1 Intended Use Statement</h3>
+<div class="eq"><b>BASILISK&trade;</b> is a dissolving microneedle patch intended for transdermal delivery of cosmetic and/or therapeutic agents to the dermis for the purpose of promoting dermal collagen repair, hydration, and skin rejuvenation.</div>
+
+<h3>2.2 Indications for Use</h3>
+<div class="eq"><b>V1 (Device):</b> For temporary improvement in the appearance of fine lines and wrinkles through dermal hydration and support of the skin's natural collagen renewal processes.</div>
+<div class="eq"><b>V2 (Drug-Device):</b> For the treatment of moderate to severe photoaging, including fine lines, wrinkles, and loss of skin elasticity, through targeted dermal delivery of collagen-stimulating agents with photodynamic activation.</div>
+
+<h3>2.3 Intended Users</h3>
+<div class="eq"><b>V1:</b> Self-application by adult consumers (18+) in a home-use setting. No clinical supervision required.</div>
+<div class="eq"><b>V2:</b> Initial use under healthcare provider supervision; potential transition to home use following training.</div>
+
+<h3>2.4 Target Population</h3>
+<div class="eq">Adults aged 30-70 with visible signs of skin photoaging (Glogau Scale II-IV).</div>
+<div class="eq"><b>Exclusions:</b> Patients with known hypersensitivity to hyaluronic acid, PLLA, or any listed component; active skin infections at the application site; pregnancy or lactation; patients on anticoagulant therapy (relative); history of keloid scarring.</div>
+
+<h3>2.5 Anatomical Target</h3>
+<div class="eq">Periorbital region, nasolabial folds, forehead, d&eacute;colletage. Patch geometry optimized for facial contours.</div>
+</div>
+
+<!-- ═══ 3. USER NEEDS ═══ -->
+<div class="s" id="s3">
+<h2>3. USER NEEDS</h2>
+
+<table>
+<tr><th>ID</th><th>User Need</th><th>Priority</th><th>Rationale</th></tr>
+<tr><td><span class="req-id">UN-001</span></td><td>Application shall be painless or minimally uncomfortable (VAS &le; 2/10)</td><td><span class="tag tag-red">CRITICAL</span></td><td>Consumer compliance; differentiation from injectable procedures</td></tr>
+<tr><td><span class="req-id">UN-002</span></td><td>Single session shall not exceed 15 minutes from application to removal</td><td><span class="tag tag-red">CRITICAL</span></td><td>Consumer convenience; dissolution must complete within session</td></tr>
+<tr><td><span class="req-id">UN-003</span></td><td>Visible effects shall persist for 6-12 months per application</td><td><span class="tag tag-red">CRITICAL</span></td><td>PLLA microsphere sustained release; value proposition vs. topicals</td></tr>
+<tr><td><span class="req-id">UN-004</span></td><td>Suitable for unsupervised home use (V1)</td><td><span class="tag tag-red">CRITICAL</span></td><td>Market access; no clinic visit required for cosmetic version</td></tr>
+<tr><td><span class="req-id">UN-005</span></td><td>Single-use, pre-loaded, no mixing or preparation required</td><td><span class="tag tag-yellow">HIGH</span></td><td>Minimize use error; human factors compliance</td></tr>
+<tr><td><span class="req-id">UN-006</span></td><td>Patch shall conform to facial contours without curling or lifting</td><td><span class="tag tag-yellow">HIGH</span></td><td>Ensure uniform needle penetration across treatment area</td></tr>
+<tr><td><span class="req-id">UN-007</span></td><td>No visible residue after removal</td><td><span class="tag tag-yellow">HIGH</span></td><td>Cosmetic acceptability; user satisfaction</td></tr>
+<tr><td><span class="req-id">UN-008</span></td><td>Clear instructions for use with pictorial guidance</td><td><span class="tag tag-yellow">HIGH</span></td><td>IEC 62366-1 usability; diverse user population</td></tr>
+<tr><td><span class="req-id">UN-009</span></td><td>Tamper-evident packaging indicating sterility</td><td><span class="tag tag-yellow">HIGH</span></td><td>User confidence; regulatory requirement</td></tr>
+<tr><td><span class="req-id">UN-010</span></td><td>Results comparable to or exceeding professional treatments</td><td><span class="tag tag-green">MEDIUM</span></td><td>Competitive positioning; efficacy claims substantiation</td></tr>
+</table>
+</div>
+
+<!-- ═══ 4. PERFORMANCE REQUIREMENTS ═══ -->
+<div class="s" id="s4">
+<h2>4. PERFORMANCE REQUIREMENTS</h2>
+
+<h3>4.1 Microneedle Geometry and Penetration</h3>
+<table>
+<tr><th>ID</th><th>Parameter</th><th>Specification</th><th>Acceptance Criterion</th><th>Test Method</th></tr>
+<tr><td><span class="req-id">PR-001</span></td><td>Needle height</td><td>500 &plusmn; 50 &mu;m</td><td>95% of needles within spec (n=49 per patch)</td><td>Optical microscopy / SEM</td></tr>
+<tr><td><span class="req-id">PR-002</span></td><td>Needle tip diameter</td><td>&le; 15 &mu;m</td><td>100% of needles &le; 15 &mu;m</td><td>SEM measurement</td></tr>
+<tr><td><span class="req-id">PR-003</span></td><td>Needle base diameter</td><td>200 &plusmn; 20 &mu;m</td><td>90% within spec</td><td>Optical microscopy</td></tr>
+<tr><td><span class="req-id">PR-004</span></td><td>Penetration depth (in vivo)</td><td>200-500 &mu;m (into viable epidermis/upper dermis)</td><td>OCT confirmation of penetration past stratum corneum</td><td>OCT imaging on porcine skin / human volunteers</td></tr>
+<tr><td><span class="req-id">PR-005</span></td><td>Needle fracture force</td><td>&ge; 0.1 N per needle</td><td>Mean fracture force &ge; 0.1 N (n=20 needles)</td><td>Micro-compression testing (Instron)</td></tr>
+<tr><td><span class="req-id">PR-006</span></td><td>Array configuration</td><td>7 &times; 7 array, 600 &mu;m pitch</td><td>Pitch uniformity &plusmn; 30 &mu;m</td><td>Optical measurement</td></tr>
+<tr><td><span class="req-id">PR-007</span></td><td>Patch diameter</td><td>15 &plusmn; 0.5 mm</td><td>100% within spec</td><td>Dimensional measurement</td></tr>
+</table>
+
+<h3>4.2 Dissolution Performance</h3>
+<table>
+<tr><th>ID</th><th>Parameter</th><th>Specification</th><th>Acceptance Criterion</th><th>Test Method</th></tr>
+<tr><td><span class="req-id">PR-008</span></td><td>Dissolution time (needle tips)</td><td>&le; 5 min for first 50% dissolution</td><td>Visual confirmation of tip dissolution at t=5min</td><td>Time-lapse microscopy in agarose gel</td></tr>
+<tr><td><span class="req-id">PR-009</span></td><td>Complete dissolution time</td><td>&le; 15 min for &ge; 80% needle dissolution</td><td>Mass loss &ge; 80% at t=15 min</td><td>Gravimetric analysis (Franz cell)</td></tr>
+<tr><td><span class="req-id">PR-010</span></td><td>Backing layer integrity</td><td>Backing remains intact during dissolution</td><td>No fragmentation; clean removal</td><td>Visual inspection post-application</td></tr>
+</table>
+
+<h3>4.3 Drug Loading and Release</h3>
+<table>
+<tr><th>ID</th><th>Parameter</th><th>Specification</th><th>Acceptance Criterion</th><th>Test Method</th></tr>
+<tr><td><span class="req-id">PR-011</span></td><td>Total drug loading per patch</td><td>Per formulation BOM (BSK-SPEC-001 &sect;4)</td><td>Each active &plusmn; 10% of label claim</td><td>HPLC potency assay</td></tr>
+<tr><td><span class="req-id">PR-012</span></td><td>Drug content uniformity</td><td>RSD &le; 6% across needles within a patch</td><td>Coefficient of variation &le; 6%</td><td>Individual needle extraction + HPLC</td></tr>
+<tr><td><span class="req-id">PR-013</span></td><td>Immediate release fraction</td><td>&ge; 40% of water-soluble actives within 15 min</td><td>Cumulative release &ge; 40% at t=15 min</td><td>Franz cell diffusion</td></tr>
+<tr><td><span class="req-id">PR-014</span></td><td>Sustained release (PLLA microspheres)</td><td>Continuous release over 6-12 months</td><td>Detectable release at 6 months (in vitro accelerated)</td><td>Accelerated release at 50&deg;C + real-time at 37&deg;C</td></tr>
+<tr><td><span class="req-id">PR-015</span></td><td>PLLA microsphere diameter</td><td>5-20 &mu;m</td><td>D50 = 10 &plusmn; 3 &mu;m; D90 &le; 20 &mu;m</td><td>Laser diffraction (Malvern)</td></tr>
+</table>
+
+<h3>4.4 Mechanical Performance</h3>
+<table>
+<tr><th>ID</th><th>Parameter</th><th>Specification</th><th>Acceptance Criterion</th><th>Test Method</th></tr>
+<tr><td><span class="req-id">PR-016</span></td><td>Insertion force (thumb pressure)</td><td>&le; 20 N for full array insertion</td><td>Complete penetration at &le; 20 N sustained for 10 sec</td><td>Texture analyzer on Parafilm M / porcine skin</td></tr>
+<tr><td><span class="req-id">PR-017</span></td><td>Adhesion to skin</td><td>Patch remains adhered for &ge; 15 min on vertical surface</td><td>No spontaneous detachment during dissolution period</td><td>Peel force measurement + in-use test</td></tr>
+<tr><td><span class="req-id">PR-018</span></td><td>Flexibility</td><td>Conforms to radius of curvature &ge; 20 mm without fracture</td><td>No needle breakage on mandrel bend test</td><td>Bend test on cylindrical mandrels</td></tr>
+</table>
+</div>
+
+<!-- ═══ 5. FUNCTIONAL REQUIREMENTS ═══ -->
+<div class="s" id="s5">
+<h2>5. FUNCTIONAL REQUIREMENTS</h2>
+
+<h3>5.1 Application Sequence</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th><th>Acceptance Criterion</th><th>Trace</th></tr>
+<tr><td><span class="req-id">FR-001</span></td><td>Patch adheres to clean, dry skin upon application with moderate thumb pressure (&le; 20 N)</td><td>Adhesion sufficient to resist gravity for &ge; 15 min</td><td><span class="trace-link">UN-005, UN-006, PR-016, PR-017</span></td></tr>
+<tr><td><span class="req-id">FR-002</span></td><td>Microneedles penetrate the stratum corneum (10-20 &mu;m) and reach the viable epidermis/upper dermis (200-500 &mu;m)</td><td>OCT or histological confirmation of penetration in &ge; 90% of needles</td><td><span class="trace-link">PR-001, PR-004, PR-005</span></td></tr>
+<tr><td><span class="req-id">FR-003</span></td><td>Hyaluronic acid matrix dissolves upon contact with interstitial fluid, releasing water-soluble actives</td><td>&ge; 80% HA dissolution within 15 min</td><td><span class="trace-link">UN-002, PR-009, PR-013</span></td></tr>
+<tr><td><span class="req-id">FR-004</span></td><td>PLLA microspheres deposit in the dermis as needles dissolve, remaining as sustained-release depot</td><td>Histological confirmation of microsphere deposition at 200-500 &mu;m depth</td><td><span class="trace-link">UN-003, PR-014, PR-015</span></td></tr>
+<tr><td><span class="req-id">FR-005</span></td><td>Backing layer remains intact and enables clean removal after needle dissolution</td><td>Backing removable in one piece; no needle fragments remain on skin surface</td><td><span class="trace-link">UN-007, PR-010</span></td></tr>
+</table>
+
+<h3>5.2 Drug Delivery Functions</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th><th>Acceptance Criterion</th><th>Trace</th></tr>
+<tr><td><span class="req-id">FR-006</span></td><td>ALT-711 delivered to dermis at effective concentration for AGE crosslink disruption</td><td>Detectable ALT-711 in dermal layer at 0.5% w/w of needle mass (&plusmn; 10%)</td><td><span class="trace-link">PR-011, PR-012</span></td></tr>
+<tr><td><span class="req-id">FR-007</span></td><td>GHK-Cu peptide complex delivered intact with Cu&sup2;+ chelation maintained</td><td>Cu&sup2;+ :GHK molar ratio 1:1 &plusmn; 5% in dissolution eluate</td><td><span class="trace-link">PR-011</span></td></tr>
+<tr><td><span class="req-id">FR-008</span></td><td>Peptide cocktail (Matrixyl, Argireline, Syn-Ake, EGF) released from HA matrix within 15 min</td><td>&ge; 60% peptide recovery in receptor fluid at t=15 min (Franz cell)</td><td><span class="trace-link">PR-013</span></td></tr>
+<tr><td><span class="req-id">FR-009</span></td><td>Retinol encapsulated in MCT carrier within PLLA microspheres for sustained release</td><td>Retinol stability &ge; 90% at release; sustained release detectable at 6 months</td><td><span class="trace-link">PR-014</span></td></tr>
+<tr><td><span class="req-id">FR-010</span></td><td>5-ALA (V2 only) delivered at sufficient concentration for photodynamic activation in dermis</td><td>PpIX fluorescence detectable at 635 nm in treated skin at t=3h post-application</td><td><span class="trace-link">PR-011</span></td></tr>
+</table>
+
+<h3>5.3 Packaging and Labeling Functions</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th><th>Acceptance Criterion</th><th>Trace</th></tr>
+<tr><td><span class="req-id">FR-011</span></td><td>Individual foil pouch provides moisture and light barrier</td><td>WVTR &le; 0.01 g/m&sup2;/day; light transmission &le; 0.1% (UV-Vis 200-800 nm)</td><td><span class="trace-link">UN-009, ER-003</span></td></tr>
+<tr><td><span class="req-id">FR-012</span></td><td>Tamper-evident seal visible to user</td><td>Seal breakage visually detectable; cannot be resealed</td><td><span class="trace-link">UN-009</span></td></tr>
+<tr><td><span class="req-id">FR-013</span></td><td>Labeling includes pictorial instructions for use (IFU)</td><td>IFU validated per IEC 62366-1; &ge; 90% task success in summative usability</td><td><span class="trace-link">UN-008</span></td></tr>
+</table>
+</div>
+
+<!-- ═══ 6. SAFETY REQUIREMENTS ═══ -->
+<div class="s" id="s6">
+<h2>6. SAFETY REQUIREMENTS</h2>
+
+<h3>6.1 Biocompatibility</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th><th>Standard</th><th>Acceptance Criterion</th></tr>
+<tr><td><span class="req-id">SR-001</span></td><td>All patient-contacting materials biocompatible</td><td>ISO 10993-1:2018 (Biological evaluation framework)</td><td>Risk assessment per ISO 10993-1; testing per Parts 5, 10, 23 as applicable</td></tr>
+<tr><td><span class="req-id">SR-002</span></td><td>Non-cytotoxic</td><td>ISO 10993-5</td><td>Cell viability &ge; 70% (L929 fibroblast, 24h extract)</td></tr>
+<tr><td><span class="req-id">SR-003</span></td><td>Non-sensitizing</td><td>ISO 10993-10</td><td>Negative result in guinea pig maximization test (GPMT) or LLNA</td></tr>
+<tr><td><span class="req-id">SR-004</span></td><td>Non-irritating</td><td>ISO 10993-10 / ISO 10993-23</td><td>Primary irritation index (PII) &le; 0.4 (negligible); or validated in vitro (EpiDerm EIT)</td></tr>
+<tr><td><span class="req-id">SR-005</span></td><td>Implantation response acceptable (PLLA microspheres reside &ge; 30 days)</td><td>ISO 10993-6</td><td>Local tissue response no worse than negative control at 12 weeks</td></tr>
+<tr><td><span class="req-id">SR-006</span></td><td>No genotoxicity</td><td>ISO 10993-3</td><td>Negative Ames test; negative in vitro chromosomal aberration assay</td></tr>
+</table>
+
+<h3>6.2 Sterility and Microbiology</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th><th>Specification</th><th>Acceptance Criterion</th></tr>
+<tr><td><span class="req-id">SR-007</span></td><td>Product sterile at point of use</td><td>SAL 10&#8315;&sup6; or validated low-bioburden process</td><td>Sterility per USP &lt;71&gt; or validated bioburden + terminal treatment</td></tr>
+<tr><td><span class="req-id">SR-008</span></td><td>Endotoxin content within limits</td><td>&lt; 20 EU/device</td><td>LAL testing per USP &lt;85&gt;</td></tr>
+<tr><td><span class="req-id">SR-009</span></td><td>Particulate matter within limits</td><td>Per USP &lt;788&gt; (subvisible) if applicable</td><td>Visual inspection 100%; subvisible per specification</td></tr>
+</table>
+
+<h3>6.3 Systemic Safety</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th><th>Specification</th><th>Acceptance Criterion</th></tr>
+<tr><td><span class="req-id">SR-010</span></td><td>No systemic absorption of actives above safety threshold</td><td>Systemic exposure &lt; NOAEL/100 for each active</td><td>Dermal PK study (V2): plasma levels below safety thresholds</td></tr>
+<tr><td><span class="req-id">SR-011</span></td><td>Local reactions limited to transient erythema</td><td>Erythema resolves within 2 hours; no edema, vesiculation, or necrosis</td><td>Clinical observation at 30 min, 2h, 24h, 48h post-application</td></tr>
+<tr><td><span class="req-id">SR-012</span></td><td>No needle fragments retained in skin after backing removal</td><td>Zero retained fragments &gt; 50 &mu;m</td><td>Dermoscopy + OCT of application site post-removal</td></tr>
+<tr><td><span class="req-id">SR-013</span></td><td>Residual solvent (DCM) in PLLA microspheres below ICH Q3C limit</td><td>&lt; 600 ppm DCM (Class 2 solvent)</td><td>Headspace GC per ICH Q3C(R8)</td></tr>
+</table>
+
+<div class="warn">SAFETY NOTE: ALT-711 lacks long-term human dermal safety data. Conduct 90-day repeat-dose dermal toxicology study. Monitor for systemic AGE-crosslink disruption effects (vascular compliance changes) even at low dermal doses.</div>
+</div>
+
+<!-- ═══ 7. ENVIRONMENTAL AND STORAGE ═══ -->
+<div class="s" id="s7">
+<h2>7. ENVIRONMENTAL AND STORAGE REQUIREMENTS</h2>
+
+<table>
+<tr><th>ID</th><th>Requirement</th><th>Specification</th><th>Acceptance Criterion</th><th>Version</th></tr>
+<tr><td><span class="req-id">ER-001</span></td><td>Storage temperature (V1)</td><td>15-25&deg;C (controlled room temperature)</td><td>Meets all release specifications after storage at 25&deg;C/60% RH for 18 months</td><td>V1</td></tr>
+<tr><td><span class="req-id">ER-002</span></td><td>Storage temperature (V2)</td><td>2-8&deg;C (refrigerated)</td><td>Meets all release specifications after storage at 5&deg;C &plusmn; 3&deg;C for 12 months</td><td>V2</td></tr>
+<tr><td><span class="req-id">ER-003</span></td><td>Light protection</td><td>Protect from light (especially V2 with photosensitive 5-ALA)</td><td>Amber foil pouch; light transmission &le; 0.1% at 200-800 nm</td><td>Both</td></tr>
+<tr><td><span class="req-id">ER-004</span></td><td>Moisture protection</td><td>Sealed foil pouch with desiccant; product moisture &lt; 5%</td><td>Karl Fischer moisture &lt; 5% through shelf life</td><td>Both</td></tr>
+<tr><td><span class="req-id">ER-005</span></td><td>Shelf life target (V1)</td><td>18 months</td><td>Stability data supporting 18-month dating at 15-25&deg;C</td><td>V1</td></tr>
+<tr><td><span class="req-id">ER-006</span></td><td>Shelf life target (V2)</td><td>12 months</td><td>Stability data supporting 12-month dating at 2-8&deg;C</td><td>V2</td></tr>
+<tr><td><span class="req-id">ER-007</span></td><td>Shipping stress tolerance</td><td>Withstand ISTA 3A distribution simulation</td><td>No visual damage; meets release specifications post-test</td><td>Both</td></tr>
+<tr><td><span class="req-id">ER-008</span></td><td>In-use stability (post-opening)</td><td>Use immediately after opening pouch</td><td>Single-use labeling; product degrades within 1h of opening (by design)</td><td>Both</td></tr>
+</table>
+</div>
+
+<!-- ═══ 8. REGULATORY REQUIREMENTS ═══ -->
+<div class="s" id="s8">
+<h2>8. REGULATORY REQUIREMENTS</h2>
+
+<h3>8.1 United States (FDA)</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th><th>Regulatory Basis</th><th>Version</th></tr>
+<tr><td><span class="req-id">RR-001</span></td><td>Classification as Class II medical device</td><td>21 CFR 878.4430; 510(k) or De Novo pathway</td><td>V1</td></tr>
+<tr><td><span class="req-id">RR-002</span></td><td>Combination product classification (drug primary mode)</td><td>21 CFR Part 3; 505(b)(2) NDA</td><td>V2</td></tr>
+<tr><td><span class="req-id">RR-003</span></td><td>Quality system compliance</td><td>21 CFR Part 820 (QSR/QMSR)</td><td>Both</td></tr>
+<tr><td><span class="req-id">RR-004</span></td><td>Design controls maintained</td><td>21 CFR 820.30</td><td>Both</td></tr>
+<tr><td><span class="req-id">RR-005</span></td><td>Labeling compliance</td><td>21 CFR 801; MoCRA (Modernization of Cosmetics Regulation Act 2022)</td><td>Both</td></tr>
+<tr><td><span class="req-id">RR-006</span></td><td>UDI (Unique Device Identification)</td><td>21 CFR Part 830</td><td>Both</td></tr>
+<tr><td><span class="req-id">RR-007</span></td><td>Electronic records compliance</td><td>21 CFR Part 11</td><td>Both</td></tr>
+<tr><td><span class="req-id">RR-008</span></td><td>Adverse event reporting</td><td>21 CFR Part 803 (MDR) / 21 CFR Part 4 (combo)</td><td>Both</td></tr>
+</table>
+
+<h3>8.2 European Union</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th><th>Regulatory Basis</th><th>Version</th></tr>
+<tr><td><span class="req-id">RR-009</span></td><td>Classification as Class IIa medical device</td><td>EU MDR 2017/745 Rule 6 (invasive, transient use)</td><td>V1</td></tr>
+<tr><td><span class="req-id">RR-010</span></td><td>Conformity assessment via Notified Body</td><td>MDR Annex IX or XI</td><td>V1</td></tr>
+<tr><td><span class="req-id">RR-011</span></td><td>Clinical evaluation per MDR Article 61</td><td>MEDDEV 2.7/1 Rev 4</td><td>Both</td></tr>
+<tr><td><span class="req-id">RR-012</span></td><td>EUDAMED registration</td><td>MDR Article 29</td><td>Both</td></tr>
+<tr><td><span class="req-id">RR-013</span></td><td>V2 regulated as medicinal product in EU</td><td>Directive 2001/83/EC; EMA centralized or national procedure</td><td>V2</td></tr>
+</table>
+
+<h3>8.3 Quality System Standards</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th><th>Standard</th><th>Version</th></tr>
+<tr><td><span class="req-id">RR-014</span></td><td>Quality Management System</td><td>ISO 13485:2016</td><td>Both</td></tr>
+<tr><td><span class="req-id">RR-015</span></td><td>Risk Management</td><td>ISO 14971:2019 + ISO/TR 24971:2020</td><td>Both</td></tr>
+<tr><td><span class="req-id">RR-016</span></td><td>Biocompatibility evaluation</td><td>ISO 10993 series (Parts 1,3,5,6,10,11,12,23)</td><td>Both</td></tr>
+<tr><td><span class="req-id">RR-017</span></td><td>Usability engineering</td><td>IEC 62366-1:2015 + IEC 62366-2:2016</td><td>Both</td></tr>
+<tr><td><span class="req-id">RR-018</span></td><td>Drug cGMP compliance (V2)</td><td>21 CFR Parts 210/211; 21 CFR Part 4</td><td>V2</td></tr>
+<tr><td><span class="req-id">RR-019</span></td><td>Stability testing</td><td>ICH Q1A(R2), ICH Q1B (photostability), ASTM F1980</td><td>Both</td></tr>
+</table>
+</div>
+
+<!-- ═══ 9. ACCEPTANCE CRITERIA SUMMARY ═══ -->
+<div class="s" id="s9">
+<h2>9. ACCEPTANCE CRITERIA SUMMARY</h2>
+
+<div class="eq"><b>Purpose:</b> Consolidated acceptance criteria enabling pass/fail determination at each verification and validation gate.</div>
+
+<table>
+<tr><th>Req ID</th><th>Short Name</th><th>Criterion</th><th>Method</th><th>Gate</th></tr>
+<tr><td>PR-001</td><td>Needle height</td><td>500 &plusmn; 50 &mu;m, 95% compliance</td><td>Microscopy</td><td>Verification</td></tr>
+<tr><td>PR-002</td><td>Tip diameter</td><td>&le; 15 &mu;m, 100%</td><td>SEM</td><td>Verification</td></tr>
+<tr><td>PR-005</td><td>Fracture force</td><td>&ge; 0.1 N/needle</td><td>Instron</td><td>Verification</td></tr>
+<tr><td>PR-009</td><td>Dissolution</td><td>&ge; 80% at 15 min</td><td>Franz cell</td><td>Verification</td></tr>
+<tr><td>PR-011</td><td>Drug loading</td><td>&plusmn; 10% of label</td><td>HPLC</td><td>Verification</td></tr>
+<tr><td>PR-012</td><td>Content uniformity</td><td>RSD &le; 6%</td><td>HPLC</td><td>Verification</td></tr>
+<tr><td>PR-014</td><td>Sustained release</td><td>Detectable at 6 months</td><td>Accelerated dissolution</td><td>Validation</td></tr>
+<tr><td>PR-016</td><td>Insertion force</td><td>&le; 20 N</td><td>Texture analyzer</td><td>Verification</td></tr>
+<tr><td>SR-002</td><td>Cytotoxicity</td><td>Viability &ge; 70%</td><td>ISO 10993-5</td><td>Verification</td></tr>
+<tr><td>SR-007</td><td>Sterility</td><td>SAL 10&#8315;&sup6;</td><td>USP &lt;71&gt;</td><td>Verification</td></tr>
+<tr><td>SR-010</td><td>Systemic safety</td><td>&lt; NOAEL/100</td><td>Dermal PK</td><td>Validation</td></tr>
+<tr><td>SR-013</td><td>Residual DCM</td><td>&lt; 600 ppm</td><td>Headspace GC</td><td>Verification</td></tr>
+<tr><td>ER-005</td><td>Shelf life V1</td><td>18 months at 15-25&deg;C</td><td>ICH stability</td><td>Validation</td></tr>
+<tr><td>ER-006</td><td>Shelf life V2</td><td>12 months at 2-8&deg;C</td><td>ICH stability</td><td>Validation</td></tr>
+<tr><td>FR-013</td><td>Usability</td><td>&ge; 90% task success</td><td>IEC 62366-1 summative</td><td>Validation</td></tr>
+</table>
+</div>
+
+<!-- ═══ 10. TRACEABILITY MATRIX ═══ -->
+<div class="s" id="s10">
+<h2>10. TRACEABILITY MATRIX</h2>
+
+<div class="eq"><b>Purpose:</b> Links user needs &rarr; requirements &rarr; design outputs &rarr; verification/validation activities per 21 CFR 820.30.</div>
+
+<div style="overflow-x:auto">
+<table>
+<tr><th>User Need</th><th>URS Requirement(s)</th><th>Design Output (DHF)</th><th>Verification</th><th>Validation</th></tr>
+<tr><td>UN-001 Painless application</td><td>PR-001, PR-002, PR-004, PR-016</td><td>Needle geometry spec; insertion force spec</td><td>Needle dimension inspection; Instron force test</td><td>Human factors pain assessment (VAS)</td></tr>
+<tr><td>UN-002 15-minute session</td><td>PR-008, PR-009, FR-003</td><td>HA formulation spec; dissolution rate spec</td><td>Franz cell dissolution testing</td><td>In-use timing study (human volunteers)</td></tr>
+<tr><td>UN-003 6-12 month effect</td><td>PR-014, PR-015, FR-004, FR-009</td><td>PLLA microsphere spec; encapsulation process</td><td>Accelerated release study</td><td>Clinical efficacy study (photography, biopsy)</td></tr>
+<tr><td>UN-004 Home use</td><td>FR-001, FR-005, FR-013, SR-011</td><td>Application instructions; backing design</td><td>Simulated use (untrained users)</td><td>Summative usability evaluation (IEC 62366-1)</td></tr>
+<tr><td>UN-005 No preparation</td><td>FR-001, FR-011, FR-012</td><td>Pre-loaded packaging spec</td><td>Package integrity testing</td><td>Formative usability studies</td></tr>
+<tr><td>UN-006 Conforms to face</td><td>PR-017, PR-018, FR-001</td><td>Patch flexibility spec; adhesive spec</td><td>Bend test; peel force test</td><td>In-use conformity assessment</td></tr>
+<tr><td>UN-007 No residue</td><td>PR-010, FR-005, SR-012</td><td>Backing layer spec; dissolution completeness</td><td>Post-removal inspection protocol</td><td>User perception study</td></tr>
+<tr><td>UN-008 Clear instructions</td><td>FR-013, RR-005</td><td>IFU design; labeling artwork</td><td>Labeling review vs. standards</td><td>Summative usability evaluation</td></tr>
+<tr><td>UN-009 Tamper-evident</td><td>FR-011, FR-012</td><td>Packaging spec; seal design</td><td>Seal integrity test</td><td>User perception of tamper evidence</td></tr>
+<tr><td>UN-010 Comparable to professional</td><td>PR-011, PR-014, FR-006 through FR-010</td><td>Formulation spec; clinical protocol</td><td>In vitro permeation; porcine skin model</td><td>Clinical efficacy trial (comparator arm)</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ═══ 11. REFERENCES ═══ -->
+<div class="s" id="s11">
+<h2>11. REFERENCES</h2>
+
+<table>
+<tr><th>Doc ID</th><th>Title</th><th>Revision</th></tr>
+<tr><td>BSK-SPEC-001</td><td>BASILISK Technical Specification &amp; Regulatory Package</td><td>Rev A</td></tr>
+<tr><td>BSK-DHF-001</td><td>BASILISK Design History File</td><td>Rev A</td></tr>
+<tr><td>BSK-RISK-001</td><td>BASILISK Risk Management File</td><td>TBD</td></tr>
+<tr><td>BSK-BIO-001</td><td>BASILISK Biocompatibility Evaluation Plan</td><td>TBD</td></tr>
+<tr><td>BSK-HF-001</td><td>BASILISK Human Factors Engineering File</td><td>TBD</td></tr>
+<tr><td>BSK-STAB-001</td><td>BASILISK Stability Protocol</td><td>TBD</td></tr>
+<tr><td>BSK-VAL-001</td><td>BASILISK Process Validation Protocol</td><td>TBD</td></tr>
+<tr><td>&mdash;</td><td>21 CFR Part 820 &mdash; Quality System Regulation</td><td>&mdash;</td></tr>
+<tr><td>&mdash;</td><td>ISO 13485:2016 &mdash; Medical Devices QMS</td><td>2016</td></tr>
+<tr><td>&mdash;</td><td>ISO 14971:2019 &mdash; Risk Management</td><td>2019</td></tr>
+<tr><td>&mdash;</td><td>ISO 10993 series &mdash; Biological Evaluation of Medical Devices</td><td>Various</td></tr>
+<tr><td>&mdash;</td><td>IEC 62366-1:2015 &mdash; Usability Engineering</td><td>2015</td></tr>
+<tr><td>&mdash;</td><td>ICH Q1A(R2) &mdash; Stability Testing</td><td>R2</td></tr>
+<tr><td>&mdash;</td><td>ICH Q3C(R8) &mdash; Residual Solvents</td><td>R8</td></tr>
+</table>
+</div>
+
+<!-- ═══ 12. GLOSSARY ═══ -->
+<div class="s" id="s12">
+<h2>12. GLOSSARY</h2>
+
+<table>
+<tr><th>Term</th><th>Definition</th></tr>
+<tr><td>AGE</td><td>Advanced Glycation End-product &mdash; protein crosslinks formed by non-enzymatic glycation</td></tr>
+<tr><td>5-ALA</td><td>5-Aminolevulinic acid &mdash; photosensitizer prodrug converted to protoporphyrin IX (PpIX)</td></tr>
+<tr><td>CCP</td><td>Critical Control Point &mdash; process step where control is essential to ensure product quality</td></tr>
+<tr><td>DCM</td><td>Dichloromethane &mdash; Class 2 solvent used in PLLA microsphere fabrication</td></tr>
+<tr><td>DHF</td><td>Design History File &mdash; compilation of design control records per 21 CFR 820.30</td></tr>
+<tr><td>GPMT</td><td>Guinea Pig Maximization Test &mdash; sensitization test method per ISO 10993-10</td></tr>
+<tr><td>HA</td><td>Hyaluronic Acid &mdash; dissolving matrix polymer (MW 100-300 kDa)</td></tr>
+<tr><td>IFU</td><td>Instructions for Use</td></tr>
+<tr><td>LAL</td><td>Limulus Amebocyte Lysate &mdash; endotoxin detection assay</td></tr>
+<tr><td>LLNA</td><td>Local Lymph Node Assay &mdash; murine sensitization test alternative</td></tr>
+<tr><td>NOAEL</td><td>No Observed Adverse Effect Level</td></tr>
+<tr><td>OCT</td><td>Optical Coherence Tomography &mdash; non-invasive imaging of skin microstructure</td></tr>
+<tr><td>PII</td><td>Primary Irritation Index &mdash; numerical score from skin irritation testing</td></tr>
+<tr><td>PLLA</td><td>Poly-L-Lactic Acid &mdash; biodegradable microsphere material (sustained release depot)</td></tr>
+<tr><td>PpIX</td><td>Protoporphyrin IX &mdash; endogenous photosensitizer generated from 5-ALA</td></tr>
+<tr><td>RSD</td><td>Relative Standard Deviation &mdash; coefficient of variation expressed as percentage</td></tr>
+<tr><td>SAL</td><td>Sterility Assurance Level</td></tr>
+<tr><td>SEM</td><td>Scanning Electron Microscopy</td></tr>
+<tr><td>URS</td><td>User Requirements Specification &mdash; foundational design input document</td></tr>
+<tr><td>VAS</td><td>Visual Analog Scale &mdash; pain measurement tool (0=no pain, 10=worst pain)</td></tr>
+<tr><td>WVTR</td><td>Water Vapor Transmission Rate</td></tr>
+</table>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<div style="margin-top:30px;font-size:7px;color:rgba(255,255,255,.08);text-align:center">
+BASILISK&trade; &middot; BSK-URS-001 Rev A &middot; DRAFT &mdash; NOT FOR REGULATORY SUBMISSION<br>
+Z=82 &middot; Pb &middot; 2&times;ANETA &middot; The AITistic Research Initiative &middot; 2026<br>
+CONFIDENTIAL &mdash; File provisional patent before external disclosure
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>BSK-DHF-001 — Design History File</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0c08;overflow-y:auto;font-family:'Courier New',monospace;color:#b0c0a0}
+#ui{max-width:1100px;margin:0 auto;padding:20px 24px 80px}
+h1{font-size:14px;letter-spacing:5px;color:rgba(150,255,100,.5);margin-bottom:2px}
+.sub{font-size:8px;color:rgba(150,255,100,.25);letter-spacing:2px;margin-bottom:4px}
+.doc-id{font-size:7px;color:rgba(255,255,255,.1);margin-bottom:16px}
+.back{display:inline-block;font-size:8px;color:rgba(150,255,100,.25);text-decoration:none;letter-spacing:1px;margin-bottom:14px;border:1px solid rgba(150,255,100,.08);padding:3px 8px;border-radius:3px}
+.back:hover{border-color:rgba(150,255,100,.25);color:rgba(150,255,100,.45)}
+.s{background:rgba(255,255,255,.02);border:1px solid rgba(150,255,100,.06);border-radius:6px;padding:14px 18px;margin-bottom:12px}
+.s h2{font-size:10px;letter-spacing:3px;color:rgba(150,255,100,.4);margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:5px}
+.s h3{font-size:9px;color:rgba(150,255,100,.3);margin:10px 0 4px;letter-spacing:1px}
+.s h4{font-size:8px;color:rgba(150,255,100,.25);margin:6px 0 3px;letter-spacing:1px}
+.eq{font-size:9px;color:rgba(200,220,180,.35);line-height:1.9;margin:3px 0}
+.eq b{color:rgba(180,255,120,.5)}
+table{width:100%;border-collapse:collapse;margin:8px 0;font-size:8px}
+th{color:rgba(150,255,100,.3);text-align:left;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.06);letter-spacing:1px}
+td{padding:3px 6px;color:rgba(200,220,180,.3);border-bottom:1px solid rgba(255,255,255,.02);vertical-align:top}
+.tag{display:inline-block;padding:1px 5px;border-radius:2px;font-size:7px;letter-spacing:1px;margin:1px}
+.tag-green{background:rgba(100,255,100,.08);border:1px solid rgba(100,255,100,.15);color:rgba(100,255,100,.5)}
+.tag-yellow{background:rgba(255,255,100,.08);border:1px solid rgba(255,255,100,.15);color:rgba(255,255,100,.5)}
+.tag-red{background:rgba(255,100,100,.08);border:1px solid rgba(255,100,100,.15);color:rgba(255,100,100,.5)}
+.tag-blue{background:rgba(100,150,255,.08);border:1px solid rgba(100,150,255,.15);color:rgba(100,150,255,.5)}
+.tag-purple{background:rgba(180,100,255,.08);border:1px solid rgba(180,100,255,.15);color:rgba(180,100,255,.5)}
+.sig-block{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:10px 0}
+.sig{background:rgba(255,255,255,.015);border:1px solid rgba(150,255,100,.04);border-radius:4px;padding:8px 10px}
+.sig-label{font-size:6px;letter-spacing:2px;color:rgba(150,255,100,.2);margin-bottom:4px}
+.sig-line{border-top:1px solid rgba(150,255,100,.08);margin-top:18px;padding-top:4px;font-size:7px;color:rgba(200,220,180,.15)}
+.sig-date{font-size:6px;color:rgba(200,220,180,.1);margin-top:2px}
+.warn{background:rgba(255,200,50,.03);border:1px solid rgba(255,200,50,.08);border-radius:4px;padding:8px 12px;margin:6px 0;font-size:8px;color:rgba(255,220,100,.4)}
+.note{background:rgba(100,150,255,.03);border:1px solid rgba(100,150,255,.08);border-radius:4px;padding:8px 12px;margin:6px 0;font-size:8px;color:rgba(140,180,255,.4)}
+.req-id{font-size:7px;color:rgba(100,150,255,.4);letter-spacing:1px;font-weight:bold}
+.trace-link{font-size:6px;color:rgba(150,255,100,.2);letter-spacing:1px}
+.rev-table{margin:8px 0}
+.rev-table td,.rev-table th{font-size:7px;padding:2px 6px}
+.watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:60px;letter-spacing:30px;color:rgba(255,255,255,.01);pointer-events:none;z-index:0;white-space:nowrap}
+.phase-gate{display:flex;align-items:center;gap:6px;margin:8px 0;flex-wrap:wrap}
+.gate{background:rgba(255,255,255,.02);border:1px solid rgba(150,255,100,.06);border-radius:4px;padding:4px 8px;font-size:7px;letter-spacing:1px;color:rgba(200,220,180,.3);text-align:center;min-width:80px}
+.gate-active{border-color:rgba(150,255,100,.3);color:rgba(150,255,100,.5);box-shadow:0 0 8px rgba(100,255,50,.05)}
+.gate-arrow{color:rgba(150,255,100,.15);font-size:10px}
+.process{border-left:3px solid rgba(150,255,100,.1);padding:8px 14px;margin:8px 0}
+.review-block{background:rgba(255,255,255,.015);border:1px solid rgba(150,255,100,.04);border-radius:4px;padding:10px 14px;margin:8px 0}
+.review-header{font-size:8px;color:rgba(150,255,100,.3);letter-spacing:2px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,.03);padding-bottom:4px}
+.toc{margin:6px 0}
+.toc a{display:block;font-size:8px;color:rgba(200,220,180,.25);text-decoration:none;line-height:2;letter-spacing:1px}
+.toc a:hover{color:rgba(150,255,100,.45)}
+.toc-num{color:rgba(150,255,100,.2);margin-right:8px;display:inline-block;width:24px}
+.change-record{background:rgba(255,200,50,.02);border:1px solid rgba(255,200,50,.06);border-radius:4px;padding:10px 14px;margin:8px 0}
+.change-header{font-size:8px;color:rgba(255,220,100,.3);letter-spacing:2px;margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="watermark">DRAFT</div>
+<div id="ui">
+
+<a class="back" href="index.html">&larr; DOCUMENT CONTROL CENTER</a>
+
+<h1>BASILISK&trade;</h1>
+<div class="sub">DESIGN HISTORY FILE</div>
+<div class="doc-id">DOC: BSK-DHF-001 &middot; Rev A &middot; DRAFT &middot; EFFECTIVE DATE: PENDING APPROVAL</div>
+<div class="doc-id">CONFIDENTIAL &mdash; The AITistic Research Initiative &middot; Thomas Frumkin &middot; 2026</div>
+
+<!-- ═══ DOCUMENT CONTROL ═══ -->
+<div class="s">
+<h2>DOCUMENT CONTROL</h2>
+
+<h3>Revision History</h3>
+<table class="rev-table">
+<tr><th>Rev</th><th>Date</th><th>Author</th><th>Description</th><th>ECO#</th></tr>
+<tr><td>A</td><td>2026-07-15</td><td>T. Frumkin</td><td>Initial draft &mdash; DHF structure established</td><td>ECO-BSK-002</td></tr>
+<tr><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+</table>
+
+<h3>Approval Signatures</h3>
+<div class="sig-block">
+<div class="sig">
+<div class="sig-label">AUTHORED BY</div>
+<div class="sig-line">Name: _________________________</div>
+<div class="sig-date">Title: R&D Lead / Design Owner</div>
+<div class="sig-date">Date: ____/____/________</div>
+<div class="sig-date">Signature: ______________________</div>
+</div>
+<div class="sig">
+<div class="sig-label">REVIEWED BY</div>
+<div class="sig-line">Name: _________________________</div>
+<div class="sig-date">Title: Quality Assurance Manager</div>
+<div class="sig-date">Date: ____/____/________</div>
+<div class="sig-date">Signature: ______________________</div>
+</div>
+<div class="sig">
+<div class="sig-label">APPROVED BY</div>
+<div class="sig-line">Name: _________________________</div>
+<div class="sig-date">Title: Management Representative</div>
+<div class="sig-date">Date: ____/____/________</div>
+<div class="sig-date">Signature: ______________________</div>
+</div>
+</div>
+
+<div class="note">NOTE: This Design History File is a living document maintained per 21 CFR 820.30(j) and ISO 13485:2016 clause 7.3.9. All design control records are compiled herein or referenced by document number. Electronic records comply with 21 CFR Part 11.</div>
+</div>
+
+<!-- ═══ TABLE OF CONTENTS ═══ -->
+<div class="s">
+<h2>TABLE OF CONTENTS</h2>
+<div class="toc">
+<a href="#s1"><span class="toc-num">1</span>DESIGN AND DEVELOPMENT PLANNING</a>
+<a href="#s2"><span class="toc-num">2</span>PHASE GATE STRUCTURE</a>
+<a href="#s3"><span class="toc-num">3</span>DESIGN INPUTS</a>
+<a href="#s4"><span class="toc-num">4</span>DESIGN OUTPUTS</a>
+<a href="#s5"><span class="toc-num">5</span>DESIGN REVIEW RECORDS</a>
+<a href="#s6"><span class="toc-num">6</span>DESIGN VERIFICATION</a>
+<a href="#s7"><span class="toc-num">7</span>DESIGN VALIDATION</a>
+<a href="#s8"><span class="toc-num">8</span>DESIGN TRANSFER</a>
+<a href="#s9"><span class="toc-num">9</span>DESIGN CHANGES</a>
+<a href="#s10"><span class="toc-num">10</span>DHF INDEX OF RECORDS</a>
+<a href="#s11"><span class="toc-num">11</span>REFERENCES</a>
+</div>
+</div>
+
+<!-- ═══ 1. DESIGN AND DEVELOPMENT PLANNING ═══ -->
+<div class="s" id="s1">
+<h2>1. DESIGN AND DEVELOPMENT PLANNING &mdash; 21 CFR 820.30(b)</h2>
+
+<h3>1.1 Design and Development Plan</h3>
+<div class="eq"><b>Product:</b> BASILISK&trade; Dissolving Microneedle Collagen Repair System</div>
+<div class="eq"><b>Scope:</b> V1 BASILISK CROWN (10-ingredient cosmetic device) and V2 BASILISK RADIANT (11-ingredient drug-device combination)</div>
+<div class="eq"><b>Design Owner:</b> T. Frumkin, R&D Lead</div>
+<div class="eq"><b>Quality Representative:</b> TBD</div>
+<div class="eq"><b>Regulatory Representative:</b> TBD</div>
+
+<h3>1.2 Organizational Interfaces</h3>
+<table>
+<tr><th>Function</th><th>Responsibility</th><th>Design Phase Involvement</th></tr>
+<tr><td>R&D / Design Engineering</td><td>Formulation development, needle geometry design, prototype fabrication</td><td>All phases</td></tr>
+<tr><td>Quality Assurance</td><td>Design review participation, verification protocol approval, process validation</td><td>All phases</td></tr>
+<tr><td>Regulatory Affairs</td><td>Classification confirmation, submission strategy, labeling review</td><td>Planning, Verification, Transfer</td></tr>
+<tr><td>Manufacturing / Process Engineering</td><td>Process development, scale-up, process validation execution</td><td>Development, Verification, Transfer</td></tr>
+<tr><td>Clinical / Medical Affairs</td><td>Clinical protocol design, investigator engagement (V2)</td><td>Validation</td></tr>
+<tr><td>Human Factors Engineering</td><td>Use-related risk analysis, usability testing</td><td>Development, Validation</td></tr>
+<tr><td>Supply Chain</td><td>Supplier qualification, incoming material specifications</td><td>Development, Transfer</td></tr>
+<tr><td>IP / Legal Counsel</td><td>Patent prosecution, freedom-to-operate analysis</td><td>Planning, Development</td></tr>
+</table>
+
+<h3>1.3 Development Timeline (V1 Target)</h3>
+<table>
+<tr><th>Phase</th><th>Duration</th><th>Target Dates</th><th>Key Deliverables</th></tr>
+<tr><td>Concept</td><td>Months 1-2</td><td>2026 Q3</td><td>URS, preliminary risk analysis, concept review</td></tr>
+<tr><td>Feasibility</td><td>Months 3-5</td><td>2026 Q3-Q4</td><td>Proof-of-concept prototypes, feasibility report, FTO analysis</td></tr>
+<tr><td>Development</td><td>Months 6-10</td><td>2026 Q4 &ndash; 2027 Q1</td><td>Design freeze, verification protocols, process development report</td></tr>
+<tr><td>Verification</td><td>Months 11-14</td><td>2027 Q1-Q2</td><td>Verification test reports, biocompatibility report, design review</td></tr>
+<tr><td>Validation</td><td>Months 15-18</td><td>2027 Q2-Q3</td><td>Clinical/usability validation, stability data, process validation</td></tr>
+<tr><td>Transfer</td><td>Months 19-21</td><td>2027 Q3-Q4</td><td>DMR release, regulatory submission, production readiness</td></tr>
+</table>
+
+<h3>1.4 Applicable Standards and Regulations</h3>
+<div class="eq">See BSK-URS-001 &sect;1.3 and BSK-SPEC-001 &sect;2.3 for complete listing. Key design control references:</div>
+<div class="eq">&emsp;<b>21 CFR 820.30(a)-(j)</b> &mdash; Design Controls (US QSR)</div>
+<div class="eq">&emsp;<b>ISO 13485:2016 &sect;7.3</b> &mdash; Design and Development</div>
+<div class="eq">&emsp;<b>FDA Design Control Guidance (1997)</b> &mdash; Waterfall + iteration model</div>
+</div>
+
+<!-- ═══ 2. PHASE GATE STRUCTURE ═══ -->
+<div class="s" id="s2">
+<h2>2. PHASE GATE STRUCTURE</h2>
+
+<div class="eq"><b>Purpose:</b> Each phase gate requires formal design review and management approval before proceeding. Gate criteria define minimum deliverables. No phase may be skipped.</div>
+
+<div class="phase-gate">
+<div class="gate gate-active">GATE 0<br><span style="font-size:6px">CONCEPT</span></div>
+<span class="gate-arrow">&rarr;</span>
+<div class="gate gate-active">GATE 1<br><span style="font-size:6px">FEASIBILITY</span></div>
+<span class="gate-arrow">&rarr;</span>
+<div class="gate">GATE 2<br><span style="font-size:6px">DEVELOPMENT</span></div>
+<span class="gate-arrow">&rarr;</span>
+<div class="gate">GATE 3<br><span style="font-size:6px">VERIFICATION</span></div>
+<span class="gate-arrow">&rarr;</span>
+<div class="gate">GATE 4<br><span style="font-size:6px">VALIDATION</span></div>
+<span class="gate-arrow">&rarr;</span>
+<div class="gate">GATE 5<br><span style="font-size:6px">TRANSFER</span></div>
+</div>
+
+<table>
+<tr><th>Gate</th><th>Name</th><th>Entry Criteria</th><th>Exit Deliverables</th><th>Approvers</th></tr>
+<tr><td><span class="tag tag-green">G0</span></td><td>Concept</td><td>Market need identified; initial product concept defined</td><td>URS approved; preliminary hazard analysis; regulatory classification confirmed; FTO initiated; provisional patent filed</td><td>R&D Lead, QA, Regulatory</td></tr>
+<tr><td><span class="tag tag-green">G1</span></td><td>Feasibility</td><td>G0 deliverables complete</td><td>Proof-of-concept data (needle fabrication, dissolution, drug loading); feasibility report; updated risk assessment; FTO opinion; development budget approved</td><td>R&D Lead, QA, Regulatory, Management</td></tr>
+<tr><td><span class="tag tag-yellow">G2</span></td><td>Development</td><td>Feasibility confirmed; design inputs locked</td><td>Design freeze (formulation, geometry, process); verification protocols approved; supplier qualification initiated; design FMEA complete; biocompatibility test plan approved</td><td>Full design review team</td></tr>
+<tr><td><span class="tag tag-red">G3</span></td><td>Verification</td><td>Design outputs documented; verification protocols approved</td><td>All verification test reports complete and accepted; biocompatibility testing complete; stability studies initiated; design review with all findings closed or dispositioned</td><td>Full design review team</td></tr>
+<tr><td><span class="tag tag-red">G4</span></td><td>Validation</td><td>Verification complete; validation protocols approved</td><td>Clinical validation complete (V2); usability validation complete; process validation protocol approved; stability data supporting shelf life; residual risk acceptable per ISO 14971</td><td>Full design review team + Medical (V2)</td></tr>
+<tr><td><span class="tag tag-red">G5</span></td><td>Transfer</td><td>Validation complete; all design outputs finalized</td><td>DMR released; process validation complete (IQ/OQ/PQ); regulatory submission filed; training complete; commercial readiness confirmed</td><td>Full design review team + Management</td></tr>
+</table>
+</div>
+
+<!-- ═══ 3. DESIGN INPUTS ═══ -->
+<div class="s" id="s3">
+<h2>3. DESIGN INPUTS &mdash; 21 CFR 820.30(c)</h2>
+
+<div class="eq"><b>Purpose:</b> Design inputs are the physical and performance requirements used as a basis for device design. Inputs derive from the User Requirements Specification (BSK-URS-001) and applicable standards.</div>
+
+<h3>3.1 Input Sources</h3>
+<table>
+<tr><th>Source</th><th>Document</th><th>Input Category</th></tr>
+<tr><td>User Requirements</td><td>BSK-URS-001 Rev A</td><td>User needs (UN-001 through UN-010), performance requirements (PR-001 through PR-018), functional requirements (FR-001 through FR-013), safety requirements (SR-001 through SR-013)</td></tr>
+<tr><td>Regulatory Requirements</td><td>BSK-URS-001 &sect;8; BSK-SPEC-001 &sect;2</td><td>Classification, applicable standards, labeling requirements (RR-001 through RR-019)</td></tr>
+<tr><td>Risk Analysis</td><td>BSK-RISK-001 (TBD)</td><td>Hazard-derived requirements, risk control measures</td></tr>
+<tr><td>Competitive Analysis</td><td>Internal market research</td><td>Benchmarking data, differentiation requirements</td></tr>
+<tr><td>Manufacturing Constraints</td><td>Process development reports</td><td>Feasible process parameters, equipment capability</td></tr>
+</table>
+
+<h3>3.2 Design Input Requirements (Summary)</h3>
+<table>
+<tr><th>Category</th><th>Input ID Range</th><th>Count</th><th>Source Document</th><th>Status</th></tr>
+<tr><td>User Needs</td><td>UN-001 &ndash; UN-010</td><td>10</td><td>BSK-URS-001 &sect;3</td><td><span class="tag tag-green">APPROVED</span></td></tr>
+<tr><td>Performance Requirements</td><td>PR-001 &ndash; PR-018</td><td>18</td><td>BSK-URS-001 &sect;4</td><td><span class="tag tag-green">APPROVED</span></td></tr>
+<tr><td>Functional Requirements</td><td>FR-001 &ndash; FR-013</td><td>13</td><td>BSK-URS-001 &sect;5</td><td><span class="tag tag-green">APPROVED</span></td></tr>
+<tr><td>Safety Requirements</td><td>SR-001 &ndash; SR-013</td><td>13</td><td>BSK-URS-001 &sect;6</td><td><span class="tag tag-green">APPROVED</span></td></tr>
+<tr><td>Environmental Requirements</td><td>ER-001 &ndash; ER-008</td><td>8</td><td>BSK-URS-001 &sect;7</td><td><span class="tag tag-green">APPROVED</span></td></tr>
+<tr><td>Regulatory Requirements</td><td>RR-001 &ndash; RR-019</td><td>19</td><td>BSK-URS-001 &sect;8</td><td><span class="tag tag-green">APPROVED</span></td></tr>
+<tr><td>Risk-Derived Requirements</td><td>RD-001 &ndash; TBD</td><td>TBD</td><td>BSK-RISK-001</td><td><span class="tag tag-red">PENDING</span></td></tr>
+</table>
+
+<div class="note">NOTE: Design inputs are reviewed for adequacy, completeness, and absence of ambiguity or conflict per 21 CFR 820.30(c). Input review is documented in Design Review DR-001 (see Section 5).</div>
+</div>
+
+<!-- ═══ 4. DESIGN OUTPUTS ═══ -->
+<div class="s" id="s4">
+<h2>4. DESIGN OUTPUTS &mdash; 21 CFR 820.30(d)</h2>
+
+<div class="eq"><b>Purpose:</b> Design outputs are the results of the design effort at each phase. They are expressed in terms that allow adequate evaluation of conformance to design input requirements.</div>
+
+<h3>4.1 Formulation Specification</h3>
+<table>
+<tr><th>Output ID</th><th>Parameter</th><th>Specification</th><th>Traces to Input</th></tr>
+<tr><td><span class="req-id">DO-001</span></td><td>HA matrix concentration</td><td>20% w/v, MW 100-300 kDa</td><td>PR-009, FR-003</td></tr>
+<tr><td><span class="req-id">DO-002</span></td><td>PLLA microsphere loading</td><td>15% w/w of needle mass; D50 = 10 &plusmn; 3 &mu;m</td><td>PR-014, PR-015, FR-004</td></tr>
+<tr><td><span class="req-id">DO-003</span></td><td>ALT-711 concentration</td><td>0.5% w/w in needle formulation</td><td>FR-006, PR-011</td></tr>
+<tr><td><span class="req-id">DO-004</span></td><td>GHK-Cu complex</td><td>0.1% w/w; Cu&sup2;+:GHK ratio 1:1 &plusmn; 5%</td><td>FR-007, PR-011</td></tr>
+<tr><td><span class="req-id">DO-005</span></td><td>Peptide cocktail</td><td>Matrixyl 0.05%, Argireline 0.1%, Syn-Ake 0.05%, EGF 0.001% w/w</td><td>FR-008, PR-011</td></tr>
+<tr><td><span class="req-id">DO-006</span></td><td>Niacinamide concentration</td><td>2% w/w</td><td>PR-011</td></tr>
+<tr><td><span class="req-id">DO-007</span></td><td>Retinol (in MCT carrier)</td><td>0.3% w/w, encapsulated in PLLA microspheres</td><td>FR-009, PR-011</td></tr>
+<tr><td><span class="req-id">DO-008</span></td><td>5-ALA concentration (V2 only)</td><td>1% w/w as phosphate salt</td><td>FR-010, PR-011</td></tr>
+<tr><td><span class="req-id">DO-009</span></td><td>Formulation pH</td><td>6.8-7.4</td><td>SR-004, FR-007</td></tr>
+<tr><td><span class="req-id">DO-010</span></td><td>Formulation viscosity</td><td>8000-12000 cP (for mold filling)</td><td>PR-001 (needle formation)</td></tr>
+</table>
+
+<h3>4.2 Needle Geometry Specification</h3>
+<table>
+<tr><th>Output ID</th><th>Parameter</th><th>Specification</th><th>Traces to Input</th></tr>
+<tr><td><span class="req-id">DO-011</span></td><td>Needle height</td><td>500 &plusmn; 50 &mu;m</td><td>PR-001, PR-004</td></tr>
+<tr><td><span class="req-id">DO-012</span></td><td>Needle tip diameter</td><td>&le; 15 &mu;m</td><td>PR-002</td></tr>
+<tr><td><span class="req-id">DO-013</span></td><td>Needle base diameter</td><td>200 &plusmn; 20 &mu;m</td><td>PR-003</td></tr>
+<tr><td><span class="req-id">DO-014</span></td><td>Array configuration</td><td>7 &times; 7 (49 needles), pitch 600 &plusmn; 30 &mu;m</td><td>PR-006</td></tr>
+<tr><td><span class="req-id">DO-015</span></td><td>Patch diameter</td><td>15 &plusmn; 0.5 mm circular</td><td>PR-007</td></tr>
+<tr><td><span class="req-id">DO-016</span></td><td>Backing layer thickness</td><td>200 &plusmn; 30 &mu;m (HA 10% w/v)</td><td>PR-010, FR-005</td></tr>
+<tr><td><span class="req-id">DO-017</span></td><td>Needle geometry (profile)</td><td>Conical, aspect ratio 2.5:1 (height:base)</td><td>PR-005, PR-016</td></tr>
+</table>
+
+<h3>4.3 Manufacturing Process Specification</h3>
+<table>
+<tr><th>Output ID</th><th>Parameter</th><th>Specification</th><th>Reference</th></tr>
+<tr><td><span class="req-id">DO-018</span></td><td>Process flow</td><td>7-stage ISA-88/PackML process (BSK-SPEC-001 &sect;5)</td><td>BSK-SPEC-001</td></tr>
+<tr><td><span class="req-id">DO-019</span></td><td>Critical Control Points</td><td>CCP-1 through CCP-9 defined with limits</td><td>BSK-SPEC-001 &sect;5</td></tr>
+<tr><td><span class="req-id">DO-020</span></td><td>PDMS mold specification</td><td>7&times;7 array, 500 &mu;m depth, 200 &mu;m base, 10 &mu;m tip</td><td>DO-011 through DO-014</td></tr>
+<tr><td><span class="req-id">DO-021</span></td><td>Centrifugal casting parameters</td><td>4000g, 5 min fill time</td><td>Process development</td></tr>
+<tr><td><span class="req-id">DO-022</span></td><td>Drying conditions</td><td>25&deg;C, 30% RH, 24 hours</td><td>Process development</td></tr>
+<tr><td><span class="req-id">DO-023</span></td><td>Spray drying parameters (microspheres)</td><td>Inlet 110&deg;C, outlet 65&deg;C, feed 5 mL/min</td><td>Process development</td></tr>
+</table>
+
+<h3>4.4 Packaging Specification</h3>
+<table>
+<tr><th>Output ID</th><th>Parameter</th><th>Specification</th><th>Traces to Input</th></tr>
+<tr><td><span class="req-id">DO-024</span></td><td>Primary packaging</td><td>Individual aluminum foil laminate pouch, N&sub2; flushed</td><td>FR-011, ER-003, ER-004</td></tr>
+<tr><td><span class="req-id">DO-025</span></td><td>Moisture barrier</td><td>WVTR &le; 0.01 g/m&sup2;/day</td><td>FR-011, ER-004</td></tr>
+<tr><td><span class="req-id">DO-026</span></td><td>Light barrier</td><td>Light transmission &le; 0.1% (200-800 nm)</td><td>FR-011, ER-003</td></tr>
+<tr><td><span class="req-id">DO-027</span></td><td>Tamper-evident feature</td><td>Peel-seal with visual tear indicator</td><td>FR-012</td></tr>
+<tr><td><span class="req-id">DO-028</span></td><td>Desiccant</td><td>Silica gel sachet, 1g, pharma grade</td><td>ER-004</td></tr>
+<tr><td><span class="req-id">DO-029</span></td><td>Labeling content</td><td>Per 21 CFR 801 / MoCRA: lot, expiry, UDI, storage, IFU</td><td>FR-013, RR-005, RR-006</td></tr>
+</table>
+
+<h3>4.5 Design Output Acceptance</h3>
+<div class="eq">Each design output shall be reviewed and approved before release for verification testing. Design outputs are documented in the Device Master Record (BSK-DMR-001) upon design transfer.</div>
+<div class="eq"><b>Essential outputs for design transfer acceptance:</b></div>
+<div class="eq">&emsp;1. Formulation master batch record</div>
+<div class="eq">&emsp;2. Component and material specifications</div>
+<div class="eq">&emsp;3. Manufacturing process instructions (7 stages)</div>
+<div class="eq">&emsp;4. In-process and final QC test methods and specifications</div>
+<div class="eq">&emsp;5. Packaging and labeling specifications</div>
+<div class="eq">&emsp;6. Finished device specifications</div>
+</div>
+
+<!-- ═══ 5. DESIGN REVIEW RECORDS ═══ -->
+<div class="s" id="s5">
+<h2>5. DESIGN REVIEW RECORDS &mdash; 21 CFR 820.30(e)</h2>
+
+<div class="eq"><b>Purpose:</b> Formal documented examinations of design results at defined phase gates, conducted by a cross-functional team including individuals not directly responsible for the design stage being reviewed. Includes an independent reviewer per 21 CFR 820.30(e).</div>
+
+<h3>5.1 Design Review Schedule</h3>
+<table>
+<tr><th>Review ID</th><th>Phase Gate</th><th>Scope</th><th>Status</th><th>Date</th></tr>
+<tr><td><span class="req-id">DR-001</span></td><td>G0 &rarr; G1 (Concept)</td><td>URS adequacy, regulatory pathway, risk assessment, FTO</td><td><span class="tag tag-green">COMPLETE</span></td><td>2026-07-15</td></tr>
+<tr><td><span class="req-id">DR-002</span></td><td>G1 &rarr; G2 (Feasibility)</td><td>POC data review, formulation feasibility, process feasibility</td><td><span class="tag tag-yellow">SCHEDULED</span></td><td>TBD</td></tr>
+<tr><td><span class="req-id">DR-003</span></td><td>G2 &rarr; G3 (Development)</td><td>Design freeze review, DFMEA, verification protocol adequacy</td><td><span class="tag tag-red">NOT STARTED</span></td><td>TBD</td></tr>
+<tr><td><span class="req-id">DR-004</span></td><td>G3 &rarr; G4 (Verification)</td><td>Verification results, biocompatibility data, design conformance</td><td><span class="tag tag-red">NOT STARTED</span></td><td>TBD</td></tr>
+<tr><td><span class="req-id">DR-005</span></td><td>G4 &rarr; G5 (Validation)</td><td>Validation results, residual risk, process capability, commercial readiness</td><td><span class="tag tag-red">NOT STARTED</span></td><td>TBD</td></tr>
+</table>
+
+<h3>5.2 Design Review Record Template</h3>
+<div class="review-block">
+<div class="review-header">DESIGN REVIEW RECORD &mdash; DR-00X</div>
+<table>
+<tr><th style="width:30%">Field</th><th>Content</th></tr>
+<tr><td>Review ID</td><td>DR-00X</td></tr>
+<tr><td>Date</td><td>____/____/________</td></tr>
+<tr><td>Phase Gate</td><td>GX &rarr; GY</td></tr>
+<tr><td>Location</td><td>____________________</td></tr>
+<tr><td>Duration</td><td>____________________</td></tr>
+</table>
+
+<div class="eq" style="margin-top:8px"><b>Attendees:</b></div>
+<table>
+<tr><th>Name</th><th>Role</th><th>Function</th><th>Independent?</th><th>Signature</th></tr>
+<tr><td>____________</td><td>Chair</td><td>____________</td><td>___</td><td>____________</td></tr>
+<tr><td>____________</td><td>Presenter</td><td>____________</td><td>___</td><td>____________</td></tr>
+<tr><td>____________</td><td>Independent Reviewer</td><td>____________</td><td>Yes</td><td>____________</td></tr>
+<tr><td>____________</td><td>Scribe</td><td>____________</td><td>___</td><td>____________</td></tr>
+</table>
+
+<div class="eq" style="margin-top:8px"><b>Materials Reviewed:</b></div>
+<div class="eq">&emsp;1. ___________________________</div>
+<div class="eq">&emsp;2. ___________________________</div>
+<div class="eq">&emsp;3. ___________________________</div>
+
+<div class="eq" style="margin-top:8px"><b>Findings / Action Items:</b></div>
+<table>
+<tr><th>#</th><th>Finding</th><th>Severity</th><th>Action Required</th><th>Owner</th><th>Due Date</th><th>Status</th></tr>
+<tr><td>1</td><td>_______________</td><td>___</td><td>_______________</td><td>_____</td><td>________</td><td>___</td></tr>
+<tr><td>2</td><td>_______________</td><td>___</td><td>_______________</td><td>_____</td><td>________</td><td>___</td></tr>
+<tr><td>3</td><td>_______________</td><td>___</td><td>_______________</td><td>_____</td><td>________</td><td>___</td></tr>
+</table>
+
+<div class="eq" style="margin-top:8px"><b>Conclusion:</b> [ ] APPROVED to proceed to next phase &emsp; [ ] APPROVED with conditions &emsp; [ ] NOT APPROVED &mdash; rework required</div>
+
+<div class="sig-block" style="margin-top:12px">
+<div class="sig">
+<div class="sig-label">REVIEW CHAIR</div>
+<div class="sig-line">Signature: ___________________</div>
+<div class="sig-date">Date: ____/____/________</div>
+</div>
+<div class="sig">
+<div class="sig-label">INDEPENDENT REVIEWER</div>
+<div class="sig-line">Signature: ___________________</div>
+<div class="sig-date">Date: ____/____/________</div>
+</div>
+<div class="sig">
+<div class="sig-label">QA REPRESENTATIVE</div>
+<div class="sig-line">Signature: ___________________</div>
+<div class="sig-date">Date: ____/____/________</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ 6. DESIGN VERIFICATION ═══ -->
+<div class="s" id="s6">
+<h2>6. DESIGN VERIFICATION &mdash; 21 CFR 820.30(f)</h2>
+
+<div class="eq"><b>Purpose:</b> Design verification confirms that design outputs meet design input requirements. Verification is performed under controlled conditions using predefined protocols with documented acceptance criteria.</div>
+
+<h3>6.1 Verification Test Matrix</h3>
+<table>
+<tr><th>Test ID</th><th>Test Name</th><th>Design Output</th><th>Design Input</th><th>Method</th><th>Acceptance Criterion</th><th>Protocol</th><th>Status</th></tr>
+<tr><td><span class="req-id">VER-001</span></td><td>Needle dimensional inspection</td><td>DO-011, DO-012, DO-013</td><td>PR-001, PR-002, PR-003</td><td>SEM + optical microscopy</td><td>Height 500&plusmn;50&mu;m (95%); tip &le;15&mu;m (100%); base 200&plusmn;20&mu;m (90%)</td><td>BSK-VER-P001</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-002</span></td><td>Needle fracture force</td><td>DO-017</td><td>PR-005</td><td>Micro-compression (Instron 5943)</td><td>Mean fracture force &ge; 0.1 N/needle (n=20)</td><td>BSK-VER-P002</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-003</span></td><td>Dissolution rate</td><td>DO-001</td><td>PR-008, PR-009</td><td>Franz cell diffusion; gravimetric; time-lapse microscopy</td><td>&ge;50% at 5 min; &ge;80% at 15 min</td><td>BSK-VER-P003</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-004</span></td><td>Drug content / potency</td><td>DO-003 through DO-008</td><td>PR-011</td><td>HPLC (validated analytical methods)</td><td>Each active &plusmn;10% of label claim</td><td>BSK-VER-P004</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-005</span></td><td>Content uniformity</td><td>DO-003 through DO-008</td><td>PR-012</td><td>Individual needle extraction + HPLC</td><td>RSD &le; 6% (n=10 needles per patch, 3 patches)</td><td>BSK-VER-P005</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-006</span></td><td>Insertion force</td><td>DO-011, DO-017</td><td>PR-016</td><td>Texture analyzer on Parafilm M model</td><td>Complete penetration at &le; 20 N (10 sec hold)</td><td>BSK-VER-P006</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-007</span></td><td>Patch adhesion</td><td>DO-015, DO-016</td><td>PR-017</td><td>Peel force measurement; vertical hang test</td><td>Adhesion &ge; 15 min on vertical surface</td><td>BSK-VER-P007</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-008</span></td><td>Flexibility / bend test</td><td>DO-015, DO-016</td><td>PR-018</td><td>Cylindrical mandrel bend (R=20mm)</td><td>No needle breakage; no backing fracture</td><td>BSK-VER-P008</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-009</span></td><td>PLLA microsphere characterization</td><td>DO-002</td><td>PR-015</td><td>Laser diffraction (Malvern Mastersizer)</td><td>D50 = 10&plusmn;3 &mu;m; D90 &le; 20 &mu;m</td><td>BSK-VER-P009</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-010</span></td><td>Residual solvent (DCM)</td><td>DO-023</td><td>SR-013</td><td>Headspace GC per ICH Q3C</td><td>&lt; 600 ppm DCM</td><td>BSK-VER-P010</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-011</span></td><td>Cytotoxicity</td><td>Formulation</td><td>SR-002</td><td>ISO 10993-5 (L929, MEM elution, 24h)</td><td>Cell viability &ge; 70%</td><td>BSK-BIO-P001</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-012</span></td><td>Sensitization</td><td>Formulation</td><td>SR-003</td><td>ISO 10993-10 (GPMT or LLNA)</td><td>Negative result</td><td>BSK-BIO-P002</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-013</span></td><td>Irritation</td><td>Formulation</td><td>SR-004</td><td>ISO 10993-23 (EpiDerm EIT) or ISO 10993-10</td><td>PII &le; 0.4 or non-irritant classification</td><td>BSK-BIO-P003</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-014</span></td><td>Sterility</td><td>Finished device</td><td>SR-007</td><td>USP &lt;71&gt; or validated bioburden</td><td>SAL 10&#8315;&sup6;</td><td>BSK-VER-P014</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-015</span></td><td>Endotoxin</td><td>Finished device</td><td>SR-008</td><td>LAL per USP &lt;85&gt;</td><td>&lt; 20 EU/device</td><td>BSK-VER-P015</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-016</span></td><td>Moisture content</td><td>Finished device</td><td>ER-004</td><td>Karl Fischer titration</td><td>&lt; 5%</td><td>BSK-VER-P016</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VER-017</span></td><td>Package integrity</td><td>DO-024, DO-025, DO-026</td><td>FR-011, ER-003, ER-004</td><td>WVTR measurement; spectrophotometry; seal strength</td><td>WVTR &le;0.01 g/m&sup2;/day; OD &ge;3 (200-800nm); seal &ge;15 N/15mm</td><td>BSK-VER-P017</td><td><span class="tag tag-red">PENDING</span></td></tr>
+</table>
+
+<h3>6.2 Verification Protocol Structure</h3>
+<div class="eq">Each verification protocol (BSK-VER-PXXX) shall contain:</div>
+<div class="eq">&emsp;1. Objective and scope</div>
+<div class="eq">&emsp;2. Reference documents and design inputs being verified</div>
+<div class="eq">&emsp;3. Equipment, materials, and sample requirements</div>
+<div class="eq">&emsp;4. Detailed test procedure</div>
+<div class="eq">&emsp;5. Acceptance criteria (traceable to design inputs)</div>
+<div class="eq">&emsp;6. Data recording forms</div>
+<div class="eq">&emsp;7. Statistical analysis plan (sample size justification)</div>
+<div class="eq">&emsp;8. Deviation handling procedure</div>
+<div class="eq">&emsp;9. Report template with signature block</div>
+</div>
+
+<!-- ═══ 7. DESIGN VALIDATION ═══ -->
+<div class="s" id="s7">
+<h2>7. DESIGN VALIDATION &mdash; 21 CFR 820.30(g)</h2>
+
+<div class="eq"><b>Purpose:</b> Design validation ensures that the device conforms to defined user needs and intended uses. Validation is performed on initial production units or equivalents under actual or simulated use conditions.</div>
+
+<h3>7.1 Validation Test Matrix</h3>
+<table>
+<tr><th>Test ID</th><th>Test Name</th><th>User Need</th><th>Method</th><th>Acceptance Criterion</th><th>Protocol</th><th>Status</th></tr>
+<tr><td><span class="req-id">VAL-001</span></td><td>Franz cell permeation study</td><td>UN-003, UN-010</td><td>Vertical Franz diffusion cells; human cadaver or synthetic skin; 72h sampling</td><td>Cumulative permeation profile matches predicted release kinetics; &ge;40% immediate release at 15 min</td><td>BSK-VAL-P001</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VAL-002</span></td><td>Porcine skin penetration model</td><td>UN-001, UN-002</td><td>Ex vivo porcine ear skin; OCT imaging + histological sectioning; application by untrained operators</td><td>&ge;90% needle penetration past stratum corneum; penetration depth 200-500 &mu;m; dissolution &ge;80% at 15 min</td><td>BSK-VAL-P002</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VAL-003</span></td><td>Porcine skin PLLA deposition</td><td>UN-003</td><td>Histological sectioning + fluorescence microscopy (FITC-labeled microspheres)</td><td>Microspheres deposited in dermis (200-500 &mu;m depth); uniform distribution within application area</td><td>BSK-VAL-P003</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VAL-004</span></td><td>Accelerated release kinetics</td><td>UN-003</td><td>PLLA microspheres in PBS at 50&deg;C; sampling at 1, 7, 14, 30, 60, 90, 180 days; correlation to 37&deg;C real-time</td><td>Sustained release detectable at accelerated equivalent of 6 months; zero-order or first-order release fit R&sup2; &ge; 0.95</td><td>BSK-VAL-P004</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VAL-005</span></td><td>Human factors formative evaluation</td><td>UN-004, UN-005, UN-008</td><td>Simulated use with 15 representative users (naive); task analysis per IEC 62366-1</td><td>All critical tasks completed without use error; identified risks mitigated in design or IFU</td><td>BSK-HF-P001</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VAL-006</span></td><td>Human factors summative evaluation</td><td>UN-004, UN-005, UN-008</td><td>Simulated use with 30 representative users; summative per IEC 62366-1 / FDA HF guidance</td><td>&ge;90% task success for all critical tasks; no new use errors with potential for harm</td><td>BSK-HF-P002</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VAL-007</span></td><td>Pain assessment (VAS)</td><td>UN-001</td><td>Visual Analog Scale administered to 30 volunteers immediately after application, at 5 min, 15 min</td><td>Mean VAS &le; 2.0/10 at application; mean VAS &le; 1.0/10 at 15 min</td><td>BSK-VAL-P007</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VAL-008</span></td><td>Local tolerance study</td><td>UN-001</td><td>Clinical observation at 30 min, 2h, 24h, 48h, 7 days post-application (n=30)</td><td>No edema, vesiculation, or necrosis; erythema resolves within 2h in &ge;90% of subjects</td><td>BSK-VAL-P008</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VAL-009</span></td><td>Stability validation (V1)</td><td>ER-005</td><td>ICH Q1A(R2): 25&deg;C/60%RH long-term; 40&deg;C/75%RH accelerated; 6-month interim + 18-month final</td><td>All release specifications met at 18 months (long-term); 6 months (accelerated)</td><td>BSK-STAB-001</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VAL-010</span></td><td>Stability validation (V2)</td><td>ER-006</td><td>5&deg;C long-term; 25&deg;C/60%RH accelerated; photostability per ICH Q1B</td><td>All release specifications met at 12 months; 5-ALA content &ge; 90% of initial</td><td>BSK-STAB-001</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VAL-011</span></td><td>Implantation biocompatibility (PLLA)</td><td>SR-005</td><td>ISO 10993-6: subcutaneous implantation in rabbit; 4-week and 12-week explant</td><td>Local tissue response no worse than PLLA control (Sculptra predicate)</td><td>BSK-BIO-P004</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td><span class="req-id">VAL-012</span></td><td>Systemic absorption (V2)</td><td>SR-010</td><td>Dermal PK study: plasma sampling at 0, 0.5, 1, 2, 4, 8, 12, 24h post-application (n=12)</td><td>Systemic exposure of each active &lt; NOAEL/100</td><td>BSK-VAL-P012</td><td><span class="tag tag-red">PENDING</span></td></tr>
+</table>
+
+<h3>7.2 Clinical Validation (V2 Only)</h3>
+<div class="process">
+<div class="eq"><b>Phase I Safety Study</b> <span class="tag tag-purple">V2 ONLY</span></div>
+<div class="eq">Protocol: BSK-CLIN-P001 (TBD)</div>
+<div class="eq">Design: Open-label, single-center, dose-escalation (n=30)</div>
+<div class="eq">Endpoints: Safety (AEs, local reactions, laboratory), PK, preliminary efficacy (photography)</div>
+<div class="eq">Duration: 12 months follow-up (PLLA sustained release assessment)</div>
+</div>
+<div class="process">
+<div class="eq"><b>Phase II Efficacy Study</b> <span class="tag tag-purple">V2 ONLY</span></div>
+<div class="eq">Protocol: BSK-CLIN-P002 (TBD)</div>
+<div class="eq">Design: Randomized, double-blind, vehicle-controlled, multi-center (n=120)</div>
+<div class="eq">Endpoints: Wrinkle severity (Fitzpatrick scale), photography, patient satisfaction, biopsy (collagen density)</div>
+<div class="eq">Duration: 12 months follow-up</div>
+</div>
+</div>
+
+<!-- ═══ 8. DESIGN TRANSFER ═══ -->
+<div class="s" id="s8">
+<h2>8. DESIGN TRANSFER &mdash; 21 CFR 820.30(h)</h2>
+
+<div class="eq"><b>Purpose:</b> Design transfer ensures that the device design is correctly translated into production specifications and that the manufacturing process is capable of consistently producing devices meeting design output requirements.</div>
+
+<h3>8.1 Transfer Deliverables</h3>
+<table>
+<tr><th>Deliverable</th><th>Document</th><th>Owner</th><th>Status</th></tr>
+<tr><td>Device Master Record</td><td>BSK-DMR-001</td><td>Manufacturing</td><td><span class="tag tag-red">NOT STARTED</span></td></tr>
+<tr><td>Manufacturing Process Instructions</td><td>BSK-DMR-001 (within)</td><td>Process Engineering</td><td><span class="tag tag-red">NOT STARTED</span></td></tr>
+<tr><td>Bill of Materials (released)</td><td>BSK-DMR-001 (within)</td><td>Supply Chain</td><td><span class="tag tag-red">NOT STARTED</span></td></tr>
+<tr><td>Component Specifications</td><td>BSK-DMR-001 (within)</td><td>Quality / R&D</td><td><span class="tag tag-red">NOT STARTED</span></td></tr>
+<tr><td>In-Process Test Methods</td><td>BSK-DMR-001 (within)</td><td>Quality</td><td><span class="tag tag-red">NOT STARTED</span></td></tr>
+<tr><td>Final Release Test Methods</td><td>BSK-DMR-001 (within)</td><td>Quality</td><td><span class="tag tag-red">NOT STARTED</span></td></tr>
+<tr><td>Packaging Specifications</td><td>BSK-DMR-001 (within)</td><td>Packaging Engineering</td><td><span class="tag tag-red">NOT STARTED</span></td></tr>
+<tr><td>Labeling Artwork</td><td>BSK-LBL-001</td><td>Regulatory</td><td><span class="tag tag-red">NOT STARTED</span></td></tr>
+</table>
+
+<h3>8.2 Process Validation Protocol References</h3>
+<table>
+<tr><th>Protocol</th><th>Scope</th><th>Stage (FDA 2011 Guidance)</th><th>Status</th></tr>
+<tr><td>BSK-VAL-IQ-001</td><td>Installation Qualification &mdash; molding equipment, spray dryer, centrifuge, packaging line</td><td>Stage 1: Process Design</td><td><span class="tag tag-red">NOT STARTED</span></td></tr>
+<tr><td>BSK-VAL-OQ-001</td><td>Operational Qualification &mdash; process parameter ranges, equipment capability</td><td>Stage 2: Process Qualification</td><td><span class="tag tag-red">NOT STARTED</span></td></tr>
+<tr><td>BSK-VAL-PQ-001</td><td>Performance Qualification &mdash; 3 consecutive conforming production lots (minimum)</td><td>Stage 2: Process Qualification</td><td><span class="tag tag-red">NOT STARTED</span></td></tr>
+<tr><td>BSK-VAL-CPV-001</td><td>Continued Process Verification &mdash; ongoing monitoring plan</td><td>Stage 3: Continued Verification</td><td><span class="tag tag-red">NOT STARTED</span></td></tr>
+</table>
+
+<h3>8.3 Transfer Acceptance Criteria</h3>
+<div class="eq">Design transfer is complete when all of the following are satisfied:</div>
+<div class="eq">&emsp;1. DMR released and under document control</div>
+<div class="eq">&emsp;2. IQ/OQ/PQ completed with all acceptance criteria met</div>
+<div class="eq">&emsp;3. Manufacturing personnel trained and training documented</div>
+<div class="eq">&emsp;4. Supplier qualification complete for all critical materials</div>
+<div class="eq">&emsp;5. Analytical methods validated (ICH Q2(R2) for V2; appropriate for V1)</div>
+<div class="eq">&emsp;6. Labeling reviewed and approved by Regulatory Affairs</div>
+<div class="eq">&emsp;7. Post-market surveillance plan established</div>
+<div class="eq">&emsp;8. Regulatory submission filed (510(k)/De Novo for V1; NDA for V2)</div>
+
+<div class="sig-block" style="margin-top:14px">
+<div class="sig">
+<div class="sig-label">DESIGN TRANSFER APPROVED &mdash; R&D</div>
+<div class="sig-line">Signature: ___________________</div>
+<div class="sig-date">Date: ____/____/________</div>
+</div>
+<div class="sig">
+<div class="sig-label">DESIGN TRANSFER ACCEPTED &mdash; MANUFACTURING</div>
+<div class="sig-line">Signature: ___________________</div>
+<div class="sig-date">Date: ____/____/________</div>
+</div>
+<div class="sig">
+<div class="sig-label">DESIGN TRANSFER CONFIRMED &mdash; QA</div>
+<div class="sig-line">Signature: ___________________</div>
+<div class="sig-date">Date: ____/____/________</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ 9. DESIGN CHANGES ═══ -->
+<div class="s" id="s9">
+<h2>9. DESIGN CHANGES &mdash; 21 CFR 820.30(i)</h2>
+
+<div class="eq"><b>Purpose:</b> All changes to approved design inputs, outputs, or processes shall be documented, reviewed, and approved through the change control procedure before implementation.</div>
+
+<h3>9.1 Change Control Procedure</h3>
+<div class="eq"><b>Step 1:</b> Change Request (CR) initiated by any team member via ECO form</div>
+<div class="eq"><b>Step 2:</b> Impact assessment &mdash; effect on design inputs, outputs, risk file, regulatory status, validated processes</div>
+<div class="eq"><b>Step 3:</b> Review by affected functions (R&D, QA, Regulatory, Manufacturing as applicable)</div>
+<div class="eq"><b>Step 4:</b> Classification:</div>
+<div class="eq">&emsp;<span class="tag tag-red">MAJOR</span> &mdash; Affects safety, efficacy, or regulatory classification; requires design review + re-verification/validation</div>
+<div class="eq">&emsp;<span class="tag tag-yellow">MODERATE</span> &mdash; Affects performance specifications; requires re-verification of affected outputs</div>
+<div class="eq">&emsp;<span class="tag tag-green">MINOR</span> &mdash; Editorial, cosmetic, or process optimization within validated ranges; QA review sufficient</div>
+<div class="eq"><b>Step 5:</b> Approval (level determined by classification)</div>
+<div class="eq"><b>Step 6:</b> Implementation and verification of change effectiveness</div>
+<div class="eq"><b>Step 7:</b> DHF update &mdash; all affected documents revised; traceability matrix updated</div>
+
+<h3>9.2 Design Change Log</h3>
+<div class="change-record">
+<div class="change-header">DESIGN CHANGE LOG</div>
+<table>
+<tr><th>ECO#</th><th>Date</th><th>Description</th><th>Classification</th><th>Affected Docs</th><th>Disposition</th><th>Status</th></tr>
+<tr><td>ECO-BSK-001</td><td>2026-07-15</td><td>Initial release &mdash; URS established</td><td><span class="tag tag-green">N/A (Initial)</span></td><td>BSK-URS-001</td><td>Approved</td><td><span class="tag tag-green">CLOSED</span></td></tr>
+<tr><td>ECO-BSK-002</td><td>2026-07-15</td><td>Initial release &mdash; DHF structure established</td><td><span class="tag tag-green">N/A (Initial)</span></td><td>BSK-DHF-001</td><td>Approved</td><td><span class="tag tag-green">CLOSED</span></td></tr>
+<tr><td colspan="7" style="text-align:center;color:rgba(200,220,180,.15)">--- subsequent changes recorded here ---</td></tr>
+</table>
+</div>
+
+<h3>9.3 Regulatory Impact Assessment</h3>
+<div class="eq">Changes classified as MAJOR require the following additional assessments:</div>
+<div class="eq">&emsp;1. Determination of whether a new 510(k) or supplement is required (V1)</div>
+<div class="eq">&emsp;2. Determination of whether an NDA supplement is required (V2)</div>
+<div class="eq">&emsp;3. Assessment of impact on CE marking / Notified Body notification (EU)</div>
+<div class="eq">&emsp;4. Update to risk management file (BSK-RISK-001)</div>
+<div class="eq">&emsp;5. Assessment of impact on validated processes (re-validation determination)</div>
+</div>
+
+<!-- ═══ 10. DHF INDEX ═══ -->
+<div class="s" id="s10">
+<h2>10. DHF INDEX OF RECORDS</h2>
+
+<div class="eq"><b>Purpose:</b> Master index of all documents comprising this Design History File, per 21 CFR 820.30(j).</div>
+
+<table>
+<tr><th>Doc ID</th><th>Title</th><th>Section</th><th>Rev</th><th>Status</th></tr>
+<tr><td>BSK-URS-001</td><td>User Requirements Specification</td><td>3 (Inputs)</td><td>A</td><td><span class="tag tag-green">APPROVED</span></td></tr>
+<tr><td>BSK-SPEC-001</td><td>Technical Specification</td><td>4 (Outputs)</td><td>A</td><td><span class="tag tag-green">APPROVED</span></td></tr>
+<tr><td>BSK-RISK-001</td><td>Risk Management File (ISO 14971)</td><td>3, 6, 7</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>BSK-BIO-001</td><td>Biocompatibility Evaluation Plan</td><td>6 (Verification)</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>BSK-HF-001</td><td>Human Factors Engineering File</td><td>7 (Validation)</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>BSK-DMR-001</td><td>Device Master Record</td><td>8 (Transfer)</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>BSK-STAB-001</td><td>Stability Protocol</td><td>7 (Validation)</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>BSK-VAL-001</td><td>Process Validation Master Plan</td><td>8 (Transfer)</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>BSK-LBL-001</td><td>Labeling</td><td>4 (Outputs)</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>BSK-REG-001</td><td>Regulatory Strategy</td><td>1 (Planning)</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>BSK-PAT-001</td><td>Patent Application</td><td>1 (Planning)</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>BSK-P11-001</td><td>21 CFR Part 11 Validation</td><td>1 (Planning)</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>BSK-VER-PXXX</td><td>Verification Protocols (17 protocols)</td><td>6 (Verification)</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>BSK-VAL-PXXX</td><td>Validation Protocols (12 protocols)</td><td>7 (Validation)</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>BSK-CLIN-PXXX</td><td>Clinical Protocols (V2 only)</td><td>7 (Validation)</td><td>TBD</td><td><span class="tag tag-red">PENDING</span></td></tr>
+<tr><td>DR-001 through DR-005</td><td>Design Review Records</td><td>5 (Reviews)</td><td>&mdash;</td><td><span class="tag tag-yellow">IN PROGRESS</span></td></tr>
+<tr><td>ECO-BSK-XXX</td><td>Engineering Change Orders</td><td>9 (Changes)</td><td>&mdash;</td><td><span class="tag tag-yellow">ONGOING</span></td></tr>
+</table>
+</div>
+
+<!-- ═══ 11. REFERENCES ═══ -->
+<div class="s" id="s11">
+<h2>11. REFERENCES</h2>
+
+<table>
+<tr><th>Reference</th><th>Title</th><th>Relevance</th></tr>
+<tr><td>21 CFR 820.30</td><td>Design Controls</td><td>Mandatory design control framework (US)</td></tr>
+<tr><td>21 CFR 820.181</td><td>Device Master Record</td><td>DMR requirements for design transfer</td></tr>
+<tr><td>21 CFR 820.184</td><td>Device History Record</td><td>Production record keeping post-transfer</td></tr>
+<tr><td>21 CFR Part 11</td><td>Electronic Records; Electronic Signatures</td><td>Electronic DHF compliance</td></tr>
+<tr><td>ISO 13485:2016 &sect;7.3</td><td>Design and Development</td><td>International design control requirements</td></tr>
+<tr><td>ISO 14971:2019</td><td>Risk Management for Medical Devices</td><td>Risk-based design decisions</td></tr>
+<tr><td>ISO 10993 series</td><td>Biological Evaluation of Medical Devices</td><td>Biocompatibility verification</td></tr>
+<tr><td>IEC 62366-1:2015</td><td>Usability Engineering</td><td>Human factors validation</td></tr>
+<tr><td>ICH Q1A(R2)</td><td>Stability Testing of New Drug Substances and Products</td><td>Stability validation protocol</td></tr>
+<tr><td>FDA Design Control Guidance (1997)</td><td>Design Control Guidance for Medical Device Manufacturers</td><td>Interpretive guidance for 820.30</td></tr>
+<tr><td>FDA Process Validation Guidance (2011)</td><td>Guidance for Industry: Process Validation</td><td>3-stage validation model</td></tr>
+<tr><td>GAMP 5 (2nd Ed, 2022)</td><td>A Risk-Based Approach to Compliant GxP Computerized Systems</td><td>URS framework, CSV</td></tr>
+</table>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<div style="margin-top:30px;font-size:7px;color:rgba(255,255,255,.08);text-align:center">
+BASILISK&trade; &middot; BSK-DHF-001 Rev A &middot; DRAFT &mdash; NOT FOR REGULATORY SUBMISSION<br>
+Z=82 &middot; Pb &middot; 2&times;ANETA &middot; The AITistic Research Initiative &middot; 2026<br>
+CONFIDENTIAL &mdash; File provisional patent before external disclosure
+</div>
+
+</div>
+</body>
+</html>

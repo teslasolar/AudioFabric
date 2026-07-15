@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>BASILISK™ — Document Control Center</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0c08;font-family:'Courier New',monospace;color:#b0c0a0;padding:20px 24px 80px}
+h1{font-size:14px;letter-spacing:5px;color:rgba(150,255,100,.5);margin-bottom:2px}
+.sub{font-size:8px;color:rgba(150,255,100,.2);letter-spacing:2px;margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.card{background:rgba(255,255,255,.02);border:1px solid rgba(150,255,100,.06);border-radius:6px;padding:14px 16px;cursor:pointer;transition:all .2s;text-decoration:none;color:inherit;display:block}
+.card:hover{border-color:rgba(150,255,100,.2);box-shadow:0 0 15px rgba(100,255,50,.05);transform:translateY(-2px)}
+.card h3{font-size:10px;letter-spacing:2px;color:rgba(150,255,100,.4);margin-bottom:6px}
+.card p{font-size:8px;color:rgba(200,220,180,.25);line-height:1.6}
+.card .status{margin-top:6px}
+.tag{display:inline-block;padding:1px 5px;border-radius:2px;font-size:6px;letter-spacing:1px}
+.tag-g{background:rgba(100,255,100,.08);border:1px solid rgba(100,255,100,.15);color:rgba(100,255,100,.5)}
+.tag-y{background:rgba(255,255,100,.08);border:1px solid rgba(255,255,100,.15);color:rgba(255,255,100,.5)}
+.tag-r{background:rgba(255,100,100,.08);border:1px solid rgba(255,100,100,.15);color:rgba(255,100,100,.5)}
+.tag-b{background:rgba(100,150,255,.08);border:1px solid rgba(100,150,255,.15);color:rgba(100,150,255,.5)}
+.section-title{font-size:9px;letter-spacing:3px;color:rgba(150,255,100,.25);margin:20px 0 8px;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:4px}
+</style>
+</head>
+<body>
+<h1>BASILISK™</h1>
+<div class="sub">DOCUMENT CONTROL CENTER · BSK-DCC-001 · Rev A</div>
+
+<div class="section-title">CORE SPECIFICATIONS</div>
+<div class="grid">
+<a class="card" href="spec.html"><h3>BSK-SPEC-001 · TECHNICAL SPECIFICATION</h3><p>Master product spec — formulation, regulatory, manufacturing, UDTs, cost, strategy</p><div class="status"><span class="tag tag-g">COMPLETE</span></div></a>
+<a class="card" href="urs.html"><h3>BSK-URS-001 · USER REQUIREMENTS</h3><p>User needs, intended use, performance requirements, acceptance criteria</p><div class="status"><span class="tag tag-y">DRAFT</span></div></a>
+<a class="card" href="dhf.html"><h3>BSK-DHF-001 · DESIGN HISTORY FILE</h3><p>Design inputs, outputs, reviews, verification, validation per 21 CFR 820.30</p><div class="status"><span class="tag tag-y">DRAFT</span></div></a>
+</div>
+
+<div class="section-title">QUALITY & RISK</div>
+<div class="grid">
+<a class="card" href="risk.html"><h3>BSK-RISK-001 · RISK MANAGEMENT FILE</h3><p>ISO 14971 hazard analysis, FMEA, risk controls, residual risk evaluation</p><div class="status"><span class="tag tag-y">DRAFT</span></div></a>
+<a class="card" href="biocompat.html"><h3>BSK-BIO-001 · BIOCOMPATIBILITY</h3><p>ISO 10993 test plan — cytotoxicity, sensitization, irritation, implantation</p><div class="status"><span class="tag tag-y">DRAFT</span></div></a>
+<a class="card" href="stability.html"><h3>BSK-STAB-001 · STABILITY PROTOCOL</h3><p>ICH Q1A(R2) long-term and accelerated, ASTM F1980 aging, photostability</p><div class="status"><span class="tag tag-y">DRAFT</span></div></a>
+</div>
+
+<div class="section-title">MANUFACTURING</div>
+<div class="grid">
+<a class="card" href="dmr.html"><h3>BSK-DMR-001 · DEVICE MASTER RECORD</h3><p>Complete manufacturing instructions, BOM, drawings, process specs</p><div class="status"><span class="tag tag-y">DRAFT</span></div></a>
+<a class="card" href="validation.html"><h3>BSK-VAL-001 · PROCESS VALIDATION</h3><p>IQ/OQ/PQ protocols, critical process parameters, acceptance criteria</p><div class="status"><span class="tag tag-y">DRAFT</span></div></a>
+<a class="card" href="part11.html"><h3>BSK-P11-001 · 21 CFR PART 11</h3><p>Electronic records validation — audit trails, e-signatures, system security</p><div class="status"><span class="tag tag-y">DRAFT</span></div></a>
+</div>
+
+<div class="section-title">REGULATORY</div>
+<div class="grid">
+<a class="card" href="regulatory.html"><h3>BSK-REG-001 · REGULATORY STRATEGY</h3><p>FDA 510(k)/De Novo (V1), 505(b)(2) NDA (V2), EU MDR, dual-track plan</p><div class="status"><span class="tag tag-y">DRAFT</span></div></a>
+<a class="card" href="labeling.html"><h3>BSK-LBL-001 · LABELING</h3><p>21 CFR 801, MoCRA, UDI, claims substantiation, package insert</p><div class="status"><span class="tag tag-y">DRAFT</span></div></a>
+<a class="card" href="patent.html"><h3>BSK-PAT-001 · PATENT APPLICATION</h3><p>Provisional 35 USC §111(b) — composition, method, novel claims strategy</p><div class="status"><span class="tag tag-y">DRAFT</span></div></a>
+</div>
+
+<div class="section-title">CLINICAL & HUMAN FACTORS</div>
+<div class="grid">
+<a class="card" href="usability.html"><h3>BSK-HF-001 · HUMAN FACTORS</h3><p>IEC 62366-1 usability engineering — use scenarios, risk analysis, validation</p><div class="status"><span class="tag tag-y">DRAFT</span></div></a>
+</div>
+
+<div class="section-title">VISUALIZATIONS</div>
+<div class="grid">
+<a class="card" href="../basilisk.html"><h3>BASILISK EYE</h3><p>Serpent iris visualization — 7 components + 4 peptides as orbital rings</p><div class="status"><span class="tag tag-g">LIVE</span></div></a>
+<a class="card" href="../basilisk-factory.html"><h3>BASILISK FACTORY</h3><p>Live production line — particle flow through 7 manufacturing stages</p><div class="status"><span class="tag tag-g">LIVE</span></div></a>
+<a class="card" href="../super-botox.html"><h3>COLLAGEN REACTOR</h3><p>4-phase mechanism visualization — AGE break, fibroblast, hydrate, photoactivate</p><div class="status"><span class="tag tag-g">LIVE</span></div></a>
+</div>
+
+<div style="margin-top:30px;font-size:7px;color:rgba(255,255,255,.08);text-align:center">
+BASILISK™ · Z=82 · Pb · 2×ANETA · The AITistic Research Initiative · 2026<br>
+CONFIDENTIAL — File provisional patent before external disclosure
+</div>
+</body></html>

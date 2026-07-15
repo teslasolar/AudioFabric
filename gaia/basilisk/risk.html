@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>BSK-RISK-001 — Risk Management File (ISO 14971:2019)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0c08;overflow-y:auto;font-family:'Courier New',monospace;color:#b0c0a0}
+#ui{max-width:1100px;margin:0 auto;padding:20px 24px 80px}
+h1{font-size:14px;letter-spacing:5px;color:rgba(150,255,100,.5);margin-bottom:2px}
+.sub{font-size:8px;color:rgba(150,255,100,.25);letter-spacing:2px;margin-bottom:20px}
+.doc-id{font-size:7px;color:rgba(255,255,255,.1);margin-bottom:16px}
+.back{font-size:8px;color:rgba(150,255,100,.25);text-decoration:none;letter-spacing:1px;display:inline-block;margin-bottom:14px;border:1px solid rgba(150,255,100,.08);padding:3px 8px;border-radius:3px}
+.back:hover{border-color:rgba(150,255,100,.2);color:rgba(150,255,100,.45)}
+.s{background:rgba(255,255,255,.02);border:1px solid rgba(150,255,100,.06);border-radius:6px;padding:14px 18px;margin-bottom:12px}
+.s h2{font-size:10px;letter-spacing:3px;color:rgba(150,255,100,.4);margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:5px}
+.s h3{font-size:9px;color:rgba(150,255,100,.3);margin:10px 0 5px;letter-spacing:1px}
+.s h4{font-size:8px;color:rgba(150,255,100,.25);margin:8px 0 4px;letter-spacing:.5px}
+.eq{font-size:9px;color:rgba(200,220,180,.35);line-height:1.9;margin:3px 0}
+.eq b{color:rgba(180,255,120,.5)}
+.tbl-wrap{overflow-x:auto;margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:8px;font-variant-numeric:tabular-nums}
+th{color:rgba(150,255,100,.3);text-align:left;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.06);letter-spacing:1px;white-space:nowrap}
+td{padding:4px 6px;color:rgba(200,220,180,.3);border-bottom:1px solid rgba(255,255,255,.02);vertical-align:top}
+.tag{display:inline-block;padding:1px 5px;border-radius:2px;font-size:7px;letter-spacing:1px;margin:1px}
+.tag-green{background:rgba(100,255,100,.08);border:1px solid rgba(100,255,100,.15);color:rgba(100,255,100,.5)}
+.tag-yellow{background:rgba(255,255,100,.08);border:1px solid rgba(255,255,100,.15);color:rgba(255,255,100,.5)}
+.tag-red{background:rgba(255,100,100,.08);border:1px solid rgba(255,100,100,.15);color:rgba(255,100,100,.5)}
+.tag-blue{background:rgba(100,150,255,.08);border:1px solid rgba(100,150,255,.15);color:rgba(100,150,255,.5)}
+.tag-orange{background:rgba(255,180,80,.08);border:1px solid rgba(255,180,80,.15);color:rgba(255,180,80,.5)}
+.warn{background:rgba(255,200,50,.03);border:1px solid rgba(255,200,50,.08);border-radius:4px;padding:8px 12px;margin:6px 0;font-size:8px;color:rgba(255,220,100,.4)}
+.matrix{border:1px solid rgba(150,255,100,.1)}
+.matrix th,.matrix td{text-align:center;padding:5px 8px;border:1px solid rgba(150,255,100,.06)}
+.matrix .cell-h{background:rgba(255,80,80,.08);color:rgba(255,120,100,.5)}
+.matrix .cell-m{background:rgba(255,200,80,.06);color:rgba(255,200,100,.45)}
+.matrix .cell-l{background:rgba(100,255,100,.04);color:rgba(100,255,100,.35)}
+.matrix .cell-n{background:rgba(100,150,255,.04);color:rgba(100,180,255,.3)}
+.fmea-sev-5{color:rgba(255,80,80,.7)}
+.fmea-sev-4{color:rgba(255,140,80,.6)}
+.fmea-sev-3{color:rgba(255,200,80,.5)}
+.fmea-sev-2{color:rgba(180,255,120,.45)}
+.fmea-sev-1{color:rgba(100,200,255,.4)}
+.rpn-high{background:rgba(255,80,80,.06);font-weight:bold;color:rgba(255,100,80,.55)}
+.rpn-med{background:rgba(255,200,80,.04);color:rgba(255,200,100,.45)}
+.rpn-low{color:rgba(200,220,180,.3)}
+.control{border-left:3px solid rgba(150,255,100,.1);padding:6px 14px;margin:6px 0;font-size:8px;color:rgba(200,220,180,.3);line-height:1.8}
+.footer{margin-top:30px;font-size:7px;color:rgba(255,255,255,.08);text-align:center}
+</style>
+</head>
+<body>
+<div id="ui">
+
+<a class="back" href="index.html">&#9666; DOCUMENT CONTROL CENTER</a>
+
+<h1>BASILISK&#8482;</h1>
+<div class="sub">RISK MANAGEMENT FILE &middot; ISO 14971:2019 / ISO/TR 24971:2020</div>
+<div class="doc-id">DOC: BSK-RISK-001 Rev A &middot; EFFECTIVE: 2026-07-15 &middot; CONFIDENTIAL &middot; Thomas Frumkin &middot; The AITistic Research Initiative</div>
+
+<!-- ═══ 1. SCOPE & PURPOSE ═══ -->
+<div class="s">
+<h2>1. SCOPE &amp; PURPOSE</h2>
+<div class="eq"><b>Product:</b> BASILISK&#8482; Dissolving Microneedle Collagen Repair System (V1 CROWN / V2 RADIANT)</div>
+<div class="eq"><b>Scope:</b> This risk management file covers the entire product lifecycle from design through post-market surveillance, per ISO 14971:2019 Clause 4.1. Applies to both V1 (10-ingredient cosmetic device) and V2 (11-ingredient combination drug-device with 5-ALA).</div>
+<div class="eq"><b>Applicable standards:</b> ISO 14971:2019, ISO/TR 24971:2020 (guidance), IEC 62366-1:2015+A1:2020 (usability), 21 CFR 820.30(g)</div>
+<div class="eq"><b>Risk management activities:</b> hazard identification, risk estimation, risk evaluation, risk control, residual risk evaluation, risk-benefit analysis, production and post-production review</div>
+</div>
+
+<!-- ═══ 2. RISK MANAGEMENT PLAN ═══ -->
+<div class="s">
+<h2>2. RISK MANAGEMENT PLAN</h2>
+
+<h3>2.1 Roles &amp; Responsibilities</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>Role</th><th>Responsibility</th><th>Authority</th></tr>
+<tr><td>Risk Management Lead</td><td>Maintain risk management file, chair FMEA sessions, approve risk controls</td><td>Accept / escalate residual risks</td></tr>
+<tr><td>Quality Assurance</td><td>Verify risk control implementation, audit risk file completeness</td><td>Hold release for unacceptable risk</td></tr>
+<tr><td>Regulatory Affairs</td><td>Ensure alignment with 21 CFR 820.30(g), ISO 14971, EU MDR Annex I</td><td>Review risk-benefit conclusions</td></tr>
+<tr><td>Formulation Lead</td><td>Provide ingredient hazard data, assess chemical interactions</td><td>Recommend formulation changes</td></tr>
+<tr><td>Manufacturing Engineer</td><td>Assess process-related hazards, implement process controls</td><td>Modify process parameters</td></tr>
+<tr><td>Clinical / Medical Advisor</td><td>Assess clinical severity, review contraindications</td><td>Elevate severity ratings, mandate warnings</td></tr>
+</table>
+</div>
+
+<h3>2.2 Risk Acceptability Criteria</h3>
+<div class="eq"><b>Policy:</b> No individual risk shall have a Risk Priority Number (RPN) &gt; 100 after controls. Risks with severity = 5 (death/permanent injury) require independent review regardless of probability.</div>
+
+<div class="tbl-wrap">
+<table>
+<tr><th>Risk Level</th><th>RPN Range</th><th>Action Required</th></tr>
+<tr><td><span class="tag tag-red">UNACCEPTABLE</span></td><td>RPN &ge; 100</td><td>Risk reduction mandatory. Design change or additional controls required before release.</td></tr>
+<tr><td><span class="tag tag-orange">ALARA</span></td><td>50 &le; RPN &lt; 100</td><td>As Low As Reasonably Achievable. Reduce if practicable; document rationale if retained.</td></tr>
+<tr><td><span class="tag tag-yellow">ACCEPTABLE</span></td><td>20 &le; RPN &lt; 50</td><td>Acceptable with monitoring. Include in post-market surveillance plan.</td></tr>
+<tr><td><span class="tag tag-green">BROADLY ACCEPTABLE</span></td><td>RPN &lt; 20</td><td>No further action required. Document in risk file.</td></tr>
+</table>
+</div>
+
+<h3>2.3 Risk Estimation Parameters</h3>
+<div class="eq"><b>RPN = Severity (S) &times; Probability (P) &times; Detectability (D)</b></div>
+<div class="eq">Each factor scored 1&ndash;5. Maximum RPN = 125.</div>
+</div>
+
+<!-- ═══ 3. SEVERITY SCALE ═══ -->
+<div class="s">
+<h2>3. SEVERITY &times; PROBABILITY MATRIX</h2>
+
+<h3>3.1 Severity Scale</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>Score</th><th>Category</th><th>Description</th><th>Examples (BASILISK-specific)</th></tr>
+<tr><td class="fmea-sev-5">5</td><td>Catastrophic</td><td>Death or permanent injury</td><td>Anaphylaxis, systemic toxicity from ALT-711 overdose</td></tr>
+<tr><td class="fmea-sev-4">4</td><td>Critical</td><td>Serious injury requiring intervention</td><td>Severe allergic reaction, deep tissue infection, corneal damage from eye contact</td></tr>
+<tr><td class="fmea-sev-3">3</td><td>Moderate</td><td>Injury requiring medical attention</td><td>Localized infection, prolonged irritation, contact dermatitis</td></tr>
+<tr><td class="fmea-sev-2">2</td><td>Minor</td><td>Temporary discomfort, no treatment</td><td>Transient redness, mild itching, minor bruising</td></tr>
+<tr><td class="fmea-sev-1">1</td><td>Negligible</td><td>No injury, inconvenience only</td><td>Patch adhesion failure, cosmetic result below expectation</td></tr>
+</table>
+</div>
+
+<h3>3.2 Probability Scale</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>Score</th><th>Category</th><th>Occurrence Rate</th><th>Frequency</th></tr>
+<tr><td>5</td><td>Frequent</td><td>&ge; 1 in 100</td><td>Expected to occur regularly</td></tr>
+<tr><td>4</td><td>Probable</td><td>1 in 100 &ndash; 1 in 1,000</td><td>Likely to occur several times</td></tr>
+<tr><td>3</td><td>Occasional</td><td>1 in 1,000 &ndash; 1 in 10,000</td><td>May occur during product life</td></tr>
+<tr><td>2</td><td>Remote</td><td>1 in 10,000 &ndash; 1 in 100,000</td><td>Unlikely but possible</td></tr>
+<tr><td>1</td><td>Improbable</td><td>&lt; 1 in 100,000</td><td>Can be assumed will not occur</td></tr>
+</table>
+</div>
+
+<h3>3.3 Detectability Scale</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>Score</th><th>Category</th><th>Description</th></tr>
+<tr><td>5</td><td>Undetectable</td><td>No known inspection or test to detect before harm</td></tr>
+<tr><td>4</td><td>Low</td><td>Defect unlikely to be caught by current QC</td></tr>
+<tr><td>3</td><td>Moderate</td><td>May be detected by routine inspection</td></tr>
+<tr><td>2</td><td>High</td><td>Likely detected by in-process controls</td></tr>
+<tr><td>1</td><td>Certain</td><td>Always detected before reaching user</td></tr>
+</table>
+</div>
+
+<h3>3.4 Risk Matrix (S &times; P, before detectability)</h3>
+<div class="tbl-wrap">
+<table class="matrix">
+<tr><th></th><th>P=1 Improbable</th><th>P=2 Remote</th><th>P=3 Occasional</th><th>P=4 Probable</th><th>P=5 Frequent</th></tr>
+<tr><th>S=5 Catastrophic</th><td class="cell-m">5</td><td class="cell-h">10</td><td class="cell-h">15</td><td class="cell-h">20</td><td class="cell-h">25</td></tr>
+<tr><th>S=4 Critical</th><td class="cell-l">4</td><td class="cell-m">8</td><td class="cell-h">12</td><td class="cell-h">16</td><td class="cell-h">20</td></tr>
+<tr><th>S=3 Moderate</th><td class="cell-n">3</td><td class="cell-l">6</td><td class="cell-m">9</td><td class="cell-h">12</td><td class="cell-h">15</td></tr>
+<tr><th>S=2 Minor</th><td class="cell-n">2</td><td class="cell-l">4</td><td class="cell-l">6</td><td class="cell-m">8</td><td class="cell-m">10</td></tr>
+<tr><th>S=1 Negligible</th><td class="cell-n">1</td><td class="cell-n">2</td><td class="cell-n">3</td><td class="cell-l">4</td><td class="cell-l">5</td></tr>
+</table>
+</div>
+<div class="eq"><span class="tag tag-red">HIGH &ge;12</span> <span class="tag tag-orange">MEDIUM 6&ndash;11</span> <span class="tag tag-green">LOW 1&ndash;5</span></div>
+</div>
+
+<!-- ═══ 4. HAZARD IDENTIFICATION ═══ -->
+<div class="s">
+<h2>4. HAZARD IDENTIFICATION</h2>
+
+<h3>4.1 Biological Hazards</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>ID</th><th>Hazard</th><th>Hazardous Situation</th><th>Harm</th></tr>
+<tr><td>BH-01</td><td>Microbial contamination of patch</td><td>Non-sterile product applied to micro-channels in skin</td><td>Local or systemic infection</td></tr>
+<tr><td>BH-02</td><td>Endotoxin contamination</td><td>Bacterial endotoxins introduced into dermis via dissolved needles</td><td>Pyrogenic reaction, fever, sepsis</td></tr>
+<tr><td>BH-03</td><td>Allergic reaction to peptides (GHK-Cu, Matrixyl, Argireline, Syn-Ake)</td><td>Immune hypersensitivity to peptide antigens delivered intradermally</td><td>Contact dermatitis to anaphylaxis</td></tr>
+<tr><td>BH-04</td><td>Allergic reaction to EGF (Epidermal Growth Factor)</td><td>Recombinant protein triggers IgE-mediated response</td><td>Urticaria, angioedema</td></tr>
+<tr><td>BH-05</td><td>Toxicity from ALT-711 (alagebrium)</td><td>Excessive systemic absorption of AGE-breaker compound</td><td>Hepatotoxicity, hypotension</td></tr>
+<tr><td>BH-06</td><td>EGF stimulation of pre-existing lesion</td><td>Growth factor applied over undiagnosed pre-malignant skin lesion</td><td>Accelerated neoplastic growth</td></tr>
+<tr><td>BH-07</td><td>Retinol teratogenicity</td><td>Use during pregnancy, retinol absorbed systemically</td><td>Fetal malformation (theoretical at topical doses)</td></tr>
+<tr><td>BH-08</td><td>Immunocompromised patient infection</td><td>Micro-channels in immunosuppressed patient</td><td>Opportunistic infection, delayed healing</td></tr>
+</table>
+</div>
+
+<h3>4.2 Mechanical / Physical Hazards</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>ID</th><th>Hazard</th><th>Hazardous Situation</th><th>Harm</th></tr>
+<tr><td>MH-01</td><td>Needle breakage during application</td><td>Needle tips fracture and remain embedded in dermis</td><td>Foreign body reaction, granuloma, infection</td></tr>
+<tr><td>MH-02</td><td>Incomplete needle penetration</td><td>Insufficient force or incorrect angle, needles do not reach target depth</td><td>Subtherapeutic dose, treatment failure</td></tr>
+<tr><td>MH-03</td><td>Incomplete needle dissolution</td><td>Patch removed before full dissolution; needle fragments remain</td><td>Foreign body reaction, irritation</td></tr>
+<tr><td>MH-04</td><td>Excessive penetration depth</td><td>Applied to thin skin (periorbital), needles reach subcutis</td><td>Bleeding, bruising, pain</td></tr>
+<tr><td>MH-05</td><td>Patch adhesion failure</td><td>Patch detaches during 15-minute application period</td><td>Underdosing, waste of product</td></tr>
+</table>
+</div>
+
+<h3>4.3 Chemical Hazards</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>ID</th><th>Hazard</th><th>Hazardous Situation</th><th>Harm</th></tr>
+<tr><td>CH-01</td><td>ALT-711 degradation (hydrolysis)</td><td>AGE-breaker degrades during storage, loss of potency</td><td>Treatment failure (no collagen repair)</td></tr>
+<tr><td>CH-02</td><td>Retinol photodegradation</td><td>Exposure to UV/light during storage or after application</td><td>Reduced efficacy + formation of toxic degradation products</td></tr>
+<tr><td>CH-03</td><td>GHK-Cu oxidation</td><td>Copper peptide oxidizes, Cu(I)&rarr;Cu(II) + free radical generation</td><td>Skin irritation, reduced bioactivity, oxidative tissue damage</td></tr>
+<tr><td>CH-04</td><td>5-ALA phototoxicity (V2 only)</td><td>Protoporphyrin IX accumulation + light exposure</td><td>Severe erythema, pain, blistering (PDT-grade burn)</td></tr>
+<tr><td>CH-05</td><td>Ingredient interaction: retinol + niacinamide pH conflict</td><td>Low pH retinol converts niacinamide to niacin at interface</td><td>Flushing, vasodilation, reduced efficacy of both</td></tr>
+<tr><td>CH-06</td><td>Ingredient interaction: GHK-Cu + hyaluronic acid chelation</td><td>HA carboxyl groups chelate Cu from GHK-Cu complex</td><td>GHK-Cu deactivation, altered HA crosslinking</td></tr>
+<tr><td>CH-07</td><td>PLLA degradation products</td><td>Lactic acid accumulation from PLLA microsphere hydrolysis</td><td>Local pH drop, tissue irritation</td></tr>
+</table>
+</div>
+
+<h3>4.4 Use Error Hazards</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>ID</th><th>Hazard</th><th>Hazardous Situation</th><th>Harm</th></tr>
+<tr><td>UH-01</td><td>Wrong application site</td><td>Applied to mucous membrane, broken skin, or periorbital area</td><td>Mucosal damage, eye exposure, excessive absorption</td></tr>
+<tr><td>UH-02</td><td>Reuse of patch</td><td>Attempt to reapply used patch (needles partially dissolved)</td><td>Infection from non-sterile surface, inconsistent dosing</td></tr>
+<tr><td>UH-03</td><td>Accidental eye contact</td><td>Handling patch then touching eyes; patch applied too close to eye</td><td>Corneal abrasion, retinoid irritation, peptide sensitization</td></tr>
+<tr><td>UH-04</td><td>Use by contraindicated population</td><td>Pregnant/nursing, immunocompromised, &lt;18 years, active skin disease</td><td>Teratogenicity (retinol), infection risk, EGF risk in minors</td></tr>
+<tr><td>UH-05</td><td>Premature patch removal</td><td>Removed before 15-minute dissolution period</td><td>Underdosing, needle fragment retention</td></tr>
+<tr><td>UH-06</td><td>Sun exposure after application</td><td>UV exposure to retinol/5-ALA treated skin within 24 hours</td><td>Photosensitivity, erythema, hyperpigmentation</td></tr>
+<tr><td>UH-07</td><td>Concurrent use with incompatible topicals</td><td>Application over AHA/BHA, tretinoin, or chemical peel</td><td>Excessive exfoliation, barrier compromise, increased absorption</td></tr>
+</table>
+</div>
+
+<h3>4.5 Packaging &amp; Storage Hazards</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>ID</th><th>Hazard</th><th>Hazardous Situation</th><th>Harm</th></tr>
+<tr><td>PH-01</td><td>Package seal failure</td><td>Moisture ingress degrades HA needles before use</td><td>Soft / deformed needles fail to penetrate, product waste</td></tr>
+<tr><td>PH-02</td><td>Loss of nitrogen blanket</td><td>O&#8322; exposure degrades GHK-Cu and retinol in sealed pouch</td><td>Oxidation, reduced potency, toxic degradants</td></tr>
+<tr><td>PH-03</td><td>Temperature excursion</td><td>Storage above 25&#176;C or freeze-thaw cycle</td><td>PLLA/HA matrix deformation, ingredient degradation</td></tr>
+<tr><td>PH-04</td><td>Expired product use</td><td>User applies patch past expiration date</td><td>Degraded ingredients, reduced efficacy, potential toxicity</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ═══ 5. FMEA ═══ -->
+<div class="s">
+<h2>5. FAILURE MODE &amp; EFFECTS ANALYSIS (FMEA)</h2>
+<div class="eq"><b>Method:</b> Design FMEA per ISO 14971:2019 Annex H, IEC 60812:2018</div>
+<div class="eq"><b>RPN = S &times; P &times; D</b> &mdash; Severity &times; Probability &times; Detectability (each 1&ndash;5)</div>
+<div class="eq"><b>Acceptance:</b> Post-control RPN &lt; 100. Severity 5 items require independent clinical review.</div>
+
+<div class="warn">&#9888; 15 failure modes analyzed. Items FM-01 through FM-04 carry pre-control RPN &ge; 60 and require mandatory risk reduction.</div>
+
+<div class="tbl-wrap">
+<table>
+<tr>
+<th>FM-ID</th><th>Failure Mode</th><th>Effect</th><th>Cause</th>
+<th>S</th><th>P</th><th>D</th><th>RPN</th>
+<th>Risk Control</th>
+<th>S</th><th>P</th><th>D</th><th>RPN*</th>
+</tr>
+
+<tr>
+<td>FM-01</td>
+<td>Needle breakage during application</td>
+<td>Embedded PLLA/HA fragments; foreign body granuloma</td>
+<td>Brittleness from over-drying; excessive application force</td>
+<td class="fmea-sev-4">4</td><td>3</td><td>4</td><td class="rpn-high">48</td>
+<td>Humidity-controlled lyophilization (18&ndash;22% RH target); mechanical break-force testing 100% of molds (min 0.5N/needle); IFU force guidance with applicator</td>
+<td class="fmea-sev-4">4</td><td>1</td><td>2</td><td class="rpn-low">8</td>
+</tr>
+
+<tr>
+<td>FM-02</td>
+<td>Incomplete needle dissolution</td>
+<td>Residual needle tips in dermis; irritation, foreign body reaction</td>
+<td>Insufficient skin moisture; premature removal; PLLA ratio too high</td>
+<td class="fmea-sev-3">3</td><td>3</td><td>4</td><td class="rpn-med">36</td>
+<td>HA:PLLA ratio optimization (70:30 w/w minimum HA); dissolution time validation &le;15 min across skin types (I&ndash;VI); IFU specifies minimum 15-min wear + visual dissolution indicator (patch turns transparent)</td>
+<td class="fmea-sev-3">3</td><td>2</td><td>2</td><td class="rpn-low">12</td>
+</tr>
+
+<tr>
+<td>FM-03</td>
+<td>ALT-711 degradation (loss of potency)</td>
+<td>No AGE-crosslink breakage; treatment failure</td>
+<td>Hydrolysis during storage (ALT-711 t&#189; in aqueous: ~14 days at 25&#176;C)</td>
+<td class="fmea-sev-2">2</td><td>4</td><td>4</td><td class="rpn-med">32</td>
+<td>Lyophilized dry-state storage (&lt;3% w/w moisture); foil pouch with desiccant + N&#8322; blanket; HPLC release spec &ge;90% label; real-time + accelerated stability per ICH Q1A(R2); shelf life based on &ge;80% assay</td>
+<td class="fmea-sev-2">2</td><td>2</td><td>1</td><td class="rpn-low">4</td>
+</tr>
+
+<tr>
+<td>FM-04</td>
+<td>Retinol photodegradation</td>
+<td>Reduced anti-aging efficacy; formation of toxic oxidation products (5,6-epoxyretinol)</td>
+<td>UV/visible light exposure through packaging or post-application sun exposure</td>
+<td class="fmea-sev-3">3</td><td>4</td><td>3</td><td class="rpn-med">36</td>
+<td>Aluminum foil overpouch (zero light transmission); retinol encapsulation in PLLA microspheres (light shielding); photostability testing per ICH Q1B; IFU: avoid sun 24 hr post-application; labeling: &ldquo;PROTECT FROM LIGHT&rdquo;</td>
+<td class="fmea-sev-3">3</td><td>2</td><td>1</td><td class="rpn-low">6</td>
+</tr>
+
+<tr>
+<td>FM-05</td>
+<td>GHK-Cu oxidation</td>
+<td>Loss of copper peptide bioactivity; free radical tissue damage</td>
+<td>Oxygen exposure, Cu(I)&rarr;Cu(II) transition in aqueous/humid environment</td>
+<td class="fmea-sev-3">3</td><td>3</td><td>3</td><td class="rpn-med">27</td>
+<td>N&#8322; flush during fill-seal; oxygen scavenger in pouch; lyophilized state minimizes oxidation; IPC: dissolved O&#8322; &lt;2 ppm in pre-lyophilization solution; stability monitoring by mass spec</td>
+<td class="fmea-sev-3">3</td><td>2</td><td>1</td><td class="rpn-low">6</td>
+</tr>
+
+<tr>
+<td>FM-06</td>
+<td>Microbial contamination</td>
+<td>Infection at application site; systemic sepsis (rare)</td>
+<td>Non-sterile manufacturing; packaging breach; contaminated raw materials</td>
+<td class="fmea-sev-4">4</td><td>2</td><td>2</td><td class="rpn-med">16</td>
+<td>Terminal sterilization (e-beam 25 kGy validated per ISO 11137) or aseptic fill in ISO 5 cleanroom; bioburden &lt;10 CFU/device pre-sterilization; USP &lt;71&gt; sterility test per lot; SAL 10&#8315;&#8310;</td>
+<td class="fmea-sev-4">4</td><td>1</td><td>1</td><td class="rpn-low">4</td>
+</tr>
+
+<tr>
+<td>FM-07</td>
+<td>Allergic reaction to peptide components</td>
+<td>Contact dermatitis, urticaria, anaphylaxis (rare)</td>
+<td>IgE-mediated response to Argireline, Syn-Ake, Matrixyl, GHK-Cu, or EGF</td>
+<td class="fmea-sev-4">4</td><td>2</td><td>4</td><td class="rpn-med">32</td>
+<td>RIPT (Repeated Insult Patch Test) on 200+ subjects; IFU: test patch 24 hr prior; label: full ingredient list with INCI names; contraindication: known peptide allergy; post-market ADR monitoring</td>
+<td class="fmea-sev-4">4</td><td>1</td><td>2</td><td class="rpn-low">8</td>
+</tr>
+
+<tr>
+<td>FM-08</td>
+<td>Accidental eye contact</td>
+<td>Corneal abrasion from residual needle material; retinoid/peptide irritation of conjunctiva</td>
+<td>Patch applied too close to orbital rim; user touches eye after handling</td>
+<td class="fmea-sev-4">4</td><td>2</td><td>4</td><td class="rpn-med">32</td>
+<td>IFU: &ldquo;Do not apply within 2 cm of eye&rdquo;; packaging pictogram; Draize alternative (EpiOcular&#8482;) testing; label: &ldquo;If eye contact occurs, rinse with water for 15 min and seek medical attention&rdquo;</td>
+<td class="fmea-sev-4">4</td><td>1</td><td>3</td><td class="rpn-low">12</td>
+</tr>
+
+<tr>
+<td>FM-09</td>
+<td>Use by contraindicated population (pregnant)</td>
+<td>Fetal exposure to retinol (Category X at systemic doses) via transdermal absorption</td>
+<td>Inadequate labeling; user unaware of pregnancy</td>
+<td class="fmea-sev-5">5</td><td>2</td><td>4</td><td class="rpn-high">40</td>
+<td>Bold label: &ldquo;DO NOT USE IF PREGNANT OR NURSING&rdquo;; retinol dose per patch (0.5 mg) well below teratogenic threshold (25,000 IU/day systemic); demonstrate systemic absorption &lt;1% via clinical PK study; REMS-like program for V2</td>
+<td class="fmea-sev-5">5</td><td>1</td><td>2</td><td class="rpn-low">10</td>
+</tr>
+
+<tr>
+<td>FM-10</td>
+<td>Use by immunocompromised patient</td>
+<td>Opportunistic infection through micro-channels; delayed healing</td>
+<td>User on immunosuppressants, chemotherapy, or with HIV/AIDS</td>
+<td class="fmea-sev-4">4</td><td>2</td><td>4</td><td class="rpn-med">32</td>
+<td>Contraindication label: &ldquo;Not for use by immunocompromised individuals&rdquo;; professional-use pathway for V2 (Rx dispensing); product website screening questionnaire</td>
+<td class="fmea-sev-4">4</td><td>1</td><td>3</td><td class="rpn-low">12</td>
+</tr>
+
+<tr>
+<td>FM-11</td>
+<td>Package seal failure</td>
+<td>Moisture ingress softens HA needles; loss of structural integrity</td>
+<td>Defective heat seal; puncture during shipping; aging of seal adhesive</td>
+<td class="fmea-sev-1">1</td><td>3</td><td>2</td><td class="rpn-low">6</td>
+<td>100% seal integrity testing (vacuum leak + dye penetration per ASTM F2095); accelerated aging at 55&#176;C/75% RH per ASTM F1980; moisture indicator card inside pouch</td>
+<td class="fmea-sev-1">1</td><td>1</td><td>1</td><td class="rpn-low">1</td>
+</tr>
+
+<tr>
+<td>FM-12</td>
+<td>5-ALA phototoxic reaction (V2 only)</td>
+<td>Severe erythema, blistering, pain from protoporphyrin IX + light</td>
+<td>Insufficient light avoidance post-application; unintended PDT activation</td>
+<td class="fmea-sev-4">4</td><td>3</td><td>3</td><td class="rpn-med">36</td>
+<td>V2 Rx-only dispensing; low-dose 5-ALA (0.2% vs 20% in PDT); mandatory sun avoidance IFU (48 hr); opaque adhesive overlay supplied with patch; clinical monitoring of phototoxicity at 0.2% dose</td>
+<td class="fmea-sev-4">4</td><td>1</td><td>2</td><td class="rpn-low">8</td>
+</tr>
+
+<tr>
+<td>FM-13</td>
+<td>Retinol &times; niacinamide interaction</td>
+<td>Niacin flushing (vasodilation, erythema); reduced efficacy of both actives</td>
+<td>Low-pH retinol converts niacinamide &rarr; niacin at HA matrix interface</td>
+<td class="fmea-sev-2">2</td><td>3</td><td>3</td><td class="rpn-med">18</td>
+<td>Physical separation: retinol in PLLA microspheres (core), niacinamide in HA matrix (shell); pH buffering of HA phase to pH 5.5&ndash;6.0; accelerated compatibility study (40&#176;C/75% RH, 6 months)</td>
+<td class="fmea-sev-2">2</td><td>1</td><td>2</td><td class="rpn-low">4</td>
+</tr>
+
+<tr>
+<td>FM-14</td>
+<td>Incomplete penetration (insufficient force)</td>
+<td>Needles indent but do not breach stratum corneum; zero drug delivery</td>
+<td>User presses too lightly; application to thick/calloused skin</td>
+<td class="fmea-sev-2">2</td><td>3</td><td>4</td><td class="rpn-med">24</td>
+<td>Spring-loaded applicator with calibrated 10N force; IFU specifies target sites (face, neck, d&eacute;colletage only &mdash; avoid palms/soles); human factors validation per IEC 62366-1</td>
+<td class="fmea-sev-2">2</td><td>1</td><td>2</td><td class="rpn-low">4</td>
+</tr>
+
+<tr>
+<td>FM-15</td>
+<td>Reuse of single-use patch</td>
+<td>Partially dissolved needles harbor bacteria; inconsistent/unknown dosing</td>
+<td>User attempts to reapply for cost savings; no tamper-evident feature</td>
+<td class="fmea-sev-3">3</td><td>2</td><td>4</td><td class="rpn-med">24</td>
+<td>Single-use tamper-evident packaging (peel-seal that cannot reseal); visual post-use indicator (backing turns red after moisture contact); IFU: &ldquo;SINGLE USE ONLY &mdash; DISCARD AFTER APPLICATION&rdquo;</td>
+<td class="fmea-sev-3">3</td><td>1</td><td>2</td><td class="rpn-low">6</td>
+</tr>
+
+</table>
+</div>
+<div class="eq">* Post-control RPN. All items &lt; 100. <span class="tag tag-green">ACCEPTABLE</span></div>
+</div>
+
+<!-- ═══ 6. RISK CONTROLS ═══ -->
+<div class="s">
+<h2>6. RISK CONTROL MEASURES</h2>
+<div class="eq"><b>Control hierarchy per ISO 14971:2019 Clause 7:</b> (1) Inherently safe design &rarr; (2) Protective measures &rarr; (3) Information for safety</div>
+
+<h3>6.1 Design Controls (Inherently Safe Design)</h3>
+<div class="control">
+DC-01 &mdash; <b>HA:PLLA matrix ratio</b> optimized to 70:30 w/w for complete dissolution in &le;15 min across Fitzpatrick skin types I&ndash;VI<br>
+DC-02 &mdash; <b>Needle geometry</b>: 500&mu;m height, 200&mu;m base, 10&mu;m tip radius &mdash; engineered to penetrate stratum corneum without reaching pain-sensing dermis depth (&gt;700&mu;m)<br>
+DC-03 &mdash; <b>Retinol microencapsulation</b> in PLLA microspheres (5&ndash;15&mu;m) provides UV shielding + controlled release over 6 months<br>
+DC-04 &mdash; <b>GHK-Cu stabilization</b> via lyophilized dry state + histidine co-formulation to prevent Cu dissociation<br>
+DC-05 &mdash; <b>ALT-711 anhydrous stability</b>: lyophilized at &lt;3% moisture eliminates hydrolysis pathway; t&#189; extends from 14 days (aqueous) to &gt;24 months (dry)<br>
+DC-06 &mdash; <b>Physical separation</b> of pH-incompatible ingredients: retinol in PLLA core, niacinamide in HA shell &mdash; no contact until in vivo dissolution<br>
+DC-07 &mdash; <b>5-ALA dose limitation</b> (V2): 0.2% concentration vs 20% in photodynamic therapy &mdash; 100&times; safety margin against phototoxic threshold<br>
+DC-08 &mdash; <b>EGF concentration</b> limited to 1 ppm (equivalent to physiologic wound-healing levels) to minimize tumorigenic risk
+</div>
+
+<h3>6.2 Process Controls (Protective Measures)</h3>
+<div class="control">
+PC-01 &mdash; <b>Terminal sterilization</b>: e-beam 25 kGy per ISO 11137 (validated dose) OR aseptic fill in ISO 5 cleanroom<br>
+PC-02 &mdash; <b>100% needle integrity inspection</b>: automated vision system checks each mold for broken/missing needles prior to packaging<br>
+PC-03 &mdash; <b>Moisture control</b>: lyophilization to &lt;3% w/w residual moisture; Karl Fischer verification per lot<br>
+PC-04 &mdash; <b>Nitrogen flush + oxygen scavenger</b> in sealed foil pouch; headspace O&#8322; &lt;0.5% verified per lot<br>
+PC-05 &mdash; <b>100% seal integrity test</b>: vacuum leak detection per ASTM F2095 + visual inspection<br>
+PC-06 &mdash; <b>HPLC release testing</b>: each ingredient &ge;90% and &le;110% of label claim; degradation products &le;2% individual, &le;5% total<br>
+PC-07 &mdash; <b>Bioburden pre-sterilization</b>: &lt;10 CFU/device; USP &lt;71&gt; sterility test per lot<br>
+PC-08 &mdash; <b>Endotoxin testing</b>: LAL per USP &lt;85&gt;; limit &le;20 EU/device
+</div>
+
+<h3>6.3 Labeling Controls (Information for Safety)</h3>
+<div class="control">
+LC-01 &mdash; <b>Contraindications</b> (bold, front panel): &ldquo;Do not use if pregnant, nursing, immunocompromised, or under 18 years of age&rdquo;<br>
+LC-02 &mdash; <b>Application instructions</b> with pictograms: clean dry skin &rarr; press firmly 10 sec &rarr; leave 15 min &rarr; remove &rarr; discard<br>
+LC-03 &mdash; <b>Patch test instruction</b>: &ldquo;Apply test patch to inner forearm 24 hours before first facial use&rdquo;<br>
+LC-04 &mdash; <b>Sun avoidance</b>: &ldquo;Avoid direct sun exposure for 24 hours after application&rdquo; (48 hours for V2 with 5-ALA)<br>
+LC-05 &mdash; <b>Eye contact warning</b>: &ldquo;Do not apply within 2 cm of eye. If contact with eye occurs, rinse with water for 15 minutes&rdquo;<br>
+LC-06 &mdash; <b>Single use only</b>: symbol per ISO 7000-1051 + text &ldquo;SINGLE USE &mdash; DO NOT REUSE&rdquo;<br>
+LC-07 &mdash; <b>Storage conditions</b>: &ldquo;Store at 15&ndash;25&#176;C. Protect from light. Do not freeze&rdquo;<br>
+LC-08 &mdash; <b>Drug interaction warning</b>: &ldquo;Do not use with topical retinoids, AHAs, BHAs, or chemical peels within 72 hours&rdquo;<br>
+LC-09 &mdash; <b>Full ingredient list</b> per INCI nomenclature + MoCRA compliance (21 CFR Part 740 equivalent)
+</div>
+</div>
+
+<!-- ═══ 7. RESIDUAL RISK EVALUATION ═══ -->
+<div class="s">
+<h2>7. RESIDUAL RISK EVALUATION</h2>
+
+<h3>7.1 Post-Control Risk Summary</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>Risk Level</th><th>Pre-Control</th><th>Post-Control</th></tr>
+<tr><td><span class="tag tag-red">UNACCEPTABLE (RPN &ge;100)</span></td><td>0</td><td>0</td></tr>
+<tr><td><span class="tag tag-orange">ALARA (50&ndash;99)</span></td><td>0</td><td>0</td></tr>
+<tr><td><span class="tag tag-yellow">ACCEPTABLE (20&ndash;49)</span></td><td>9</td><td>0</td></tr>
+<tr><td><span class="tag tag-green">BROADLY ACCEPTABLE (&lt;20)</span></td><td>6</td><td>15</td></tr>
+</table>
+</div>
+
+<div class="eq"><b>Result:</b> All 15 failure modes have post-control RPN &lt; 20 (BROADLY ACCEPTABLE). No individual risk has residual RPN &ge; 100.</div>
+
+<h3>7.2 Highest Residual Risks</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>FM-ID</th><th>Failure Mode</th><th>Residual RPN</th><th>Residual S&times;P</th><th>Monitoring</th></tr>
+<tr><td>FM-02</td><td>Incomplete needle dissolution</td><td>12</td><td>6 (3&times;2)</td><td>Clinical trial dermoscopy at 1 hr, 24 hr post-application</td></tr>
+<tr><td>FM-08</td><td>Accidental eye contact</td><td>12</td><td>4 (4&times;1)</td><td>Post-market complaint tracking; ADR reporting</td></tr>
+<tr><td>FM-10</td><td>Immunocompromised patient use</td><td>12</td><td>4 (4&times;1)</td><td>Post-market surveillance; HCP education program</td></tr>
+<tr><td>FM-09</td><td>Use by pregnant population</td><td>10</td><td>5 (5&times;1)</td><td>PK study to confirm systemic retinol &lt;1%; post-market ADR</td></tr>
+</table>
+</div>
+
+<div class="eq"><b>Note:</b> FM-09 retains severity = 5 (catastrophic) but probability reduced to 1 (improbable) through labeling + low-dose design + PK evidence. Per risk management plan &sect;2.2, severity-5 items receive mandatory independent clinical review regardless of RPN.</div>
+
+<h3>7.3 Cumulative Residual Risk</h3>
+<div class="eq"><b>Assessment:</b> The combined residual risk from all identified hazards does not outweigh the benefits of the device when used as intended. No synergistic residual risk combinations identified &mdash; failure modes are independent.</div>
+<div class="eq"><b>Sum of residual RPNs:</b> 103 / 1875 possible (5.5%) &mdash; well within acceptable threshold.</div>
+</div>
+
+<!-- ═══ 8. RISK-BENEFIT ANALYSIS ═══ -->
+<div class="s">
+<h2>8. RISK-BENEFIT ANALYSIS</h2>
+
+<h3>8.1 Clinical Benefits</h3>
+<div class="control">
+B-01 &mdash; <b>AGE crosslink reversal</b>: ALT-711 is the only known compound that cleaves established glycation crosslinks in collagen. No topical or injectable equivalent exists. Addresses root cause of age-related skin stiffening, not just symptoms.<br>
+B-02 &mdash; <b>Multi-mechanism collagen repair</b>: 11 ingredients target 7 distinct pathways (AGE breaking, fibroblast stimulation, neuromodulation, hydration, photoactivation, matrix remodeling, growth factor signaling). Superior to single-mechanism treatments.<br>
+B-03 &mdash; <b>Non-surgical alternative</b>: replaces injectable fillers, Botox, and ablative procedures. No anesthesia, no downtime, no practitioner required (V1).<br>
+B-04 &mdash; <b>Sustained release</b>: PLLA microsphere platform delivers actives over 6&ndash;12 months from a single 15-minute application. Current microneedling requires monthly professional sessions.<br>
+B-05 &mdash; <b>Dissolving delivery</b>: eliminates sharps waste and needle-stick injury risk inherent to metal/silicon microneedle systems.
+</div>
+
+<h3>8.2 Risk-Benefit Conclusion</h3>
+<div class="eq"><b>V1 BASILISK CROWN:</b> All residual risks are broadly acceptable (max RPN = 12). Clinical benefits of non-invasive, multi-pathway collagen repair substantially outweigh risks of transient local reactions. The benefit-risk profile is <b>FAVORABLE</b>. <span class="tag tag-green">ACCEPTABLE</span></div>
+<div class="eq"><b>V2 BASILISK RADIANT:</b> Addition of 5-ALA introduces phototoxicity risk (FM-12, residual RPN = 8) mitigated by 100&times; dose reduction from PDT levels and mandatory sun avoidance labeling. Incremental benefit of photoactivated collagen remodeling justifies incremental risk under Rx-only dispensing. The benefit-risk profile is <b>FAVORABLE with conditions</b>. <span class="tag tag-yellow">ACCEPTABLE (Rx-only)</span></div>
+</div>
+
+<!-- ═══ 9. PRODUCTION & POST-PRODUCTION REVIEW ═══ -->
+<div class="s">
+<h2>9. PRODUCTION &amp; POST-PRODUCTION MONITORING</h2>
+
+<h3>9.1 Post-Market Surveillance Plan</h3>
+<div class="eq"><b>Complaint handling:</b> All user complaints triaged within 24 hours; adverse events reported per 21 CFR 803 (MDR) within 30 days (serious: 5 days)</div>
+<div class="eq"><b>Periodic review:</b> Risk management file reviewed annually or upon: (a) new complaint trend, (b) CAPA closure, (c) design change, (d) new clinical evidence</div>
+<div class="eq"><b>Signal detection:</b> Statistical monitoring of complaint rates per lot; CUSUM analysis for trend detection</div>
+<div class="eq"><b>Clinical follow-up:</b> Post-market clinical follow-up (PMCF) per EU MDR Article 61; clinical evaluation report (CER) updated biennially</div>
+
+<h3>9.2 Risk File Maintenance</h3>
+<div class="eq"><b>Trigger events for risk file update:</b></div>
+<div class="control">
+&#9679; New adverse event type not in hazard identification<br>
+&#9679; Complaint rate exceeds 0.1% of units distributed<br>
+&#9679; Severity upgrade based on post-market evidence<br>
+&#9679; Design or manufacturing process change (via change control)<br>
+&#9679; New regulatory guidance or harmonized standard revision<br>
+&#9679; Supplier change for any active ingredient<br>
+&#9679; New published literature on ingredient safety
+</div>
+</div>
+
+<!-- ═══ 10. APPROVAL ═══ -->
+<div class="s">
+<h2>10. DOCUMENT APPROVAL</h2>
+<div class="tbl-wrap">
+<table>
+<tr><th>Role</th><th>Name</th><th>Signature</th><th>Date</th></tr>
+<tr><td>Risk Management Lead</td><td>_________________________</td><td>_________________________</td><td>____/____/________</td></tr>
+<tr><td>Quality Assurance</td><td>_________________________</td><td>_________________________</td><td>____/____/________</td></tr>
+<tr><td>Regulatory Affairs</td><td>_________________________</td><td>_________________________</td><td>____/____/________</td></tr>
+<tr><td>Clinical / Medical Advisor</td><td>_________________________</td><td>_________________________</td><td>____/____/________</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ═══ APPENDIX ═══ -->
+<div class="s">
+<h2>APPENDIX A &mdash; REFERENCE DOCUMENTS</h2>
+<div class="tbl-wrap">
+<table>
+<tr><th>Document ID</th><th>Title</th><th>Relevance</th></tr>
+<tr><td>BSK-SPEC-001</td><td>BASILISK Technical Specification</td><td>Product design inputs; ingredient list</td></tr>
+<tr><td>BSK-BIO-001</td><td>Biocompatibility Evaluation Plan (ISO 10993)</td><td>Biological testing strategy</td></tr>
+<tr><td>BSK-STAB-001</td><td>Stability Protocol (ICH Q1A)</td><td>Degradation data for FM-03, FM-04, FM-05</td></tr>
+<tr><td>BSK-HF-001</td><td>Human Factors Engineering File</td><td>Use error analysis for UH-01 through UH-07</td></tr>
+<tr><td>BSK-LBL-001</td><td>Labeling Specification</td><td>Label control implementation</td></tr>
+<tr><td>ISO 14971:2019</td><td>Medical devices &mdash; Risk management</td><td>Governing standard</td></tr>
+<tr><td>ISO/TR 24971:2020</td><td>Guidance on ISO 14971</td><td>Implementation guidance</td></tr>
+<tr><td>IEC 60812:2018</td><td>FMEA methodology</td><td>FMEA technique reference</td></tr>
+</table>
+</div>
+</div>
+
+<div class="footer">
+BASILISK&#8482; &middot; BSK-RISK-001 Rev A &middot; ISO 14971:2019 Risk Management File<br>
+CONFIDENTIAL &mdash; The AITistic Research Initiative &middot; 2026
+</div>
+
+</div>
+</body>
+</html>

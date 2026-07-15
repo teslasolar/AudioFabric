@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>BSK-BIO-001 — Biocompatibility Evaluation Plan (ISO 10993)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0c08;overflow-y:auto;font-family:'Courier New',monospace;color:#b0c0a0}
+#ui{max-width:1100px;margin:0 auto;padding:20px 24px 80px}
+h1{font-size:14px;letter-spacing:5px;color:rgba(150,255,100,.5);margin-bottom:2px}
+.sub{font-size:8px;color:rgba(150,255,100,.25);letter-spacing:2px;margin-bottom:20px}
+.doc-id{font-size:7px;color:rgba(255,255,255,.1);margin-bottom:16px}
+.back{font-size:8px;color:rgba(150,255,100,.25);text-decoration:none;letter-spacing:1px;display:inline-block;margin-bottom:14px;border:1px solid rgba(150,255,100,.08);padding:3px 8px;border-radius:3px}
+.back:hover{border-color:rgba(150,255,100,.2);color:rgba(150,255,100,.45)}
+.s{background:rgba(255,255,255,.02);border:1px solid rgba(150,255,100,.06);border-radius:6px;padding:14px 18px;margin-bottom:12px}
+.s h2{font-size:10px;letter-spacing:3px;color:rgba(150,255,100,.4);margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:5px}
+.s h3{font-size:9px;color:rgba(150,255,100,.3);margin:10px 0 5px;letter-spacing:1px}
+.s h4{font-size:8px;color:rgba(150,255,100,.25);margin:8px 0 4px;letter-spacing:.5px}
+.eq{font-size:9px;color:rgba(200,220,180,.35);line-height:1.9;margin:3px 0}
+.eq b{color:rgba(180,255,120,.5)}
+.tbl-wrap{overflow-x:auto;margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:8px;font-variant-numeric:tabular-nums}
+th{color:rgba(150,255,100,.3);text-align:left;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.06);letter-spacing:1px;white-space:nowrap}
+td{padding:4px 6px;color:rgba(200,220,180,.3);border-bottom:1px solid rgba(255,255,255,.02);vertical-align:top}
+.tag{display:inline-block;padding:1px 5px;border-radius:2px;font-size:7px;letter-spacing:1px;margin:1px}
+.tag-green{background:rgba(100,255,100,.08);border:1px solid rgba(100,255,100,.15);color:rgba(100,255,100,.5)}
+.tag-yellow{background:rgba(255,255,100,.08);border:1px solid rgba(255,255,100,.15);color:rgba(255,255,100,.5)}
+.tag-red{background:rgba(255,100,100,.08);border:1px solid rgba(255,100,100,.15);color:rgba(255,100,100,.5)}
+.tag-blue{background:rgba(100,150,255,.08);border:1px solid rgba(100,150,255,.15);color:rgba(100,150,255,.5)}
+.tag-orange{background:rgba(255,180,80,.08);border:1px solid rgba(255,180,80,.15);color:rgba(255,180,80,.5)}
+.warn{background:rgba(255,200,50,.03);border:1px solid rgba(255,200,50,.08);border-radius:4px;padding:8px 12px;margin:6px 0;font-size:8px;color:rgba(255,220,100,.4)}
+.note{background:rgba(100,150,255,.03);border:1px solid rgba(100,150,255,.08);border-radius:4px;padding:8px 12px;margin:6px 0;font-size:8px;color:rgba(140,180,255,.4)}
+.control{border-left:3px solid rgba(150,255,100,.1);padding:6px 14px;margin:6px 0;font-size:8px;color:rgba(200,220,180,.3);line-height:1.8}
+.test-req{background:rgba(150,255,100,.015);border:1px solid rgba(150,255,100,.05);border-radius:4px;padding:10px 14px;margin:8px 0}
+.test-req h4{color:rgba(150,255,100,.35);margin:0 0 6px;font-size:8px;letter-spacing:1.5px}
+.test-req .eq{font-size:8px;line-height:1.7}
+.accept{border-left:3px solid rgba(100,255,100,.12);padding:4px 12px;margin:4px 0;font-size:7px;color:rgba(100,255,100,.35);line-height:1.7}
+.footer{margin-top:30px;font-size:7px;color:rgba(255,255,255,.08);text-align:center}
+</style>
+</head>
+<body>
+<div id="ui">
+
+<a class="back" href="index.html">&#9666; DOCUMENT CONTROL CENTER</a>
+
+<h1>BASILISK&#8482;</h1>
+<div class="sub">BIOCOMPATIBILITY EVALUATION PLAN &middot; ISO 10993-1:2018</div>
+<div class="doc-id">DOC: BSK-BIO-001 Rev A &middot; EFFECTIVE: 2026-07-15 &middot; CONFIDENTIAL &middot; Thomas Frumkin &middot; The AITistic Research Initiative</div>
+
+<!-- ═══ 1. PURPOSE & SCOPE ═══ -->
+<div class="s">
+<h2>1. PURPOSE &amp; SCOPE</h2>
+<div class="eq"><b>Purpose:</b> Define the biocompatibility evaluation strategy for the BASILISK&#8482; Dissolving Microneedle Collagen Repair System per ISO 10993-1:2018, including material characterization, required biological tests, acceptance criteria, and testing strategy.</div>
+<div class="eq"><b>Product:</b> BASILISK&#8482; V1 CROWN (10 ingredients) and V2 RADIANT (11 ingredients, includes 5-ALA)</div>
+<div class="eq"><b>Device description:</b> Dissolving microneedle array (7&times;7, 49 needles) on adhesive backing. Needles composed of hyaluronic acid / poly-L-lactic acid (PLLA) composite matrix loaded with 9 active ingredients + 2 peptide neuromodulators. Needles dissolve in situ within 15 minutes, depositing actives into dermis.</div>
+<div class="eq"><b>Applicable standards:</b> ISO 10993-1:2018, ISO 10993-3, -5, -6, -10, -11, -12, -17, -18, -23; FDA Guidance &ldquo;Use of ISO 10993-1&rdquo; (2020); EU MDR 2017/745 Annex I &sect;10.4</div>
+</div>
+
+<!-- ═══ 2. DEVICE CATEGORIZATION ═══ -->
+<div class="s">
+<h2>2. DEVICE CATEGORIZATION (ISO 10993-1:2018, Clause 6)</h2>
+
+<h3>2.1 Contact Nature</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>Parameter</th><th>Classification</th><th>Rationale</th></tr>
+<tr><td>Body contact type</td><td><b>Breached or compromised surface</b> (microneedles penetrate stratum corneum into dermis)</td><td>Needles create micro-channels 500&mu;m deep; device material deposited in tissue</td></tr>
+<tr><td>Secondary contact</td><td><b>Tissue / bone contact</b> (implant behavior)</td><td>PLLA microspheres reside in dermis for 6&ndash;12 months post-dissolution</td></tr>
+<tr><td>Surface component</td><td><b>Skin-contacting surface device</b> (adhesive backing)</td><td>Adhesive backing contacts intact epidermis during 15-min application</td></tr>
+</table>
+</div>
+
+<h3>2.2 Contact Duration</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>Component</th><th>Duration Category</th><th>Actual Duration</th></tr>
+<tr><td>Adhesive backing</td><td><b>Limited</b> (&le;24 hours)</td><td>15 minutes skin contact</td></tr>
+<tr><td>HA matrix (dissolving)</td><td><b>Limited</b> (&le;24 hours)</td><td>Dissolves within 15 min; HA absorbed within hours</td></tr>
+<tr><td>PLLA microspheres</td><td><b>Permanent</b> (&gt;30 days)</td><td>Resides in dermis 6&ndash;12 months until hydrolytic degradation</td></tr>
+<tr><td>Released actives</td><td><b>Prolonged</b> (24 hr &ndash; 30 days)</td><td>Metabolized / cleared within days to weeks depending on compound</td></tr>
+</table>
+</div>
+
+<div class="warn">&#9888; The PLLA microsphere component triggers PERMANENT implant testing requirements per ISO 10993-1:2018 Table A.1, including implantation testing (Part 6) and subchronic systemic toxicity (Part 11). This is the most stringent category.</div>
+</div>
+
+<!-- ═══ 3. MATERIAL CHARACTERIZATION ═══ -->
+<div class="s">
+<h2>3. MATERIAL CHARACTERIZATION</h2>
+<div class="eq"><b>Reference:</b> ISO 10993-18:2020 &mdash; Chemical characterization of medical device materials within a risk management process</div>
+
+<h3>3.1 Ingredient Inventory</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>#</th><th>Ingredient</th><th>CAS</th><th>Function</th><th>Contact Type</th><th>Conc %</th><th>Existing Safety Data</th></tr>
+<tr><td>1</td><td><b>Hyaluronic Acid (HA)</b></td><td>9004-61-9</td><td>Matrix / needle structure</td><td>Breached surface &rarr; absorbed</td><td>35.0</td><td><span class="tag tag-green">EXTENSIVE</span> FDA-cleared in dermal fillers (Juvederm, Restylane)</td></tr>
+<tr><td>2</td><td><b>Poly-L-Lactic Acid (PLLA)</b></td><td>26100-51-6</td><td>Sustained release microspheres</td><td>Permanent implant (6&ndash;12 mo)</td><td>15.0</td><td><span class="tag tag-green">EXTENSIVE</span> FDA-approved implant (Sculptra); ISO 10993 data on file</td></tr>
+<tr><td>3</td><td><b>Retinol (Vitamin A)</b></td><td>68-26-8</td><td>Keratinocyte turnover, collagen gene expression</td><td>Tissue contact, metabolized</td><td>0.5</td><td><span class="tag tag-green">EXTENSIVE</span> GRAS; decades of topical use data; CIR reviewed</td></tr>
+<tr><td>4</td><td><b>Niacinamide (Vitamin B3)</b></td><td>98-92-0</td><td>Barrier repair, anti-inflammatory</td><td>Tissue contact, metabolized</td><td>5.0</td><td><span class="tag tag-green">EXTENSIVE</span> GRAS; CIR safety assessment; OTC monograph</td></tr>
+<tr><td>5</td><td><b>GHK-Cu (Copper tripeptide-1)</b></td><td>49557-75-7</td><td>Fibroblast stimulation, ECM remodeling</td><td>Tissue contact, metabolized</td><td>1.0</td><td><span class="tag tag-yellow">MODERATE</span> Topical cosmetic use; limited intradermal data</td></tr>
+<tr><td>6</td><td><b>ALT-711 (Alagebrium)</b></td><td>341028-37-3</td><td>AGE crosslink breaker</td><td>Tissue contact, metabolized</td><td>2.0</td><td><span class="tag tag-red">LIMITED</span> Phase II oral clinical trials (Alteon); no topical/intradermal data</td></tr>
+<tr><td>7</td><td><b>Matrixyl (Palmitoyl pentapeptide-4)</b></td><td>214047-00-4</td><td>Collagen I/III/IV synthesis stimulation</td><td>Tissue contact, metabolized</td><td>2.0</td><td><span class="tag tag-yellow">MODERATE</span> Topical cosmetic safety; limited intradermal data</td></tr>
+<tr><td>8</td><td><b>Argireline (Acetyl hexapeptide-3)</b></td><td>616204-22-9</td><td>SNARE complex inhibition (neuromodulation)</td><td>Tissue contact, metabolized</td><td>5.0</td><td><span class="tag tag-yellow">MODERATE</span> Topical use; CIR reviewed; no intradermal toxicology</td></tr>
+<tr><td>9</td><td><b>Syn-Ake (Dipeptide diaminobutyroyl benzylamide diacetate)</b></td><td>823202-99-9</td><td>Waglerin-1 mimetic, muscular relaxation</td><td>Tissue contact, metabolized</td><td>4.0</td><td><span class="tag tag-red">LIMITED</span> Topical cosmetic only; no intradermal or systemic tox data</td></tr>
+<tr><td>10</td><td><b>EGF (Epidermal Growth Factor)</b></td><td>62253-63-8</td><td>Keratinocyte/fibroblast proliferation</td><td>Tissue contact, metabolized</td><td>0.0001</td><td><span class="tag tag-yellow">MODERATE</span> Recombinant; wound healing products; tumorigenic concern at high dose</td></tr>
+<tr><td>11</td><td><b>5-ALA (5-Aminolevulinic acid)</b> <span class="tag tag-blue">V2 ONLY</span></td><td>106-60-5</td><td>Porphyrin precursor, photoactivation</td><td>Tissue contact, metabolized</td><td>0.2</td><td><span class="tag tag-green">EXTENSIVE</span> FDA-approved drug (Levulan Kerastick 20%); well-characterized at PDT doses</td></tr>
+</table>
+</div>
+
+<h3>3.2 Adhesive Backing &amp; Packaging Materials</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>Material</th><th>Contact</th><th>Duration</th><th>Existing Data</th></tr>
+<tr><td>Medical-grade acrylate pressure-sensitive adhesive</td><td>Intact skin (epidermis)</td><td>Limited (15 min)</td><td><span class="tag tag-green">EXTENSIVE</span> USP Class VI; ISO 10993-5, -10 data from supplier</td></tr>
+<tr><td>PET backing film</td><td>Intact skin (indirect)</td><td>Limited (15 min)</td><td><span class="tag tag-green">EXTENSIVE</span> USP Class VI; standard medical device material</td></tr>
+<tr><td>Aluminum foil pouch (inner layer: LDPE)</td><td>No body contact</td><td>N/A</td><td><span class="tag tag-green">EXTENSIVE</span> FDA 21 CFR 177.1520 compliant</td></tr>
+</table>
+</div>
+
+<h3>3.3 Chemical Characterization Requirements (ISO 10993-18:2020)</h3>
+<div class="control">
+CC-01 &mdash; <b>Extractables study</b>: exhaustive extraction (polar + nonpolar solvents) per ISO 10993-12:2021 on finished device. GC-MS, LC-MS/MS, ICP-MS for metals.<br>
+CC-02 &mdash; <b>Leachables study</b>: simulated use extraction (phosphate-buffered saline, pH 7.4, 37&#176;C, 24 hr) mimicking in vivo dissolution conditions.<br>
+CC-03 &mdash; <b>Degradation product identification</b>: forced degradation (acid, base, oxidative, photolytic, thermal) with LC-MS/MS characterization of all degradants &ge;0.1%.<br>
+CC-04 &mdash; <b>Elemental impurities</b>: per ICH Q3D(R2) / ISO 10993-17:2023; limits per parenteral route for intradermal delivery.<br>
+CC-05 &mdash; <b>Residual solvent analysis</b>: per ICH Q3C(R8) for any solvents used in PLLA microsphere fabrication (dichloromethane if emulsion method).<br>
+CC-06 &mdash; <b>Particle characterization</b>: PLLA microsphere size distribution (laser diffraction), morphology (SEM), crystallinity (DSC/XRD).
+</div>
+</div>
+
+<!-- ═══ 4. REQUIRED BIOCOMPATIBILITY TESTS ═══ -->
+<div class="s">
+<h2>4. REQUIRED BIOLOGICAL TESTS (ISO 10993-1:2018 TABLE A.1)</h2>
+<div class="eq"><b>Device category:</b> Breached/compromised surface + implant component (PLLA). Duration: Limited (matrix) + Permanent (PLLA microspheres).</div>
+<div class="eq"><b>Testing basis:</b> Permanent implant endpoints apply because PLLA microspheres reside in tissue &gt;30 days.</div>
+
+<div class="test-req">
+<h4>4.1 &mdash; ISO 10993-5: CYTOTOXICITY</h4>
+<div class="eq"><b>Purpose:</b> Evaluate potential of device materials and extractables to cause cell death or growth inhibition</div>
+<div class="eq"><b>Method:</b> MEM (Minimum Essential Medium) elution assay per ISO 10993-5:2009</div>
+<div class="eq"><b>Cell line:</b> L929 mouse fibroblasts (ATCC CCL-1)</div>
+<div class="eq"><b>Extraction conditions:</b> Complete device extracted in MEM + 10% FBS, 37&#176;C, 24 hr (per ISO 10993-12:2021 surface area / volume ratio)</div>
+<div class="eq"><b>Endpoints:</b> Cell viability (quantitative: XTT or MTT metabolic assay), morphological assessment (qualitative: grade 0&ndash;4)</div>
+<div class="eq"><b>Additional:</b> Direct contact assay for PLLA microsphere component (cells seeded on microspheres, 24 hr + 72 hr)</div>
+<div class="accept">
+ACCEPTANCE: Cell viability &ge;70% of negative control (quantitative). Morphological grade &le;2 (mild reactivity) for qualitative. Positive control (latex) must show grade &ge;3.
+</div>
+</div>
+
+<div class="test-req">
+<h4>4.2 &mdash; ISO 10993-10 / ISO 10993-23: IRRITATION &amp; SKIN SENSITIZATION</h4>
+<div class="eq"><b>Purpose:</b> Evaluate potential to cause skin irritation and delayed-type hypersensitivity (Type IV)</div>
+
+<div class="eq"><b>4.2.1 Irritation</b></div>
+<div class="eq"><b>Method:</b> Reconstructed Human Epidermis (RhE) model per ISO 10993-23:2021 (replaces Draize rabbit test)</div>
+<div class="eq"><b>Model:</b> EpiDerm&#8482; (MatTek) or EpiSkin&#8482; (L'Or&eacute;al) &mdash; validated OECD TG 439</div>
+<div class="eq"><b>Extraction:</b> Device extract (saline + sesame oil) applied to RhE tissue for 60 min exposure</div>
+<div class="eq"><b>Endpoints:</b> Tissue viability (MTT assay), IL-1&alpha; release (ELISA)</div>
+<div class="accept">
+ACCEPTANCE: Mean tissue viability &ge;50% of negative control (non-irritant classification per OECD TG 439). IL-1&alpha; &lt;100 pg/mL.
+</div>
+
+<div class="eq"><b>4.2.2 Skin Sensitization</b></div>
+<div class="eq"><b>Method:</b> Combination of three validated non-animal methods (Defined Approach per OECD GL 497):</div>
+<div class="control">
+(a) <b>DPRA</b> (Direct Peptide Reactivity Assay) &mdash; OECD TG 442C: cysteine and lysine peptide depletion<br>
+(b) <b>KeratinoSens&#8482;</b> &mdash; OECD TG 442D: ARE-Nrf2 luciferase reporter in HaCaT keratinocytes<br>
+(c) <b>h-CLAT</b> (Human Cell Line Activation Test) &mdash; OECD TG 442E: CD86/CD54 expression on THP-1 cells
+</div>
+<div class="eq"><b>Supplemental:</b> RIPT (Repeated Insult Patch Test) on &ge;200 human subjects for finished device (clinical confirmation)</div>
+<div class="accept">
+ACCEPTANCE: DPRA: cysteine depletion &lt;13.89% AND lysine depletion &lt;23.03% (non-sensitizer). KeratinoSens: EC1.5 &gt;1000 &mu;M (negative). h-CLAT: CD86 &lt;150% and CD54 &lt;200% of control (negative). RIPT: zero sensitization reactions in &ge;200 subjects.
+</div>
+</div>
+
+<div class="test-req">
+<h4>4.3 &mdash; ISO 10993-3: GENOTOXICITY</h4>
+<div class="eq"><b>Purpose:</b> Evaluate potential of device materials and extractables to cause gene mutations, chromosomal damage, or DNA damage</div>
+<div class="eq"><b>Rationale:</b> Required for all implant devices with &gt;24 hr contact. PLLA microspheres qualify as permanent implant.</div>
+
+<div class="eq"><b>4.3.1 Gene Mutation (Ames Test)</b></div>
+<div class="eq"><b>Method:</b> Bacterial reverse mutation assay per OECD TG 471</div>
+<div class="eq"><b>Strains:</b> S. typhimurium TA98, TA100, TA1535, TA1537 + E. coli WP2 uvrA</div>
+<div class="eq"><b>Conditions:</b> &plusmn; S9 metabolic activation; device extract (polar + nonpolar); 5 concentrations + vehicle + positive controls</div>
+<div class="accept">
+ACCEPTANCE: &lt;2&times; increase in revertant colonies vs vehicle control at all concentrations, with no dose-response. Positive controls must show &ge;3&times; increase.
+</div>
+
+<div class="eq"><b>4.3.2 Chromosomal Damage (In Vitro Micronucleus)</b></div>
+<div class="eq"><b>Method:</b> In vitro mammalian cell micronucleus test per OECD TG 487</div>
+<div class="eq"><b>Cell line:</b> CHO-K1 or TK6 human lymphoblastoid cells</div>
+<div class="eq"><b>Conditions:</b> &plusmn; S9; short-term (3 hr + 24 hr recovery) and continuous (24 hr) exposure; &ge;2000 cells scored per concentration</div>
+<div class="accept">
+ACCEPTANCE: No statistically significant increase (p &gt;0.05, Fisher's exact test) in micronucleated cells vs vehicle control. Positive control (mitomycin C/colchicine) must show significant increase.
+</div>
+</div>
+
+<div class="test-req">
+<h4>4.4 &mdash; ISO 10993-6: IMPLANTATION (LOCAL TISSUE EFFECTS)</h4>
+<div class="eq"><b>Purpose:</b> Evaluate local tissue response to PLLA microspheres and dissolved needle matrix deposited in dermis</div>
+<div class="eq"><b>Rationale:</b> <span class="tag tag-red">CRITICAL</span> &mdash; Dissolving microneedles deposit material into living tissue. PLLA microspheres remain for 6&ndash;12 months. This is the most important biocompatibility endpoint for BASILISK.</div>
+
+<div class="eq"><b>Method:</b> Subcutaneous / intradermal implantation per ISO 10993-6:2016</div>
+<div class="eq"><b>Animal model:</b> New Zealand White rabbit (intradermal) + Sprague-Dawley rat (subcutaneous for PLLA microspheres)</div>
+<div class="eq"><b>Test articles:</b></div>
+<div class="control">
+(a) Complete BASILISK patch applied to shaved dorsal skin (rabbit intradermal model)<br>
+(b) PLLA microspheres injected subcutaneously (rat model, 12-month endpoint)<br>
+(c) HA matrix alone (negative control comparison)<br>
+(d) USP-grade HDPE strip (negative control per ISO 10993-6)
+</div>
+<div class="eq"><b>Timepoints:</b> 1 week, 4 weeks, 12 weeks, 26 weeks, 52 weeks (PLLA only)</div>
+<div class="eq"><b>Evaluation:</b> Gross pathology, histopathology (H&amp;E, Masson's trichrome for collagen, CD68 for macrophages), semi-quantitative scoring per ISO 10993-6 Annex E</div>
+<div class="accept">
+ACCEPTANCE: Test article tissue response score &le; negative control score + 2.9 at each timepoint (non-irritant per ISO 10993-6 Annex E scoring). No abscess, necrosis, or excessive fibrosis. Foreign body giant cell reaction, if present, must be minimal (grade &le;2) and decreasing over time. PLLA microspheres must show progressive resorption without chronic inflammation at 52 weeks.
+</div>
+</div>
+
+<div class="test-req">
+<h4>4.5 &mdash; ISO 10993-11: SYSTEMIC TOXICITY</h4>
+<div class="eq"><b>Purpose:</b> Evaluate potential for systemic toxic effects from absorbed device materials</div>
+<div class="eq"><b>Rationale:</b> Required for implant devices. ALT-711 and peptide components have limited intradermal absorption data.</div>
+
+<div class="eq"><b>4.5.1 Acute Systemic Toxicity</b></div>
+<div class="eq"><b>Method:</b> Per ISO 10993-11:2017 Annex B; USP &lt;87&gt; / &lt;88&gt; Class VI</div>
+<div class="eq"><b>Animal model:</b> Swiss albino mice (5/sex/group); IV and IP routes</div>
+<div class="eq"><b>Dose:</b> Maximum feasible dose of device extract (50 mL/kg polar; 10 mL/kg nonpolar)</div>
+<div class="eq"><b>Observation:</b> 72 hours; clinical signs, body weight, gross necropsy</div>
+<div class="accept">
+ACCEPTANCE: No mortality. No significant body weight loss (&gt;10%). No significant clinical signs (convulsions, prostration, respiratory distress). Gross necropsy: no organ abnormalities.
+</div>
+
+<div class="eq"><b>4.5.2 Subchronic Systemic Toxicity (28-day)</b></div>
+<div class="eq"><b>Method:</b> Per ISO 10993-11:2017 Annex D; OECD TG 407</div>
+<div class="eq"><b>Animal model:</b> Sprague-Dawley rats (10/sex/group)</div>
+<div class="eq"><b>Dose groups:</b> Low (1&times; clinical equivalent), Mid (5&times;), High (25&times;), Vehicle control</div>
+<div class="eq"><b>Route:</b> Intradermal injection of device extract (to mimic dissolved microneedle delivery)</div>
+<div class="eq"><b>Duration:</b> 28 days repeated dose + 14 days recovery</div>
+<div class="eq"><b>Endpoints:</b> Clinical observations, body weight, food consumption, hematology (CBC + differential), clinical chemistry (ALT, AST, BUN, creatinine, albumin, glucose), urinalysis, gross necropsy, organ weights, histopathology (liver, kidney, spleen, injection site, lymph nodes)</div>
+<div class="accept">
+ACCEPTANCE: NOAEL (No Observed Adverse Effect Level) &ge;25&times; clinical dose. No target organ toxicity. No treatment-related mortality. Hematology and clinical chemistry within &plusmn;20% of control group means with no dose-response trend.
+</div>
+
+<div class="eq"><b>4.5.3 Subchronic Systemic Toxicity (90-day) &mdash; PLLA Component</b></div>
+<div class="eq"><b>Method:</b> Per ISO 10993-11:2017; OECD TG 408</div>
+<div class="eq"><b>Rationale:</b> Required for permanent implant (&gt;30 days contact). PLLA microspheres degrade over 6&ndash;12 months; 90-day study captures chronic lactic acid release phase.</div>
+<div class="eq"><b>Design:</b> Same as 28-day study with 90-day exposure + 28-day recovery; subcutaneous PLLA microsphere implantation in rats</div>
+<div class="accept">
+ACCEPTANCE: Same criteria as 28-day study. Additionally: no evidence of systemic lactic acidosis (serum lactate within normal range); no hepatotoxicity or nephrotoxicity attributable to PLLA degradation products.
+</div>
+</div>
+
+<div class="test-req">
+<h4>4.6 &mdash; ISO 10993-12: SAMPLE PREPARATION &amp; REFERENCE MATERIALS</h4>
+<div class="eq"><b>Purpose:</b> Standardize extraction conditions for all biocompatibility tests</div>
+<div class="eq"><b>Reference standard:</b> ISO 10993-12:2021</div>
+
+<div class="eq"><b>Extraction parameters:</b></div>
+<div class="tbl-wrap">
+<table>
+<tr><th>Parameter</th><th>Condition</th><th>Rationale</th></tr>
+<tr><td>Polar solvent</td><td>Physiological saline (0.9% NaCl) or MEM + 10% serum</td><td>Simulates aqueous tissue fluid environment</td></tr>
+<tr><td>Nonpolar solvent</td><td>Sesame oil (USP) or DMSO</td><td>Extracts lipophilic compounds (retinol, Syn-Ake)</td></tr>
+<tr><td>Surface area:volume ratio</td><td>6 cm&sup2;/mL (for devices &lt;0.5 mm thickness) per ISO 10993-12 Table 1</td><td>Exaggerated extraction to maximize sensitivity</td></tr>
+<tr><td>Temperature</td><td>37&#176;C &plusmn; 1&#176;C</td><td>Physiological temperature</td></tr>
+<tr><td>Duration</td><td>72 hr (&plusmn;2 hr)</td><td>Exhaustive extraction per ISO 10993-12 &sect;10.3.2</td></tr>
+<tr><td>Agitation</td><td>Orbital shaker at 100 rpm</td><td>Ensures uniform extraction</td></tr>
+</table>
+</div>
+
+<div class="eq"><b>Reference materials:</b></div>
+<div class="control">
+Negative control: USP-grade high-density polyethylene (HDPE) per ISO 10993-12 Annex A<br>
+Positive control (cytotoxicity): Stabilized ZDEC polyurethane (Hatano Research Institute)<br>
+Positive control (irritation): 1% SDS (sodium dodecyl sulfate)<br>
+Positive control (sensitization): DNCB (2,4-dinitrochlorobenzene) for h-CLAT
+</div>
+</div>
+
+<div class="test-req">
+<h4>4.7 &mdash; ISO 10993-23: IRRITATION TESTING (UPDATED METHODS)</h4>
+<div class="eq"><b>Purpose:</b> Updated irritation testing methodology replacing the in vivo Draize test with validated in vitro RhE models</div>
+<div class="eq"><b>Reference:</b> ISO 10993-23:2021 &mdash; Tests for irritation (supersedes relevant sections of ISO 10993-10 for irritation)</div>
+
+<div class="eq"><b>Method:</b> Reconstructed Human Epidermis (RhE) model per OECD TG 439</div>
+<div class="eq"><b>Test protocol:</b></div>
+<div class="control">
+1. Prepare polar and nonpolar extracts per ISO 10993-12:2021<br>
+2. Apply 50 &mu;L extract to RhE tissue surface (EpiDerm&#8482; EPI-200)<br>
+3. Incubate 60 min at 37&#176;C, 5% CO&#8322;, 95% RH<br>
+4. Rinse, transfer to fresh medium, incubate 42 hr (recovery)<br>
+5. MTT viability assay; calculate mean % viability vs negative control<br>
+6. Classify per threshold: &ge;50% viability = non-irritant; &lt;50% = irritant
+</div>
+<div class="eq"><b>Supplemental ocular irritation:</b> EpiOcular&#8482; Eye Irritation Test (OECD TG 492) for accidental eye contact risk characterization</div>
+<div class="accept">
+ACCEPTANCE: Mean tissue viability &ge;50% (non-irritant classification). For ocular: viability &ge;60% (no eye irritation category per GHS). Both positive and negative controls must meet defined acceptance ranges.
+</div>
+</div>
+</div>
+
+<!-- ═══ 5. TESTING STRATEGY ═══ -->
+<div class="s">
+<h2>5. TESTING STRATEGY</h2>
+
+<h3>5.1 Approach: Leverage Existing Data Where Possible</h3>
+<div class="eq"><b>Principle:</b> Per ISO 10993-1:2018 Clause 4.3 and FDA Guidance (2020), existing data may reduce or eliminate the need for new testing when: (a) the material has established biocompatibility in equivalent contact conditions, (b) the concentration is within previously tested ranges, and (c) the manufacturing process does not introduce new risks.</div>
+
+<div class="tbl-wrap">
+<table>
+<tr><th>Ingredient</th><th>Data Sufficiency</th><th>Strategy</th></tr>
+<tr><td>Hyaluronic Acid</td><td><span class="tag tag-green">SUFFICIENT</span></td><td>Cite existing ISO 10993 data from dermal filler device master files. No new testing for HA alone.</td></tr>
+<tr><td>PLLA</td><td><span class="tag tag-green">SUFFICIENT</span></td><td>Cite Sculptra (Galderma) predicate data + published literature. New implantation study required for microsphere form factor only.</td></tr>
+<tr><td>Retinol</td><td><span class="tag tag-green">SUFFICIENT</span></td><td>CIR safety assessment + GRAS status. Intradermal exposure covered by published transdermal PK studies. Literature review.</td></tr>
+<tr><td>Niacinamide</td><td><span class="tag tag-green">SUFFICIENT</span></td><td>CIR + GRAS. Extensive oral and topical safety data. Literature review sufficient.</td></tr>
+<tr><td>GHK-Cu</td><td><span class="tag tag-yellow">PARTIAL</span></td><td>Topical safety data available. New: cytotoxicity + sensitization at intradermal concentration. Cu ion release quantification required.</td></tr>
+<tr><td>ALT-711</td><td><span class="tag tag-red">INSUFFICIENT</span></td><td>Phase II oral trial data (Alteon Inc.) provides systemic tox baseline. New: full ISO 10993 panel required for intradermal route. Priority testing.</td></tr>
+<tr><td>Matrixyl</td><td><span class="tag tag-yellow">PARTIAL</span></td><td>Topical safety data. New: cytotoxicity + genotoxicity at intradermal concentration.</td></tr>
+<tr><td>Argireline</td><td><span class="tag tag-yellow">PARTIAL</span></td><td>CIR reviewed topically. New: intradermal systemic toxicity assessment.</td></tr>
+<tr><td>Syn-Ake</td><td><span class="tag tag-red">INSUFFICIENT</span></td><td>Topical cosmetic only. Venom-mimetic mechanism requires full safety panel for intradermal. New: complete ISO 10993 battery.</td></tr>
+<tr><td>EGF</td><td><span class="tag tag-yellow">PARTIAL</span></td><td>Wound healing product data at therapeutic doses. New: genotoxicity and carcinogenicity risk assessment at 1 ppm intradermal. Literature-based biological risk assessment per ISO 10993-1 Clause 4.4.</td></tr>
+<tr><td>5-ALA (V2)</td><td><span class="tag tag-green">SUFFICIENT</span></td><td>FDA-approved drug (Levulan). Comprehensive safety data at 100&times; higher dose. Literature review + concentration-adjusted risk assessment.</td></tr>
+</table>
+</div>
+
+<h3>5.2 Novel Combination Testing</h3>
+<div class="warn">&#9888; Even where individual ingredients have established safety, the <b>combination in a dissolving microneedle matrix</b> is novel. ISO 10993-1:2018 Clause 4.6 requires testing of the finished device, not just individual components. All Part 5, 10, 23, and 11 (acute) tests must be performed on complete device extracts.</div>
+
+<div class="eq"><b>Priority novel combinations requiring dedicated testing:</b></div>
+<div class="control">
+NC-01 &mdash; <b>ALT-711 + GHK-Cu interaction</b>: ALT-711 thiazolium ring may chelate copper from GHK-Cu. Test: cytotoxicity of combined extract vs individual extracts.<br>
+NC-02 &mdash; <b>Retinol + HA matrix stability</b>: HA hydration may accelerate retinol oxidation. Test: 6-month stability with degradation product toxicological assessment.<br>
+NC-03 &mdash; <b>Syn-Ake intradermal absorption</b>: Topical safety does not predict intradermal safety for a neuromuscular agent. Test: in vitro transdermal PK (Franz cell) + in vivo PK in rat model.<br>
+NC-04 &mdash; <b>PLLA microsphere + peptide adsorption</b>: Peptides may adsorb to PLLA surface, altering release kinetics and creating concentrated local exposure. Test: dissolution profile + local tissue response at peak concentration.
+</div>
+</div>
+
+<!-- ═══ 6. BIOLOGICAL RISK ASSESSMENT ═══ -->
+<div class="s">
+<h2>6. BIOLOGICAL RISK ASSESSMENT (ISO 10993-1:2018)</h2>
+<div class="eq"><b>Reference:</b> ISO 10993-1:2018 Clause 4.4 &mdash; Biological evaluation within a risk management process</div>
+<div class="eq"><b>Integration:</b> This biological risk assessment feeds into BSK-RISK-001 (ISO 14971 Risk Management File)</div>
+
+<h3>6.1 Endpoint-Level Risk Summary</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>Biological Endpoint</th><th>Inherent Risk</th><th>Data Gap</th><th>Testing Required</th><th>Residual Risk</th></tr>
+<tr><td>Cytotoxicity</td><td><span class="tag tag-yellow">MODERATE</span></td><td>Combined extract not tested</td><td>ISO 10993-5 on finished device</td><td><span class="tag tag-green">LOW</span> (expected)</td></tr>
+<tr><td>Irritation</td><td><span class="tag tag-yellow">MODERATE</span></td><td>Intradermal irritation potential unknown for combination</td><td>ISO 10993-23 RhE model</td><td><span class="tag tag-green">LOW</span> (expected)</td></tr>
+<tr><td>Sensitization</td><td><span class="tag tag-yellow">MODERATE</span></td><td>Peptide sensitization via intradermal route</td><td>DPRA + KeratinoSens + h-CLAT + RIPT</td><td><span class="tag tag-yellow">MODERATE</span> (peptides are inherently immunogenic)</td></tr>
+<tr><td>Genotoxicity</td><td><span class="tag tag-orange">ELEVATED</span></td><td>ALT-711 + Syn-Ake no genotoxicity data</td><td>Ames + in vitro micronucleus</td><td><span class="tag tag-green">LOW</span> (pending results)</td></tr>
+<tr><td>Implantation</td><td><span class="tag tag-red">HIGH</span></td><td>PLLA microsphere form factor novel; dissolved needle matrix residue</td><td>ISO 10993-6 (12-month rabbit/rat)</td><td><span class="tag tag-yellow">MODERATE</span> (PLLA granuloma risk)</td></tr>
+<tr><td>Systemic toxicity (acute)</td><td><span class="tag tag-yellow">MODERATE</span></td><td>Combined extract systemic effects</td><td>ISO 10993-11 acute</td><td><span class="tag tag-green">LOW</span> (expected, given low doses)</td></tr>
+<tr><td>Systemic toxicity (subchronic)</td><td><span class="tag tag-orange">ELEVATED</span></td><td>ALT-711 chronic intradermal; PLLA degradation</td><td>ISO 10993-11 (28-day + 90-day)</td><td><span class="tag tag-yellow">MODERATE</span> (pending results)</td></tr>
+</table>
+</div>
+
+<h3>6.2 Highest-Risk Ingredients</h3>
+<div class="eq"><b>ALT-711 (Alagebrium):</b> No prior intradermal or topical use. Oral Phase II data (Alteon, 2003&ndash;2007) showed hepatotoxicity signals at 210 mg/day oral. Estimated dermal dose: 0.4 mg per patch application. Safety margin: &gt;500&times; vs oral LOAEL. However, intradermal bioavailability is unknown and may differ significantly from oral. <span class="tag tag-red">FULL TESTING REQUIRED</span></div>
+<div class="eq"><b>Syn-Ake:</b> Waglerin-1 mimetic peptide. Neuromuscular mechanism at nicotinic acetylcholine receptor. No intradermal safety data published. Topical penetration is negligible; microneedle delivery bypasses barrier entirely. Systemic absorption and neuromuscular effects at intradermal dose must be characterized. <span class="tag tag-red">FULL TESTING REQUIRED</span></div>
+<div class="eq"><b>EGF:</b> Theoretical tumorigenic concern at supraphysiologic doses. BASILISK concentration (1 ppm / 0.0001%) is at physiologic wound-healing levels. Literature-based risk assessment per ISO 10993-1 Clause 4.4 may suffice if supporting data is robust. <span class="tag tag-yellow">RISK ASSESSMENT + LITERATURE REVIEW</span></div>
+</div>
+
+<!-- ═══ 7. ACCEPTANCE CRITERIA SUMMARY ═══ -->
+<div class="s">
+<h2>7. ACCEPTANCE CRITERIA SUMMARY</h2>
+<div class="tbl-wrap">
+<table>
+<tr><th>Test (ISO 10993 Part)</th><th>Method</th><th>Acceptance Criterion</th><th>Basis</th></tr>
+<tr><td>Cytotoxicity (Part 5)</td><td>MEM elution + direct contact</td><td>Cell viability &ge;70%; morphology &le; grade 2</td><td>ISO 10993-5:2009 &sect;8.5</td></tr>
+<tr><td>Irritation (Part 23)</td><td>RhE model (EpiDerm)</td><td>Tissue viability &ge;50%</td><td>OECD TG 439; ISO 10993-23:2021</td></tr>
+<tr><td>Sensitization (Part 10)</td><td>DPRA + KeratinoSens + h-CLAT</td><td>Below sensitizer thresholds (see &sect;4.2.2)</td><td>OECD GL 497; ISO 10993-10:2021</td></tr>
+<tr><td>Sensitization (clinical)</td><td>RIPT (200+ subjects)</td><td>Zero sensitization reactions</td><td>RIPT protocol (Marzulli-Maibach)</td></tr>
+<tr><td>Genotoxicity &mdash; mutation (Part 3)</td><td>Ames (OECD TG 471)</td><td>&lt;2&times; revertants; no dose-response</td><td>ISO 10993-3:2014</td></tr>
+<tr><td>Genotoxicity &mdash; clastogenicity (Part 3)</td><td>In vitro micronucleus (OECD TG 487)</td><td>No significant increase (p &gt;0.05)</td><td>ISO 10993-3:2014</td></tr>
+<tr><td>Implantation (Part 6)</td><td>Rabbit intradermal + rat subcutaneous</td><td>Score &le; control + 2.9</td><td>ISO 10993-6:2016 Annex E</td></tr>
+<tr><td>Acute systemic toxicity (Part 11)</td><td>Mouse IV + IP injection</td><td>No mortality; no significant clinical signs</td><td>ISO 10993-11:2017; USP &lt;87&gt;</td></tr>
+<tr><td>Subchronic toxicity 28-day (Part 11)</td><td>Rat intradermal, repeated dose</td><td>NOAEL &ge;25&times; clinical dose</td><td>ISO 10993-11:2017; OECD TG 407</td></tr>
+<tr><td>Subchronic toxicity 90-day (Part 11)</td><td>Rat subcutaneous (PLLA)</td><td>NOAEL &ge;25&times;; no systemic lactic acidosis</td><td>ISO 10993-11:2017; OECD TG 408</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ═══ 8. TEST LAB REQUIREMENTS ═══ -->
+<div class="s">
+<h2>8. TEST LABORATORY REQUIREMENTS</h2>
+
+<h3>8.1 GLP Compliance</h3>
+<div class="eq"><b>Requirement:</b> All biocompatibility studies must be conducted at laboratories compliant with Good Laboratory Practice (GLP) per 21 CFR Part 58 (FDA) and OECD Principles of GLP.</div>
+<div class="eq"><b>Rationale:</b> GLP compliance is required for all non-clinical safety studies intended to support regulatory submissions (21 CFR 58.1(a); EU MDR Annex I &sect;10.4.1).</div>
+
+<h3>8.2 Laboratory Qualifications</h3>
+<div class="tbl-wrap">
+<table>
+<tr><th>Requirement</th><th>Standard</th><th>Verification</th></tr>
+<tr><td>GLP certification</td><td>21 CFR Part 58; OECD GLP</td><td>FDA inspection status (Form 483 review); national GLP authority registration</td></tr>
+<tr><td>ISO 17025 accreditation</td><td>ISO/IEC 17025:2017</td><td>Accreditation certificate for relevant test methods</td></tr>
+<tr><td>AAALAC accreditation (in vivo)</td><td>AAALAC International</td><td>Current accreditation for animal facility</td></tr>
+<tr><td>IACUC / Ethics approval</td><td>21 CFR Part 58.35</td><td>Protocol-specific IACUC approval prior to study initiation</td></tr>
+<tr><td>Method validation</td><td>ISO 10993-12; OECD TG validation</td><td>Documented method validation records for each assay</td></tr>
+<tr><td>Reference material traceability</td><td>ISO 10993-12:2021</td><td>Certificate of analysis for HDPE, ZDEC reference materials</td></tr>
+</table>
+</div>
+
+<h3>8.3 Recommended Contract Research Organizations</h3>
+<div class="control">
+Selection criteria: GLP + ISO 17025 + ISO 10993 experience + FDA inspection history<br>
+Minimum 3 qualified CROs to be evaluated via supplier qualification audit per ISO 13485 &sect;7.4<br>
+CRO must have documented experience with dissolving/biodegradable device testing<br>
+Study director must hold relevant advanced degree with &ge;5 years GLP study experience
+</div>
+</div>
+
+<!-- ═══ 9. TESTING TIMELINE ═══ -->
+<div class="s">
+<h2>9. TESTING TIMELINE &amp; SEQUENCING</h2>
+
+<h3>9.1 Phase 1: Screening (Months 1&ndash;3)</h3>
+<div class="control">
+&#9679; Chemical characterization (ISO 10993-18): extractables/leachables &mdash; 8 weeks<br>
+&#9679; Cytotoxicity (ISO 10993-5): MEM elution + direct contact &mdash; 4 weeks<br>
+&#9679; Genotoxicity (ISO 10993-3): Ames + micronucleus &mdash; 8 weeks<br>
+&#9679; Irritation (ISO 10993-23): RhE model &mdash; 4 weeks
+</div>
+
+<h3>9.2 Phase 2: Core Battery (Months 3&ndash;6)</h3>
+<div class="control">
+&#9679; Sensitization (ISO 10993-10): DPRA + KeratinoSens + h-CLAT &mdash; 6 weeks<br>
+&#9679; Acute systemic toxicity (ISO 10993-11): mouse IV/IP &mdash; 6 weeks<br>
+&#9679; 28-day subchronic toxicity (ISO 10993-11): rat &mdash; 12 weeks (including pathology)
+</div>
+
+<h3>9.3 Phase 3: Long-Term Studies (Months 6&ndash;18)</h3>
+<div class="control">
+&#9679; Implantation (ISO 10993-6): rabbit + rat, up to 52-week endpoint &mdash; 14 months<br>
+&#9679; 90-day subchronic toxicity (ISO 10993-11): rat with PLLA &mdash; 20 weeks<br>
+&#9679; RIPT clinical sensitization: 200+ subjects &mdash; 12 weeks
+</div>
+
+<h3>9.4 Phase 4: Supplemental (Months 12&ndash;18)</h3>
+<div class="control">
+&#9679; EGF carcinogenicity risk assessment (literature-based) &mdash; 8 weeks<br>
+&#9679; Syn-Ake PK study (Franz cell + rat in vivo) &mdash; 8 weeks<br>
+&#9679; Final biocompatibility evaluation report &mdash; 4 weeks
+</div>
+
+<div class="note">Total estimated timeline: 18 months from study initiation to final biocompatibility evaluation report. Critical path: 52-week implantation study (PLLA microspheres). V1 510(k) submission may proceed with interim 26-week implantation data if Phase 1&ndash;2 results are favorable.</div>
+</div>
+
+<!-- ═══ 10. DOCUMENT APPROVAL ═══ -->
+<div class="s">
+<h2>10. DOCUMENT APPROVAL</h2>
+<div class="tbl-wrap">
+<table>
+<tr><th>Role</th><th>Name</th><th>Signature</th><th>Date</th></tr>
+<tr><td>Biocompatibility Lead</td><td>_________________________</td><td>_________________________</td><td>____/____/________</td></tr>
+<tr><td>Quality Assurance</td><td>_________________________</td><td>_________________________</td><td>____/____/________</td></tr>
+<tr><td>Regulatory Affairs</td><td>_________________________</td><td>_________________________</td><td>____/____/________</td></tr>
+<tr><td>Toxicologist (external)</td><td>_________________________</td><td>_________________________</td><td>____/____/________</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ═══ APPENDIX ═══ -->
+<div class="s">
+<h2>APPENDIX A &mdash; REFERENCE DOCUMENTS</h2>
+<div class="tbl-wrap">
+<table>
+<tr><th>Document ID</th><th>Title</th><th>Relevance</th></tr>
+<tr><td>BSK-SPEC-001</td><td>BASILISK Technical Specification</td><td>Ingredient list, concentrations, device description</td></tr>
+<tr><td>BSK-RISK-001</td><td>Risk Management File (ISO 14971)</td><td>Biological hazard inputs (BH-01 through BH-08)</td></tr>
+<tr><td>BSK-STAB-001</td><td>Stability Protocol</td><td>Degradation product data for chemical characterization</td></tr>
+<tr><td>ISO 10993-1:2018</td><td>Biological evaluation &mdash; Part 1: Evaluation and testing within a risk management process</td><td>Governing standard; Table A.1 test requirements</td></tr>
+<tr><td>ISO 10993-3:2014</td><td>Tests for genotoxicity, carcinogenicity, reproductive toxicity</td><td>Ames + micronucleus methodology</td></tr>
+<tr><td>ISO 10993-5:2009</td><td>Tests for in vitro cytotoxicity</td><td>MEM elution + direct contact protocol</td></tr>
+<tr><td>ISO 10993-6:2016</td><td>Tests for local effects after implantation</td><td>Implantation study design + scoring</td></tr>
+<tr><td>ISO 10993-10:2021</td><td>Tests for skin sensitization</td><td>DPRA, KeratinoSens, h-CLAT methodology</td></tr>
+<tr><td>ISO 10993-11:2017</td><td>Tests for systemic toxicity</td><td>Acute + subchronic toxicity protocols</td></tr>
+<tr><td>ISO 10993-12:2021</td><td>Sample preparation and reference materials</td><td>Extraction conditions for all tests</td></tr>
+<tr><td>ISO 10993-17:2023</td><td>Toxicological risk assessment of device constituents</td><td>TTC + PDE derivation for extractables</td></tr>
+<tr><td>ISO 10993-18:2020</td><td>Chemical characterization of medical device materials</td><td>Extractables/leachables framework</td></tr>
+<tr><td>ISO 10993-23:2021</td><td>Tests for irritation</td><td>RhE model methodology (replaces in vivo Draize)</td></tr>
+<tr><td>FDA Guidance</td><td>Use of ISO 10993-1 (2020)</td><td>FDA-specific interpretation of ISO 10993</td></tr>
+</table>
+</div>
+</div>
+
+<div class="footer">
+BASILISK&#8482; &middot; BSK-BIO-001 Rev A &middot; ISO 10993 Biocompatibility Evaluation Plan<br>
+CONFIDENTIAL &mdash; The AITistic Research Initiative &middot; 2026
+</div>
+
+</div>
+</body>
+</html>

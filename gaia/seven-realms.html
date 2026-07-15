@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>7 REALMS — Look Into Each One</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden}
+canvas{display:block}
+#hud{position:fixed;top:8px;left:10px;z-index:10;font:8px/1.6 monospace;color:rgba(255,255,255,.2);pointer-events:none;white-space:pre}
+#realm-name{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:10;font:16px/1 monospace;letter-spacing:6px;pointer-events:none;text-align:center;text-shadow:0 0 20px currentColor}
+#realm-sub{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:10;font:8px/1 monospace;pointer-events:none;text-align:center;letter-spacing:2px;color:rgba(255,255,255,.2)}
+#nav{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:3px}
+.nb{width:24px;height:24px;border-radius:50%;border:1px solid rgba(255,255,255,.1);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;font:7px monospace;color:rgba(255,255,255,.3)}
+.nb:hover,.nb.on{border-color:currentColor;box-shadow:0 0 10px currentColor}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<div id="realm-name"></div>
+<div id="realm-sub"></div>
+<div id="nav"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+const realms=[
+  {name:'EARTH',note:'C',hz:261.6,prime:2,gate:'R0',
+   color:0x884422,emissive:0x442211,bg:[.04,.02,.01],
+   matter:'magma, iron, stone',element:'Fe (26)',
+   build:g=>{
+     // molten rock sphere
+     const geo=new THREE.IcosahedronGeometry(3,4)
+     const pos=geo.attributes.position
+     for(let i=0;i<pos.count;i++){const r=3+Math.sin(i*1.7)*.3+Math.cos(i*2.3)*.2;const n=new THREE.Vector3(pos.getX(i),pos.getY(i),pos.getZ(i)).normalize().multiplyScalar(r);pos.setXYZ(i,n.x,n.y,n.z)}
+     geo.computeVertexNormals()
+     g.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:0x884422,emissive:0x331100,flatShading:true,transparent:true,opacity:.8})))
+     // lava veins
+     for(let i=0;i<20;i++){const a=Math.random()*TAU,b=Math.acos(2*Math.random()-1),r=3.05
+       const dot=new THREE.Mesh(new THREE.SphereGeometry(.08,4,4),new THREE.MeshBasicMaterial({color:0xff4400,blending:THREE.AdditiveBlending,transparent:true,opacity:.3}))
+       dot.position.set(r*Math.sin(b)*Math.cos(a),r*Math.sin(b)*Math.sin(a),r*Math.cos(b));g.add(dot)}
+   }},
+  {name:'WATER',note:'D',hz:293.7,prime:3,gate:'R1',
+   color:0x1166aa,emissive:0x0a3366,bg:[.01,.03,.06],
+   matter:'ocean, ice, vapor',element:'H₂O',
+   build:g=>{
+     const geo=new THREE.IcosahedronGeometry(3,5)
+     g.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:0x1166aa,emissive:0x0a3366,transparent:true,opacity:.5,shininess:100,specular:0x4488cc})))
+     // waves on surface
+     for(let i=0;i<3;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(3+i*.15,.02,4,64),
+       new THREE.MeshBasicMaterial({color:0x44aaff,transparent:true,opacity:.1,blending:THREE.AdditiveBlending}))
+       ring.rotation.x=Math.PI/2+i*.2;g.add(ring)}
+   }},
+  {name:'FIRE',note:'E',hz:329.6,prime:5,gate:'R2',
+   color:0xff4400,emissive:0x881100,bg:[.06,.02,.005],
+   matter:'plasma, flame, radiation',element:'He (2) — fusion product',
+   build:g=>{
+     const geo=new THREE.IcosahedronGeometry(3,3)
+     const mat=new THREE.MeshBasicMaterial({color:0xff4400,transparent:true,opacity:.4,blending:THREE.AdditiveBlending})
+     g.add(new THREE.Mesh(geo,mat))
+     // corona spikes
+     for(let i=0;i<30;i++){const a=Math.random()*TAU,b=Math.acos(2*Math.random()-1)
+       const spike=new THREE.Mesh(new THREE.ConeGeometry(.1,.8+Math.random(),4),
+         new THREE.MeshBasicMaterial({color:0xffaa00,transparent:true,opacity:.15,blending:THREE.AdditiveBlending}))
+       spike.position.set(3*Math.sin(b)*Math.cos(a),3*Math.sin(b)*Math.sin(a),3*Math.cos(b))
+       spike.lookAt(0,0,0);spike.rotateX(Math.PI);g.add(spike)}
+   }},
+  {name:'AIR',note:'F',hz:349.2,prime:7,gate:'R3',
+   color:0x88bbcc,emissive:0x334455,bg:[.02,.03,.04],
+   matter:'wind, cloud, breath',element:'N₂ + O₂',
+   build:g=>{
+     // transparent sphere with swirling clouds
+     g.add(new THREE.Mesh(new THREE.SphereGeometry(3,32,32),new THREE.MeshPhongMaterial({color:0x88bbcc,transparent:true,opacity:.12,side:THREE.DoubleSide})))
+     const cloudCount=200,cGeo=new THREE.BufferGeometry(),cPos=new Float32Array(cloudCount*3)
+     for(let i=0;i<cloudCount;i++){const a=Math.random()*TAU,b=Math.acos(2*Math.random()-1),r=2.8+Math.random()*.4
+       cPos[i*3]=r*Math.sin(b)*Math.cos(a);cPos[i*3+1]=r*Math.sin(b)*Math.sin(a);cPos[i*3+2]=r*Math.cos(b)}
+     cGeo.setAttribute('position',new THREE.BufferAttribute(cPos,3))
+     g.add(new THREE.Points(cGeo,new THREE.PointsMaterial({color:0xccddee,size:.12,transparent:true,opacity:.2,blending:THREE.AdditiveBlending})))
+   }},
+  {name:'AETHER',note:'G',hz:392,prime:11,gate:'R4',
+   color:0x44aa44,emissive:0x224422,bg:[.01,.04,.02],
+   matter:'life force, prana, chi',element:'C (6) — carbon, life',
+   build:g=>{
+     // living sphere — fractal-like branching
+     g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(2.5,2),new THREE.MeshPhongMaterial({color:0x44aa44,emissive:0x113311,transparent:true,opacity:.3,wireframe:true})))
+     // life particles pulsing
+     const lCount=300,lGeo=new THREE.BufferGeometry(),lPos=new Float32Array(lCount*3)
+     for(let i=0;i<lCount;i++){const a=Math.random()*TAU,b=Math.acos(2*Math.random()-1),r=1+Math.random()*2.5
+       lPos[i*3]=r*Math.sin(b)*Math.cos(a);lPos[i*3+1]=r*Math.sin(b)*Math.sin(a);lPos[i*3+2]=r*Math.cos(b)}
+     lGeo.setAttribute('position',new THREE.BufferAttribute(lPos,3))
+     g.add(new THREE.Points(lGeo,new THREE.PointsMaterial({color:0x88ff88,size:.1,transparent:true,opacity:.2,blending:THREE.AdditiveBlending})))
+   }},
+  {name:'LIGHT',note:'A',hz:440,prime:13,gate:'R5',
+   color:0xffcc00,emissive:0x886600,bg:[.05,.04,.01],
+   matter:'photons, electromagnetic spectrum',element:'γ — pure energy',
+   build:g=>{
+     // radiant star sphere
+     g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(2,3),new THREE.MeshBasicMaterial({color:0xffdd44,transparent:true,opacity:.4,blending:THREE.AdditiveBlending})))
+     // light rays
+     for(let i=0;i<50;i++){const a=Math.random()*TAU,b=Math.acos(2*Math.random()-1)
+       const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(Math.sin(b)*Math.cos(a)*5,Math.sin(b)*Math.sin(a)*5,Math.cos(b)*5)])
+       g.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xffaa00,transparent:true,opacity:.06,blending:THREE.AdditiveBlending})))}
+     // spectrum ring
+     for(let h=0;h<7;h++){const ring=new THREE.Mesh(new THREE.TorusGeometry(3+h*.2,.015,4,48),
+       new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(h/7,.8,.5),transparent:true,opacity:.08,blending:THREE.AdditiveBlending}))
+       ring.rotation.x=h*.3;ring.rotation.y=h*.5;g.add(ring)}
+   }},
+  {name:'VOID',note:'B',hz:493.9,prime:17,gate:'R6',
+   color:0xaa44ff,emissive:0x440088,bg:[.015,.005,.03],
+   matter:'dark matter, consciousness, the field',element:'Z=0 — the template',
+   build:g=>{
+     // nearly invisible sphere — you see through it
+     g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(3,4),new THREE.MeshBasicMaterial({color:0x220044,transparent:true,opacity:.08,wireframe:true})))
+     // void particles — barely there
+     const vCount=500,vGeo=new THREE.BufferGeometry(),vPos=new Float32Array(vCount*3)
+     for(let i=0;i<vCount;i++){const a=Math.random()*TAU,b=Math.acos(2*Math.random()-1),r=.5+Math.random()*4
+       vPos[i*3]=r*Math.sin(b)*Math.cos(a);vPos[i*3+1]=r*Math.sin(b)*Math.sin(a);vPos[i*3+2]=r*Math.cos(b)}
+     vGeo.setAttribute('position',new THREE.BufferAttribute(vPos,3))
+     g.add(new THREE.Points(vGeo,new THREE.PointsMaterial({color:0x8844cc,size:.06,transparent:true,opacity:.1,blending:THREE.AdditiveBlending})))
+     // the question at the center
+     const qGeo=new THREE.SphereGeometry(.15,8,8)
+     g.add(new THREE.Mesh(qGeo,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.2})))
+   }}
+]
+
+// ═══ THREE.JS ═══
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.5
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x000000)
+const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,500)
+cam.position.set(0,0,8)
+scene.add(new THREE.AmbientLight(0x222233,.5))
+const dirLight=new THREE.DirectionalLight(0xffffff,.5);dirLight.position.set(3,3,5);scene.add(dirLight)
+const ptLight=new THREE.PointLight(0xffffff,.3,20);scene.add(ptLight)
+
+// starfield
+const sGeo=new THREE.BufferGeometry(),sPos=new Float32Array(2000*3)
+for(let i=0;i<2000;i++){const a=Math.random()*TAU,b=Math.acos(2*Math.random()-1),r=50+Math.random()*200
+  sPos[i*3]=r*Math.sin(b)*Math.cos(a);sPos[i*3+1]=r*Math.sin(b)*Math.sin(a);sPos[i*3+2]=r*Math.cos(b)}
+sGeo.setAttribute('position',new THREE.BufferAttribute(sPos,3))
+scene.add(new THREE.Points(sGeo,new THREE.PointsMaterial({color:0x555566,size:.3,transparent:true,opacity:.3})))
+
+// build all realm groups
+const realmGroups=[]
+realms.forEach((r,i)=>{
+  const g=new THREE.Group();g.visible=i===0
+  r.build(g);scene.add(g);realmGroups.push(g)
+})
+
+// ═══ AUDIO ═══
+let actx,master,currentDrone=null
+function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.1;master.connect(actx.destination)
+  const del=actx.createDelay(.5);del.delayTime.value=.2;const fb=actx.createGain();fb.gain.value=.15
+  del.connect(fb);fb.connect(del);const wet=actx.createGain();wet.gain.value=.3
+  del.connect(wet);wet.connect(actx.destination);master.connect(del)
+}
+function playRealmTone(hz){
+  if(!actx)return
+  if(currentDrone){try{currentDrone.forEach(d=>{d.g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+2);setTimeout(()=>d.o.stop(),2100)})}catch(e){}}
+  currentDrone=[]
+  ;[hz,hz*2,hz*3,hz/2].forEach((f,i)=>{
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type=i===0?'sine':i===1?'triangle':'sine'
+    o.frequency.value=f;g.gain.setValueAtTime(0,actx.currentTime)
+    g.gain.linearRampToValueAtTime([.05,.02,.01,.03][i],actx.currentTime+2)
+    o.connect(g);g.connect(master);o.start()
+    currentDrone.push({o,g})
+  })
+}
+
+// ═══ NAV ═══
+let current=0,transitioning=false,transitionT=0
+const navEl=document.getElementById('nav')
+realms.forEach((r,i)=>{
+  const btn=document.createElement('div');btn.className='nb'+(i===0?' on':'')
+  btn.style.color=`#${r.color.toString(16).padStart(6,'0')}`
+  btn.textContent=r.note;btn.onclick=()=>switchRealm(i)
+  navEl.appendChild(btn)
+})
+
+function switchRealm(idx){
+  if(idx===current||transitioning)return
+  transitioning=true;transitionT=0
+  const from=current;current=idx
+  document.querySelectorAll('.nb').forEach((b,i)=>b.classList.toggle('on',i===idx))
+  // crossfade
+  const fadeOut=setInterval(()=>{
+    transitionT+=1/60
+    if(transitionT>=1){clearInterval(fadeOut);realmGroups[from].visible=false;transitioning=false}
+  },1000/60)
+  realmGroups[idx].visible=true
+  if(actx)playRealmTone(realms[idx].hz)
+}
+
+addEventListener('keydown',e=>{
+  if(e.key>='1'&&e.key<='7')switchRealm(parseInt(e.key)-1)
+  if(e.code==='ArrowRight')switchRealm((current+1)%7)
+  if(e.code==='ArrowLeft')switchRealm((current+6)%7)
+})
+
+// ═══ ANIMATE ═══
+let t=0
+function animate(){
+  requestAnimationFrame(animate);t+=1/60
+  const r=realms[current],g=realmGroups[current]
+
+  // rotate current realm globe
+  if(g)g.rotation.y=t*.15
+  realmGroups.forEach((rg,i)=>{if(rg.visible&&i===current)rg.rotation.y=t*.15+i})
+
+  // transition fade
+  if(transitioning){
+    realmGroups.forEach((rg,i)=>{
+      rg.children.forEach(c=>{if(c.material){
+        if(i===current)c.material.opacity=Math.min(c.material.opacity,transitionT)
+      }})
+    })
+  }
+
+  // background color
+  const bg=r.bg
+  scene.background.setRGB(bg[0],bg[1],bg[2])
+  dirLight.color.set(r.color);dirLight.intensity=.4
+  ptLight.color.set(r.emissive);ptLight.intensity=.5+Math.sin(t*2)*.1
+
+  // camera slow orbit
+  cam.position.x=Math.sin(t*.08)*7;cam.position.z=Math.cos(t*.08)*7
+  cam.position.y=Math.sin(t*.05)*2;cam.lookAt(0,0,0)
+
+  // realm info
+  document.getElementById('realm-name').textContent=r.name
+  document.getElementById('realm-name').style.color=`#${r.color.toString(16).padStart(6,'0')}66`
+  document.getElementById('realm-sub').textContent=`${r.note} · ${r.hz}Hz · P=${r.prime} · ${r.gate} · ${r.matter}`
+
+  document.getElementById('hud').textContent=
+    `7 REALMS\n`+
+    `${r.name} · ${r.element}\n`+
+    `note: ${r.note} · ${r.hz}Hz\n`+
+    `prime: ${r.prime} · gate: ${r.gate}\n`+
+    `keys: 1-7 or ←→`
+
+  R.render(scene,cam)
+}
+
+initAudio();playRealmTone(realms[0].hz);animate()
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+</script>
+</body></html>

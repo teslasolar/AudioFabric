@@ -1,0 +1,276 @@
+<title>BSK-HF-001 — Human Factors Engineering</title>
+<style>
+body{background:#0a0c08;font-family:'Courier New',monospace;color:#b0c0a0;margin:0;padding:20px 40px;line-height:1.6}
+a{color:#7a9a5a;text-decoration:none}a:hover{color:#a0d080;text-decoration:underline}
+h1,h2,h3{color:#c8d8b8;border-bottom:1px solid #2a3a1a;padding-bottom:6px;font-weight:normal}
+h1{font-size:1.4em;letter-spacing:2px;text-transform:uppercase}
+h2{font-size:1.15em;margin-top:2em}
+h3{font-size:1em;border-bottom:none;margin-top:1.5em}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:0.92em}
+th,td{border:1px solid #2a3a1a;padding:6px 10px;text-align:left;vertical-align:top}
+th{background:#151a10;color:#c8d8b8;font-weight:normal;text-transform:uppercase;font-size:0.85em;letter-spacing:1px}
+td{background:#0d0f0a}
+.doc-header{border:1px solid #2a3a1a;padding:14px 18px;margin-bottom:28px;background:#0d0f0a;font-size:0.9em}
+.doc-header table{margin:0;border:none}
+.doc-header td,.doc-header th{border:none;padding:2px 14px 2px 0;background:transparent}
+.doc-header .title-row{font-size:1.3em;color:#c8d8b8;letter-spacing:2px;text-transform:uppercase;padding-bottom:8px}
+.back{display:inline-block;margin-bottom:18px;font-size:0.9em;padding:4px 0}
+.note{color:#7a8a6a;font-size:0.88em;font-style:italic;margin:8px 0}
+.section-num{color:#7a9a5a}
+.warn{color:#c0a060}
+.risk-h{color:#c07070}
+.risk-m{color:#c0a060}
+.risk-l{color:#7a9a5a}
+.scenario{border-left:3px solid #2a3a1a;padding:8px 14px;margin:10px 0;background:#0c0e09}
+.scenario .scenario-name{color:#c8d8b8;font-weight:bold;margin-bottom:4px}
+ul,ol{margin:8px 0 8px 24px}li{margin:4px 0}
+</style>
+
+<a class="back" href="index.html">&lt; BASILISK INDEX</a>
+
+<div class="doc-header">
+  <div class="title-row">BSK-HF-001 &mdash; Human Factors Engineering</div>
+  <table>
+    <tr><td><strong>Document No.:</strong> BSK-HF-001</td><td><strong>Revision:</strong> A</td><td><strong>Effective Date:</strong> ____-__-__</td></tr>
+    <tr><td><strong>Author:</strong> ________________</td><td><strong>Department:</strong> Human Factors / R&amp;D</td><td><strong>Classification:</strong> Controlled</td></tr>
+    <tr><td><strong>Approved By:</strong> ________________</td><td><strong>Approval Date:</strong> ____-__-__</td><td><strong>Next Review:</strong> ____-__-__</td></tr>
+  </table>
+  <p class="note">This document defines the usability engineering process for the BASILISK dissolving microneedle patch per IEC 62366-1:2015 and FDA Human Factors guidance.</p>
+</div>
+
+<h1><span class="section-num">1.0</span> Purpose</h1>
+<p>To establish the human factors engineering (HFE) / usability engineering process for the BASILISK dissolving microneedle patch in compliance with IEC 62366-1:2015 (Application of usability engineering to medical devices) and FDA guidance "Applying Human Factors and Usability Engineering to Medical Devices" (2016). This document covers use specification, hazard-related use scenarios, risk analysis, and evaluation planning.</p>
+
+<h1><span class="section-num">2.0</span> Scope</h1>
+<p>This HFE file applies to the BASILISK patch in all commercial configurations (V1 cosmetic, V2 drug-device) including:</p>
+<ul>
+  <li>The microneedle patch (primary product)</li>
+  <li>Primary packaging (foil pouch with tear notch)</li>
+  <li>Secondary packaging (outer carton)</li>
+  <li>Instructions for Use (IFU) insert</li>
+  <li>Quick-start guide (if included)</li>
+</ul>
+
+<h1><span class="section-num">3.0</span> References</h1>
+<table>
+  <tr><th>Document / Standard</th><th>Description</th></tr>
+  <tr><td>IEC 62366-1:2015 + A1:2020</td><td>Medical devices &mdash; Application of usability engineering to medical devices</td></tr>
+  <tr><td>IEC/TR 62366-2:2016</td><td>Guidance on the application of usability engineering to medical devices</td></tr>
+  <tr><td>FDA Guidance (2016)</td><td>Applying Human Factors and Usability Engineering to Medical Devices</td></tr>
+  <tr><td>ANSI/AAMI HE75:2009/(R)2018</td><td>Human factors engineering &mdash; Design of medical devices</td></tr>
+  <tr><td>ISO 14971:2019</td><td>Medical devices &mdash; Application of risk management</td></tr>
+  <tr><td>BSK-RISK-001</td><td>BASILISK Risk Management File</td></tr>
+  <tr><td>BSK-LBL-001</td><td>BASILISK Labeling Specification</td></tr>
+  <tr><td>BSK-REG-001</td><td>BASILISK Regulatory Strategy</td></tr>
+</table>
+
+<h1><span class="section-num">4.0</span> Use Specification</h1>
+
+<h2><span class="section-num">4.1</span> Intended Users</h2>
+<table>
+  <tr><th>Attribute</th><th>Specification</th></tr>
+  <tr><td>Age range</td><td>25-65 years (primary); up to 80 years (extended)</td></tr>
+  <tr><td>Medical training</td><td>None required &mdash; consumer / lay user</td></tr>
+  <tr><td>Education</td><td>Ability to read and comprehend package labeling (est. 8th-grade reading level)</td></tr>
+  <tr><td>Vision</td><td>Corrected-to-normal vision. Label text minimum 6pt (per 21 CFR 801.15). IFU illustrations for low-literacy support.</td></tr>
+  <tr><td>Dexterity</td><td>May have mild dexterity limitations (arthritis, neuropathy). Must accommodate single-handed operation for facial application.</td></tr>
+  <tr><td>Experience with microneedles</td><td>Assumed none for first-time users. Product must be intuitive without prior MN experience.</td></tr>
+  <tr><td>Language</td><td>English (US primary); multilingual IFU for EU/APAC (see BSK-LBL-001 Section 11.2)</td></tr>
+</table>
+
+<h2><span class="section-num">4.2</span> Use Environments</h2>
+<table>
+  <tr><th>Environment</th><th>Lighting</th><th>Surface</th><th>Mirror Access</th><th>Distractions</th><th>Special Considerations</th></tr>
+  <tr><td>Home bathroom</td><td>Variable (vanity light, overhead, natural)</td><td>Countertop</td><td>Yes (wall mirror)</td><td>Moderate (family, pets)</td><td>Most common. Humidity from shower may affect pouch opening timing.</td></tr>
+  <tr><td>Home bedroom</td><td>Dim (bedside lamp)</td><td>Nightstand</td><td>Possibly (handheld)</td><td>Low</td><td>Nighttime application common. Low-light label readability critical.</td></tr>
+  <tr><td>Hotel room</td><td>Variable</td><td>Desk/counter</td><td>Yes (bathroom)</td><td>Low</td><td>Travel use. User may not have full IFU available. Quick-start guide importance.</td></tr>
+  <tr><td>Clinical/spa setting (V2)</td><td>Good (clinical lighting)</td><td>Treatment table</td><td>Available</td><td>Low</td><td>Professional application for V2 drug-device. Training materials for aesthetician.</td></tr>
+  <tr><td>Airplane / transit</td><td>Poor</td><td>Tray table / lap</td><td>None</td><td>High</td><td>Not recommended. IFU should not encourage transit use. Cabin pressure changes &mdash; pouch may puff.</td></tr>
+</table>
+
+<h2><span class="section-num">4.3</span> Use Scenarios</h2>
+
+<div class="scenario">
+  <div class="scenario-name">Scenario 1: First-Time Use (Naive User)</div>
+  <p><strong>Context:</strong> 42-year-old female, purchased online, first microneedle product. Reading IFU for the first time. Home bathroom, evening.</p>
+  <p><strong>Critical factors:</strong> Must understand microneedle concept without alarm. Must correctly identify needle side vs. backing. Must apply adequate pressure. Must understand 15-minute wait time.</p>
+  <p><strong>Success criteria:</strong> Completes application without critical use errors. Reports experience as manageable and would use again.</p>
+</div>
+
+<div class="scenario">
+  <div class="scenario-name">Scenario 2: Repeat Use (Experienced User)</div>
+  <p><strong>Context:</strong> Same user, 4th application. Familiar with process. May skip IFU. Home bathroom, morning before work.</p>
+  <p><strong>Critical factors:</strong> Time pressure may cause rushed application. May attempt to multitask during 15-minute wait. Complacency with pressure application.</p>
+  <p><strong>Success criteria:</strong> Maintains correct technique. Does not develop unsafe shortcuts.</p>
+</div>
+
+<div class="scenario">
+  <div class="scenario-name">Scenario 3: Travel Use</div>
+  <p><strong>Context:</strong> 55-year-old male, hotel bathroom, limited counter space. Brought patches in carry-on. No IFU available (discarded outer carton).</p>
+  <p><strong>Critical factors:</strong> Must identify correct application without IFU (pouch-printed quick-start). Storage conditions may have varied during travel.</p>
+  <p><strong>Success criteria:</strong> Pouch label provides sufficient instruction for correct application.</p>
+</div>
+
+<div class="scenario">
+  <div class="scenario-name">Scenario 4: Dexterity-Limited User</div>
+  <p><strong>Context:</strong> 63-year-old female with mild rheumatoid arthritis. Reduced grip strength and fine motor control.</p>
+  <p><strong>Critical factors:</strong> Pouch opening (tear notch). Patch removal from liner (peeling). Positioning on face (periorbital area). Maintaining pressure for 30 seconds.</p>
+  <p><strong>Success criteria:</strong> Completes application without assistance. Pouch opens without scissors or tools.</p>
+</div>
+
+<h1><span class="section-num">5.0</span> Critical Task Analysis</h1>
+<table>
+  <tr><th>Task #</th><th>Task Description</th><th>Critical?</th><th>Potential Use Error</th><th>Consequence of Error</th><th>Severity</th></tr>
+  <tr><td>T1</td><td>Open foil pouch</td><td>No</td><td>Cannot open; uses scissors and damages patch</td><td>Wasted patch; possible needle damage</td><td>Low</td></tr>
+  <tr><td>T2</td><td>Remove patch from protective liner</td><td>Yes</td><td>Touches needle surface; drops patch needle-down</td><td>Contamination; reduced efficacy (needles damaged)</td><td>Medium</td></tr>
+  <tr><td>T3</td><td>Identify correct side (needles vs. backing)</td><td>Yes</td><td>Applies backing-side to skin (patch inverted)</td><td>No drug delivery; complete treatment failure</td><td class="risk-h">High</td></tr>
+  <tr><td>T4</td><td>Select appropriate application site</td><td>Yes</td><td>Applies to contraindicated area (broken skin, eyes)</td><td>Irritation, injury, adverse reaction</td><td class="risk-h">High</td></tr>
+  <tr><td>T5</td><td>Apply patch to skin</td><td>Yes</td><td>Slides/repositions after initial contact</td><td>Needle damage; incomplete penetration</td><td>Medium</td></tr>
+  <tr><td>T6</td><td>Apply adequate pressure</td><td>Yes</td><td>Insufficient pressure &mdash; needles do not fully penetrate</td><td>Reduced drug delivery; incomplete treatment</td><td>Medium</td></tr>
+  <tr><td>T7</td><td>Maintain contact for 15 minutes</td><td>Yes</td><td>Premature removal (&lt;5 min)</td><td>Incomplete needle dissolution; reduced efficacy; needle fragments on skin</td><td class="risk-m">Medium-High</td></tr>
+  <tr><td>T8</td><td>Remove backing after dissolution</td><td>No</td><td>Aggressive removal; pulls on skin</td><td>Minor skin trauma; discomfort</td><td>Low</td></tr>
+  <tr><td>T9</td><td>Dispose of used patch</td><td>No</td><td>Discards in location accessible to children</td><td>Child contact with residual adhesive/ingredients (low risk &mdash; needles dissolved)</td><td>Low</td></tr>
+  <tr><td>T10</td><td>Attempt to reuse patch</td><td>Yes</td><td>Saves and reapplies used patch</td><td>No efficacy (needles dissolved); possible skin irritation from degraded adhesive</td><td>Medium</td></tr>
+</table>
+
+<h1><span class="section-num">6.0</span> Use-Related Risk Analysis</h1>
+<table>
+  <tr><th>Hazard ID</th><th>Use Error / Hazardous Situation</th><th>Harm</th><th>Pre-Mitigation Severity</th><th>Pre-Mitigation Probability</th><th>Risk Level</th><th>Risk Control Measure</th><th>Post-Mitigation Risk</th></tr>
+  <tr><td>UH-001</td><td>Patch applied inverted (backing to skin)</td><td>Treatment failure</td><td class="risk-h">3 (Moderate)</td><td>Medium</td><td class="risk-m">Medium</td><td>Tactile indicator on needle side; printed arrow "THIS SIDE TO SKIN"; visual difference between sides</td><td class="risk-l">Low</td></tr>
+  <tr><td>UH-002</td><td>Patch applied to broken / infected skin</td><td>Infection spread; adverse reaction</td><td class="risk-h">4 (Serious)</td><td>Low</td><td class="risk-m">Medium</td><td>Contraindication warning on pouch + IFU; bold red text</td><td class="risk-l">Low</td></tr>
+  <tr><td>UH-003</td><td>Insufficient pressure during application</td><td>Reduced efficacy</td><td>2 (Minor)</td><td>High</td><td class="risk-m">Medium</td><td>IFU pressure guidance ("press firmly until you feel slight tingling"); application aid accessory (optional)</td><td class="risk-l">Low</td></tr>
+  <tr><td>UH-004</td><td>Premature removal (&lt;5 minutes)</td><td>Incomplete dissolution; needle fragments; reduced efficacy</td><td>3 (Moderate)</td><td>Medium</td><td class="risk-m">Medium</td><td>Timer prompt in IFU; color-change indicator on backing (clear = dissolved); minimum 15-min instruction prominent</td><td class="risk-l">Low</td></tr>
+  <tr><td>UH-005</td><td>Reuse of spent patch</td><td>No efficacy; skin irritation</td><td>2 (Minor)</td><td>Low</td><td class="risk-l">Low</td><td>"SINGLE USE ONLY" on patch and pouch; ISO 15223-1 do-not-reuse symbol; IFU statement that needles dissolve on first use</td><td class="risk-l">Low</td></tr>
+  <tr><td>UH-006</td><td>Child accesses unused patch</td><td>Skin puncture; accidental ingredient exposure</td><td>3 (Moderate)</td><td>Low</td><td class="risk-m">Medium</td><td>"Keep out of reach of children" warning; child-resistant outer carton (if required by risk assessment); individual foil pouch provides additional barrier</td><td class="risk-l">Low</td></tr>
+  <tr><td>UH-007</td><td>Application near eyes / mucous membranes</td><td>Eye irritation; mucosal reaction</td><td class="risk-h">4 (Serious)</td><td>Low</td><td class="risk-m">Medium</td><td>IFU site diagram with exclusion zones; "Avoid direct contact with eyes" warning; patch size limits over-application</td><td class="risk-l">Low</td></tr>
+  <tr><td>UH-008</td><td>Cannot open foil pouch (dexterity limitation)</td><td>Inability to use product; frustration</td><td>1 (Negligible)</td><td>Medium</td><td class="risk-l">Low</td><td>Wide tear notch (>5mm); easy-peel adhesive seal; tested with reduced-grip-strength population</td><td class="risk-l">Low</td></tr>
+  <tr><td>UH-009</td><td>Applies multiple patches simultaneously</td><td>Excessive dose; skin irritation</td><td>3 (Moderate)</td><td>Low</td><td class="risk-l">Low</td><td>IFU: "Apply one patch per treatment session." Dosing instructions prominent.</td><td class="risk-l">Low</td></tr>
+  <tr><td>UH-010</td><td>Sun exposure after V2 application (photosensitivity)</td><td>Phototoxic reaction; severe erythema</td><td class="risk-h">4 (Serious)</td><td>Medium</td><td class="risk-h">High</td><td>Bold boxed warning on V2 label; "AVOID SUN 48 HOURS" on pouch; evening-application recommendation; sunscreen advisory</td><td class="risk-m">Medium</td></tr>
+</table>
+
+<h1><span class="section-num">7.0</span> Design Mitigations &mdash; Packaging &amp; Device</h1>
+<table>
+  <tr><th>Design Feature</th><th>Purpose</th><th>Addresses Hazard</th><th>Specification</th></tr>
+  <tr><td>Needle-side tactile indicator</td><td>Distinguish needle side from backing by touch</td><td>UH-001</td><td>Raised dot pattern or textured border on needle side of backing; detectable by fingertip in low light</td></tr>
+  <tr><td>"THIS SIDE TO SKIN" print</td><td>Visual orientation cue</td><td>UH-001</td><td>Printed on protective liner covering needle side; visible immediately upon pouch opening</td></tr>
+  <tr><td>Color-change dissolution indicator</td><td>Indicate when needles are fully dissolved</td><td>UH-004</td><td>Backing material changes from opaque white to translucent when underlying needles have dissolved (moisture-activated indicator)</td></tr>
+  <tr><td>Wide tear notch</td><td>Easy pouch opening for dexterity-limited users</td><td>UH-008</td><td>Tear notch width &ge; 8mm; tear initiation force &le; 3N; tear propagation force &le; 5N</td></tr>
+  <tr><td>Pouch-printed quick-start</td><td>Instructions available without IFU</td><td>Travel use; lost IFU</td><td>4-step pictogram sequence printed on inner side of pouch: open, place, press, wait, remove</td></tr>
+  <tr><td>Single-unit packaging</td><td>Prevent dose confusion</td><td>UH-009</td><td>Each patch individually pouched. Outer carton contains [4] individual pouches. No multi-dose dispensing.</td></tr>
+  <tr><td>Child-resistant outer carton</td><td>Prevent child access</td><td>UH-006</td><td>Push-tab or squeeze-and-turn mechanism per 16 CFR 1700 (if risk assessment determines CR packaging required)</td></tr>
+</table>
+
+<h1><span class="section-num">8.0</span> Formative Evaluation Plan</h1>
+
+<h2><span class="section-num">8.1</span> Study Design</h2>
+<table>
+  <tr><th>Parameter</th><th>Specification</th></tr>
+  <tr><td>Study type</td><td>Formative usability evaluation (iterative)</td></tr>
+  <tr><td>Method</td><td>Think-aloud protocol with concurrent observation</td></tr>
+  <tr><td>Participants</td><td>5-8 per round (2-3 rounds anticipated)</td></tr>
+  <tr><td>Participant profile</td><td>Representative users: age 25-65, mixed gender, no prior microneedle experience, including 1-2 participants with mild dexterity limitations</td></tr>
+  <tr><td>Test article</td><td>Engineering prototype (placebo formulation &mdash; no active ingredients) with representative packaging and IFU</td></tr>
+  <tr><td>Application site</td><td>Simulated (silicone skin model) and/or forearm (non-facial) for safety</td></tr>
+  <tr><td>Environment</td><td>Simulated home bathroom (vanity mirror, countertop, representative lighting)</td></tr>
+  <tr><td>Duration</td><td>45-60 minutes per participant (includes briefing, tasks, debrief interview)</td></tr>
+</table>
+
+<h2><span class="section-num">8.2</span> Formative Evaluation Tasks</h2>
+<table>
+  <tr><th>Task</th><th>Description</th><th>Observation Focus</th><th>Success Criteria (Formative)</th></tr>
+  <tr><td>F1</td><td>Read outer carton; determine product purpose</td><td>Comprehension of intended use and key warnings</td><td>Participant correctly describes product use</td></tr>
+  <tr><td>F2</td><td>Open outer carton; select one pouch</td><td>Package interaction; child-resistant mechanism (if present)</td><td>Opens without excessive difficulty or frustration</td></tr>
+  <tr><td>F3</td><td>Open foil pouch; remove patch</td><td>Tear notch identification; patch handling; needle side awareness</td><td>Correctly identifies needle side; does not touch needle surface</td></tr>
+  <tr><td>F4</td><td>Determine application site</td><td>Site selection rationale; awareness of contraindicated areas</td><td>Selects appropriate site; avoids exclusion zones</td></tr>
+  <tr><td>F5</td><td>Apply patch to simulated skin</td><td>Orientation (needle-down); pressure adequacy; repositioning attempts</td><td>Correct orientation; firm pressure; no repositioning</td></tr>
+  <tr><td>F6</td><td>Wait for dissolution</td><td>Patience; understanding of wait time; premature removal attempts</td><td>Waits minimum time; understands dissolution concept</td></tr>
+  <tr><td>F7</td><td>Remove backing and dispose</td><td>Removal technique; disposal location</td><td>Gentle removal; appropriate disposal</td></tr>
+  <tr><td>F8</td><td>Identify storage conditions from label</td><td>Label comprehension; storage symbol recognition</td><td>Correctly states storage temperature and conditions</td></tr>
+</table>
+
+<h2><span class="section-num">8.3</span> Formative Iteration Criteria</h2>
+<p>After each formative round, design modifications are implemented if:</p>
+<ul>
+  <li>Any participant commits a critical use error (wrong orientation, contraindicated site)</li>
+  <li>&gt;25% of participants struggle with the same non-critical task</li>
+  <li>Participants express confusion or uncertainty about a critical task (even if completed correctly)</li>
+  <li>Close calls observed (participant nearly commits error, self-corrects)</li>
+</ul>
+<p class="note">Formative studies do not have pass/fail criteria. Their purpose is to identify use difficulties and guide design improvements before summative validation.</p>
+
+<h1><span class="section-num">9.0</span> Summative (Validation) Evaluation Plan</h1>
+
+<h2><span class="section-num">9.1</span> Study Design</h2>
+<table>
+  <tr><th>Parameter</th><th>Specification</th></tr>
+  <tr><td>Study type</td><td>Summative usability validation (Human Factors Validation Test)</td></tr>
+  <tr><td>Participants</td><td>Minimum 15 representative users per distinct user group</td></tr>
+  <tr><td>User groups</td><td>Group 1: General consumers (25-50 years); Group 2: Older adults (50-65+ years, including dexterity limitations)</td></tr>
+  <tr><td>Total participants</td><td>Minimum 15 per group = 30 total (per FDA guidance recommendation)</td></tr>
+  <tr><td>Test article</td><td>Final production-equivalent device with final labeling (placebo or low-dose formulation)</td></tr>
+  <tr><td>Application site</td><td>Actual facial application site (periorbital or nasolabial) if IRB-approved; otherwise forearm</td></tr>
+  <tr><td>Environment</td><td>Simulated home environment (bathroom/bedroom setup)</td></tr>
+  <tr><td>Intervention</td><td>None &mdash; participants use only the device and its labeling (no training, no prompting from moderator)</td></tr>
+</table>
+
+<h2><span class="section-num">9.2</span> Critical Task Pass/Fail Criteria</h2>
+<table>
+  <tr><th>Critical Task</th><th>Use Error Definition</th><th>Acceptance Criterion</th></tr>
+  <tr><td>Correct orientation (needle-side to skin)</td><td>Applies patch inverted (backing to skin)</td><td>ZERO critical use errors across all participants</td></tr>
+  <tr><td>Appropriate site selection</td><td>Applies to contraindicated site (broken skin, eyes, mucous membrane)</td><td>ZERO critical use errors across all participants</td></tr>
+  <tr><td>Adequate contact duration</td><td>Removes patch before 5 minutes</td><td>ZERO critical use errors across all participants</td></tr>
+  <tr><td>Single use</td><td>Attempts to save and reuse patch</td><td>ZERO participants express intent to reuse</td></tr>
+  <tr><td>Sun avoidance (V2 only)</td><td>Unaware of photosensitivity risk after application</td><td>ZERO critical knowledge failures</td></tr>
+</table>
+<p class="warn">Per FDA guidance, ANY critical use error in summative validation requires root cause analysis and potential design modification with re-testing. The goal is zero critical use errors &mdash; not a statistical threshold.</p>
+
+<h2><span class="section-num">9.3</span> Non-Critical Task Assessment</h2>
+<table>
+  <tr><th>Non-Critical Task</th><th>Difficulty Metric</th><th>Target</th></tr>
+  <tr><td>Pouch opening</td><td>Successful opening without tools; time to open</td><td>&ge;90% success without tools; mean time &lt;15 seconds</td></tr>
+  <tr><td>Patch removal from liner</td><td>Removal without touching needle surface</td><td>&ge;80% clean removal</td></tr>
+  <tr><td>Pressure application</td><td>Self-reported confidence in adequate pressure</td><td>&ge;80% report "confident" or "very confident"</td></tr>
+  <tr><td>Backing removal</td><td>Removal without skin discomfort</td><td>&ge;90% report "comfortable" or "no difficulty"</td></tr>
+  <tr><td>Label comprehension</td><td>Correct identification of storage conditions, warnings</td><td>&ge;85% correct on key comprehension items</td></tr>
+</table>
+
+<h1><span class="section-num">10.0</span> Packaging Design Requirements</h1>
+<table>
+  <tr><th>Requirement ID</th><th>Requirement</th><th>Specification</th><th>Verification Method</th></tr>
+  <tr><td>PKG-001</td><td>Pouch shall be openable without tools by users with reduced grip strength</td><td>Tear initiation force &le; 3N; tear propagation &le; 5N; tear notch &ge; 8mm wide</td><td>Force measurement (Instron); user testing with arthritis simulation gloves</td></tr>
+  <tr><td>PKG-002</td><td>Pouch shall maintain seal integrity during transit and storage</td><td>Seal strength &ge; 15 N/15mm; leak test per ASTM F2095</td><td>Seal strength testing; dye penetration test</td></tr>
+  <tr><td>PKG-003</td><td>Patch orientation shall be immediately identifiable upon pouch opening</td><td>"THIS SIDE TO SKIN" visible without flipping or rotating patch; needle-side tactile indicator detectable in &lt;3 seconds</td><td>Formative usability testing</td></tr>
+  <tr><td>PKG-004</td><td>Quick-start instructions shall be readable on pouch interior</td><td>Pictogram height &ge; 10mm; printed on pouch interior flap; legible at 30cm in 200 lux</td><td>Visual acuity testing; lighting measurement</td></tr>
+  <tr><td>PKG-005</td><td>Outer carton shall protect patches during shipping</td><td>Drop test: 1m onto concrete, 6 orientations; compression test: 100N static load 24hr; patches undamaged</td><td>ISTA 1A transit testing</td></tr>
+  <tr><td>PKG-006</td><td>Outer carton shall be child-resistant (if required)</td><td>Per 16 CFR 1700.20: &ge;85% child-resistant; &ge;90% adult-accessible</td><td>Child-resistant packaging protocol (16 CFR 1700.20)</td></tr>
+  <tr><td>PKG-007</td><td>Label text shall be legible in low-light conditions</td><td>Minimum 6pt font; high contrast (light text on dark background or vice versa); critical warnings in bold</td><td>Readability testing at 50 lux and 200 lux</td></tr>
+  <tr><td>PKG-008</td><td>Patch shall be removable from liner without damage</td><td>Peel force from liner &le; 1N; patch remains intact with all needles attached post-removal</td><td>Peel testing (Instron); microscopy inspection post-removal</td></tr>
+</table>
+
+<h1><span class="section-num">11.0</span> Known Use Issues &amp; Design Responses</h1>
+<table>
+  <tr><th>Issue Identified</th><th>Source</th><th>Design Response</th><th>Verification</th></tr>
+  <tr><td>Users uncertain about required pressure</td><td>Literature (microneedle usability studies)</td><td>IFU states "press firmly until you feel slight tingling." Tactile feedback confirms penetration. Optional: spring-loaded applicator accessory (future development).</td><td>Formative usability round 1</td></tr>
+  <tr><td>Users do not wait full dissolution time</td><td>Literature; analogous product complaints</td><td>Color-change dissolution indicator on backing. IFU: "Wait until backing becomes clear." Timer recommendation (phone timer).</td><td>Formative usability round 1</td></tr>
+  <tr><td>Confusion about single-use nature</td><td>Consumer product complaints (MN patches)</td><td>ISO do-not-reuse symbol on pouch. "SINGLE USE" text. IFU explains needles dissolve on first use &mdash; "there is nothing left to reuse."</td><td>Summative validation</td></tr>
+  <tr><td>Difficulty identifying correct patch side</td><td>Analogous device usability studies</td><td>Asymmetric design: needle side has textured indicator; backing has smooth finish. Visual + tactile redundancy.</td><td>Formative usability round 1</td></tr>
+</table>
+
+<h1><span class="section-num">12.0</span> HFE Process Timeline</h1>
+<table>
+  <tr><th>Phase</th><th>Activity</th><th>Deliverable</th><th>Timeline</th></tr>
+  <tr><td>1</td><td>Use specification &amp; task analysis (this document)</td><td>BSK-HF-001</td><td>Month 0-1</td></tr>
+  <tr><td>2</td><td>Formative Round 1 (early prototype)</td><td>Formative evaluation report; design change recommendations</td><td>Month 3-4</td></tr>
+  <tr><td>3</td><td>Design iteration based on Round 1 findings</td><td>Updated prototype + IFU</td><td>Month 4-5</td></tr>
+  <tr><td>4</td><td>Formative Round 2 (updated prototype)</td><td>Formative evaluation report</td><td>Month 5-6</td></tr>
+  <tr><td>5</td><td>Design freeze (if formative results acceptable)</td><td>Final device + packaging + IFU design</td><td>Month 6-7</td></tr>
+  <tr><td>6</td><td>Formative Round 3 (final design, if needed)</td><td>Formative evaluation report</td><td>Month 7-8</td></tr>
+  <tr><td>7</td><td>Summative validation (production-equivalent)</td><td>HF validation test report</td><td>Month 8-10</td></tr>
+  <tr><td>8</td><td>HFE summary report for regulatory submission</td><td>HFE report (510(k) or NDA)</td><td>Month 10-11</td></tr>
+</table>
+
+<h1><span class="section-num">13.0</span> Revision History</h1>
+<table>
+  <tr><th>Rev</th><th>Date</th><th>Author</th><th>Description</th></tr>
+  <tr><td>A</td><td>____-__-__</td><td>________________</td><td>Initial release</td></tr>
+</table>

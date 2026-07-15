@@ -1,0 +1,249 @@
+<title>BSK-P11-001 — 21 CFR Part 11 Compliance</title>
+<style>
+body{background:#0a0c08;font-family:'Courier New',monospace;color:#b0c0a0;margin:0;padding:20px 40px;line-height:1.6}
+a{color:#7a9a5a;text-decoration:none}a:hover{color:#a0d080;text-decoration:underline}
+h1,h2,h3{color:#c8d8b8;border-bottom:1px solid #2a3a1a;padding-bottom:6px;font-weight:normal}
+h1{font-size:1.4em;letter-spacing:2px;text-transform:uppercase}
+h2{font-size:1.15em;margin-top:2em}
+h3{font-size:1em;border-bottom:none;margin-top:1.5em}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:0.92em}
+th,td{border:1px solid #2a3a1a;padding:6px 10px;text-align:left;vertical-align:top}
+th{background:#151a10;color:#c8d8b8;font-weight:normal;text-transform:uppercase;font-size:0.85em;letter-spacing:1px}
+td{background:#0d0f0a}
+.doc-header{border:1px solid #2a3a1a;padding:14px 18px;margin-bottom:28px;background:#0d0f0a;font-size:0.9em}
+.doc-header table{margin:0;border:none}
+.doc-header td,.doc-header th{border:none;padding:2px 14px 2px 0;background:transparent}
+.doc-header .title-row{font-size:1.3em;color:#c8d8b8;letter-spacing:2px;text-transform:uppercase;padding-bottom:8px}
+.back{display:inline-block;margin-bottom:18px;font-size:0.9em;padding:4px 0}
+.note{color:#7a8a6a;font-size:0.88em;font-style:italic;margin:8px 0}
+.section-num{color:#7a9a5a}
+.alcoa{background:#111410;border:1px solid #2a3a1a;padding:12px 16px;margin:12px 0}
+.alcoa strong{color:#c8d8b8}
+.principle{color:#7a9a5a;font-weight:bold;font-size:1.05em}
+</style>
+
+<a class="back" href="index.html">&lt; BASILISK INDEX</a>
+
+<div class="doc-header">
+  <div class="title-row">BSK-P11-001 &mdash; 21 CFR Part 11 Compliance</div>
+  <table>
+    <tr><td><strong>Document No.:</strong> BSK-P11-001</td><td><strong>Revision:</strong> A</td><td><strong>Effective Date:</strong> ____-__-__</td></tr>
+    <tr><td><strong>Author:</strong> ________________</td><td><strong>Department:</strong> Quality Assurance / IT</td><td><strong>Classification:</strong> Controlled</td></tr>
+    <tr><td><strong>Approved By:</strong> ________________</td><td><strong>Approval Date:</strong> ____-__-__</td><td><strong>Next Review:</strong> ____-__-__</td></tr>
+  </table>
+  <p class="note">This document defines the compliance framework for electronic records and electronic signatures per 21 CFR Part 11, as applicable to BASILISK manufacturing, quality, and regulatory systems.</p>
+</div>
+
+<h1><span class="section-num">1.0</span> Purpose</h1>
+<p>To establish the policies, procedures, and technical controls necessary to ensure that electronic records and electronic signatures used in the manufacture and quality management of the BASILISK dissolving microneedle patch comply with 21 CFR Part 11 requirements. This document defines the framework for system validation, access controls, audit trails, electronic signatures, and data integrity across all GxP-regulated electronic systems.</p>
+
+<h1><span class="section-num">2.0</span> Scope</h1>
+
+<h2><span class="section-num">2.1</span> Systems Requiring Part 11 Compliance</h2>
+<p>The following electronic systems fall within the scope of this compliance framework:</p>
+<table>
+  <tr><th>System Category</th><th>System Description</th><th>Record Types</th><th>Part 11 Applicability</th></tr>
+  <tr><td>Electronic Batch Records (EBR)</td><td>Manufacturing execution system for batch record creation, execution, and review</td><td>Batch production records, in-process data, equipment logs</td><td>Full (Subparts B and C)</td></tr>
+  <tr><td>Laboratory Information Management System (LIMS)</td><td>QC data management: sample tracking, test results, specifications</td><td>Analytical data, release certificates, stability data</td><td>Full (Subparts B and C)</td></tr>
+  <tr><td>HPLC / Chromatography Data System (CDS)</td><td>Instrument control and data acquisition for HPLC, GC</td><td>Raw chromatographic data, processed results, method parameters</td><td>Full (Subparts B and C)</td></tr>
+  <tr><td>Quality Management System (QMS)</td><td>CAPA, deviations, change control, complaints, audit management</td><td>CAPA records, deviation reports, change requests, complaint files</td><td>Full (Subparts B and C)</td></tr>
+  <tr><td>Document Management System (DMS)</td><td>Controlled document creation, approval, distribution</td><td>SOPs, specifications, protocols, reports</td><td>Full (Subparts B and C)</td></tr>
+  <tr><td>Training Management System</td><td>Training assignment, completion tracking, competency records</td><td>Training records, curricula, assessments</td><td>Full (Subpart B; e-sig if used)</td></tr>
+  <tr><td>Environmental Monitoring System</td><td>Cleanroom particle counts, temperature, humidity, differential pressure</td><td>Continuous monitoring data, alert/action limit excursions</td><td>Subpart B (closed system)</td></tr>
+  <tr><td>Calibration Management</td><td>Equipment calibration scheduling, records, certificates</td><td>Calibration records, as-found/as-left data</td><td>Subpart B</td></tr>
+</table>
+
+<h2><span class="section-num">2.2</span> Exclusions</h2>
+<p>The following are excluded from Part 11 scope: general business email (non-GxP), financial/accounting systems, building management systems (non-cleanroom), and personal productivity tools not used to create or manage GxP records.</p>
+
+<h1><span class="section-num">3.0</span> References</h1>
+<table>
+  <tr><th>Document</th><th>Description</th></tr>
+  <tr><td>21 CFR Part 11</td><td>Electronic Records; Electronic Signatures</td></tr>
+  <tr><td>FDA Guidance (Sep 2003)</td><td>Scope and Application of 21 CFR Part 11</td></tr>
+  <tr><td>FDA Guidance (Dec 2018)</td><td>Data Integrity and Compliance with Drug CGMP</td></tr>
+  <tr><td>GAMP 5 (2nd Edition)</td><td>A Risk-Based Approach to Compliant GxP Computerized Systems</td></tr>
+  <tr><td>PIC/S PI 041-1</td><td>Good Practices for Data Management and Integrity in Regulated GMP/GDP Environments</td></tr>
+  <tr><td>EU Annex 11</td><td>Computerised Systems</td></tr>
+</table>
+
+<h1><span class="section-num">4.0</span> Electronic Signatures</h1>
+
+<h2><span class="section-num">4.1</span> Meaning and Legal Binding</h2>
+<p>Electronic signatures applied within Part 11-compliant systems shall be the legally binding equivalent of handwritten signatures per 21 CFR 11.50. Each organization using electronic signatures shall submit a certification letter to the FDA prior to or at the time of first electronic signature use.</p>
+
+<h2><span class="section-num">4.2</span> Signature Requirements</h2>
+<table>
+  <tr><th>Requirement</th><th>Implementation</th><th>CFR Reference</th></tr>
+  <tr><td>Unique to individual</td><td>Each user has a unique user ID; no shared accounts permitted</td><td>11.100(a)</td></tr>
+  <tr><td>Identity verification before first use</td><td>Identity verified by Security Officer before account provisioning</td><td>11.100(b)</td></tr>
+  <tr><td>Non-biometric e-sig components</td><td>Two distinct components: user ID + password</td><td>11.200(a)(1)</td></tr>
+  <tr><td>Continuous session signing</td><td>First signature in a session requires both components; subsequent signatures in the same continuous session may use password only</td><td>11.200(a)(1)(i-ii)</td></tr>
+  <tr><td>Non-repudiation</td><td>Signed records display signer name, date/time, and meaning (e.g., "Approved," "Reviewed," "Authored")</td><td>11.50(a)</td></tr>
+  <tr><td>Linked to record</td><td>Electronic signature is permanently linked to the signed record; cannot be excised, copied, or transferred</td><td>11.70</td></tr>
+</table>
+
+<h2><span class="section-num">4.3</span> Signature Meanings</h2>
+<table>
+  <tr><th>Meaning</th><th>Used For</th><th>Example</th></tr>
+  <tr><td>Authored</td><td>Creating or entering data</td><td>Analyst entering test results</td></tr>
+  <tr><td>Reviewed</td><td>Verifying accuracy of data or records</td><td>Supervisor reviewing batch record entries</td></tr>
+  <tr><td>Approved</td><td>Authorizing records, documents, or actions</td><td>QA approving batch release, SOP effective</td></tr>
+  <tr><td>Rejected</td><td>Denying approval</td><td>QA rejecting a batch</td></tr>
+  <tr><td>Verified</td><td>Second-person verification</td><td>Independent check of calculations</td></tr>
+</table>
+
+<h1><span class="section-num">5.0</span> Audit Trails</h1>
+
+<h2><span class="section-num">5.1</span> Requirements</h2>
+<p>All Part 11-applicable systems shall maintain computer-generated, time-stamped audit trails that record the following for every record creation, modification, or deletion:</p>
+<table>
+  <tr><th>Audit Trail Element</th><th>Description</th><th>CFR Reference</th></tr>
+  <tr><td>Who</td><td>User ID and full name of the person making the change</td><td>11.10(e)</td></tr>
+  <tr><td>What</td><td>Previous value and new value (old/new comparison)</td><td>11.10(e)</td></tr>
+  <tr><td>When</td><td>Date and time stamp (system-generated, not user-editable)</td><td>11.10(e)</td></tr>
+  <tr><td>Why</td><td>Reason for change (user-entered, from controlled list or free text as appropriate)</td><td>11.10(e)</td></tr>
+</table>
+
+<h2><span class="section-num">5.2</span> Audit Trail Controls</h2>
+<table>
+  <tr><th>Control</th><th>Requirement</th></tr>
+  <tr><td>Immutability</td><td>Audit trail entries cannot be modified, disabled, or deleted by any user, including administrators</td></tr>
+  <tr><td>Availability</td><td>Audit trail data available for review and copying by FDA during inspections</td></tr>
+  <tr><td>Retention</td><td>Retained for at least the same duration as the associated record (per retention policy)</td></tr>
+  <tr><td>Readability</td><td>Audit trail entries must be human-readable (not raw database dumps)</td></tr>
+  <tr><td>Review</td><td>Audit trails reviewed as part of record review process (e.g., batch record review includes audit trail review)</td></tr>
+  <tr><td>Time synchronization</td><td>All system clocks synchronized to a common NTP source; time changes logged</td></tr>
+</table>
+
+<h1><span class="section-num">6.0</span> System Access Controls</h1>
+
+<h2><span class="section-num">6.1</span> User Roles and Permissions</h2>
+<table>
+  <tr><th>Role</th><th>Typical Users</th><th>Permissions</th><th>Restrictions</th></tr>
+  <tr><td>Operator</td><td>Production operators</td><td>Enter data, execute batch records</td><td>Cannot approve, cannot modify after submission</td></tr>
+  <tr><td>Analyst</td><td>QC laboratory staff</td><td>Enter test data, run instruments</td><td>Cannot approve own results</td></tr>
+  <tr><td>Reviewer</td><td>Supervisors, lead analysts</td><td>Review and verify data entered by others</td><td>Cannot approve final release</td></tr>
+  <tr><td>Approver</td><td>QA managers, department heads</td><td>Approve documents, release batches, sign off on deviations</td><td>Cannot approve own entries without independent review</td></tr>
+  <tr><td>System Administrator</td><td>IT personnel</td><td>User account management, system configuration</td><td>Cannot enter, modify, or approve GxP data; no production role</td></tr>
+  <tr><td>Read-Only</td><td>Auditors, regulatory affairs</td><td>View records and audit trails</td><td>Cannot create, modify, or delete any records</td></tr>
+</table>
+
+<h2><span class="section-num">6.2</span> Password Policy</h2>
+<table>
+  <tr><th>Parameter</th><th>Requirement</th></tr>
+  <tr><td>Minimum length</td><td>12 characters</td></tr>
+  <tr><td>Complexity</td><td>Must contain uppercase, lowercase, number, and special character</td></tr>
+  <tr><td>Expiration</td><td>Every 90 days (or per corporate policy, whichever is stricter)</td></tr>
+  <tr><td>History</td><td>Cannot reuse last 12 passwords</td></tr>
+  <tr><td>Lockout</td><td>Account locked after 5 consecutive failed attempts; requires administrator unlock</td></tr>
+  <tr><td>Initial password</td><td>System-generated temporary password; must be changed at first login</td></tr>
+  <tr><td>Shared accounts</td><td>Prohibited. No group logins, no generic accounts for GxP activities</td></tr>
+</table>
+
+<h2><span class="section-num">6.3</span> Session Management</h2>
+<table>
+  <tr><th>Control</th><th>Requirement</th></tr>
+  <tr><td>Session timeout (inactivity)</td><td>Automatic screen lock after 15 minutes of inactivity</td></tr>
+  <tr><td>Re-authentication</td><td>Full user ID + password required to resume after timeout</td></tr>
+  <tr><td>Concurrent sessions</td><td>Policy-dependent; if permitted, all sessions logged in audit trail</td></tr>
+  <tr><td>Session logging</td><td>Login/logout events recorded with timestamp, user ID, workstation ID</td></tr>
+</table>
+
+<h1><span class="section-num">7.0</span> System Validation</h1>
+
+<h2><span class="section-num">7.1</span> Validation Approach</h2>
+<p>All Part 11-applicable systems shall be validated per a risk-based approach consistent with GAMP 5. Validation shall include:</p>
+<table>
+  <tr><th>Phase</th><th>Activities</th><th>Deliverables</th></tr>
+  <tr><td>Planning</td><td>System assessment, risk analysis, GAMP category determination, validation plan</td><td>Validation Plan, System Risk Assessment, URS</td></tr>
+  <tr><td>IQ (Installation Qualification)</td><td>Verify system installed per specifications: hardware, software version, network, database</td><td>Executed IQ protocol with evidence</td></tr>
+  <tr><td>OQ (Operational Qualification)</td><td>Verify system functions per requirements: user roles, audit trails, e-signatures, calculations, data handling, error handling</td><td>Executed OQ protocol with test results</td></tr>
+  <tr><td>PQ (Performance Qualification)</td><td>Verify system performs as intended under simulated production conditions: end-to-end workflows, load testing, integration</td><td>Executed PQ protocol with test results</td></tr>
+  <tr><td>Validation Report</td><td>Summarize all qualification results, deviations, and final disposition</td><td>Validation Summary Report</td></tr>
+</table>
+
+<h2><span class="section-num">7.2</span> Ongoing Validated State</h2>
+<table>
+  <tr><th>Activity</th><th>Frequency</th><th>Responsible</th></tr>
+  <tr><td>Change control for system changes</td><td>Every change</td><td>IT + QA</td></tr>
+  <tr><td>Periodic review of validated state</td><td>Annual</td><td>QA</td></tr>
+  <tr><td>Security patches / updates assessment</td><td>Per release</td><td>IT + QA</td></tr>
+  <tr><td>User access review</td><td>Semi-annual</td><td>System owner + QA</td></tr>
+  <tr><td>Audit trail review (system level)</td><td>Quarterly</td><td>QA</td></tr>
+</table>
+
+<h1><span class="section-num">8.0</span> Data Integrity &mdash; ALCOA+ Principles</h1>
+
+<div class="alcoa">
+<p>All GxP data generated in electronic systems shall comply with ALCOA+ principles as defined by FDA and WHO guidance:</p>
+
+<p><span class="principle">A &mdash; Attributable</span><br>
+Every data entry must be traceable to the person who performed it. System-generated data must be traceable to the instrument/system. No anonymous or shared-account entries permitted.</p>
+
+<p><span class="principle">L &mdash; Legible</span><br>
+All records must be readable and permanent throughout their retention period. Electronic records must be viewable in human-readable format. Printouts, if used as official records, must be legible.</p>
+
+<p><span class="principle">C &mdash; Contemporaneous</span><br>
+Data must be recorded at the time the activity is performed. Systems shall enforce real-time data entry where feasible. Backdating of entries is prohibited; late entries must be documented with justification.</p>
+
+<p><span class="principle">O &mdash; Original</span><br>
+The first capture of data is the original record. For electronic systems, the electronic record is the original (not a printout). Original data must be preserved and accessible. True copies must be verified as exact and complete.</p>
+
+<p><span class="principle">A &mdash; Accurate</span><br>
+Data must be error-free and conform to the actual observation or measurement. Systems shall include checks (e.g., range checks, mandatory fields) to prevent transcription errors. Corrections must preserve the original entry.</p>
+
+<p><span class="principle">+ Complete</span><br>
+All data, including repeat tests, OOS results, and failed runs, must be retained. Deletion of GxP data is prohibited. All relevant metadata must be preserved.</p>
+
+<p><span class="principle">+ Consistent</span><br>
+Data elements must be internally consistent (e.g., timestamps in chronological order). Date/time stamps must reflect the actual sequence of events.</p>
+
+<p><span class="principle">+ Enduring</span><br>
+Records must be retained and accessible for the required retention period. Media must be periodically verified for readability. Migration plans required for system decommissioning.</p>
+
+<p><span class="principle">+ Available</span><br>
+Records must be accessible and retrievable throughout their retention period. Backup and archival systems must allow timely retrieval. Records must be available for inspection upon request.</p>
+</div>
+
+<h1><span class="section-num">9.0</span> Backup and Disaster Recovery</h1>
+<table>
+  <tr><th>Control</th><th>Requirement</th></tr>
+  <tr><td>Backup frequency</td><td>Full backup: weekly; Incremental backup: daily</td></tr>
+  <tr><td>Backup verification</td><td>Monthly restore test of random data subset to verify backup integrity</td></tr>
+  <tr><td>Offsite storage</td><td>Backup media stored at geographically separate location (or cloud with validated provider)</td></tr>
+  <tr><td>Recovery Time Objective (RTO)</td><td>Critical systems: 4 hours; Non-critical: 24 hours</td></tr>
+  <tr><td>Recovery Point Objective (RPO)</td><td>Critical systems: 1 hour (maximum data loss); Non-critical: 24 hours</td></tr>
+  <tr><td>Disaster recovery plan</td><td>Documented DR plan; tested annually via tabletop exercise and semi-annual partial failover</td></tr>
+  <tr><td>Data retention</td><td>Per record type: minimum 2 years past product expiry or per regulatory requirement, whichever is longer</td></tr>
+  <tr><td>Media migration</td><td>Assess media obsolescence every 3 years; migrate data before media end-of-life</td></tr>
+</table>
+
+<h1><span class="section-num">10.0</span> Periodic Review Schedule</h1>
+<table>
+  <tr><th>Review Activity</th><th>Frequency</th><th>Responsible</th><th>Deliverable</th></tr>
+  <tr><td>User access review</td><td>Semi-annual</td><td>System Owner + QA</td><td>Access review report; revoke unused accounts</td></tr>
+  <tr><td>Audit trail review (system-level)</td><td>Quarterly</td><td>QA</td><td>Audit trail review report</td></tr>
+  <tr><td>Password policy compliance</td><td>Quarterly</td><td>IT Security</td><td>Compliance summary; enforce non-compliant accounts</td></tr>
+  <tr><td>System validation periodic review</td><td>Annual</td><td>QA + System Owner</td><td>Periodic review report; revalidation if needed</td></tr>
+  <tr><td>Backup/restore verification</td><td>Monthly (restore test); Annual (DR drill)</td><td>IT</td><td>Test report and DR exercise summary</td></tr>
+  <tr><td>Data integrity assessment</td><td>Annual</td><td>QA</td><td>Data integrity assessment report</td></tr>
+  <tr><td>Part 11 compliance self-inspection</td><td>Annual</td><td>QA</td><td>Self-inspection report with findings and CAPA</td></tr>
+  <tr><td>Vendor/supplier assessment (hosted systems)</td><td>Annual or per change</td><td>QA + IT</td><td>Vendor audit report or questionnaire</td></tr>
+</table>
+
+<h1><span class="section-num">11.0</span> Training</h1>
+<table>
+  <tr><th>Training Topic</th><th>Audience</th><th>Frequency</th></tr>
+  <tr><td>21 CFR Part 11 awareness</td><td>All GxP personnel</td><td>Upon hire + annual refresher</td></tr>
+  <tr><td>Data integrity (ALCOA+)</td><td>All GxP personnel</td><td>Upon hire + annual refresher</td></tr>
+  <tr><td>System-specific training</td><td>System users</td><td>Before first use + after major changes</td></tr>
+  <tr><td>Electronic signature responsibilities</td><td>All signers</td><td>Before first e-signature use</td></tr>
+  <tr><td>Audit trail review procedures</td><td>Reviewers, QA</td><td>Before first review assignment</td></tr>
+</table>
+
+<h1><span class="section-num">12.0</span> Document History</h1>
+<table>
+  <tr><th>Revision</th><th>Date</th><th>Author</th><th>Description</th></tr>
+  <tr><td>A</td><td>--</td><td>--</td><td>Initial release</td></tr>
+</table>
