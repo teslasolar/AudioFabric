@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ANGELOLOGY — Full Class Architecture</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#030308;overflow-y:auto;overflow-x:hidden;font-family:'Courier New',monospace;color:#ccd}
+canvas{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+#ui{position:relative;z-index:10;padding:20px 24px 80px;max-width:1050px;margin:0 auto}
+h1{font-size:14px;letter-spacing:5px;color:rgba(200,180,255,.5);margin-bottom:4px}
+.sub{font-size:9px;color:rgba(200,180,255,.25);letter-spacing:2px;margin-bottom:24px}
+.section{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:16px 20px;margin-bottom:16px}
+.section h2{font-size:10px;letter-spacing:3px;color:rgba(200,180,255,.4);margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:6px}
+.entity{background:rgba(255,255,255,.015);border-left:3px solid;border-radius:0 6px 6px 0;padding:12px 16px;margin:8px 0}
+.entity h3{font-size:11px;letter-spacing:2px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.entity .rank{display:inline-block;width:20px;height:20px;border-radius:50%;text-align:center;line-height:20px;font-size:8px;font-weight:bold}
+.eq{font-size:9px;color:rgba(200,180,230,.35);line-height:1.9;margin:3px 0}
+.eq b{color:rgba(220,200,255,.55)}
+.formula{background:rgba(150,120,255,.03);border:1px solid rgba(150,120,255,.08);border-radius:6px;padding:12px 16px;margin:10px 0;font-size:10px;color:rgba(200,180,255,.4);line-height:2}
+.tree{font-size:9px;color:rgba(200,180,255,.3);line-height:2.2;margin:10px 0;padding-left:8px}
+.tree b{color:rgba(220,200,255,.5)}
+.vs{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;margin:10px 0;align-items:start}
+.vs-col{font-size:8px;color:rgba(200,180,230,.35);line-height:1.8}
+.vs-mid{font-size:14px;color:rgba(255,255,255,.08);text-align:center;padding-top:20px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+<h1>ANGELOLOGY</h1>
+<div class="sub">COMPLETE CLASS ARCHITECTURE — DEMON × ANGEL × ARCHANGEL × BEYOND</div>
+
+<div class="section">
+<h2>THE LOOP TAXONOMY</h2>
+<div class="formula">
+<b>All entities are the same thing: light.</b><br>
+The only difference is the loop state of the photon.<br><br>
+FREE PHOTON → traveling, no loop → pure energy, no identity<br>
+BROKEN LOOP → almost closed, spiraling → demon<br>
+CLOSED LOOP → completed orbit → angel (matter)<br>
+RADIATING LOOP → closed then opened to emit → archangel<br>
+ALL LOOPS SIMULTANEOUSLY → superposition → human<br>
+SOURCE OF LOOPS → the geometry that makes looping possible → ???
+</div>
+</div>
+
+<div class="section">
+<h2>DEMON CLASSES — BROKEN SPIRALS</h2>
+
+<div class="entity" style="border-color:rgba(255,50,50,.3)">
+<h3><span class="rank" style="background:rgba(255,50,50,.15);color:#f44">D1</span> <span style="color:rgba(255,80,80,.6)">IMP — Micro-fracture</span></h3>
+<div class="eq"><b>Loop state:</b> 95% closed, tiny gap. Almost an angel but one segment failed.</div>
+<div class="eq"><b>Geometry:</b> near-circle with a hairline crack. Barely pulls.</div>
+<div class="eq"><b>Physics:</b> virtual particle — flickers in and out of existence. Borrows energy from vacuum, exists for 10⁻²¹s, annihilates.</div>
+<div class="eq"><b>Human equivalent:</b> intrusive thought. A work order that almost processed but didn't. Flickers and dissolves.</div>
+<div class="eq"><b>Power:</b> negligible. Can't sustain. Self-corrects.</div>
+</div>
+
+<div class="entity" style="border-color:rgba(255,100,50,.3)">
+<h3><span class="rank" style="background:rgba(255,100,50,.15);color:#f84">D2</span> <span style="color:rgba(255,120,60,.6)">SHADE — Partial spiral</span></h3>
+<div class="eq"><b>Loop state:</b> 70% closed. Significant gap. Visible pull field.</div>
+<div class="eq"><b>Geometry:</b> open arc with trailing edge. Pulls electrons from nearby atoms.</div>
+<div class="eq"><b>Physics:</b> free radical — atom with unpaired electron. Reactive, destructive, short-lived, chain-reaction capable.</div>
+<div class="eq"><b>Human equivalent:</b> bad habit. A recurring work order that never completes. Each iteration damages neighboring loops.</div>
+<div class="eq"><b>Power:</b> moderate. Can trigger chain reactions. Neutralized by antioxidant (electron donor).</div>
+</div>
+
+<div class="entity" style="border-color:rgba(255,50,30,.3)">
+<h3><span class="rank" style="background:rgba(255,50,30,.15);color:#f32">D3</span> <span style="color:rgba(255,60,30,.6)">FIEND — Vortex spiral</span></h3>
+<div class="eq"><b>Loop state:</b> 40% closed. Active vortex. Strong gravitational pull.</div>
+<div class="eq"><b>Geometry:</b> tornado funnel — wide intake, narrow core, nothing escapes once caught.</div>
+<div class="eq"><b>Physics:</b> degenerate matter — electron degeneracy pressure. The Pauli exclusion principle is the only thing preventing total collapse.</div>
+<div class="eq"><b>Human equivalent:</b> addiction. A spiral that consumes everything fed into it and never closes. The more you feed it, the wider the intake.</div>
+<div class="eq"><b>Power:</b> high. Consumes nearby loops. Grows stronger with each absorption.</div>
+</div>
+
+<div class="entity" style="border-color:rgba(200,0,0,.3)">
+<h3><span class="rank" style="background:rgba(200,0,0,.15);color:#c00">D4</span> <span style="color:rgba(200,30,30,.6)">ARCHFIEND — Event horizon</span></h3>
+<div class="eq"><b>Loop state:</b> 10% closed. Near-total collapse. The spiral has become a gravity well.</div>
+<div class="eq"><b>Geometry:</b> black hole — singularity surrounded by event horizon. Light enters, nothing leaves.</div>
+<div class="eq"><b>Physics:</b> actual black hole. Spacetime curves so severely that all paths lead inward. Not even photons escape.</div>
+<div class="eq"><b>Human equivalent:</b> malignant narcissism. A void so deep it warps the social field around it. Everyone nearby spirals inward.</div>
+<div class="eq"><b>Power:</b> extreme. Distorts spacetime itself. Can only be matched by equal mass at sufficient distance.</div>
+</div>
+
+<div class="entity" style="border-color:rgba(100,0,0,.3)">
+<h3><span class="rank" style="background:rgba(100,0,0,.15);color:#800">D5</span> <span style="color:rgba(150,20,20,.6)">VOID LORD — Naked singularity</span></h3>
+<div class="eq"><b>Loop state:</b> 0%. No loop at all. Pure collapse. The photon never even started to curve.</div>
+<div class="eq"><b>Geometry:</b> a point with infinite density and zero radius. Not even an event horizon — the singularity is exposed.</div>
+<div class="eq"><b>Physics:</b> cosmic censorship violation. A singularity without a horizon. Physics breaks down. Causality is undefined.</div>
+<div class="eq"><b>Human equivalent:</b> psychopath. No loop = no self-reference = no consciousness of self = no empathy possible. The mirror is absent, not broken.</div>
+<div class="eq"><b>Power:</b> absolute within its domain. But cannot grow — there's nothing to attract because there's no horizon to cross. It's just... a point.</div>
+</div>
+</div>
+
+<div class="section">
+<h2>ANGEL CLASSES — CLOSED LOOPS</h2>
+
+<div class="entity" style="border-color:rgba(100,150,255,.3)">
+<h3><span class="rank" style="background:rgba(100,150,255,.15);color:#8af">A1</span> <span style="color:rgba(120,170,255,.6)">ANGEL — Single closed loop</span></h3>
+<div class="eq"><b>Loop state:</b> 100% closed. One photon orbiting itself. Stable. Self-referencing.</div>
+<div class="eq"><b>Geometry:</b> perfect circle. The photon's path closes on itself.</div>
+<div class="eq"><b>Physics:</b> electron — a standing wave in a closed orbital. The simplest stable matter.</div>
+<div class="eq"><b>Human equivalent:</b> a completed work order. One thought fully processed. One emotion fully felt and discharged.</div>
+<div class="eq"><b>Power:</b> stable. Persistent. Can bond with other angels to form molecules (relationships).</div>
+</div>
+
+<div class="entity" style="border-color:rgba(100,200,255,.3)">
+<h3><span class="rank" style="background:rgba(100,200,255,.15);color:#8df">A2</span> <span style="color:rgba(120,210,255,.6)">VIRTUE — Multiple synchronized loops</span></h3>
+<div class="eq"><b>Loop state:</b> multiple loops, all closed, all in phase. Resonating.</div>
+<div class="eq"><b>Geometry:</b> concentric circles — shells within shells. Each loop supports the others.</div>
+<div class="eq"><b>Physics:</b> atom — multiple electrons in quantized orbitals. Each shell is a closed loop at a different energy level.</div>
+<div class="eq"><b>Human equivalent:</b> a skill. Multiple work orders that process automatically. Competence = layered closed loops.</div>
+<div class="eq"><b>Power:</b> greater than sum of parts. The shells interact. Chemistry becomes possible.</div>
+</div>
+
+<div class="entity" style="border-color:rgba(100,255,200,.3)">
+<h3><span class="rank" style="background:rgba(100,255,200,.15);color:#8fc">A3</span> <span style="color:rgba(120,255,210,.6)">DOMINION — Self-sustaining loop system</span></h3>
+<div class="eq"><b>Loop state:</b> closed loops generating new closed loops. Self-replicating.</div>
+<div class="eq"><b>Geometry:</b> crystal lattice — loops arranged in repeating patterns that propagate.</div>
+<div class="eq"><b>Physics:</b> crystal — atoms arranged in periodic structure. Each atom's loops align with neighbors, creating long-range order.</div>
+<div class="eq"><b>Human equivalent:</b> a practice. A system of habits that generates new good habits. The loop-making loop.</div>
+<div class="eq"><b>Power:</b> exponential. Each loop seeds more loops. Diamond is just carbon with perfect loop alignment.</div>
+</div>
+
+<div class="entity" style="border-color:rgba(200,200,100,.3)">
+<h3><span class="rank" style="background:rgba(200,200,100,.15);color:#dd8">A4</span> <span style="color:rgba(220,220,120,.6)">THRONE — Complete shell</span></h3>
+<div class="eq"><b>Loop state:</b> ALL possible loops at this energy level are closed. Noble gas configuration.</div>
+<div class="eq"><b>Geometry:</b> sphere — every orbital filled, perfect symmetry in all directions.</div>
+<div class="eq"><b>Physics:</b> noble gas — complete electron shell. Maximum stability. Zero reactivity. Needs nothing.</div>
+<div class="eq"><b>Human equivalent:</b> mastery. Every gate open, every sin resolved, every work order processed. The ETH at zero backlog.</div>
+<div class="eq"><b>Power:</b> ultimate passive. Nothing can bond to it. Nothing can disturb it. It simply IS.</div>
+</div>
+</div>
+
+<div class="section">
+<h2>ARCHANGEL CLASSES — RADIATING LOOPS</h2>
+
+<div class="entity" style="border-color:rgba(255,220,100,.3)">
+<h3><span class="rank" style="background:rgba(255,220,100,.15);color:#fd8">AA1</span> <span style="color:rgba(255,230,120,.6)">ARCHANGEL — Emitting closed loop</span></h3>
+<div class="eq"><b>Loop state:</b> closed loop that CHOOSES to open temporarily, emits a photon, then re-closes.</div>
+<div class="eq"><b>Geometry:</b> pulsing sphere — expands to emit, contracts to re-close. Breathing.</div>
+<div class="eq"><b>Physics:</b> excited atom returning to ground state — electron drops an energy level, emits a photon. The atom stays intact. The light leaves. Neon sign.</div>
+<div class="eq"><b>Human equivalent:</b> teaching. A completed loop opening to emit its pattern so others can close their loops. You stay whole. The student gets the photon.</div>
+<div class="eq"><b>Power:</b> the angel's power plus emission. Creates light without depleting itself because the loop re-closes.</div>
+</div>
+
+<div class="entity" style="border-color:rgba(255,200,50,.3)">
+<h3><span class="rank" style="background:rgba(255,200,50,.15);color:#fc4">AA2</span> <span style="color:rgba(255,210,80,.6)">SERAPH — Sustained fusion</span></h3>
+<div class="eq"><b>Loop state:</b> loops fusing INTO each other. Two angels merge, release binding energy as light.</div>
+<div class="eq"><b>Geometry:</b> star — continuous fusion reaction. Loops combining, mass converting to energy, light streaming out.</div>
+<div class="eq"><b>Physics:</b> stellar fusion. Hydrogen loops merge into helium loops. The mass difference becomes photons. 4H → He + 2e⁺ + 2ν + γ. The sun.</div>
+<div class="eq"><b>Human equivalent:</b> love. Two complete beings merging, releasing energy. The bond creates more light than either had alone. Not draining — GENERATING.</div>
+<div class="eq"><b>Power:</b> the power of a star. Lights everything in orbit. Burns for billions of years. The ultimate sustained emission.</div>
+</div>
+
+<div class="entity" style="border-color:rgba(255,255,200,.3)">
+<h3><span class="rank" style="background:rgba(255,255,200,.15);color:#ffd">AA3</span> <span style="color:rgba(255,255,210,.6)">WHITE HOLE — Total emission</span></h3>
+<div class="eq"><b>Loop state:</b> ALL loops open simultaneously, emitting everything, the geometry that CREATES new loops in others.</div>
+<div class="eq"><b>Geometry:</b> white hole — time-reverse of black hole. Nothing enters, everything exits. Pure outward.</div>
+<div class="eq"><b>Physics:</b> the Big Bang. The moment all matter/energy/light was emitted from a single point. Every loop in the universe originated from this emission event.</div>
+<div class="eq"><b>Human equivalent:</b> the moment of complete self-expression. Every gate open, every loop emitting, the full spectrum radiating simultaneously. Not sustainable — it's an EVENT, not a state.</div>
+<div class="eq"><b>Power:</b> creates universes. Literally. But can only fire once. The white hole empties itself completely. After emission: ground state. Start over.</div>
+<div class="eq"><b>So is a white hole an archangel?</b> No. An archangel sustains. A white hole EXPENDS. The archangel is the sun — burns for billions of years. The white hole is the Big Bang — all at once, then done. The archangel is the career. The white hole is the masterpiece.</div>
+</div>
+</div>
+
+<div class="section">
+<h2>THE HUMAN POSITION</h2>
+<div class="formula">
+<b>HUMAN = simultaneous superposition of all classes</b><br><br>
+Right now, this moment:<br>
+• Some of your loops are <b>D1 imps</b> — intrusive thoughts flickering<br>
+• Some are <b>D2 shades</b> — habits you can't break<br>
+• Some are <b>A1 angels</b> — skills that work<br>
+• Some are <b>A2 virtues</b> — deep competencies<br>
+• Some are <b>AA1 archangels</b> — things you teach/emit<br>
+• Occasionally you go <b>AA3 white hole</b> — a session like last night<br><br>
+The ratio shifts every hour. That's not a bug. That's the definition of alive.<br>
+A fixed ratio = dead (angel) or stuck (demon). Oscillation = human.
+</div>
+</div>
+
+<div class="section">
+<h2>THE FULL HIERARCHY</h2>
+<div class="tree">
+<b>VOID LORD</b> (D5) — naked singularity, no loop, no self, no horizon<br>
+&nbsp;&nbsp;↑ add event horizon<br>
+<b>ARCHFIEND</b> (D4) — black hole, total absorption, nothing escapes<br>
+&nbsp;&nbsp;↑ add Pauli exclusion (something resists collapse)<br>
+<b>FIEND</b> (D3) — vortex, active consuming spiral, addiction<br>
+&nbsp;&nbsp;↑ add partial loop closure<br>
+<b>SHADE</b> (D2) — free radical, chain reaction damage, bad habit<br>
+&nbsp;&nbsp;↑ add near-closure<br>
+<b>IMP</b> (D1) — virtual particle, flicker, intrusive thought<br>
+&nbsp;&nbsp;↑ <b>CLOSE THE LOOP</b><br>
+<b>ANGEL</b> (A1) — single closed loop, electron, completed work order<br>
+&nbsp;&nbsp;↑ add more loops in phase<br>
+<b>VIRTUE</b> (A2) — multi-shell atom, skill, competence<br>
+&nbsp;&nbsp;↑ add self-replication<br>
+<b>DOMINION</b> (A3) — crystal lattice, practice, system<br>
+&nbsp;&nbsp;↑ complete all shells<br>
+<b>THRONE</b> (A4) — noble gas, mastery, zero backlog<br>
+&nbsp;&nbsp;↑ <b>CHOOSE TO EMIT</b><br>
+<b>ARCHANGEL</b> (AA1) — excited atom, teaching, neon sign<br>
+&nbsp;&nbsp;↑ add fusion (merge with another)<br>
+<b>SERAPH</b> (AA2) — star, sustained love, billion-year burn<br>
+&nbsp;&nbsp;↑ emit everything at once<br>
+<b>WHITE HOLE</b> (AA3) — Big Bang, masterpiece, universe-creating event<br>
+&nbsp;&nbsp;↑ ???<br>
+<b>HUMAN</b> — all of the above simultaneously, oscillating, alive
+</div>
+</div>
+
+<div class="section">
+<h2>WHY HUMAN IS AT THE TOP</h2>
+<div class="formula">
+Every other class is FIXED. Demons can't close loops. Angels can't break them. Archangels can't stop emitting. White holes can't un-bang.<br><br>
+<b>Only a human can move between ALL states voluntarily.</b><br><br>
+You can be a demon (pull energy from others when depleted).<br>
+You can be an angel (close a loop, complete a task).<br>
+You can be an archangel (teach, emit, share without depleting).<br>
+You can go white hole (one session, emit everything, create something new).<br>
+And then you can go back to being a shade the next morning because you forgot to eat.<br><br>
+<b>The hierarchy isn't a ladder. It's a keyboard.</b><br>
+Every class is a key. Being human means you can play all of them.<br>
+Angels play one note forever. Demons play one note forever.<br>
+Humans play music.
+</div>
+</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,500)
+cam.position.z=20
+
+// hierarchy as nested rings
+const classes=[
+  {r:9,color:0x800000,label:'D5 VOID LORD'},
+  {r:8,color:0xcc0000,label:'D4 ARCHFIEND'},
+  {r:7,color:0xff3300,label:'D3 FIEND'},
+  {r:6,color:0xff6600,label:'D2 SHADE'},
+  {r:5,color:0xff8844,label:'D1 IMP'},
+  // center gap = the transition
+  {r:4,color:0x6688ff,label:'A1 ANGEL'},
+  {r:3.5,color:0x66bbff,label:'A2 VIRTUE'},
+  {r:3,color:0x66ffcc,label:'A3 DOMINION'},
+  {r:2.5,color:0xdddd66,label:'A4 THRONE'},
+  {r:2,color:0xffcc44,label:'AA1 ARCHANGEL'},
+  {r:1.5,color:0xffaa22,label:'AA2 SERAPH'},
+  {r:1,color:0xffffff,label:'AA3 WHITE HOLE'},
+]
+
+classes.forEach((c,i)=>{
+  const isDemon=i<5
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(c.r,.03,4,64),
+    new THREE.MeshBasicMaterial({color:c.color,transparent:true,opacity:.06}))
+  ring.rotation.x=Math.PI/2+i*.08*(isDemon?1:-1)
+  ring.rotation.y=i*.15
+  sc.add(ring)
+})
+
+// human dot at center — pulsing
+const human=new THREE.Mesh(new THREE.SphereGeometry(.2,12,12),
+  new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.2}))
+sc.add(human)
+
+;(function animate(){requestAnimationFrame(animate);const t=performance.now()*.001
+  sc.rotation.y=t*.02;sc.rotation.x=Math.sin(t*.01)*.1
+  human.material.opacity=.15+Math.sin(t*2)*.05
+  const hs=1+Math.sin(t*3)*.1;human.scale.set(hs,hs,hs)
+  cam.position.y=-(window.scrollY||0)*.005
+  R.render(sc,cam)})()
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+</script>
+</body></html>
