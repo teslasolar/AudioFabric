@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>CHLADNI FULL — Rotating Glyph Rings</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),C=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+const GLYPHS=['●','〜','┃','♡','△','◐','◯']
+const PRIMES=[2,3,5,7,11,13,17]
+const NAMES=['ROOT','VAGUS','GATE','HEART','VOICE','LENS','CROWN']
+
+// each ring has its own spectrum slice
+const RINGS=[
+  {glyph:'●',prime:2,n:1,m:1,specStart:640,specEnd:780,name:'ROOT',dir:1},   // red
+  {glyph:'〜',prime:3,n:2,m:1,specStart:590,specEnd:640,name:'VAGUS',dir:-1}, // orange
+  {glyph:'┃',prime:5,n:2,m:2,specStart:560,specEnd:590,name:'GATE',dir:1},   // yellow
+  {glyph:'♡',prime:7,n:3,m:1,specStart:490,specEnd:560,name:'HEART',dir:-1}, // green
+  {glyph:'△',prime:11,n:3,m:2,specStart:450,specEnd:490,name:'VOICE',dir:1}, // blue
+  {glyph:'◐',prime:13,n:3,m:3,specStart:420,specEnd:450,name:'LENS',dir:-1}, // indigo
+  {glyph:'◯',prime:17,n:4,m:1,specStart:380,specEnd:420,name:'CROWN',dir:1}  // violet
+]
+
+function nmToRGB(nm){
+  let r=0,g=0,b=0
+  if(nm>=380&&nm<440){r=-(nm-440)/(440-380);b=1}
+  else if(nm>=440&&nm<490){g=(nm-440)/(490-440);b=1}
+  else if(nm>=490&&nm<510){g=1;b=-(nm-510)/(510-490)}
+  else if(nm>=510&&nm<580){r=(nm-510)/(580-510);g=1}
+  else if(nm>=580&&nm<645){r=1;g=-(nm-645)/(645-580)}
+  else if(nm>=645&&nm<=780){r=1}
+  let f=1
+  if(nm>=380&&nm<420)f=.3+.7*(nm-380)/(420-380)
+  else if(nm>=645&&nm<=780)f=.3+.7*(780-nm)/(780-645)
+  return[r*f*255|0,g*f*255|0,b*f*255|0]
+}
+
+function chladni(x,y,n,m,t2){
+  return Math.cos(n*Math.PI*x)*Math.cos(m*Math.PI*y)+Math.cos(m*Math.PI*x)*Math.cos(n*Math.PI*y)*Math.cos(t2)
+}
+
+// sand per ring
+const ringSand=RINGS.map((ring,ri)=>{
+  const particles=[]
+  const count=300+ri*50
+  for(let i=0;i<count;i++){
+    const a=Math.random()*TAU,r=Math.random()
+    particles.push({x:(Math.random()-.5)*2,y:(Math.random()-.5)*2,vx:0,vy:0})
+  }
+  return particles
+})
+
+// ═══ AUDIO ═══
+let actx,master
+function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.25;master.connect(actx.destination)
+  ;[[.18,.16,.22],[.31,.12,.18],[.47,.08,.12]].forEach(([dt,fbv,wv])=>{
+    const d=actx.createDelay(.6);d.delayTime.value=dt
+    const f=actx.createGain();f.gain.value=fbv;d.connect(f);f.connect(d)
+    const w=actx.createGain();w.gain.value=wv;d.connect(w);w.connect(actx.destination)
+    master.connect(d)
+  })
+  // all 7 drones
+  const hzs=[55,82,110,147,196,262,330]
+  hzs.forEach((hz,i)=>{
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type='sine';o.frequency.value=hz;g.gain.value=.025
+    o.connect(g);g.connect(master);o.start()
+    const o2=actx.createOscillator(),g2=actx.createGain()
+    o2.type='sine';o2.frequency.value=hz*1.003;g2.gain.value=.018
+    o2.connect(g2);g2.connect(master);o2.start()
+  })
+}
+setTimeout(initAudio,300)
+
+let t=0
+
+function loop(){
+  requestAnimationFrame(loop)
+  t+=1/60
+
+  // full black clear
+  C.fillStyle='#000';C.globalAlpha=1;C.fillRect(0,0,W,H)
+
+  const maxR=Math.min(W,H)*.46
+
+  // ═══ 7 RINGS — each its own Chladni plate, counter-rotating ═══
+  RINGS.forEach((ring,ri)=>{
+    const innerR=maxR*(.08+ri*.12)
+    const outerR=innerR+maxR*.11
+    const midR=(innerR+outerR)/2
+    const ringWidth=outerR-innerR
+    const rot=t*(.02+ri*.006)*ring.dir
+
+    // ═══ CHLADNI SAND within this ring's annulus ═══
+    const particles=ringSand[ri]
+    particles.forEach(s=>{
+      // rotate sand coordinates with ring
+      const rx=s.x*Math.cos(rot*.3)-s.y*Math.sin(rot*.3)
+      const ry=s.x*Math.sin(rot*.3)+s.y*Math.cos(rot*.3)
+      const val=chladni(rx,ry,ring.n+Math.sin(t*.2+ri)*.3,ring.m+Math.cos(t*.15+ri)*.2,t*1.5+ri)
+      const dx=chladni(rx+.02,ry,ring.n,ring.m,t*1.5+ri)-val
+      const dy=chladni(rx,ry+.02,ring.n,ring.m,t*1.5+ri)-val
+      s.vx+=-dx*1.5;s.vy+=-dy*1.5;s.vx*=.88;s.vy*=.88
+      s.x+=s.vx*.008;s.y+=s.vy*.008
+      if(s.x>1.1)s.x=-1.1;if(s.x<-1.1)s.x=1.1
+      if(s.y>1.1)s.y=-1.1;if(s.y<-1.1)s.y=1.1
+
+      // map particle to ring annulus
+      const px=s.x,py=s.y
+      const pr=Math.sqrt(px*px+py*py)
+      if(pr<.01)return
+      const pa=Math.atan2(py,px)+rot
+      const mappedR=innerR+(pr%1)*ringWidth
+      const sx=cx+Math.cos(pa)*mappedR
+      const sy=cy+Math.sin(pa)*mappedR
+
+      // color from ring's spectrum slice
+      const specFrac=((pa/TAU+.5)%1)
+      const nm=ring.specStart+(ring.specEnd-ring.specStart)*specFrac
+      const rgb=nmToRGB(nm)
+
+      const atNode=Math.abs(val)<.2
+      C.beginPath();C.arc(sx,sy,atNode?1.5:.7,0,TAU)
+      C.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${atNode?.5:.08})`
+      C.globalAlpha=1;C.fill()
+    })
+
+    // ═══ RING BORDER — segmented by prime, counter-rotating ═══
+    const segments=ring.prime
+    const segArc=TAU/segments*.7
+    C.save();C.translate(cx,cy);C.rotate(rot*1.5)
+    for(let s=0;s<segments;s++){
+      const sa=s*TAU/segments
+      const segNm=ring.specStart+(ring.specEnd-ring.specStart)*(s/segments)
+      const segRGB=nmToRGB(segNm)
+
+      // outer arc
+      C.beginPath();C.arc(0,0,outerR,sa,sa+segArc)
+      C.strokeStyle=`rgba(${segRGB[0]},${segRGB[1]},${segRGB[2]},.25)`
+      C.lineWidth=2+Math.sin(t*2+s+ri)*.5;C.globalAlpha=1;C.stroke()
+
+      // inner arc
+      C.beginPath();C.arc(0,0,innerR,sa+segArc*.1,sa+segArc*.9)
+      C.strokeStyle=`rgba(${segRGB[0]},${segRGB[1]},${segRGB[2]},.12)`
+      C.lineWidth=1;C.stroke()
+
+      // radial spokes at segment boundaries
+      C.beginPath()
+      C.moveTo(Math.cos(sa)*innerR,Math.sin(sa)*innerR)
+      C.lineTo(Math.cos(sa)*outerR,Math.sin(sa)*outerR)
+      C.strokeStyle=`rgba(${segRGB[0]},${segRGB[1]},${segRGB[2]},.08)`
+      C.lineWidth=.5;C.stroke()
+    }
+    C.restore()
+
+    // ═══ GLYPHS — placed at prime-count positions around ring ═══
+    C.save();C.translate(cx,cy);C.rotate(-rot*.8) // counter-rotate glyphs
+    for(let g=0;g<ring.prime;g++){
+      const ga=g*TAU/ring.prime
+      const gx=Math.cos(ga)*midR,gy=Math.sin(ga)*midR
+      const glyphNm=ring.specStart+(ring.specEnd-ring.specStart)*(g/ring.prime)
+      const glyphRGB=nmToRGB(glyphNm)
+
+      C.save();C.translate(gx,gy);C.rotate(-(-rot*.8)+ga+Math.PI/2) // keep glyphs upright-ish
+      C.font=`${8+ri}px monospace`;C.textAlign='center';C.textBaseline='middle'
+      C.globalAlpha=.12+Math.sin(t*2+g+ri)*.04
+      C.fillStyle=`rgb(${glyphRGB[0]},${glyphRGB[1]},${glyphRGB[2]})`
+      C.fillText(ring.glyph,0,0)
+      C.restore()
+    }
+    C.restore()
+
+    // ring name (tiny, at 12 o'clock)
+    const labelA=rot*1.5
+    C.save();C.translate(cx,cy)
+    C.font='5px monospace';C.textAlign='center';C.globalAlpha=.04+Math.sin(t+ri)*.01
+    const labelNm=(ring.specStart+ring.specEnd)/2
+    const labelRGB=nmToRGB(labelNm)
+    C.fillStyle=`rgb(${labelRGB[0]},${labelRGB[1]},${labelRGB[2]})`
+    C.fillText(ring.name,Math.cos(labelA)*(outerR+10),Math.sin(labelA)*(outerR+10))
+    C.restore()
+  })
+
+  // ═══ CENTER — all modes superimposed ═══
+  const centerR=maxR*.07
+  // composite chladni at center
+  let centerVal=0
+  RINGS.forEach(r=>{centerVal+=chladni(Math.sin(t*.5)*.5,Math.cos(t*.3)*.5,r.n,r.m,t*2)})
+  centerVal/=7
+
+  const centerGrad=C.createRadialGradient(cx,cy,0,cx,cy,centerR*3)
+  const cv2=Math.abs(centerVal)
+  centerGrad.addColorStop(0,`rgba(255,255,255,${.05+cv2*.08})`)
+  centerGrad.addColorStop(.5,`rgba(180,150,255,${.02+cv2*.04})`)
+  centerGrad.addColorStop(1,'rgba(0,0,0,0)')
+  C.globalAlpha=1;C.fillStyle=centerGrad
+  C.beginPath();C.arc(cx,cy,centerR*3,0,TAU);C.fill()
+
+  // pupil
+  C.beginPath();C.arc(cx,cy,centerR,0,TAU)
+  C.fillStyle='#000';C.globalAlpha=1;C.fill()
+  // ❤️
+  C.globalAlpha=.2+Math.sin(t*3)*.05
+  C.font=`${centerR|0}px serif`;C.textAlign='center';C.textBaseline='middle'
+  C.fillText('❤️',cx,cy)
+
+  // ═══ INTERFERENCE PATTERNS between rings ═══
+  for(let i=0;i<6;i++){
+    const r1Outer=maxR*(.08+i*.12)+maxR*.11
+    const r2Inner=maxR*(.08+(i+1)*.12)
+    const interfR=(r1Outer+r2Inner)/2
+    const beat=Math.sin(t*(RINGS[i].n+RINGS[i+1].m)+i)
+    C.beginPath();C.arc(cx,cy,interfR,0,TAU)
+    C.strokeStyle=`rgba(255,255,255,${.01+Math.abs(beat)*.02})`
+    C.lineWidth=r2Inner-r1Outer;C.globalAlpha=1;C.stroke()
+  }
+
+  // ═══ MODE INFO ═══
+  C.globalAlpha=.03
+  C.font='6px monospace';C.textAlign='center'
+  C.fillStyle='#888'
+  C.fillText('CHLADNI FULL · 7 rings · 7 modes · 7 spectra · counter-rotating',cx,H-8)
+}
+loop()
+</script>
+</body></html>
