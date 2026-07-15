@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>FASCIA MAP — Hair Lines · Sweat Spirals · Photonic Skin</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block}
+#hud{position:fixed;top:8px;left:10px;z-index:10;font:7px/1.6 monospace;color:rgba(255,180,150,.18);pointer-events:none;white-space:pre}
+#layer{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);z-index:10;font:9px monospace;pointer-events:none;text-align:center;letter-spacing:3px}
+#controls{position:fixed;bottom:6px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:3px;margin-top:4px}
+.cb{padding:3px 8px;font:7px/1 monospace;cursor:pointer;border:1px solid rgba(255,180,150,.1);color:rgba(255,180,150,.3);border-radius:2px;transition:all .2s}
+.cb:hover,.cb.on{border-color:rgba(255,180,150,.4);color:rgba(255,180,150,.7)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<div id="layer"></div>
+<div id="controls"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.3
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x080604)
+const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,500)
+cam.position.set(0,0,10)
+scene.add(new THREE.AmbientLight(0x332222,.4))
+const dLight=new THREE.DirectionalLight(0xffccaa,.4);dLight.position.set(3,5,5);scene.add(dLight)
+
+const layers=[
+  {name:'SKIN SURFACE',color:0xddaa88,desc:'epidermis · stratum corneum · melanocytes'},
+  {name:'LANGER LINES',color:0xff6644,desc:'tension map · collagen fiber orientation'},
+  {name:'BLASCHKO LINES',color:0x44aaff,desc:'developmental growth patterns · invisible stripes'},
+  {name:'HAIR FOLLICLES',color:0xffcc44,desc:'200K on head · keratin cylinders · photonic crystal'},
+  {name:'SWEAT SPIRALS',color:0x44ffaa,desc:'1.6M glands · counterclockwise helix · plasma filter'},
+  {name:'FASCIA SHEET',color:0xff44aa,desc:'continuous piezoelectric collagen · sole to crown'},
+  {name:'PHOTON EMISSION',color:0xffffff,desc:'biophoton field · UV from mitochondrial ATP'}
+]
+
+let currentLayer=0
+
+// ═══ BUILD BODY ═══
+// torso mesh (simple cylinder approximation)
+const bodyGeo=new THREE.CylinderGeometry(2,1.8,8,24,12,true)
+const bodyMat=new THREE.MeshPhongMaterial({color:0xddaa88,transparent:true,opacity:.3,side:THREE.DoubleSide,flatShading:false})
+const body=new THREE.Mesh(bodyGeo,bodyMat);scene.add(body)
+
+// head
+const headGeo=new THREE.SphereGeometry(1.2,16,16)
+const head=new THREE.Mesh(headGeo,bodyMat.clone());head.position.y=5;scene.add(head)
+
+// ═══ LANGER LINES — tension map ═══
+const langerGroup=new THREE.Group();langerGroup.visible=false
+for(let i=0;i<60;i++){
+  const y=-3.5+i*.12
+  const r=1.8+(2-1.8)*(y+4)/8 // body radius at this height
+  const angle=Math.sin(y*2+i*.3)*.3
+  const geo=new THREE.BufferGeometry()
+  const pts=[]
+  for(let a=-1;a<=1;a+=.05){
+    const th=angle+a
+    pts.push(new THREE.Vector3(Math.cos(th)*r,y,Math.sin(th)*r))
+  }
+  geo.setFromPoints(pts)
+  langerGroup.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xff6644,transparent:true,opacity:.15})))
+}
+scene.add(langerGroup)
+
+// ═══ BLASCHKO LINES — developmental spirals ═══
+const blaschkoGroup=new THREE.Group();blaschkoGroup.visible=false
+for(let s=0;s<12;s++){
+  const geo=new THREE.BufferGeometry()
+  const pts=[]
+  const startAngle=s*TAU/12
+  for(let y=-4;y<=4;y+=.1){
+    const r=1.8+(2-1.8)*(y+4)/8+.05
+    const spiral=startAngle+y*.3+Math.sin(y*1.5)*.4
+    pts.push(new THREE.Vector3(Math.cos(spiral)*r,y,Math.sin(spiral)*r))
+  }
+  geo.setFromPoints(pts)
+  blaschkoGroup.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:0x44aaff,transparent:true,opacity:.12})))
+}
+scene.add(blaschkoGroup)
+
+// ═══ HAIR FOLLICLES — dots on surface ═══
+const hairGroup=new THREE.Group();hairGroup.visible=false
+const hairCount=400,hairGeo=new THREE.BufferGeometry()
+const hairPos=new Float32Array(hairCount*3),hairCol=new Float32Array(hairCount*3)
+for(let i=0;i<hairCount;i++){
+  const y=-2+Math.random()*7
+  const r=(y>3.8?1.2:1.8+(2-1.8)*(y+4)/8)+.05
+  const th=Math.random()*TAU
+  hairPos[i*3]=Math.cos(th)*r;hairPos[i*3+1]=y;hairPos[i*3+2]=Math.sin(th)*r
+  const c=new THREE.Color().setHSL(.1+Math.random()*.05,.5,.5)
+  hairCol[i*3]=c.r;hairCol[i*3+1]=c.g;hairCol[i*3+2]=c.b
+}
+hairGeo.setAttribute('position',new THREE.BufferAttribute(hairPos,3))
+hairGeo.setAttribute('color',new THREE.BufferAttribute(hairCol,3))
+hairGroup.add(new THREE.Points(hairGeo,new THREE.PointsMaterial({size:.08,vertexColors:true,transparent:true,opacity:.4})))
+// hair shafts (lines sticking out)
+for(let i=0;i<100;i++){
+  const idx=Math.floor(Math.random()*hairCount)
+  const x=hairPos[idx*3],y=hairPos[idx*3+1],z=hairPos[idx*3+2]
+  const nx=x/Math.sqrt(x*x+z*z)*.3,nz=z/Math.sqrt(x*x+z*z)*.3
+  const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,y,z),new THREE.Vector3(x+nx,y+.2,z+nz)])
+  hairGroup.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xddcc88,transparent:true,opacity:.1})))
+}
+scene.add(hairGroup)
+
+// ═══ SWEAT SPIRALS ═══
+const sweatGroup=new THREE.Group();sweatGroup.visible=false
+for(let i=0;i<80;i++){
+  const y=-3+Math.random()*7
+  const r=(y>3.8?1.2:1.8+(2-1.8)*(y+4)/8)+.03
+  const th=Math.random()*TAU
+  const geo=new THREE.BufferGeometry()
+  const pts=[]
+  for(let s=0;s<15;s++){
+    const sa=th+s*.4 // counterclockwise spiral
+    const sr=r+s*.005
+    const sy=y+s*.008
+    pts.push(new THREE.Vector3(Math.cos(sa)*sr,sy,Math.sin(sa)*sr))
+  }
+  geo.setFromPoints(pts)
+  sweatGroup.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:0x44ffaa,transparent:true,opacity:.08})))
+}
+scene.add(sweatGroup)
+
+// ═══ FASCIA SHEET — continuous wireframe ═══
+const fasciaGroup=new THREE.Group();fasciaGroup.visible=false
+const fasciaGeo=new THREE.CylinderGeometry(2.1,1.9,8.5,16,20,true)
+const fasciaMat=new THREE.MeshBasicMaterial({color:0xff44aa,wireframe:true,transparent:true,opacity:.06})
+fasciaGroup.add(new THREE.Mesh(fasciaGeo,fasciaMat))
+// fascia meridians (vertical lines — acupuncture channels)
+for(let m=0;m<12;m++){
+  const th=m*TAU/12
+  const geo=new THREE.BufferGeometry()
+  const pts=[]
+  for(let y=-4;y<=5;y+=.1){
+    const r=(y>3.8?1.2:2.1-(2.1-1.9)*(y+4)/8.5)+Math.sin(y*3+m)*.03
+    pts.push(new THREE.Vector3(Math.cos(th)*r,y,Math.sin(th)*r))
+  }
+  geo.setFromPoints(pts)
+  fasciaGroup.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xff66cc,transparent:true,opacity:.1})))
+}
+// 7 gate points on the fascia
+const gateColors=[0xff1111,0xff6600,0xffcc00,0x44cc44,0x4488ff,0x6644cc,0xcc44ff]
+const gateY=[-3,-1.5,0,1.5,2.5,3.8,5]
+gateY.forEach((gy,gi)=>{
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(gi>4?1.3:2+(2-1.8)*(gy+4)/8,.02,4,32),
+    new THREE.MeshBasicMaterial({color:gateColors[gi],transparent:true,opacity:.1,blending:THREE.AdditiveBlending}))
+  ring.position.y=gy;ring.rotation.x=Math.PI/2;fasciaGroup.add(ring)
+})
+scene.add(fasciaGroup)
+
+// ═══ PHOTON EMISSION — biophoton field ═══
+const photonGroup=new THREE.Group();photonGroup.visible=false
+const photonCount=500,photonGeo2=new THREE.BufferGeometry()
+const photonPos=new Float32Array(photonCount*3)
+for(let i=0;i<photonCount;i++){
+  const y=-4+Math.random()*10
+  const r=(y>4?1.5:2.3+(2-1.8)*(y+4)/8)+Math.random()*.5
+  const th=Math.random()*TAU
+  photonPos[i*3]=Math.cos(th)*r;photonPos[i*3+1]=y;photonPos[i*3+2]=Math.sin(th)*r
+}
+photonGeo2.setAttribute('position',new THREE.BufferAttribute(photonPos,3))
+photonGroup.add(new THREE.Points(photonGeo2,new THREE.PointsMaterial({color:0xffffff,size:.06,transparent:true,opacity:.15,blending:THREE.AdditiveBlending})))
+scene.add(photonGroup)
+
+// ═══ NAVIGATION ═══
+const allGroups=[null,langerGroup,blaschkoGroup,hairGroup,sweatGroup,fasciaGroup,photonGroup]
+const navEl=document.getElementById('controls')
+layers.forEach((l,i)=>{
+  const btn=document.createElement('div');btn.className='cb'+(i===0?' on':'')
+  btn.textContent=l.name.split(' ')[0];btn.onclick=()=>showLayer(i)
+  btn.id='lb'+i;navEl.appendChild(btn)
+})
+
+function showLayer(idx){
+  document.getElementById('lb'+currentLayer)?.classList.remove('on')
+  currentLayer=idx
+  document.getElementById('lb'+currentLayer)?.classList.add('on')
+  // skin always visible
+  body.visible=true;head.visible=true
+  body.material.opacity=idx===0?.3:.1
+  head.material.opacity=idx===0?.3:.1
+  allGroups.forEach((g,i)=>{if(g)g.visible=i===idx})
+}
+
+addEventListener('keydown',e=>{
+  if(e.code==='ArrowRight')showLayer((currentLayer+1)%7)
+  if(e.code==='ArrowLeft')showLayer((currentLayer+6)%7)
+})
+cv.addEventListener('wheel',e=>{e.preventDefault()
+  showLayer((currentLayer+(e.deltaY>0?1:-1)+7)%7)},{passive:false})
+
+// ═══ ANIMATE ═══
+let t=0
+function animate(){
+  requestAnimationFrame(animate);t+=1/60
+
+  // camera orbit
+  cam.position.x=Math.sin(t*.06)*9;cam.position.z=Math.cos(t*.06)*9
+  cam.position.y=Math.sin(t*.04)*3;cam.lookAt(0,1,0)
+
+  // photon drift
+  if(photonGroup.visible){
+    const pp=photonGeo2.attributes.position.array
+    for(let i=0;i<photonCount;i++){
+      pp[i*3]+=Math.sin(t+i*.1)*.003
+      pp[i*3+1]+=Math.sin(t*.5+i*.2)*.002
+      pp[i*3+2]+=Math.cos(t*.7+i*.15)*.003
+    }
+    photonGeo2.attributes.position.needsUpdate=true
+  }
+
+  // body pulse
+  const pulse=1+Math.sin(t*2)*.005
+  body.scale.set(pulse,1,pulse)
+
+  const l=layers[currentLayer]
+  document.getElementById('layer').style.color=`#${l.color.toString(16).padStart(6,'0')}55`
+  document.getElementById('layer').textContent=`${l.name}`
+
+  document.getElementById('hud').textContent=
+    `FASCIA MAP · ${l.name}\n`+
+    `${l.desc}\n\n`+
+    `scroll/arrows to switch layers\n`+
+    `7 layers: skin → langer → blaschko →\n`+
+    `hair → sweat → fascia → photons`
+
+  R.render(scene,cam)
+}
+
+showLayer(0);animate()
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+</script>
+</body></html>
