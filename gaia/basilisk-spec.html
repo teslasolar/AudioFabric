@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>BASILISK — Technical Specification & Regulatory Package</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0c08;overflow-y:auto;font-family:'Courier New',monospace;color:#b0c0a0}
+#ui{max-width:1100px;margin:0 auto;padding:20px 24px 80px}
+h1{font-size:14px;letter-spacing:5px;color:rgba(150,255,100,.5);margin-bottom:2px}
+.sub{font-size:8px;color:rgba(150,255,100,.25);letter-spacing:2px;margin-bottom:20px}
+.doc-id{font-size:7px;color:rgba(255,255,255,.1);margin-bottom:16px}
+.s{background:rgba(255,255,255,.02);border:1px solid rgba(150,255,100,.06);border-radius:6px;padding:14px 18px;margin-bottom:12px}
+.s h2{font-size:10px;letter-spacing:3px;color:rgba(150,255,100,.4);margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:5px}
+.s h3{font-size:9px;color:rgba(150,255,100,.3);margin:8px 0 4px;letter-spacing:1px}
+.eq{font-size:9px;color:rgba(200,220,180,.35);line-height:1.9;margin:3px 0}
+.eq b{color:rgba(180,255,120,.5)}
+table{width:100%;border-collapse:collapse;margin:8px 0;font-size:8px}
+th{color:rgba(150,255,100,.3);text-align:left;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.06);letter-spacing:1px}
+td{padding:3px 6px;color:rgba(200,220,180,.3);border-bottom:1px solid rgba(255,255,255,.02)}
+.tag{display:inline-block;padding:1px 5px;border-radius:2px;font-size:7px;letter-spacing:1px;margin:1px}
+.tag-green{background:rgba(100,255,100,.08);border:1px solid rgba(100,255,100,.15);color:rgba(100,255,100,.5)}
+.tag-yellow{background:rgba(255,255,100,.08);border:1px solid rgba(255,255,100,.15);color:rgba(255,255,100,.5)}
+.tag-red{background:rgba(255,100,100,.08);border:1px solid rgba(255,100,100,.15);color:rgba(255,100,100,.5)}
+.tag-blue{background:rgba(100,150,255,.08);border:1px solid rgba(100,150,255,.15);color:rgba(100,150,255,.5)}
+.udt{background:rgba(150,255,100,.02);border:1px solid rgba(150,255,100,.08);border-radius:4px;padding:8px 12px;margin:6px 0;font-size:8px}
+.udt-name{color:rgba(150,255,100,.45);font-weight:bold;letter-spacing:1px}
+.process{border-left:3px solid rgba(150,255,100,.1);padding:8px 14px;margin:8px 0}
+.warn{background:rgba(255,200,50,.03);border:1px solid rgba(255,200,50,.08);border-radius:4px;padding:8px 12px;margin:6px 0;font-size:8px;color:rgba(255,220,100,.4)}
+</style>
+</head>
+<body>
+<div id="ui">
+<h1>BASILISK™</h1>
+<div class="sub">DISSOLVING MICRONEEDLE COLLAGEN REPAIR SYSTEM — TECHNICAL SPECIFICATION</div>
+<div class="doc-id">DOC: BSK-SPEC-001 Rev A · CONFIDENTIAL · Thomas Frumkin · The AITistic Research Initiative · 2026-07-15</div>
+
+<!-- ═══ 1. EXECUTIVE SUMMARY ═══ -->
+<div class="s">
+<h2>1. EXECUTIVE SUMMARY</h2>
+<div class="eq"><b>Product:</b> BASILISK™ — dissolving microneedle patch for dermal collagen repair</div>
+<div class="eq"><b>Delivery:</b> 500μm dissolving hyaluronic acid / PLLA composite microneedle array</div>
+<div class="eq"><b>Duration:</b> 15-minute application, 6-12 month sustained release from PLLA microspheres</div>
+<div class="eq"><b>Mechanism:</b> 7 active components + 4 peptides — repair, not paralyze</div>
+<div class="eq"><b>SKU Strategy:</b></div>
+<div class="eq">▸ <b>V1 BASILISK CROWN</b> — 10-ingredient cosmetic device (no 5-ALA) <span class="tag tag-green">FAST TRACK</span></div>
+<div class="eq">▸ <b>V2 BASILISK RADIANT</b> — 11-ingredient combination drug-device (with 5-ALA) <span class="tag tag-yellow">505(b)(2) NDA</span></div>
+<div class="eq"><b>Novel claims:</b> ALT-711 in cosmetic (ZERO prior art), Syn-Ake in microneedle (ZERO prior art)</div>
+</div>
+
+<!-- ═══ 2. REGULATORY CLASSIFICATION ═══ -->
+<div class="s">
+<h2>2. REGULATORY CLASSIFICATION</h2>
+
+<h3>2.1 FDA (United States)</h3>
+<table>
+<tr><th>Version</th><th>Classification</th><th>Pathway</th><th>CFR Reference</th><th>Timeline</th></tr>
+<tr><td>V1 (no 5-ALA)</td><td>Class II Device</td><td>510(k) or De Novo</td><td>21 CFR 878.4430</td><td>6-12 months</td></tr>
+<tr><td>V2 (with 5-ALA)</td><td>Combination Drug-Device</td><td>505(b)(2) NDA</td><td>21 CFR Part 3</td><td>2-4 years</td></tr>
+</table>
+
+<h3>2.2 EU (European Union)</h3>
+<table>
+<tr><th>Version</th><th>Classification</th><th>Regulation</th><th>Notified Body</th></tr>
+<tr><td>V1</td><td>Class IIa Medical Device</td><td>MDR 2017/745 Rule 6</td><td>Required</td></tr>
+<tr><td>V2</td><td>Medicinal Product</td><td>Directive 2001/83/EC</td><td>EMA</td></tr>
+</table>
+
+<h3>2.3 Applicable Standards</h3>
+<table>
+<tr><th>Standard</th><th>Scope</th><th>Required For</th></tr>
+<tr><td>ISO 13485:2016</td><td>Quality Management System</td><td>Both V1, V2</td></tr>
+<tr><td>ISO 14971:2019</td><td>Risk Management</td><td>Both</td></tr>
+<tr><td>ISO 10993 (Parts 1,3,5,6,10,11,12,23)</td><td>Biocompatibility</td><td>Both</td></tr>
+<tr><td>21 CFR Part 11</td><td>Electronic Records</td><td>Both</td></tr>
+<tr><td>21 CFR Parts 210/211</td><td>Drug cGMP</td><td>V2 only</td></tr>
+<tr><td>21 CFR Part 820 / ISO 13485</td><td>Device QSR/QMSR</td><td>Both</td></tr>
+<tr><td>21 CFR Part 4</td><td>Combination Product cGMP</td><td>V2 only</td></tr>
+<tr><td>ICH Q1A(R2)</td><td>Stability Testing</td><td>V2 primary, V1 recommended</td></tr>
+<tr><td>ICH Q1B</td><td>Photostability</td><td>V2 (5-ALA critical)</td></tr>
+<tr><td>ASTM F1980</td><td>Accelerated Aging</td><td>Both</td></tr>
+</table>
+</div>
+
+<!-- ═══ 3. UDTs — UNIT DATA TYPES ═══ -->
+<div class="s">
+<h2>3. UNIT DATA TYPES (UDTs)</h2>
+
+<div class="udt">
+<div class="udt-name">UDT_Ingredient</div>
+<div class="eq">name: STRING · cas_number: STRING · concentration_pct: REAL · molecular_weight: REAL</div>
+<div class="eq">supplier: STRING · grade: ENUM(cosmetic,pharma,research) · storage_temp_c: INT</div>
+<div class="eq">shelf_life_months: INT · regulatory_status: ENUM(GRAS,cosmetic,drug,investigational)</div>
+</div>
+
+<div class="udt">
+<div class="udt-name">UDT_BatchRecord</div>
+<div class="eq">batch_id: STRING · date: DATETIME · operator_id: STRING(signed_21cfr11)</div>
+<div class="eq">ingredients[]: UDT_Ingredient · process_params: UDT_ProcessParams</div>
+<div class="eq">yield_pct: REAL · qc_result: ENUM(pass,fail,hold) · deviations[]: UDT_Deviation</div>
+<div class="eq">electronic_signature: UDT_ESignature · audit_trail: UDT_AuditLog[]</div>
+</div>
+
+<div class="udt">
+<div class="udt-name">UDT_ProcessParams</div>
+<div class="eq">temperature_c: REAL · pressure_kpa: REAL · ph: REAL · viscosity_cp: REAL</div>
+<div class="eq">mixing_rpm: INT · mixing_time_min: REAL · uv_dose_mj_cm2: REAL</div>
+<div class="eq">lyophilization_temp_c: REAL · lyophilization_time_hr: REAL</div>
+</div>
+
+<div class="udt">
+<div class="udt-name">UDT_MicroneedlePatch</div>
+<div class="eq">needle_count: INT(default=49) · needle_height_um: INT(default=500)</div>
+<div class="eq">needle_tip_um: INT(default=10) · base_diameter_um: INT(default=200)</div>
+<div class="eq">array_pitch_um: INT(default=600) · patch_diameter_mm: REAL(default=15)</div>
+<div class="eq">dissolution_time_min: REAL(target=15) · drug_loading_ug_per_needle: REAL</div>
+</div>
+
+<div class="udt">
+<div class="udt-name">UDT_ESignature <span class="tag tag-blue">21 CFR Part 11</span></div>
+<div class="eq">signer_id: STRING · timestamp: DATETIME(UTC) · meaning: ENUM(authored,reviewed,approved)</div>
+<div class="eq">auth_method: ENUM(biometric,password+token) · system_id: STRING</div>
+<div class="eq">immutable: BOOL(true) · linked_record_hash: SHA256</div>
+</div>
+
+<div class="udt">
+<div class="udt-name">UDT_QCResult</div>
+<div class="eq">test_id: STRING · method: STRING · specification: STRING · result: REAL</div>
+<div class="eq">units: STRING · pass: BOOL · instrument_id: STRING(calibrated)</div>
+<div class="eq">analyst: UDT_ESignature · reviewer: UDT_ESignature</div>
+</div>
+</div>
+
+<!-- ═══ 4. FORMULATION ═══ -->
+<div class="s">
+<h2>4. FORMULATION — BILL OF MATERIALS</h2>
+
+<h3>4.1 Active Components</h3>
+<table>
+<tr><th>Gate</th><th>Ingredient</th><th>CAS#</th><th>Conc%</th><th>Function</th><th>Status</th><th>Version</th></tr>
+<tr><td>R0</td><td>ALT-711 (Alagebrium)</td><td>341028-37-3</td><td>0.5</td><td>AGE crosslink breaker</td><td><span class="tag tag-green">PUBLIC DOMAIN</span></td><td>V1,V2</td></tr>
+<tr><td>R1</td><td>PLLA</td><td>26100-51-6</td><td>15</td><td>Microsphere scaffold</td><td><span class="tag tag-green">FDA APPROVED (Sculptra)</span></td><td>V1,V2</td></tr>
+<tr><td>R2</td><td>Retinol</td><td>68-26-8</td><td>0.3</td><td>Cell turnover</td><td><span class="tag tag-green">COSMETIC</span></td><td>V1,V2</td></tr>
+<tr><td>R3</td><td>GHK-Cu</td><td>49557-75-7</td><td>0.1</td><td>Fibroblast activation</td><td><span class="tag tag-green">PUBLIC DOMAIN</span></td><td>V1,V2</td></tr>
+<tr><td>R4</td><td>Niacinamide</td><td>98-92-0</td><td>2</td><td>NAD+ repair</td><td><span class="tag tag-green">COSMETIC</span></td><td>V1,V2</td></tr>
+<tr><td>R5</td><td>Hyaluronic Acid</td><td>9004-61-9</td><td>20</td><td>Needle matrix + hydration</td><td><span class="tag tag-green">COSMETIC</span></td><td>V1,V2</td></tr>
+<tr><td>R6</td><td>5-ALA</td><td>106-60-5</td><td>1</td><td>Photoactivation</td><td><span class="tag tag-red">DRUG (NDA req)</span></td><td>V2 ONLY</td></tr>
+</table>
+
+<h3>4.2 Peptide Actives</h3>
+<table>
+<tr><th>Peptide</th><th>INCI</th><th>Conc%</th><th>Function</th><th>Prior Art in MN</th></tr>
+<tr><td>Matrixyl</td><td>Palmitoyl Pentapeptide-4</td><td>0.05</td><td>Collagen I/III/IV stimulation</td><td>Yes (limited)</td></tr>
+<tr><td>Argireline</td><td>Acetyl Hexapeptide-3</td><td>0.1</td><td>Muscle relaxation (non-toxic)</td><td>Yes</td></tr>
+<tr><td>Syn-Ake</td><td>Dipeptide Diaminobutyroyl BA Diacetate</td><td>0.05</td><td>SNARE complex modulation</td><td><span class="tag tag-green">ZERO — NOVEL</span></td></tr>
+<tr><td>EGF</td><td>sh-Oligopeptide-1</td><td>0.001</td><td>Growth factor</td><td>Yes</td></tr>
+</table>
+
+<div class="warn">⚠ ALT-711 NOTE: Effective against pentosidine-type AGE crosslinks. Efficacy against glucosepane (dominant human crosslink) NOT demonstrated. Include disclosure in labeling. Active research area — monitor literature.</div>
+</div>
+
+<!-- ═══ 5. MANUFACTURING PROCESS ═══ -->
+<div class="s">
+<h2>5. MANUFACTURING PROCESS — ISA-88 / PACK-ML</h2>
+
+<h3>5.1 Process Flow</h3>
+<div class="process">
+<div class="eq"><b>STAGE 1: SOURCING</b> <span class="tag tag-blue">PACK-ML: IDLE → STARTING</span></div>
+<div class="eq">Incoming QC: identity (FTIR), purity (HPLC), microbial (USP &lt;61&gt;)</div>
+<div class="eq">Storage: ALT-711 -20°C, 5-ALA -20°C light-protected, peptides 2-8°C, HA RT</div>
+</div>
+
+<div class="process">
+<div class="eq"><b>STAGE 2: SYNTHESIS</b> <span class="tag tag-blue">PACK-ML: EXECUTE</span></div>
+<div class="eq">2a. Dissolve ALT-711 in pH 7.4 phosphate buffer at 37°C</div>
+<div class="eq">2b. Prepare GHK-Cu solution: GHK peptide + CuSO₄ → chelation at RT, 30 min</div>
+<div class="eq">2c. Dissolve retinol in MCT oil carrier (light-protected, N₂ atmosphere)</div>
+<div class="eq">2d. Prepare peptide cocktail: Matrixyl + Argireline + Syn-Ake + EGF in PBS pH 7.0</div>
+<div class="eq"><b>CCP-1:</b> pH verification ±0.2 · <b>CCP-2:</b> Cu²⁺ chelation ratio 1:1 ±5%</div>
+</div>
+
+<div class="process">
+<div class="eq"><b>STAGE 3: ENCAPSULATION</b> <span class="tag tag-blue">PACK-ML: EXECUTE</span></div>
+<div class="eq">3a. PLLA dissolved in dichloromethane (DCM)</div>
+<div class="eq">3b. W/O/W double emulsion with PVA stabilizer</div>
+<div class="eq">3c. Spray dry: inlet 110°C, outlet 65°C, feed rate 5 mL/min</div>
+<div class="eq">3d. Wash × 3 with deionized water, lyophilize 24h at -40°C</div>
+<div class="eq"><b>CCP-3:</b> Microsphere diameter 5-20μm (laser diffraction) · <b>CCP-4:</b> Residual DCM &lt;600ppm (GC)</div>
+</div>
+
+<div class="process">
+<div class="eq"><b>STAGE 4: FORMULATION</b> <span class="tag tag-blue">PACK-ML: EXECUTE</span></div>
+<div class="eq">4a. Dissolve HA (MW 100-300kDa) in water at 20% w/v, stir 12h</div>
+<div class="eq">4b. Add niacinamide to HA solution</div>
+<div class="eq">4c. Suspend PLLA microspheres (loaded) in HA matrix</div>
+<div class="eq">4d. Add peptide cocktail, ALT-711 solution, retinol emulsion</div>
+<div class="eq">4e. V2 only: Add 5-ALA phosphate (light-protected, last addition)</div>
+<div class="eq">4f. Homogenize at 3000 RPM, 10 min, vacuum degas</div>
+<div class="eq"><b>CCP-5:</b> Viscosity 8000-12000 cP · <b>CCP-6:</b> pH 6.8-7.4 · <b>CCP-7:</b> Bioburden &lt;10 CFU/g</div>
+</div>
+
+<div class="process">
+<div class="eq"><b>STAGE 5: MICRONEEDLE FABRICATION</b> <span class="tag tag-blue">PACK-ML: EXECUTE</span></div>
+<div class="eq">5a. PDMS mold preparation: 7×7 array, 500μm depth, 200μm base, 10μm tip</div>
+<div class="eq">5b. Centrifugal casting: fill mold at 4000g, 5 min</div>
+<div class="eq">5c. Backing layer: HA 10% w/v, 200μm thickness</div>
+<div class="eq">5d. Dry under controlled humidity (30% RH) at 25°C, 24h</div>
+<div class="eq">5e. Demold, inspect, trim to 15mm diameter circular patch</div>
+<div class="eq"><b>CCP-8:</b> Needle height 500±50μm · <b>CCP-9:</b> Fracture force &gt;0.1N/needle</div>
+</div>
+
+<div class="process">
+<div class="eq"><b>STAGE 6: QC & RELEASE</b> <span class="tag tag-blue">PACK-ML: COMPLETING</span></div>
+<div class="eq">6a. Visual inspection: 100% (automated vision system)</div>
+<div class="eq">6b. Dissolution test: &gt;80% release in 15 min (Franz cell)</div>
+<div class="eq">6c. HPLC potency: each active ±10% of label claim</div>
+<div class="eq">6d. Sterility: USP &lt;71&gt; or validated bioburden + terminal processing</div>
+<div class="eq">6e. Endotoxin: &lt;20 EU/device (LAL)</div>
+<div class="eq">6f. Moisture content: &lt;5% (Karl Fischer)</div>
+</div>
+
+<div class="process">
+<div class="eq"><b>STAGE 7: PACKAGING & STORAGE</b> <span class="tag tag-blue">PACK-ML: COMPLETE</span></div>
+<div class="eq">7a. Individual foil pouch (moisture barrier, light-protected), N₂ flush</div>
+<div class="eq">7b. Desiccant sachet included</div>
+<div class="eq">7c. Label: lot, expiry, UDI (if device), storage conditions</div>
+<div class="eq">7d. Storage: 2-8°C (V2 with 5-ALA), 15-25°C (V1 without)</div>
+<div class="eq">7e. Shelf life target: 18 months (V1), 12 months (V2)</div>
+</div>
+</div>
+
+<!-- ═══ 6. ENGINEERING DELIVERABLES ═══ -->
+<div class="s">
+<h2>6. ENGINEERING DELIVERABLES</h2>
+<table>
+<tr><th>Document</th><th>Standard</th><th>Status</th><th>Owner</th></tr>
+<tr><td>User Requirements Specification (URS)</td><td>GAMP 5</td><td><span class="tag tag-green">THIS DOC</span></td><td>R&D</td></tr>
+<tr><td>Design History File (DHF)</td><td>21 CFR 820.30</td><td><span class="tag tag-yellow">IN PROGRESS</span></td><td>R&D</td></tr>
+<tr><td>Device Master Record (DMR)</td><td>21 CFR 820.181</td><td><span class="tag tag-red">NOT STARTED</span></td><td>Manufacturing</td></tr>
+<tr><td>Risk Management File</td><td>ISO 14971:2019</td><td><span class="tag tag-red">NOT STARTED</span></td><td>Quality</td></tr>
+<tr><td>Biocompatibility Report</td><td>ISO 10993 series</td><td><span class="tag tag-red">NOT STARTED</span></td><td>Regulatory</td></tr>
+<tr><td>Process Validation Protocol</td><td>FDA Process Validation Guidance 2011</td><td><span class="tag tag-red">NOT STARTED</span></td><td>Manufacturing</td></tr>
+<tr><td>Stability Protocol</td><td>ICH Q1A(R2) / ASTM F1980</td><td><span class="tag tag-red">NOT STARTED</span></td><td>Quality</td></tr>
+<tr><td>21 CFR Part 11 Validation</td><td>21 CFR Part 11</td><td><span class="tag tag-red">NOT STARTED</span></td><td>IT/Quality</td></tr>
+<tr><td>IND Application (V2 only)</td><td>21 CFR 312</td><td><span class="tag tag-red">NOT STARTED</span></td><td>Regulatory</td></tr>
+<tr><td>Provisional Patent Application</td><td>35 USC §111(b)</td><td><span class="tag tag-yellow">DRAFT</span></td><td>IP Counsel</td></tr>
+<tr><td>Human Factors / Usability</td><td>IEC 62366-1</td><td><span class="tag tag-red">NOT STARTED</span></td><td>Design</td></tr>
+<tr><td>Labeling</td><td>21 CFR 801 / MoCRA</td><td><span class="tag tag-red">NOT STARTED</span></td><td>Regulatory</td></tr>
+</table>
+</div>
+
+<!-- ═══ 7. PRIOR ART & IP ═══ -->
+<div class="s">
+<h2>7. PRIOR ART & INTELLECTUAL PROPERTY</h2>
+<div class="eq"><b>Freedom to operate:</b> BROAD for V1, MODERATE for V2</div>
+<div class="eq"><b>ALT-711:</b> All 7 Alteon patents expired by 2021. Compound available ~$2-3/g bulk. <span class="tag tag-green">CLEAR</span></div>
+<div class="eq"><b>GHK-Cu:</b> All Pickart patents expired 2005-2013. <span class="tag tag-green">CLEAR</span></div>
+<div class="eq"><b>Microneedle base tech:</b> Georgia Tech + 3M patents expired 2018-2022. <span class="tag tag-green">CLEAR</span></div>
+<div class="eq"><b>Watch:</b> CosMED &gt;50wt% HA MN formulation (expires 2028), Raphas DEN process (2037)</div>
+<div class="eq"><b>Novel claims for BASILISK patent:</b></div>
+<div class="eq">▸ ALT-711 in ANY cosmetic product — <b>ZERO prior art globally</b></div>
+<div class="eq">▸ Syn-Ake in dissolving microneedle — <b>ZERO prior art globally</b></div>
+<div class="eq">▸ 11-ingredient composition with layered microsphere architecture</div>
+<div class="eq">▸ Manufacturing method for co-stabilizing pH-incompatible actives</div>
+<div class="eq"><b>Recommendation:</b> File provisional patent application establishing priority date BEFORE any public disclosure.</div>
+</div>
+
+<!-- ═══ 8. REGULATORY STRATEGY ═══ -->
+<div class="s">
+<h2>8. REGULATORY STRATEGY — DUAL TRACK</h2>
+
+<h3>Track A: V1 BASILISK CROWN (Cosmetic Device)</h3>
+<div class="process">
+<div class="eq"><b>Month 1-3:</b> Formulation development, stability initiation</div>
+<div class="eq"><b>Month 3-6:</b> Biocompatibility testing (ISO 10993), process validation</div>
+<div class="eq"><b>Month 6-9:</b> 510(k) or De Novo submission preparation</div>
+<div class="eq"><b>Month 9-12:</b> FDA review, EU Notified Body engagement</div>
+<div class="eq"><b>Month 12-15:</b> Market authorization, initial launch</div>
+<div class="eq"><b>Claims:</b> "Supports skin's natural collagen renewal" (structure/function, NOT drug claim)</div>
+</div>
+
+<h3>Track B: V2 BASILISK RADIANT (Drug-Device Combo)</h3>
+<div class="process">
+<div class="eq"><b>Month 1-6:</b> Pre-IND meeting with FDA CDER + OCP</div>
+<div class="eq"><b>Month 6-12:</b> IND-enabling studies, GLP tox</div>
+<div class="eq"><b>Month 12-24:</b> Phase I safety study (n=30)</div>
+<div class="eq"><b>Month 24-36:</b> Phase II efficacy (n=120)</div>
+<div class="eq"><b>Month 36-42:</b> 505(b)(2) NDA submission</div>
+<div class="eq"><b>Month 42-48:</b> FDA review</div>
+<div class="eq"><b>Alternative:</b> Launch V2 in EU (cosmetic 5-ALA phosphate allowed) or Japan (SBI precedent) while US NDA processes.</div>
+</div>
+</div>
+
+<!-- ═══ 9. COST ESTIMATE ═══ -->
+<div class="s">
+<h2>9. COST ESTIMATE — ROM</h2>
+<table>
+<tr><th>Item</th><th>V1 (Device)</th><th>V2 (Drug-Device)</th></tr>
+<tr><td>Formulation R&D</td><td>$150-300K</td><td>$300-500K</td></tr>
+<tr><td>Biocompatibility Testing</td><td>$80-150K</td><td>$150-250K</td></tr>
+<tr><td>Process Validation</td><td>$100-200K</td><td>$200-400K</td></tr>
+<tr><td>Stability Studies</td><td>$50-100K</td><td>$100-200K</td></tr>
+<tr><td>Regulatory Submission</td><td>$50-100K</td><td>$500K-1M</td></tr>
+<tr><td>Clinical Trials</td><td>$0 (if cosmetic)</td><td>$1-3M</td></tr>
+<tr><td>Patent Filing</td><td>$15-30K</td><td>$15-30K</td></tr>
+<tr><td>Manufacturing Setup</td><td>$200-500K</td><td>$500K-1M</td></tr>
+<tr><td><b>TOTAL</b></td><td><b>$645K-1.4M</b></td><td><b>$2.8-6.4M</b></td></tr>
+</table>
+<div class="eq">COGS per patch (at scale): $3-8 (V1), $5-12 (V2)</div>
+<div class="eq">Retail price target: $50-80/patch (V1), $150-250/patch (V2)</div>
+<div class="eq">Margin: 85-95% at scale</div>
+</div>
+
+<!-- ═══ 10. NOMENCLATURE ═══ -->
+<div class="s">
+<h2>10. NOMENCLATURE</h2>
+<div class="eq">BASILISK = B(2)+A(1)+S(19)+I(9)+L(12)+I(9)+S(19)+K(11) = <b>82 = Lead = Saturn = 2×41 = 2×ANETA</b></div>
+<div class="eq">The gaze that freezes time. Element 82. Heaviest stable element. Endpoint of all decay chains.</div>
+<div class="eq">BASILISK™ — trademark search: <b>UNOCCUPIED</b> in cosmetics (NICE Class 3, 5, 10)</div>
+</div>
+
+</div>
+</body></html>
