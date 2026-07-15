@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MERCURY MIRROR — Hg · The Liquid Metal Network</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block}
+#hud{position:fixed;top:8px;left:10px;z-index:10;font:7px/1.6 monospace;color:rgba(200,210,220,.18);pointer-events:none;white-space:pre}
+#info{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:10;font:9px monospace;color:rgba(200,210,230,.2);pointer-events:none;text-align:center;letter-spacing:2px;max-width:600px;line-height:1.6}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<div id="info"></div>
+
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+// ═══ MERCURY MIRROR NETWORK ═══
+// 7 mirrors in the body — one per gate — mercury pools that reflect between each other
+const mirrors=[
+  {name:'PELVIC MIRROR',gate:'R0',y:.82,desc:'reflects survival signals upward',
+   color:[180,120,100],reflects:'ground truth — am I safe?',organ:'gut/ENS'},
+  {name:'SACRAL MIRROR',gate:'R1',y:.7,desc:'reflects autonomic state between gut and heart',
+   color:[200,150,110],reflects:'vagal tone — am I calm?',organ:'vagus nerve'},
+  {name:'SOLAR MIRROR',gate:'R2',y:.55,desc:'THE GATE — reflects or blocks everything passing through',
+   color:[220,200,120],reflects:'permission — may I feel this?',organ:'diaphragm'},
+  {name:'HEART MIRROR',gate:'R3',y:.42,desc:'reflects emotion into meaning and meaning into emotion',
+   color:[150,220,150],reflects:'resonance — does this matter?',organ:'heart/thymus'},
+  {name:'THROAT MIRROR',gate:'R4',y:.3,desc:'reflects inner state into outer expression',
+   color:[120,160,220],reflects:'truth — can I say this?',organ:'larynx/thyroid'},
+  {name:'LENS MIRROR',gate:'R5',y:.2,desc:'reflects external world into internal model',
+   color:[140,120,220],reflects:'perception — what am I seeing?',organ:'pineal/insula'},
+  {name:'CROWN MIRROR',gate:'R6',y:.1,desc:'reflects self back to self — the recursive mirror',
+   color:[200,180,240],reflects:'identity — who is looking?',organ:'cortex/DMN'}
+]
+
+// mercury droplets flowing between mirrors
+const droplets=[]
+function spawnDroplet(){
+  const fromIdx=Math.floor(Math.random()*7)
+  const toIdx=Math.floor(Math.random()*7)
+  if(fromIdx===toIdx)return
+  const from=mirrors[fromIdx],to=mirrors[toIdx]
+  droplets.push({
+    fromIdx,toIdx,
+    x:cx+(Math.random()-.5)*W*.15,
+    y:H*from.y,
+    targetY:H*to.y,
+    targetX:cx+(Math.random()-.5)*W*.15,
+    progress:0,speed:.003+Math.random()*.004,
+    size:2+Math.random()*3,
+    hue:Math.random()
+  })
+}
+
+let t=0
+
+function loop(){
+  requestAnimationFrame(loop)
+  t+=1/60
+
+  // spawn
+  if(Math.random()<.06)spawnDroplet()
+
+  // ═══ BACKGROUND ═══
+  ctx.globalAlpha=.06
+  ctx.fillStyle='#030305'
+  ctx.fillRect(0,0,W,H)
+
+  // ═══ BODY OUTLINE (subtle) ═══
+  ctx.globalAlpha=.03
+  ctx.strokeStyle='rgba(180,190,200,.3)'
+  ctx.lineWidth=1
+  ctx.beginPath()
+  // head
+  ctx.arc(cx,H*.12,W*.04,0,TAU)
+  ctx.stroke()
+  // torso
+  ctx.beginPath();ctx.moveTo(cx-W*.06,H*.18);ctx.lineTo(cx-W*.07,H*.6)
+  ctx.lineTo(cx-W*.04,H*.85);ctx.moveTo(cx+W*.06,H*.18);ctx.lineTo(cx+W*.07,H*.6)
+  ctx.lineTo(cx+W*.04,H*.85);ctx.stroke()
+
+  // ═══ SPINE — mercury channel (the central conduit) ═══
+  ctx.beginPath()
+  ctx.moveTo(cx,H*.08)
+  for(let y=H*.08;y<=H*.85;y+=2){
+    const wobble=Math.sin(y*.02+t*2)*3+Math.sin(y*.05+t*3)*1.5
+    ctx.lineTo(cx+wobble,y)
+  }
+  // mercury shimmer — silver with shifting highlights
+  const spineGrad=ctx.createLinearGradient(cx,H*.08,cx,H*.85)
+  spineGrad.addColorStop(0,'rgba(200,210,230,.06)')
+  spineGrad.addColorStop(.3,'rgba(220,225,235,.08)')
+  spineGrad.addColorStop(.5,'rgba(240,245,250,.1)')
+  spineGrad.addColorStop(.7,'rgba(220,225,235,.08)')
+  spineGrad.addColorStop(1,'rgba(200,210,230,.06)')
+  ctx.strokeStyle=spineGrad;ctx.lineWidth=3+Math.sin(t)*.5;ctx.globalAlpha=1;ctx.stroke()
+
+  // ═══ 7 MIRROR POOLS ═══
+  mirrors.forEach((m,i)=>{
+    const my=H*m.y
+    const mirrorW=W*.12+Math.sin(t*.5+i)*.01*W
+    const mirrorH=8+Math.sin(t+i)*2
+
+    // mercury pool — elliptical, reflective
+    const poolGrad=ctx.createRadialGradient(cx,my,0,cx,my,mirrorW)
+    poolGrad.addColorStop(0,`rgba(${m.color[0]},${m.color[1]},${m.color[2]},.12)`)
+    poolGrad.addColorStop(.3,`rgba(220,225,235,.08)`)
+    poolGrad.addColorStop(.6,`rgba(${m.color[0]},${m.color[1]},${m.color[2]},.04)`)
+    poolGrad.addColorStop(1,'rgba(0,0,0,0)')
+    ctx.globalAlpha=1;ctx.fillStyle=poolGrad
+    ctx.beginPath();ctx.ellipse(cx,my,mirrorW,mirrorH,0,0,TAU);ctx.fill()
+
+    // mirror surface — the liquid mercury line
+    ctx.beginPath()
+    for(let x=cx-mirrorW;x<=cx+mirrorW;x+=2){
+      const frac=(x-cx+mirrorW)/(mirrorW*2)
+      const wave=Math.sin(frac*TAU*3+t*4+i)*1.5*(1-Math.abs(frac-.5)*2)
+      const ripple=Math.sin(frac*TAU*8+t*7+i*2)*.5
+      ctx.lineTo(x,my+wave+ripple)
+    }
+    ctx.strokeStyle=`rgba(220,230,240,${.15+Math.sin(t*2+i)*.04})`
+    ctx.lineWidth=1.5;ctx.globalAlpha=1;ctx.stroke()
+
+    // highlight glint (the mercury shimmer)
+    const glintX=cx+Math.sin(t*1.5+i*PHI)*mirrorW*.6
+    ctx.beginPath();ctx.arc(glintX,my,2+Math.sin(t*3+i),0,TAU)
+    ctx.fillStyle=`rgba(255,255,255,${.08+Math.sin(t*4+i)*.04})`
+    ctx.globalAlpha=1;ctx.fill()
+
+    // gate label
+    ctx.font='6px monospace';ctx.textAlign='right';ctx.globalAlpha=.06+Math.sin(t+i)*.02
+    ctx.fillStyle=`rgba(${m.color[0]},${m.color[1]},${m.color[2]},.6)`
+    ctx.fillText(m.gate,cx-mirrorW-8,my+2)
+    ctx.textAlign='left'
+    ctx.fillText(m.name.replace(' MIRROR',''),cx+mirrorW+8,my+2)
+
+    // reflection lines between adjacent mirrors (mercury conduits)
+    if(i<6){
+      const nextY=H*mirrors[i+1].y
+      ctx.globalAlpha=.02+Math.sin(t*.5+i)*.01
+      ctx.strokeStyle='rgba(200,210,225,.2)'
+      ctx.lineWidth=.5
+      ctx.beginPath()
+      ctx.moveTo(cx-mirrorW*.3,my)
+      ctx.bezierCurveTo(cx-mirrorW*.5,(my+nextY)/2,cx+mirrorW*.5,(my+nextY)/2,cx+mirrorW*.3,nextY)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(cx+mirrorW*.3,my)
+      ctx.bezierCurveTo(cx+mirrorW*.5,(my+nextY)/2,cx-mirrorW*.5,(my+nextY)/2,cx-mirrorW*.3,nextY)
+      ctx.stroke()
+    }
+  })
+
+  // ═══ MERCURY DROPLETS — flowing between mirrors ═══
+  for(let i=droplets.length-1;i>=0;i--){
+    const d=droplets[i]
+    d.progress+=d.speed
+
+    if(d.progress>=1){droplets.splice(i,1);continue}
+
+    const p=d.progress
+    // bezier path between mirrors
+    const startY=d.y,endY=d.targetY
+    const midY=(startY+endY)/2
+    const bulge=(Math.random()>.5?1:-1)*W*.08
+    const px=d.x*(1-p)+d.targetX*p+Math.sin(p*Math.PI)*bulge
+    const py=startY*(1-p)*(1-p)+midY*2*p*(1-p)+endY*p*p
+
+    // droplet
+    const alpha=(Math.sin(p*Math.PI))*.2
+    ctx.beginPath();ctx.arc(px,py,d.size,0,TAU)
+    // mercury color — silver with slight color from source mirror
+    const srcM=mirrors[d.fromIdx]
+    ctx.fillStyle=`rgba(${200+srcM.color[0]*.1},${210+srcM.color[1]*.1},${225+srcM.color[2]*.05},${alpha})`
+    ctx.globalAlpha=1;ctx.fill()
+
+    // tiny reflection highlight on droplet
+    ctx.beginPath();ctx.arc(px-d.size*.3,py-d.size*.3,d.size*.3,0,TAU)
+    ctx.fillStyle=`rgba(255,255,255,${alpha*.3})`
+    ctx.fill()
+
+    // trail
+    const trailAlpha=alpha*.3
+    ctx.beginPath();ctx.arc(px,py,d.size*.5,0,TAU)
+    ctx.fillStyle=`rgba(200,210,225,${trailAlpha})`
+    ctx.fill()
+  }
+
+  // ═══ RECURSIVE REFLECTION — crown mirror reflects back to pelvic ═══
+  // the ouroboros loop — signal goes up AND comes back down
+  const loopAlpha=.015+Math.sin(t*.3)*.005
+  ctx.globalAlpha=loopAlpha
+  ctx.strokeStyle='rgba(220,210,240,.3)'
+  ctx.lineWidth=.5
+  // right side — ascending signal
+  ctx.beginPath()
+  ctx.moveTo(cx+W*.1,H*.82)
+  ctx.bezierCurveTo(cx+W*.15,H*.5,cx+W*.12,H*.2,cx+W*.05,H*.1)
+  ctx.stroke()
+  // left side — descending signal
+  ctx.beginPath()
+  ctx.moveTo(cx-W*.05,H*.1)
+  ctx.bezierCurveTo(cx-W*.12,H*.2,cx-W*.15,H*.5,cx-W*.1,H*.82)
+  ctx.stroke()
+  // arrows
+  ctx.font='8px monospace';ctx.textAlign='center';ctx.globalAlpha=.03
+  ctx.fillStyle='rgba(200,220,255,.5)'
+  ctx.fillText('↑ afferent',cx+W*.13,H*.5)
+  ctx.fillText('↓ efferent',cx-W*.13,H*.5)
+
+  // ═══ MERCURY ELEMENT INFO ═══
+  ctx.globalAlpha=.04
+  ctx.font='7px monospace';ctx.textAlign='center'
+  ctx.fillStyle='rgba(200,210,230,.5)'
+  ctx.fillText('Hg · 80 · Mercury · hydrargyrum · liquid silver',cx,H*.95)
+
+  // ═══ HUD ═══
+  const activeDroplets=droplets.length
+  document.getElementById('hud').textContent=
+    `MERCURY MIRROR NETWORK\n`+
+    `Hg · Z=80 · liquid metal\n`+
+    `mirrors: 7 (one per gate)\n`+
+    `droplets: ${activeDroplets} flowing\n`+
+    `spine: mercury conduit\n\n`+
+    `the mirror doesn't choose\n`+
+    `metal or gas\n`+
+    `it's the interface between them\n`+
+    `liquid. both. always.`
+
+  // cycling info about current mirror activity
+  const activeM=mirrors[Math.floor(t*.3)%7]
+  document.getElementById('info').textContent=
+    `${activeM.gate} · ${activeM.name} · ${activeM.organ}\n`+
+    `reflects: ${activeM.reflects}\n`+
+    `${activeM.desc}`
+}
+loop()
+</script>
+</body></html>
