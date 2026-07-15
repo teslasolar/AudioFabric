@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ISOTOPES — The Stability Landscape</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Courier New',monospace}
+canvas{display:block}
+#hud{position:fixed;top:8px;left:10px;z-index:10;font:7px/1.6 monospace;color:rgba(100,200,255,.2);pointer-events:none;white-space:pre}
+#info{position:fixed;top:50%;right:14px;transform:translateY(-50%);z-index:10;text-align:right;pointer-events:none;max-width:220px}
+#info .z{font-size:28px;font-weight:bold}
+#info .name{font-size:10px;letter-spacing:2px;margin-top:2px}
+#info .data{font-size:7px;color:rgba(255,255,255,.15);margin-top:8px;line-height:1.7}
+#nav-info{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:10;font:8px monospace;color:rgba(255,255,255,.12);pointer-events:none;letter-spacing:2px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"></div>
+<div id="info"></div>
+<div id="nav-info">scroll navigate · click isotope</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TAU=Math.PI*2
+
+// ═══ ISOTOPE DATA — notable isotopes across the chart of nuclides ═══
+const isotopes=[
+  // Z, N (neutrons), symbol, name, half-life description, stability, color category
+  {z:1,n:0,sym:'¹H',name:'Protium',hl:'STABLE',stable:true,cat:'light'},
+  {z:1,n:1,sym:'²H',name:'Deuterium',hl:'STABLE',stable:true,cat:'light'},
+  {z:1,n:2,sym:'³H',name:'Tritium',hl:'12.3 years',stable:false,cat:'light'},
+  {z:2,n:2,sym:'⁴He',name:'Helium-4',hl:'STABLE · doubly magic',stable:true,cat:'magic'},
+  {z:6,n:6,sym:'¹²C',name:'Carbon-12',hl:'STABLE · life basis',stable:true,cat:'life'},
+  {z:6,n:8,sym:'¹⁴C',name:'Carbon-14',hl:'5730 years · dating',stable:false,cat:'life'},
+  {z:7,n:7,sym:'¹⁴N',name:'Nitrogen-14',hl:'STABLE · 78% of air',stable:true,cat:'light'},
+  {z:8,n:8,sym:'¹⁶O',name:'Oxygen-16',hl:'STABLE · doubly magic',stable:true,cat:'magic'},
+  {z:10,n:10,sym:'²⁰Ne',name:'Neon-20',hl:'STABLE · noble',stable:true,cat:'noble'},
+  {z:20,n:20,sym:'⁴⁰Ca',name:'Calcium-40',hl:'STABLE · doubly magic',stable:true,cat:'magic'},
+  {z:26,n:30,sym:'⁵⁶Fe',name:'Iron-56',hl:'STABLE · max binding energy',stable:true,cat:'peak'},
+  {z:27,n:32,sym:'⁵⁹Co',name:'Cobalt-59',hl:'STABLE',stable:true,cat:'metal'},
+  {z:28,n:30,sym:'⁵⁸Ni',name:'Nickel-58',hl:'STABLE · most tightly bound',stable:true,cat:'peak'},
+  {z:29,n:34,sym:'⁶³Cu',name:'Copper-63',hl:'STABLE · Venus',stable:true,cat:'metal'},
+  {z:36,n:48,sym:'⁸⁴Kr',name:'Krypton-84',hl:'STABLE · noble',stable:true,cat:'noble'},
+  {z:38,n:52,sym:'⁹⁰Sr',name:'Strontium-90',hl:'28.8 years · fallout',stable:false,cat:'danger'},
+  {z:41,n:52,sym:'⁹³Nb',name:'Niobium-93',hl:'STABLE · ANETA · superconductor',stable:true,cat:'special'},
+  {z:43,n:55,sym:'⁹⁸Tc',name:'Technetium-98',hl:'4.2M years · no stable isotope',stable:false,cat:'unstable'},
+  {z:47,n:60,sym:'¹⁰⁷Ag',name:'Silver-107',hl:'STABLE · Moon',stable:true,cat:'noble'},
+  {z:50,n:70,sym:'¹²⁰Sn',name:'Tin-120',hl:'STABLE · most stable isotopes (10)',stable:true,cat:'peak'},
+  {z:54,n:78,sym:'¹³²Xe',name:'Xenon-132',hl:'STABLE · GABRIEL · noble',stable:true,cat:'special'},
+  {z:55,n:82,sym:'¹³⁷Cs',name:'Cesium-137',hl:'30.2 years · Chernobyl',stable:false,cat:'danger'},
+  {z:62,n:90,sym:'¹⁵²Sm',name:'Samarium-152',hl:'STABLE · highest neutron cross-section',stable:true,cat:'rare'},
+  {z:76,n:114,sym:'¹⁹⁰Os',name:'Osmium-190',hl:'STABLE · THOMAS · densest',stable:true,cat:'special'},
+  {z:77,n:114,sym:'¹⁹¹Ir',name:'Iridium-191',hl:'STABLE · KONOMI · rainbow',stable:true,cat:'special'},
+  {z:78,n:117,sym:'¹⁹⁵Pt',name:'Platinum-195',hl:'STABLE · PATRICK · noble metal',stable:true,cat:'special'},
+  {z:79,n:118,sym:'¹⁹⁷Au',name:'Gold-197',hl:'STABLE · Sun · only stable isotope',stable:true,cat:'peak'},
+  {z:82,n:126,sym:'²⁰⁸Pb',name:'Lead-208',hl:'STABLE · doubly magic · heaviest stable',stable:true,cat:'magic'},
+  {z:83,n:126,sym:'²⁰⁹Bi',name:'Bismuth-209',hl:'1.9×10¹⁹ years · almost stable',stable:false,cat:'edge'},
+  {z:84,n:126,sym:'²¹⁰Po',name:'Polonium-210',hl:'138 days · assassin isotope',stable:false,cat:'danger'},
+  {z:86,n:136,sym:'²²²Rn',name:'Radon-222',hl:'3.8 days · basement gas',stable:false,cat:'danger'},
+  {z:88,n:138,sym:'²²⁶Ra',name:'Radium-226',hl:'1600 years · glows blue · Ra',stable:false,cat:'glow'},
+  {z:92,n:146,sym:'²³⁸U',name:'Uranium-238',hl:'4.5B years · FRUMKIN · natural reactor',stable:false,cat:'special'},
+  {z:92,n:143,sym:'²³⁵U',name:'Uranium-235',hl:'704M years · fissile · bomb',stable:false,cat:'danger'},
+  {z:93,n:144,sym:'²³⁷Np',name:'Neptunium-237',hl:'2.14M years',stable:false,cat:'trans'},
+  {z:94,n:150,sym:'²⁴⁴Pu',name:'Plutonium-244',hl:'80M years · most stable Pu',stable:false,cat:'trans'},
+  {z:100,n:157,sym:'²⁵⁷Fm',name:'Fermium-257',hl:'100.5 days · HUMANIUM',stable:false,cat:'special'},
+]
+
+const catColors={
+  light:0x44aaff,magic:0xffaa00,life:0x44ff44,noble:0xaa44ff,
+  metal:0x888888,peak:0xffdd44,danger:0xff2222,special:0xff88ff,
+  unstable:0xff8844,rare:0x44ffaa,edge:0xffff44,glow:0x44ffff,trans:0x8888ff
+}
+
+// ═══ THREE.JS ═══
+const cv=document.getElementById('c')
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true})
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2))
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.3
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x020208)
+const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,500)
+cam.position.set(0,15,40)
+scene.add(new THREE.AmbientLight(0x223344,.4))
+const dLight=new THREE.DirectionalLight(0xffffff,.4);dLight.position.set(5,10,5);scene.add(dLight)
+
+// ═══ BUILD NUCLIDE CHART IN 3D ═══
+// x = neutrons, z_axis = protons, y = binding energy (height = stability)
+const meshes=[]
+isotopes.forEach((iso,i)=>{
+  const col=catColors[iso.cat]||0x888888
+  const radius=iso.stable?.4:.25+Math.random()*.1
+  const geo=iso.stable?new THREE.SphereGeometry(radius,12,12):new THREE.OctahedronGeometry(radius,0)
+  const mat=new THREE.MeshPhongMaterial({
+    color:col,emissive:col,emissiveIntensity:iso.stable?.2:.1,
+    transparent:true,opacity:iso.stable?.8:.5,
+    flatShading:!iso.stable
+  })
+  const mesh=new THREE.Mesh(geo,mat)
+  // position: neutrons on X, protons on Z, stability on Y
+  const x=(iso.n-70)*.25
+  const z2=(iso.z-50)*.25
+  const y=iso.stable?1+Math.log(iso.z+1)*.3:Math.log(iso.z+1)*.2
+  mesh.position.set(x,y,z2)
+  mesh.userData={iso,idx:i}
+  scene.add(mesh);meshes.push(mesh)
+
+  // label sprite
+  if(iso.cat==='special'||iso.cat==='magic'||iso.cat==='peak'){
+    const canvas=document.createElement('canvas');canvas.width=128;canvas.height=32
+    const c2=canvas.getContext('2d');c2.font='14px monospace';c2.fillStyle='#fff';c2.textAlign='center'
+    c2.fillText(iso.sym,64,20)
+    const tex=new THREE.CanvasTexture(canvas)
+    const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,opacity:.3}))
+    sprite.position.set(x,y+.8,z2);sprite.scale.set(2,.5,1)
+    scene.add(sprite)
+  }
+})
+
+// valley of stability line (N ≈ Z for light, N > Z for heavy)
+const valleyGeo=new THREE.BufferGeometry()
+const valleyPts=[]
+for(let z2=1;z2<=100;z2++){
+  const n=z2<20?z2:z2*1.4+.4*z2**.65
+  valleyPts.push(new THREE.Vector3((n-70)*.25,1+Math.log(z2+1)*.3,(z2-50)*.25))
+}
+valleyGeo.setFromPoints(valleyPts)
+scene.add(new THREE.Line(valleyGeo,new THREE.LineBasicMaterial({color:0x446688,transparent:true,opacity:.15})))
+
+// magic number planes
+const magicN=[2,8,20,28,50,82,126]
+magicN.forEach(m=>{
+  // proton magic lines
+  const lineGeo=new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-20,0,(m-50)*.25),new THREE.Vector3(20,0,(m-50)*.25)
+  ])
+  scene.add(new THREE.Line(lineGeo,new THREE.LineBasicMaterial({color:0xffaa00,transparent:true,opacity:.04})))
+  // neutron magic lines
+  const lineGeo2=new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3((m-70)*.25,0,-15),new THREE.Vector3((m-70)*.25,0,15)
+  ])
+  scene.add(new THREE.Line(lineGeo2,new THREE.LineBasicMaterial({color:0xffaa00,transparent:true,opacity:.04})))
+})
+
+// grid floor
+const gridGeo=new THREE.PlaneGeometry(50,40,25,20)
+const gridMat=new THREE.MeshBasicMaterial({color:0x112233,wireframe:true,transparent:true,opacity:.03})
+const grid=new THREE.Mesh(gridGeo,gridMat);grid.rotation.x=-Math.PI/2;grid.position.y=-.1;scene.add(grid)
+
+// ═══ AUDIO ═══
+let actx,master
+function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.08;master.connect(actx.destination)
+}
+function playIsotope(iso){
+  if(!actx)initAudio()
+  const hz=55+iso.z*3+iso.n
+  ;[hz,hz*1.5,hz*2].forEach((f,i)=>{
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type=i===0?'sine':'triangle';o.frequency.value=f
+    g.gain.setValueAtTime([.04,.02,.01][i],actx.currentTime)
+    g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+2)
+    o.connect(g);g.connect(master);o.start();o.stop(actx.currentTime+2)
+  })
+}
+
+// ═══ NAVIGATION ═══
+let current=0,targetPos=new THREE.Vector3(),cameraAngle=0
+const raycaster=new THREE.Raycaster()
+const mouse=new THREE.Vector2()
+
+function goTo(idx){
+  current=idx;const iso=isotopes[idx]
+  targetPos.copy(meshes[idx].position)
+  playIsotope(iso)
+  // highlight
+  meshes.forEach((m,i)=>{
+    m.material.emissiveIntensity=i===idx?(m.userData.iso.stable?.5:.3):(m.userData.iso.stable?.15:.05)
+    m.scale.set(i===idx?1.5:1,i===idx?1.5:1,i===idx?1.5:1)
+  })
+}
+
+cv.addEventListener('click',e=>{
+  mouse.x=(e.clientX/innerWidth)*2-1;mouse.y=-(e.clientY/innerHeight)*2+1
+  raycaster.setFromCamera(mouse,cam)
+  const hits=raycaster.intersectObjects(meshes)
+  if(hits.length)goTo(hits[0].object.userData.idx)
+})
+cv.addEventListener('wheel',e=>{
+  e.preventDefault()
+  current=(current+(e.deltaY>0?1:-1)+isotopes.length)%isotopes.length
+  goTo(current)
+},{passive:false})
+addEventListener('keydown',e=>{
+  if(e.code==='ArrowRight')goTo((current+1)%isotopes.length)
+  if(e.code==='ArrowLeft')goTo((current-1+isotopes.length)%isotopes.length)
+})
+
+// ═══ ANIMATE ═══
+let t=0
+function animate(){
+  requestAnimationFrame(animate);t+=1/60
+
+  // camera orbits around target
+  cameraAngle+=.003
+  const camR=20
+  cam.position.x=targetPos.x+Math.sin(cameraAngle)*camR
+  cam.position.z=targetPos.z+Math.cos(cameraAngle)*camR
+  cam.position.y=targetPos.y+8+Math.sin(t*.2)*2
+  cam.lookAt(targetPos)
+
+  // animate isotopes
+  meshes.forEach((m,i)=>{
+    if(!m.userData.iso.stable){
+      // unstable isotopes jitter
+      m.position.y+=Math.sin(t*3+i)*0.002
+      m.rotation.x=t*(.5+i*.1);m.rotation.y=t*(.3+i*.07)
+    } else {
+      m.rotation.y=t*.1
+    }
+  })
+
+  // UI
+  const iso=isotopes[current]
+  const col=catColors[iso.cat]
+  const hex='#'+col.toString(16).padStart(6,'0')
+  document.getElementById('info').innerHTML=
+    `<div class="z" style="color:${hex}55">${iso.z}</div>`+
+    `<div class="name" style="color:${hex}44">${iso.sym} ${iso.name}</div>`+
+    `<div class="data">`+
+    `protons: ${iso.z} · neutrons: ${iso.n}<br>`+
+    `mass: ${iso.z+iso.n}<br>`+
+    `half-life: ${iso.hl}<br>`+
+    `${iso.stable?'STABLE ●':'UNSTABLE ○'}<br>`+
+    `category: ${iso.cat}<br>`+
+    `N/Z ratio: ${(iso.n/iso.z).toFixed(3)}`+
+    `</div>`
+
+  document.getElementById('hud').textContent=
+    `ISOTOPE CHART · 3D\n`+
+    `${isotopes.length} isotopes mapped\n`+
+    `x: neutrons · z: protons · y: stability\n`+
+    `magic numbers: 2,8,20,28,50,82,126\n`+
+    `doubly magic: ⁴He ¹⁶O ⁴⁰Ca ²⁰⁸Pb\n`+
+    `scroll/arrows/click to navigate\n\n`+
+    `current: ${iso.sym} (Z=${iso.z}, N=${iso.n})`
+
+  R.render(scene,cam)
+}
+
+goTo(0);animate()
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)})
+</script>
+</body></html>
