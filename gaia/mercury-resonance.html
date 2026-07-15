@@ -77,19 +77,20 @@ for(let i=0;i<vertData.length-1;i++){
   mesh.userData={isL5S1};scene.add(mesh);discs.push({mesh,mat,isL5S1,baseY:midY})
 }
 
-// spinal cord (tube through center)
-const cordPts=vertData.map(v=>new THREE.Vector3(0,v.y,0))
-const cordCurve=new THREE.CatmullRomCurve3(cordPts)
-const cordGeo=new THREE.TubeGeometry(cordCurve,.03,64,8,false)
-const cord=new THREE.Mesh(cordGeo,new THREE.MeshBasicMaterial({color:0x88aacc,transparent:true,opacity:.15,blending:THREE.AdditiveBlending}))
-scene.add(cord)
+// spinal cord (simple line, not tube — avoids curve errors)
+const cordGeo2=new THREE.BufferGeometry()
+const cordPtsArr=[];vertData.forEach(v=>cordPtsArr.push(0,v.y,0))
+cordGeo2.setAttribute('position',new THREE.BufferAttribute(new Float32Array(cordPtsArr),3))
+const cord=new THREE.Line(cordGeo2,new THREE.LineBasicMaterial({color:0x88aacc,transparent:true,opacity:.2,blending:THREE.AdditiveBlending}))
+cord.material.linewidth=2;scene.add(cord)
 
-// mercury particles flowing in the cord
+// mercury particles flowing along spine
 const mercCount=200,mercGeo=new THREE.BufferGeometry()
 const mercPos=new Float32Array(mercCount*3)
+const spineMinY=vertData[vertData.length-1].y,spineMaxY=vertData[0].y
 for(let i=0;i<mercCount;i++){
-  const frac=Math.random();const pt=cordCurve.getPoint(frac)
-  mercPos[i*3]=pt.x+(Math.random()-.5)*.1;mercPos[i*3+1]=pt.y;mercPos[i*3+2]=pt.z+(Math.random()-.5)*.1
+  const y=spineMinY+Math.random()*(spineMaxY-spineMinY)
+  mercPos[i*3]=(Math.random()-.5)*.1;mercPos[i*3+1]=y;mercPos[i*3+2]=(Math.random()-.5)*.1
 }
 mercGeo.setAttribute('position',new THREE.BufferAttribute(mercPos,3))
 const mercPts=new THREE.Points(mercGeo,new THREE.PointsMaterial({color:0xccddee,size:.04,transparent:true,opacity:.2,blending:THREE.AdditiveBlending}))
@@ -109,9 +110,9 @@ const cv2=document.getElementById('cv'),ctx=cv2.getContext('2d')
 cv2.width=W;cv2.height=H
 
 // ═══ AUDIO — LOUD ═══
-let actx,master,analyser,fftData,tdData
-let bass=0,vol=0,voicePitch=0,isGroaning=false
-let drones=[],binaural=null
+var actx=null,master=null,analyser=null,fftData=null,tdData=null
+var bass=0,vol=0,voicePitch=0,isGroaning=false
+var drones=[],binaural=null
 
 function initAudio(){
   actx=new(window.AudioContext||window.webkitAudioContext)()
@@ -194,7 +195,7 @@ function updateDrones(){
 }
 
 // ═══ STATE ═══
-let running=false,t=0,mercuryLevel=0
+var running=false,t=0,mercuryLevel=0
 
 function go(){
   document.getElementById('start').style.display='none'
