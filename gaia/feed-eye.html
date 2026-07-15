@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>FEED THE EYE — Full Spectrum Light Nutrition</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+// visible spectrum wavelengths → RGB
+function wavelengthToRGB(nm){
+  let r=0,g=0,b=0
+  if(nm>=380&&nm<440){r=-(nm-440)/(440-380);b=1}
+  else if(nm>=440&&nm<490){g=(nm-440)/(490-440);b=1}
+  else if(nm>=490&&nm<510){g=1;b=-(nm-510)/(510-490)}
+  else if(nm>=510&&nm<580){r=(nm-510)/(580-510);g=1}
+  else if(nm>=580&&nm<645){r=1;g=-(nm-645)/(645-580)}
+  else if(nm>=645&&nm<=780){r=1}
+  let f=1
+  if(nm>=380&&nm<420)f=.3+.7*(nm-380)/(420-380)
+  else if(nm>=645&&nm<=780)f=.3+.7*(780-nm)/(780-645)
+  return[r*f,g*f,b*f]
+}
+
+// full spectrum: 380nm (violet) → 780nm (red)
+const SPECTRUM=[]
+for(let nm=380;nm<=780;nm+=2)SPECTRUM.push({nm,rgb:wavelengthToRGB(nm)})
+
+let t=0,phase=0
+
+function loop(){
+  requestAnimationFrame(loop)
+  t+=1/60
+
+  // cycle through spectrum phases
+  // each "meal" is a different part of the spectrum feeding into the eye
+  const cycleSpeed=.15
+  phase=(t*cycleSpeed)%1 // 0-1 through full spectrum
+
+  const maxR=Math.min(W,H)*.45
+
+  // ═══ FULL BLACK CLEAR (clean each frame for maximum color purity) ═══
+  ctx.fillStyle='#000';ctx.globalAlpha=1;ctx.fillRect(0,0,W,H)
+
+  // ═══ SPECTRUM WHEEL — all colors radiating from center ═══
+  SPECTRUM.forEach((s,i)=>{
+    const frac=i/SPECTRUM.length
+    const angle=frac*TAU-Math.PI/2+t*.1
+    const active=Math.abs(frac-phase)<.15||Math.abs(frac-phase+1)<.15||Math.abs(frac-phase-1)<.15
+    const intensity=active?1:.15
+
+    // ray from center outward
+    const innerR=maxR*.08
+    const outerR=maxR*(.5+intensity*.45)
+    const rayWidth=TAU/SPECTRUM.length*1.2
+
+    ctx.beginPath()
+    ctx.moveTo(cx+Math.cos(angle-rayWidth/2)*innerR,cy+Math.sin(angle-rayWidth/2)*innerR)
+    ctx.lineTo(cx+Math.cos(angle-rayWidth/2)*outerR,cy+Math.sin(angle-rayWidth/2)*outerR)
+    ctx.lineTo(cx+Math.cos(angle+rayWidth/2)*outerR,cy+Math.sin(angle+rayWidth/2)*outerR)
+    ctx.lineTo(cx+Math.cos(angle+rayWidth/2)*innerR,cy+Math.sin(angle+rayWidth/2)*innerR)
+    ctx.closePath()
+
+    ctx.fillStyle=`rgba(${Math.floor(s.rgb[0]*255)},${Math.floor(s.rgb[1]*255)},${Math.floor(s.rgb[2]*255)},${.3*intensity+.05})`
+    ctx.globalAlpha=1;ctx.fill()
+  })
+
+  // ═══ FEEDING BEAM — active wavelength shooting into center ═══
+  const activeNm=380+phase*400
+  const activeRGB=wavelengthToRGB(activeNm)
+  const beamColor=`rgb(${Math.floor(activeRGB[0]*255)},${Math.floor(activeRGB[1]*255)},${Math.floor(activeRGB[2]*255)})`
+
+  // convergent rays from edges toward pupil
+  for(let ray=0;ray<12;ray++){
+    const ra=ray*TAU/12+t*.3+phase*TAU
+    const startR=maxR*1.2
+    const endR=maxR*.05
+    const startX=cx+Math.cos(ra)*startR,startY=cy+Math.sin(ra)*startR
+
+    ctx.beginPath();ctx.moveTo(startX,startY);ctx.lineTo(cx,cy)
+    const beamGrad=ctx.createLinearGradient(startX,startY,cx,cy)
+    beamGrad.addColorStop(0,'rgba(0,0,0,0)')
+    beamGrad.addColorStop(.3,`rgba(${Math.floor(activeRGB[0]*200)},${Math.floor(activeRGB[1]*200)},${Math.floor(activeRGB[2]*200)},.1)`)
+    beamGrad.addColorStop(1,`rgba(${Math.floor(activeRGB[0]*255)},${Math.floor(activeRGB[1]*255)},${Math.floor(activeRGB[2]*255)},.3)`)
+    ctx.strokeStyle=beamGrad;ctx.lineWidth=3+Math.sin(t*4+ray)*1.5;ctx.stroke()
+  }
+
+  // ═══ IRIS — refracting the incoming light into the 7 gate colors ═══
+  // outer iris ring
+  ctx.beginPath();ctx.arc(cx,cy,maxR*.35,0,TAU)
+  ctx.strokeStyle=beamColor;ctx.lineWidth=2;ctx.globalAlpha=.3+Math.sin(t*3)*.05;ctx.stroke()
+
+  // iris fibers — refract incoming wavelength
+  for(let i=0;i<48;i++){
+    const a=i*TAU/48
+    const innerR2=maxR*.08,outerR2=maxR*.34
+    ctx.beginPath()
+    ctx.moveTo(cx+Math.cos(a)*innerR2,cy+Math.sin(a)*innerR2)
+    const wobble=Math.sin(t*2+i*.3)*3
+    ctx.quadraticCurveTo(cx+Math.cos(a+.02)*(innerR2+outerR2)/2+wobble,cy+Math.sin(a+.02)*(innerR2+outerR2)/2,
+      cx+Math.cos(a)*outerR2,cy+Math.sin(a)*outerR2)
+    // fiber color = spectrum at that angle
+    const fiberNm=380+((i/48+phase)%1)*400
+    const fiberRGB=wavelengthToRGB(fiberNm)
+    ctx.strokeStyle=`rgba(${Math.floor(fiberRGB[0]*255)},${Math.floor(fiberRGB[1]*255)},${Math.floor(fiberRGB[2]*255)},.15)`
+    ctx.lineWidth=1;ctx.globalAlpha=1;ctx.stroke()
+  }
+
+  // ═══ PUPIL — absorbing the light ═══
+  const pupilR=maxR*.07+Math.sin(t*1.5)*.005*maxR
+  // pupil glow in active wavelength
+  const pupilGlow=ctx.createRadialGradient(cx,cy,0,cx,cy,pupilR*4)
+  pupilGlow.addColorStop(0,`rgba(${Math.floor(activeRGB[0]*255)},${Math.floor(activeRGB[1]*255)},${Math.floor(activeRGB[2]*255)},.2)`)
+  pupilGlow.addColorStop(.5,`rgba(${Math.floor(activeRGB[0]*128)},${Math.floor(activeRGB[1]*128)},${Math.floor(activeRGB[2]*128)},.08)`)
+  pupilGlow.addColorStop(1,'rgba(0,0,0,0)')
+  ctx.globalAlpha=1;ctx.fillStyle=pupilGlow;ctx.beginPath();ctx.arc(cx,cy,pupilR*4,0,TAU);ctx.fill()
+
+  // black pupil
+  ctx.beginPath();ctx.arc(cx,cy,pupilR,0,TAU)
+  ctx.fillStyle='#000';ctx.globalAlpha=1;ctx.fill()
+
+  // ═══ RETINAL RESPONSE — concentric absorption rings ═══
+  // rods (scotopic) at dim, cones (photopic) at bright
+  // S-cones peak 420nm (blue), M-cones 530nm (green), L-cones 560nm (yellow-green)
+  const cones=[
+    {peak:420,name:'S-cone',color:[80,80,255],r:.15},
+    {peak:530,name:'M-cone',color:[80,255,80],r:.22},
+    {peak:560,name:'L-cone',color:[255,255,80],r:.29}
+  ]
+  cones.forEach(cone=>{
+    const response=Math.exp(-Math.pow((activeNm-cone.peak)/50,2)) // gaussian response
+    const ringR=maxR*cone.r
+    ctx.beginPath();ctx.arc(cx,cy,ringR,0,TAU)
+    ctx.strokeStyle=`rgba(${cone.color[0]},${cone.color[1]},${cone.color[2]},${response*.3})`
+    ctx.lineWidth=2+response*4;ctx.globalAlpha=1;ctx.stroke()
+    // label
+    if(response>.3){
+      ctx.font='5px monospace';ctx.textAlign='center';ctx.globalAlpha=response*.15
+      ctx.fillStyle=`rgba(${cone.color[0]},${cone.color[1]},${cone.color[2]},1)`
+      ctx.fillText(`${cone.name} ${cone.peak}nm`,cx,cy+ringR+8)
+    }
+  })
+
+  // ═══ WAVELENGTH INDICATOR ═══
+  ctx.globalAlpha=.15
+  ctx.font='10px monospace';ctx.textAlign='center'
+  ctx.fillStyle=beamColor
+  ctx.fillText(`${activeNm.toFixed(0)}nm`,cx,cy+maxR*.42)
+
+  // color name
+  let colorName='unknown'
+  if(activeNm<440)colorName='VIOLET'
+  else if(activeNm<490)colorName='BLUE'
+  else if(activeNm<510)colorName='CYAN'
+  else if(activeNm<560)colorName='GREEN'
+  else if(activeNm<590)colorName='YELLOW'
+  else if(activeNm<625)colorName='ORANGE'
+  else colorName='RED'
+  ctx.font='8px monospace';ctx.globalAlpha=.1
+  ctx.fillText(colorName,cx,cy+maxR*.42+12)
+
+  // ═══ PHOTON PARTICLES — streaming into the eye ═══
+  for(let p=0;p<20;p++){
+    const pPhase=(t*.5+p*.05)%1
+    const pa=p*TAU/20+t*.15+phase*TAU
+    const pr=maxR*(1.2-pPhase*1.1)
+    const px=cx+Math.cos(pa)*pr,py=cy+Math.sin(pa)*pr
+    const pSize=2+pPhase*2
+
+    // photon in active wavelength color
+    ctx.beginPath();ctx.arc(px,py,pSize,0,TAU)
+    ctx.fillStyle=`rgba(${Math.floor(activeRGB[0]*255)},${Math.floor(activeRGB[1]*255)},${Math.floor(activeRGB[2]*255)},${pPhase*.2})`
+    ctx.globalAlpha=1;ctx.fill()
+  }
+
+  // ═══ SPECTRUM BAR at bottom ═══
+  const barW=W*.6,barH=4,barX=(W-barW)/2,barY=H-20
+  SPECTRUM.forEach((s,i)=>{
+    const frac=i/SPECTRUM.length
+    const x=barX+frac*barW
+    ctx.fillStyle=`rgb(${Math.floor(s.rgb[0]*255)},${Math.floor(s.rgb[1]*255)},${Math.floor(s.rgb[2]*255)})`
+    ctx.globalAlpha=.3;ctx.fillRect(x,barY,barW/SPECTRUM.length+1,barH)
+  })
+  // current position marker
+  ctx.fillStyle='#fff';ctx.globalAlpha=.4
+  ctx.fillRect(barX+phase*barW-1,barY-2,3,barH+4)
+
+  // labels
+  ctx.font='5px monospace';ctx.globalAlpha=.08;ctx.textAlign='center'
+  ctx.fillStyle='#aaf';ctx.fillText('380nm',barX,barY-4)
+  ctx.fillStyle='#faa';ctx.fillText('780nm',barX+barW,barY-4)
+
+  // ═══ TITLE ═══
+  ctx.globalAlpha=.04
+  ctx.font='7px monospace';ctx.textAlign='left'
+  ctx.fillStyle=beamColor
+  ctx.fillText('FEED THE EYE · full spectrum light nutrition',8,14)
+  ctx.fillText(`${activeNm.toFixed(0)}nm ${colorName} · S:${(cones[0].peak)}nm M:${cones[1].peak}nm L:${cones[2].peak}nm`,8,24)
+}
+loop()
+</script>
+</body></html>
