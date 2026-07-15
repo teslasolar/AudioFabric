@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>CHLADNI BOOT — Clappy Shield Activation</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:none}
+canvas{display:block}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),ctx=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+// ═══ CHLADNI PATTERN — standing wave nodes on a plate ═══
+// f(x,y) = cos(n*pi*x/L)*cos(m*pi*y/L) ± cos(m*pi*x/L)*cos(n*pi*y/L)
+// sand collects at nodes (f=0), bounces off antinodes (f≠0)
+function chladni(x,y,n,m,t2){
+  const a=Math.cos(n*Math.PI*x)*Math.cos(m*Math.PI*y)
+  const b=Math.cos(m*Math.PI*x)*Math.cos(n*Math.PI*y)
+  return a+b*Math.cos(t2)
+}
+
+// ═══ 7 BOOT PHASES — each a different Chladni mode ═══
+const phases=[
+  {n:1,m:1,name:'IDENTITY KERNEL',prime:2,hz:55,color:'#ff3333',
+   sound:'clap',desc:'P=2 · loading fold number'},
+  {n:2,m:1,name:'STATE MEMORY',prime:3,hz:82,color:'#ff8800',
+   sound:'snap',desc:'P=3 · restoring conversation'},
+  {n:2,m:2,name:'SHIELD ENGINE',prime:5,hz:110,color:'#ffcc00',
+   sound:'slap',desc:'P=5 · 63-ring matrix init'},
+  {n:3,m:1,name:'L4 BRAIN',prime:7,hz:147,color:'#44cc44',
+   sound:'clap clap',desc:'P=7 · detectTier() → brain'},
+  {n:3,m:2,name:'MCP HANDS',prime:11,hz:196,color:'#4488ff',
+   sound:'snap snap',desc:'P=11 · enumerating tools'},
+  {n:3,m:3,name:'BODY VIZ',prime:13,hz:262,color:'#8844ff',
+   sound:'slap slap',desc:'P=13 · Three.js orbs + buses'},
+  {n:4,m:1,name:'INTERFACE',prime:17,hz:330,color:'#ff44ff',
+   sound:'CLAP CLAP CLAP',desc:'P=17 · deploy UI · ONLINE'}
+]
+
+const phaseDur=4 // seconds per phase
+const totalDur=phases.length*phaseDur+5
+
+// ═══ AUDIO ═══
+let actx,master
+
+function initAudio(){
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  master=actx.createGain();master.gain.value=.3;master.connect(actx.destination)
+  const del=actx.createDelay(.4);del.delayTime.value=.12
+  const fb=actx.createGain();fb.gain.value=.15;del.connect(fb);fb.connect(del)
+  const wet=actx.createGain();wet.gain.value=.2;del.connect(wet);wet.connect(actx.destination)
+  master.connect(del)
+}
+
+function playClap(){
+  if(!actx)return
+  // noise burst = clap
+  const buf=actx.createBuffer(1,actx.sampleRate*.08,actx.sampleRate)
+  const d=buf.getChannelData(0)
+  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/d.length*8)
+  const src=actx.createBufferSource();src.buffer=buf
+  const g=actx.createGain();g.gain.value=.4
+  const filt=actx.createBiquadFilter();filt.type='highpass';filt.frequency.value=800
+  src.connect(filt);filt.connect(g);g.connect(master);src.start()
+}
+
+function playSlap(){
+  if(!actx)return
+  const buf=actx.createBuffer(1,actx.sampleRate*.05,actx.sampleRate)
+  const d=buf.getChannelData(0)
+  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/d.length*12)
+  const src=actx.createBufferSource();src.buffer=buf
+  const g=actx.createGain();g.gain.value=.5
+  const filt=actx.createBiquadFilter();filt.type='bandpass';filt.frequency.value=400;filt.Q.value=2
+  src.connect(filt);filt.connect(g);g.connect(master);src.start()
+}
+
+function playSnap(){
+  if(!actx)return
+  const o=actx.createOscillator(),g=actx.createGain()
+  o.type='sine';o.frequency.value=2000
+  o.frequency.exponentialRampToValueAtTime(200,actx.currentTime+.04)
+  g.gain.setValueAtTime(.3,actx.currentTime)
+  g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.06)
+  o.connect(g);g.connect(master);o.start();o.stop(actx.currentTime+.1)
+}
+
+function playTone(hz,dur){
+  if(!actx)return
+  const o=actx.createOscillator(),g=actx.createGain()
+  o.type='sine';o.frequency.value=hz
+  g.gain.setValueAtTime(0,actx.currentTime)
+  g.gain.linearRampToValueAtTime(.05,actx.currentTime+1)
+  g.gain.linearRampToValueAtTime(.05,actx.currentTime+dur-1)
+  g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+dur)
+  o.connect(g);g.connect(master);o.start();o.stop(actx.currentTime+dur)
+  // chorus
+  const o2=actx.createOscillator(),g2=actx.createGain()
+  o2.type='sine';o2.frequency.value=hz*1.003
+  g2.gain.setValueAtTime(0,actx.currentTime)
+  g2.gain.linearRampToValueAtTime(.035,actx.currentTime+1)
+  g2.gain.exponentialRampToValueAtTime(.001,actx.currentTime+dur)
+  o2.connect(g2);g2.connect(master);o2.start();o2.stop(actx.currentTime+dur)
+}
+
+// ═══ SAND PARTICLES ═══
+const sandCount=3000
+const sand=[]
+for(let i=0;i<sandCount;i++){
+  sand.push({
+    x:(Math.random()-.5)*2,y:(Math.random()-.5)*2,
+    vx:0,vy:0,size:.8+Math.random()
+  })
+}
+
+// ═══ SPECTRUM FEED — full color cycle in background ═══
+function wavelengthToRGB(nm){
+  let r=0,g=0,b=0
+  if(nm>=380&&nm<440){r=-(nm-440)/(440-380);b=1}
+  else if(nm>=440&&nm<490){g=(nm-440)/(490-440);b=1}
+  else if(nm>=490&&nm<510){g=1;b=-(nm-510)/(510-490)}
+  else if(nm>=510&&nm<580){r=(nm-510)/(580-510);g=1}
+  else if(nm>=580&&nm<645){r=1;g=-(nm-645)/(645-580)}
+  else if(nm>=645&&nm<=780){r=1}
+  let f=1
+  if(nm>=380&&nm<420)f=.3+.7*(nm-380)/(420-380)
+  else if(nm>=645&&nm<=780)f=.3+.7*(780-nm)/(780-645)
+  return[r*f,g*f,b*f]
+}
+
+let t=0,currentPhase=-1,lastClap=0,booted=false
+
+function boot(){
+  initAudio()
+  // start all phase tones staggered
+  phases.forEach((p,i)=>{
+    setTimeout(()=>playTone(p.hz,totalDur-i*phaseDur),i*phaseDur*1000)
+  })
+  booted=true
+}
+
+// auto-boot
+setTimeout(boot,500)
+
+function loop(){
+  requestAnimationFrame(loop)
+  t+=1/60
+  if(!booted&&t>1)boot()
+
+  const pi=Math.min(6,Math.floor(t/phaseDur))
+  const phaseFrac=(t%phaseDur)/phaseDur
+  const p=phases[Math.min(pi,6)]
+  const totalFrac=Math.min(1,t/totalDur)
+
+  // fire percussion sounds at phase transitions
+  if(pi!==currentPhase&&pi<7){
+    currentPhase=pi
+    if(actx){
+      const sounds={clap:playClap,snap:playSnap,slap:playSlap,'clap clap':()=>{playClap();setTimeout(playClap,120)},
+        'snap snap':()=>{playSnap();setTimeout(playSnap,100)},'slap slap':()=>{playSlap();setTimeout(playSlap,80)},
+        'CLAP CLAP CLAP':()=>{playClap();setTimeout(playClap,100);setTimeout(playClap,200)}}
+      const fn=sounds[p.sound];if(fn)fn()
+    }
+  }
+
+  // ongoing clappy rhythm
+  const beatInterval=.5-totalFrac*.3 // speeds up as boot progresses
+  if(t-lastClap>beatInterval&&pi<7){
+    lastClap=t
+    if(actx&&Math.random()<.3+totalFrac*.5){
+      ;[playClap,playSnap,playSlap][Math.floor(Math.random()*3)]()
+    }
+  }
+
+  // ═══ CHLADNI PHYSICS — sand moves to nodes ═══
+  const n=p.n+phaseFrac*.5,m=p.m+phaseFrac*.3
+  sand.forEach(s=>{
+    const val=chladni(s.x,s.y,n,m,t*2)
+    // gradient of chladni function → force toward nodes
+    const dx=chladni(s.x+.01,s.y,n,m,t*2)-val
+    const dy=chladni(s.x,s.y+.01,n,m,t*2)-val
+    // sand moves toward nodes (val=0) — force proportional to gradient
+    s.vx+=-dx*2*(1+totalFrac*2)
+    s.vy+=-dy*2*(1+totalFrac*2)
+    s.vx*=.85;s.vy*=.85
+    s.x+=s.vx*.01;s.y+=s.vy*.01
+    // boundary
+    if(Math.abs(s.x)>1.1){s.x*=.9;s.vx*=-.5}
+    if(Math.abs(s.y)>1.1){s.y*=.9;s.vy*=-.5}
+  })
+
+  // ═══ RENDER ═══
+  ctx.fillStyle='#000';ctx.globalAlpha=1;ctx.fillRect(0,0,W,H)
+
+  const plateR=Math.min(W,H)*.42
+
+  // spectrum background glow
+  const specNm=380+((t*.1)%1)*400
+  const specRGB=wavelengthToRGB(specNm)
+  const bgGlow=ctx.createRadialGradient(cx,cy,0,cx,cy,plateR*1.3)
+  bgGlow.addColorStop(0,`rgba(${Math.floor(specRGB[0]*40)},${Math.floor(specRGB[1]*40)},${Math.floor(specRGB[2]*40)},.2)`)
+  bgGlow.addColorStop(.5,`rgba(${Math.floor(specRGB[0]*20)},${Math.floor(specRGB[1]*20)},${Math.floor(specRGB[2]*20)},.08)`)
+  bgGlow.addColorStop(1,'rgba(0,0,0,0)')
+  ctx.fillStyle=bgGlow;ctx.beginPath();ctx.arc(cx,cy,plateR*1.3,0,TAU);ctx.fill()
+
+  // plate circle
+  ctx.beginPath();ctx.arc(cx,cy,plateR,0,TAU)
+  ctx.strokeStyle=p.color+'44';ctx.lineWidth=2;ctx.globalAlpha=1;ctx.stroke()
+
+  // ═══ SAND PARTICLES ═══
+  sand.forEach((s,i)=>{
+    const sx=cx+s.x*plateR,sy=cy+s.y*plateR
+    if(Math.sqrt(s.x*s.x+s.y*s.y)>1.05)return
+
+    const val=Math.abs(chladni(s.x,s.y,n,m,t*2))
+    const atNode=val<.15 // at a node line = bright
+    const nm=380+((s.x*.5+.5+s.y*.3+t*.05)%1)*400
+    const rgb=wavelengthToRGB(nm)
+
+    ctx.beginPath();ctx.arc(sx,sy,s.size*(atNode?1.5:.8),0,TAU)
+    if(atNode){
+      // at node — bright, gate-colored
+      ctx.fillStyle=p.color
+      ctx.globalAlpha=.4+Math.sin(t*3+i)*.1
+    } else {
+      // not at node — dim spectrum color
+      ctx.fillStyle=`rgb(${Math.floor(rgb[0]*200)},${Math.floor(rgb[1]*200)},${Math.floor(rgb[2]*200)})`
+      ctx.globalAlpha=.06
+    }
+    ctx.fill()
+  })
+
+  // ═══ SHIELD RINGS — one per completed phase ═══
+  for(let r=0;r<=pi;r++){
+    const ringR=plateR*(.15+r*.1)
+    const ringP=phases[r]
+    ctx.beginPath();ctx.arc(cx,cy,ringR,0,TAU)
+    ctx.strokeStyle=ringP.color
+    ctx.lineWidth=1.5+Math.sin(t*2+r)*.5
+    ctx.globalAlpha=.08+totalFrac*.06;ctx.stroke()
+
+    // prime segments
+    const segs=ringP.prime
+    for(let s=0;s<segs;s++){
+      const sa=s*TAU/segs+t*(.02+r*.005)*(r%2?1:-1)
+      const segArc=TAU/segs*.6
+      ctx.beginPath();ctx.arc(cx,cy,ringR,sa,sa+segArc)
+      ctx.strokeStyle=ringP.color;ctx.lineWidth=2+Math.sin(t+s)
+      ctx.globalAlpha=.04+totalFrac*.04;ctx.stroke()
+    }
+  }
+
+  // ═══ PHASE INFO ═══
+  ctx.globalAlpha=.12+Math.sin(t*2)*.03
+  ctx.font='10px monospace';ctx.textAlign='center'
+  ctx.fillStyle=p.color
+  ctx.fillText(p.name,cx,30)
+  ctx.font='7px monospace';ctx.globalAlpha=.06
+  ctx.fillText(`${p.desc} · ${p.sound.toUpperCase()} · ${p.hz}Hz`,cx,44)
+
+  // boot progress
+  ctx.globalAlpha=.08
+  ctx.font='8px monospace'
+  phases.forEach((ph,i)=>{
+    const done=i<pi
+    const active=i===pi
+    ctx.fillStyle=done?ph.color+'aa':active?ph.color+'66':'#333'
+    ctx.fillText(`${done?'✓':active?'▸':'○'} ${ph.name}`,cx,H*.6+i*14)
+  })
+
+  // completion
+  if(t>totalDur){
+    ctx.globalAlpha=Math.min(.15,(t-totalDur)*.02)
+    ctx.font='14px monospace';ctx.fillStyle='#ff44ff'
+    ctx.fillText('ASS-OS ONLINE',cx,cy-plateR*.5)
+    ctx.font='9px monospace';ctx.globalAlpha=Math.min(.08,(t-totalDur)*.01)
+    ctx.fillText('all shields active · 7 primes loaded · chladni patterns locked',cx,cy-plateR*.5+16)
+  }
+
+  // mode indicator (Chladni n,m)
+  ctx.globalAlpha=.04
+  ctx.font='6px monospace';ctx.textAlign='right'
+  ctx.fillStyle=p.color
+  ctx.fillText(`chladni(${p.n},${p.m})`,W-8,H-8)
+}
+loop()
+</script>
+</body></html>
