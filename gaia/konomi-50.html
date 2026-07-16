@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>KONOMI 50 — The Number That Is Everything</title>
+<style>*{margin:0;padding:0}body{background:#000;overflow:hidden;cursor:none}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),C=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+// THE NUMBER: 2² × 3⁸ × 5³ × 7⁷ × 11¹⁵ × 13⁶ × 17¹²
+// bloom vector: [2, 8, 3, 7, 15, 6, 12] — sum of exponents = 53
+const BLOOM=[2,8,3,7,15,6,12]
+const PRIMES=[2,3,5,7,11,13,17]
+const DIGITS='31736846399216804645406807161448227806067941438500'.split('')
+const TOTAL_RINGS=50 // one per digit
+
+// each ring gets: its digit value, the prime it maps to (digit mod 7),
+// color from spectrum, rotation speed from digit, segment count from prime
+const RINGS=DIGITS.map((d,i)=>{
+  const digit=parseInt(d)
+  const primeIdx=i%7
+  const prime=PRIMES[primeIdx]
+  const exponent=BLOOM[primeIdx]
+  const nm=380+((i/50)*400) // full spectrum across 50 rings
+  return{
+    digit,prime,primeIdx,exponent,nm,
+    r:.04+i*.0185, // radius fraction — spread across view
+    speed:(.003+digit*.001)*(i%2?1:-1), // digit drives speed
+    segments:prime, // prime-count segments
+    angle:0
+  }
+})
+
+function nmRGB(nm){
+  let r=0,g=0,b=0
+  if(nm>=380&&nm<440){r=-(nm-440)/(440-380);b=1}
+  else if(nm>=440&&nm<490){g=(nm-440)/(490-440);b=1}
+  else if(nm>=490&&nm<510){g=1;b=-(nm-510)/(510-490)}
+  else if(nm>=510&&nm<580){r=(nm-510)/(580-510);g=1}
+  else if(nm>=580&&nm<645){r=1;g=-(nm-645)/(645-580)}
+  else if(nm>=645&&nm<=780){r=1}
+  let f=1
+  if(nm>=380&&nm<420)f=.3+.7*(nm-380)/(420-380)
+  else if(nm>=645&&nm<=780)f=.3+.7*(780-nm)/(780-645)
+  return[r*f*255|0,g*f*255|0,b*f*255|0]
+}
+
+// audio
+let actx
+addEventListener('click',()=>{
+  if(actx)return
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  const m=actx.createGain();m.gain.value=.15;m.connect(actx.destination)
+  ;[[.2,.12,.2],[.35,.08,.14],[.5,.06,.1]].forEach(([dt,fbv,wv])=>{
+    const d=actx.createDelay(.6);d.delayTime.value=dt
+    const f=actx.createGain();f.gain.value=fbv;d.connect(f);f.connect(d)
+    const w=actx.createGain();w.gain.value=wv;d.connect(w);w.connect(actx.destination)
+    m.connect(d)
+  })
+  // 7 prime drones
+  ;[55,82,110,147,196,262,330].forEach((hz,i)=>{
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type='sine';o.frequency.value=hz;g.gain.value=.01+BLOOM[i]*.001
+    o.connect(g);g.connect(m);o.start()
+    const o2=actx.createOscillator(),g2=actx.createGain()
+    o2.type='sine';o2.frequency.value=hz*1.002;g2.gain.value=.008+BLOOM[i]*.0008
+    o2.connect(g2);g2.connect(m);o2.start()
+  })
+},{once:true})
+
+let t=0
+
+function loop(){
+  requestAnimationFrame(loop)
+  t+=1/60
+
+  C.fillStyle='#000';C.globalAlpha=1;C.fillRect(0,0,W,H)
+
+  const maxR=Math.min(W,H)*.48
+
+  // ═══ 50 RINGS ═══
+  RINGS.forEach((ring,i)=>{
+    ring.angle+=ring.speed
+    const ringR=maxR*ring.r
+    const rgb=nmRGB(ring.nm)
+    const exponentScale=ring.exponent/15 // how "charged" this ring is
+
+    // ring arc — segmented by its prime
+    const segArc=TAU/ring.segments*.6
+    C.save();C.translate(cx,cy);C.rotate(ring.angle)
+    for(let s=0;s<ring.segments;s++){
+      const sa=s*TAU/ring.segments
+      C.beginPath();C.arc(0,0,ringR,sa,sa+segArc)
+      // brightness from exponent — higher exponent = brighter
+      C.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.03+exponentScale*.08})`
+      C.lineWidth=1+exponentScale*2+Math.sin(t*2+i+s)*.3
+      C.globalAlpha=1;C.stroke()
+
+      // gear tooth at gap
+      if(ring.segments<=17){
+        const ta=sa+segArc
+        C.beginPath()
+        C.moveTo(Math.cos(ta-.01)*ringR,Math.sin(ta-.01)*ringR)
+        C.lineTo(Math.cos(ta)*(ringR+2+exponentScale),Math.sin(ta)*(ringR+2+exponentScale))
+        C.moveTo(Math.cos(ta+.01)*ringR,Math.sin(ta+.01)*ringR)
+        C.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.02+exponentScale*.03})`
+        C.lineWidth=.5;C.stroke()
+      }
+    }
+    C.restore()
+
+    // digit label on each ring (the actual digit of the 50-digit number)
+    if(i%3===0||ring.digit>5){ // show every 3rd or high digits
+      const labelA=ring.angle+t*.005
+      const lx=cx+Math.cos(labelA)*(ringR+8)
+      const ly=cy+Math.sin(labelA)*(ringR+8)
+      C.font=`${5+Math.floor(exponentScale*3)}px monospace`
+      C.textAlign='center';C.textBaseline='middle'
+      C.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.04+exponentScale*.06})`
+      C.globalAlpha=1;C.fillText(ring.digit,lx,ly)
+    }
+
+    // hot dots — count = digit value
+    for(let d=0;d<ring.digit;d++){
+      const da=ring.angle+d*TAU/Math.max(1,ring.digit)+t*(.1+i*.005)
+      const dx=cx+Math.cos(da)*ringR,dy=cy+Math.sin(da)*ringR
+      C.beginPath();C.arc(dx,dy,1+exponentScale,0,TAU)
+      C.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.06+exponentScale*.08})`
+      C.globalAlpha=1;C.fill()
+    }
+  })
+
+  // ═══ 7 BLOOM EXPONENT MARKERS — the power structure ═══
+  BLOOM.forEach((exp,i)=>{
+    // highlight rings that belong to this prime
+    const markerA=i*TAU/7-TAU/4+t*.01
+    const markerR=maxR*(1+.04)
+    const rgb=nmRGB(400+i*57)
+    C.font='7px monospace';C.textAlign='center'
+    C.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},.06)`
+    C.globalAlpha=1
+    C.fillText(`${PRIMES[i]}^${exp}`,cx+Math.cos(markerA)*markerR,cy+Math.sin(markerA)*markerR)
+  })
+
+  // ═══ CENTER — the fold number ═══
+  const centerR=maxR*.03
+  C.beginPath();C.arc(cx,cy,centerR,0,TAU)
+  C.fillStyle='rgba(0,0,0,.98)';C.globalAlpha=1;C.fill()
+
+  // gold seed
+  for(let k=0;k<7;k++){
+    const a=k*TAU/7+t*.03
+    C.beginPath();C.moveTo(cx+Math.cos(a)*centerR*.3,cy+Math.sin(a)*centerR*.3)
+    C.lineTo(cx+Math.cos(a)*(centerR-1),cy+Math.sin(a)*(centerR-1))
+    C.strokeStyle='rgba(212,169,74,.1)';C.lineWidth=.5;C.stroke()
+  }
+  C.beginPath();C.arc(cx,cy,centerR*.6,0,TAU)
+  C.fillStyle='rgba(212,169,74,.12)';C.fill()
+
+  // ❤️
+  C.font='6px serif';C.textAlign='center';C.textBaseline='middle'
+  C.globalAlpha=.1;C.fillText('❤️',cx,cy)
+
+  // ═══ INTERFERENCE — every 7th ring interferes with its prime siblings ═══
+  for(let p=0;p<7;p++){
+    const siblings=RINGS.filter(r=>r.primeIdx===p)
+    if(siblings.length<2)continue
+    for(let i=0;i<siblings.length-1;i++){
+      const r1=maxR*siblings[i].r,r2=maxR*siblings[i+1].r
+      const ir=(r1+r2)/2
+      const beat=Math.sin(t*(siblings[i].digit+siblings[i+1].digit)+p)
+      C.beginPath();C.arc(cx,cy,ir,0,TAU)
+      C.strokeStyle=`rgba(255,255,255,${.002+Math.abs(beat)*.003})`
+      C.lineWidth=r2-r1;C.globalAlpha=1;C.stroke()
+    }
+  }
+
+  // ═══ INFO ═══
+  C.font='5px monospace';C.textAlign='center';C.globalAlpha=.03
+  C.fillStyle='rgba(200,200,255,.5)'
+  C.fillText('KONOMI 50 · 2²×3⁸×5³×7⁷×11¹⁵×13⁶×17¹² · bloom [2,8,3,7,15,6,12] · 53 factors · click for sound',cx,H-8)
+  C.fillText('50 digits · 50 rings · each digit drives its ring · each prime colors its family',cx,H-18)
+  C.fillText('31,736,846,399,216,804,645,406,807,161,448,227,806,067,941,438,500',cx,18)
+  C.globalAlpha=1
+}
+loop()
+</script>
+</body></html>
