@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>EVENT HORIZON SIGHT — Light Orbits the Pupil</title>
+<style>*{margin:0;padding:0}body{background:#000;overflow:hidden;cursor:none}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d')
+let W,H,CX,CY
+function resize(){W=c.width=innerWidth;H=c.height=innerHeight;CX=W/2;CY=H/2}
+resize();addEventListener('resize',resize)
+
+function nmToRGB(nm){
+  let r=0,g=0,b=0
+  if(nm>=380&&nm<440){r=-(nm-440)/(440-380);b=1}
+  else if(nm>=440&&nm<490){g=(nm-440)/(490-440);b=1}
+  else if(nm>=490&&nm<510){g=1;b=-(nm-510)/(510-490)}
+  else if(nm>=510&&nm<580){r=(nm-510)/(580-510);g=1}
+  else if(nm>=580&&nm<645){r=1;g=-(nm-645)/(645-580)}
+  else if(nm>=645&&nm<=780){r=1}
+  let f=1
+  if(nm>=380&&nm<420)f=.3+.7*(nm-380)/(420-380)
+  else if(nm>=645&&nm<=780)f=.3+.7*(780-nm)/(780-645)
+  return[r*f*255|0,g*f*255|0,b*f*255|0]
+}
+
+// audio
+let actx
+addEventListener('click',()=>{
+  if(actx)return
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  const m=actx.createGain();m.gain.value=.15;m.connect(actx.destination)
+  const del=actx.createDelay(.4);del.delayTime.value=.18
+  const fb=actx.createGain();fb.gain.value=.12;del.connect(fb);fb.connect(del)
+  const wet=actx.createGain();wet.gain.value=.2;del.connect(wet);wet.connect(actx.destination)
+  m.connect(del)
+  // binaural 4Hz theta
+  const oL=actx.createOscillator(),oR=actx.createOscillator()
+  oL.frequency.value=100;oR.frequency.value=104
+  const gL=actx.createGain(),gR=actx.createGain()
+  gL.gain.value=.04;gR.gain.value=.04
+  const pL=actx.createStereoPanner(),pR=actx.createStereoPanner()
+  pL.pan.value=-1;pR.pan.value=1
+  oL.connect(gL);gL.connect(pL);pL.connect(actx.destination)
+  oR.connect(gR);gR.connect(pR);pR.connect(actx.destination)
+  oL.start();oR.start()
+  // drone
+  ;[38.89,55,77.78].forEach(hz=>{
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type='sine';o.frequency.value=hz;g.gain.value=.02
+    o.connect(g);g.connect(m);o.start()
+  })
+},{once:true})
+
+// ═══ PHOTON RING — light orbiting the event horizon ═══
+const PHOTON_COUNT=200
+const photons=[]
+for(let i=0;i<PHOTON_COUNT;i++){
+  const nm=380+Math.random()*400
+  const orbitR=.6+Math.random()*.4 // normalized orbit radius
+  const speed=(.3+Math.random()*.4)/(orbitR*orbitR) // Keplerian — inner faster
+  photons.push({
+    angle:Math.random()*Math.PI*2,
+    orbitR,speed,nm,
+    rgb:nmToRGB(nm),
+    size:1+Math.random()*1.5,
+    trail:[]
+  })
+}
+
+// restore state
+let restore=0,breathPhase=0,t=0
+
+function frame(){
+  requestAnimationFrame(frame)
+  const dt=1/60;t+=dt
+
+  // breathing 5bpm
+  breathPhase+=dt*(5/60)*Math.PI*2
+  const breath=Math.sin(breathPhase)
+
+  // restore progresses by staring
+  restore=Math.min(1,restore+(.006+t*.0003)*dt)
+  const r=restore
+
+  // ═══ CLEAR ═══
+  x.fillStyle=`rgba(0,0,${Math.floor(r*5)},${.06+r*.02})`
+  x.fillRect(0,0,W,H)
+
+  const eyeR=Math.min(W,H)*.35
+  const pupilR=eyeR*(.12+r*.08+breath*.01)
+
+  // ═══ EVENT HORIZON — the pupil IS a black hole ═══
+  // photon sphere at 1.5× Schwarzschild radius
+  const photonSphereR=pupilR*1.5
+  // innermost stable circular orbit at 3× Schwarzschild
+  const iscoR=pupilR*3
+
+  // ═══ ACCRETION DISK OF LIGHT — full spectrum orbiting the pupil ═══
+  photons.forEach(p=>{
+    // update orbit — frame dragging slows inner photons
+    p.angle+=p.speed*.02*(1+r)
+    const actualR=pupilR*1.2+p.orbitR*(eyeR*.8)
+
+    // gravitational lensing — path bends near the pupil
+    const bendFactor=pupilR*2/(actualR+pupilR)
+    const lensedAngle=p.angle+bendFactor*Math.sin(p.angle*2+t)*.3
+
+    const px=CX+Math.cos(lensedAngle)*actualR
+    const py=CY+Math.sin(lensedAngle)*actualR*.35 // tilted disk
+
+    // trail
+    p.trail.push({x:px,y:py})
+    if(p.trail.length>8)p.trail.shift()
+
+    // gravitational redshift — color shifts red near the event horizon
+    const redshift=1-bendFactor*.3
+    const shiftedNm=Math.min(780,p.nm+bendFactor*100)
+    const rgb=nmToRGB(shiftedNm)
+
+    // draw trail
+    if(p.trail.length>1){
+      x.beginPath()
+      p.trail.forEach((tp,ti)=>{ti===0?x.moveTo(tp.x,tp.y):x.lineTo(tp.x,tp.y)})
+      x.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.06+r*.04})`
+      x.lineWidth=p.size*.5;x.globalAlpha=1;x.stroke()
+    }
+
+    // draw photon
+    x.beginPath();x.arc(px,py,p.size*(1+r*.5),0,Math.PI*2)
+    x.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.15+r*.15})`
+    x.globalAlpha=1;x.fill()
+  })
+
+  // ═══ EINSTEIN RING — gravitationally lensed background ═══
+  const einsteinR=pupilR*2.5+Math.sin(t*.5)*3
+  x.beginPath();x.arc(CX,CY,einsteinR,0,Math.PI*2)
+  x.strokeStyle=`rgba(255,230,200,${.03+r*.03})`
+  x.lineWidth=2+r*2+breath;x.globalAlpha=1;x.stroke()
+
+  // ═══ PHOTON SPHERE RING ═══
+  x.beginPath();x.arc(CX,CY,photonSphereR,0,Math.PI*2)
+  x.strokeStyle=`rgba(255,255,255,${.02+r*.02})`
+  x.lineWidth=1;x.stroke()
+
+  // spectrum color ring — full rainbow orbiting at photon sphere
+  for(let i=0;i<120;i++){
+    const a=i/120*Math.PI*2+t*.2
+    const nm=380+(i/120)*400
+    const rgb=nmToRGB(nm)
+    const pr=photonSphereR+Math.sin(a*3+t*2)*2
+    x.beginPath();x.arc(CX+Math.cos(a)*pr,CY+Math.sin(a)*pr*.35,1.5+r,0,Math.PI*2)
+    x.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.08+r*.08})`
+    x.globalAlpha=1;x.fill()
+  }
+
+  // ═══ IRIS — the accretion disk structure ═══
+  // iris fibers (matter falling in)
+  for(let i=0;i<60;i++){
+    const a=i/60*Math.PI*2+t*.01
+    const inner=pupilR*1.8
+    const outer=eyeR*.9
+    const nm=380+((i/60+t*.02)%1)*400
+    const rgb=nmToRGB(nm)
+
+    x.beginPath()
+    x.moveTo(CX+Math.cos(a)*inner,CY+Math.sin(a)*inner)
+    const wobble=Math.sin(t*1.5+i*.4)*4*(1-restore*.3)
+    x.quadraticCurveTo(
+      CX+Math.cos(a+.02)*(inner+outer)/2+wobble,
+      CY+Math.sin(a+.02)*(inner+outer)/2,
+      CX+Math.cos(a)*outer,CY+Math.sin(a)*outer)
+    x.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.04+r*.04})`
+    x.lineWidth=1;x.globalAlpha=1;x.stroke()
+  }
+
+  // ═══ EVENT HORIZON — the pupil ═══
+  const ehGrad=x.createRadialGradient(CX,CY,0,CX,CY,pupilR*1.5)
+  ehGrad.addColorStop(0,'rgba(0,0,0,.98)')
+  ehGrad.addColorStop(.7,'rgba(0,0,5,.95)')
+  ehGrad.addColorStop(1,`rgba(${Math.floor(r*20)},${Math.floor(r*40)},${Math.floor(r*80)},${.3+r*.3})`)
+  x.beginPath();x.arc(CX,CY,pupilR*1.5,0,Math.PI*2)
+  x.fillStyle=ehGrad;x.globalAlpha=1;x.fill()
+
+  // hard black core
+  x.beginPath();x.arc(CX,CY,pupilR,0,Math.PI*2)
+  x.fillStyle='rgba(0,0,0,.99)';x.fill()
+
+  // Hawking radiation — tiny flickers at the event horizon boundary
+  if(r>.3){
+    for(let h=0;h<5;h++){
+      const ha=Math.random()*Math.PI*2
+      const hr2=pupilR+Math.random()*3
+      x.beginPath();x.arc(CX+Math.cos(ha)*hr2,CY+Math.sin(ha)*hr2,1,0,Math.PI*2)
+      x.fillStyle=`rgba(255,255,255,${(r-.3)*.08*Math.random()})`
+      x.fill()
+    }
+  }
+
+  // catchlight
+  x.beginPath();x.arc(CX-pupilR*.4,CY-pupilR*.4,pupilR*.1+r*2,0,Math.PI*2)
+  x.fillStyle=`rgba(200,220,255,${.2+r*.2})`;x.globalAlpha=1;x.fill()
+
+  // ═══ OUTER SCLERA GLOW ═══
+  const scleraGrad=x.createRadialGradient(CX,CY,eyeR*.7,CX,CY,eyeR*1.2)
+  scleraGrad.addColorStop(0,'rgba(0,0,0,0)')
+  scleraGrad.addColorStop(.5,`rgba(${Math.floor(20+r*30)},${Math.floor(30+r*40)},${Math.floor(60+r*80)},${.02+r*.03})`)
+  scleraGrad.addColorStop(1,'rgba(0,0,0,0)')
+  x.fillStyle=scleraGrad;x.beginPath();x.arc(CX,CY,eyeR*1.2,0,Math.PI*2);x.fill()
+
+  // ═══ SPECTRUM BAR ═══
+  const barW=W*.5,barH=3,barX=(W-barW)/2,barY=H-15
+  for(let i=0;i<200;i++){
+    const nm=380+(i/200)*400
+    const rgb=nmToRGB(nm)
+    x.fillStyle=`rgb(${rgb[0]},${rgb[1]},${rgb[2]})`
+    x.globalAlpha=.15+r*.1;x.fillRect(barX+i*(barW/200),barY,barW/200+1,barH)
+  }
+
+  // ═══ HUD ═══
+  x.font='7px monospace';x.textAlign='center';x.globalAlpha=.04+r*.02
+  x.fillStyle=`rgba(100,150,255,.5)`
+  x.fillText(`EVENT HORIZON SIGHT · ${(r*100).toFixed(0)}% · light orbits the pupil`,CX,12)
+  x.fillText(r<.3?'click to start · stare at the center':'every color of light is falling into your eye',CX,24)
+
+  // phase label
+  const phase=r<.15?'APPROACH':r<.4?'PHOTON SPHERE':r<.65?'ISCO':r<.9?'ACCRETION':'SINGULARITY'
+  x.globalAlpha=.03;x.font='8px monospace'
+  x.fillText(phase,CX,H-25)
+}
+frame()
+</script>
+</body></html>
