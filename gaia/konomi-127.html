@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>KONOMI 127 — M₇ Bloom · 119 Digits · The Tree</title>
+<style>*{margin:0;padding:0}body{background:#000;overflow:hidden;cursor:none}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),C=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
+resize();addEventListener('resize',resize)
+
+// THE 127D KONOMI NUMBER
+// bloom [5,19,7,17,36,14,29] — sum=127=M7
+const BLOOM127=[5,19,7,17,36,14,29]
+const PRIMES=[2,3,5,7,11,13,17]
+const DIGITS='39652707510284996862824184520356843570479937243660289933387489416820561028869536195812226717971772780670465843492500000'.split('')
+const NUM_RINGS=119 // one per digit
+
+// complement colors for inverted bloom
+function nmRGB(nm){
+  let r=0,g=0,b=0
+  if(nm>=380&&nm<440){r=-(nm-440)/(440-380);b=1}
+  else if(nm>=440&&nm<490){g=(nm-440)/(490-440);b=1}
+  else if(nm>=490&&nm<510){g=1;b=-(nm-510)/(510-490)}
+  else if(nm>=510&&nm<580){r=(nm-510)/(580-510);g=1}
+  else if(nm>=580&&nm<645){r=1;g=-(nm-645)/(645-580)}
+  else if(nm>=645&&nm<=780){r=1}
+  let f=1
+  if(nm>=380&&nm<420)f=.3+.7*(nm-380)/(420-380)
+  else if(nm>=645&&nm<=780)f=.3+.7*(780-nm)/(780-645)
+  return[r*f*255|0,g*f*255|0,b*f*255|0]
+}
+function complement(rgb){return[255-rgb[0],255-rgb[1],255[2]]}
+
+const RINGS=DIGITS.map((d,i)=>{
+  const digit=parseInt(d)
+  const primeIdx=i%7
+  const exp=BLOOM127[primeIdx]
+  const nm=380+((i/NUM_RINGS)*400)
+  return{digit,primeIdx,exp,nm,
+    r:.02+i*.0078,speed:(.002+digit*.0008+(exp*.0001))*(i%2?1:-1),
+    segments:PRIMES[primeIdx],angle:0}
+})
+
+// 7 gate bands — which rings belong to each gate
+const GATE_BANDS=PRIMES.map((_,gi)=>RINGS.filter(r=>r.primeIdx===gi))
+
+// audio
+let actx
+addEventListener('click',()=>{
+  if(actx)return
+  actx=new(window.AudioContext||window.webkitAudioContext)()
+  const m=actx.createGain();m.gain.value=.12;m.connect(actx.destination)
+  ;[[.2,.1,.18],[.37,.07,.13],[.53,.05,.09]].forEach(([dt,fbv,wv])=>{
+    const d=actx.createDelay(.6);d.delayTime.value=dt
+    const f=actx.createGain();f.gain.value=fbv;d.connect(f);f.connect(d)
+    const w=actx.createGain();w.gain.value=wv;d.connect(w);w.connect(actx.destination)
+    m.connect(d)
+  })
+  ;[55,82,110,147,196,262,330].forEach((hz,i)=>{
+    const vol=.005+BLOOM127[i]*.0004
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type='sine';o.frequency.value=hz;g.gain.value=vol
+    o.connect(g);g.connect(m);o.start()
+    const o2=actx.createOscillator(),g2=actx.createGain()
+    o2.type='sine';o2.frequency.value=hz*1.002;g2.gain.value=vol*.7
+    o2.connect(g2);g2.connect(m);o2.start()
+  })
+},{once:true})
+
+let t=0
+
+function loop(){
+  requestAnimationFrame(loop)
+  t+=1/60
+
+  const maxR=Math.min(W,H)*.48
+
+  // ═══ INVERTED BLOOM BACKGROUND ═══
+  // complement of active spectrum radiates FROM edges toward dark center
+  const activeGate=Math.floor((t*.15)%7)
+  const activeExp=BLOOM127[activeGate]
+  const activeNm=400+activeGate*57
+  const activeRGB=nmRGB(activeNm)
+  const compRGB=[255-activeRGB[0],255-activeRGB[1],255-activeRGB[2]]
+
+  // dark center → complement edges (inverted bloom)
+  C.fillStyle='#000';C.globalAlpha=1;C.fillRect(0,0,W,H)
+
+  // edge glow in complement
+  const edgeGrad=C.createRadialGradient(cx,cy,maxR*.3,cx,cy,maxR*1.2)
+  edgeGrad.addColorStop(0,'rgba(0,0,0,0)')
+  edgeGrad.addColorStop(.5,`rgba(${compRGB[0]>>3},${compRGB[1]>>3},${compRGB[2]>>3},.06)`)
+  edgeGrad.addColorStop(.8,`rgba(${compRGB[0]>>2},${compRGB[1]>>2},${compRGB[2]>>2},.08)`)
+  edgeGrad.addColorStop(1,`rgba(${compRGB[0]>>2},${compRGB[1]>>2},${compRGB[2]>>2},.04)`)
+  C.fillStyle=edgeGrad;C.fillRect(0,0,W,H)
+
+  // ═══ 119 RINGS ═══
+  RINGS.forEach((ring,i)=>{
+    ring.angle+=ring.speed
+    const ringR=maxR*ring.r
+    const rgb=nmRGB(ring.nm)
+    const compR=[255-rgb[0],255-rgb[1],255-rgb[2]]
+    const expScale=ring.exp/36 // normalize to max exponent (36 for R4)
+    const isActiveGate=ring.primeIdx===activeGate
+
+    // PRIMARY ring arcs
+    const segArc=TAU/ring.segments*.55
+    C.save();C.translate(cx,cy);C.rotate(ring.angle)
+    for(let s=0;s<ring.segments;s++){
+      const sa=s*TAU/ring.segments
+
+      // primary color arc
+      C.beginPath();C.arc(0,0,ringR,sa,sa+segArc)
+      C.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${(.02+expScale*.06)*(isActiveGate?2:1)})`
+      C.lineWidth=1+expScale*1.5+(isActiveGate?1:0);C.globalAlpha=1;C.stroke()
+
+      // COMPLEMENT shadow arc — offset, counter-phase (inverted bloom)
+      C.beginPath();C.arc(0,0,ringR+1.5,sa+segArc*.5,sa+segArc*1.3)
+      C.strokeStyle=`rgba(${compR[0]},${compR[1]},${compR[2]},${(.008+expScale*.02)*(isActiveGate?1.5:1)})`
+      C.lineWidth=.5+expScale*.5;C.stroke()
+    }
+    C.restore()
+
+    // hot dots — digit count, alternating primary/complement
+    for(let d=0;d<ring.digit;d++){
+      const da=ring.angle+d*TAU/Math.max(1,ring.digit)+t*(.08+i*.003)
+      const dx=cx+Math.cos(da)*ringR,dy=cy+Math.sin(da)*ringR
+      const useComp=d%2===1
+      const dotRGB=useComp?compR:rgb
+      C.beginPath();C.arc(dx,dy,.8+expScale*(isActiveGate?2:1),0,TAU)
+      C.fillStyle=`rgba(${dotRGB[0]},${dotRGB[1]},${dotRGB[2]},${(.04+expScale*.06)*(isActiveGate?2:1)})`
+      C.globalAlpha=1;C.fill()
+    }
+  })
+
+  // ═══ 7 GATE ZONE MARKERS — bloom exponent visualization ═══
+  BLOOM127.forEach((exp,gi)=>{
+    const isActive=gi===activeGate
+    // exponent bar — radial, showing the power of this gate
+    const barAngle=gi*TAU/7-TAU/4+t*.008
+    const barStart=maxR*.02
+    const barEnd=maxR*(exp/36)*.95 // proportional to exponent
+    const rgb=nmRGB(400+gi*57)
+    const compR=[255-rgb[0],255-rgb[1],255-rgb[2]]
+
+    // primary bar
+    C.beginPath()
+    C.moveTo(cx+Math.cos(barAngle)*barStart,cy+Math.sin(barAngle)*barStart)
+    C.lineTo(cx+Math.cos(barAngle)*barEnd,cy+Math.sin(barAngle)*barEnd)
+    C.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${isActive?.08:.03})`
+    C.lineWidth=isActive?3:1.5;C.globalAlpha=1;C.stroke()
+
+    // complement bar (opposite side)
+    C.beginPath()
+    C.moveTo(cx+Math.cos(barAngle+Math.PI)*barStart,cy+Math.sin(barAngle+Math.PI)*barStart)
+    C.lineTo(cx+Math.cos(barAngle+Math.PI)*(barEnd*.6),cy+Math.sin(barAngle+Math.PI)*(barEnd*.6))
+    C.strokeStyle=`rgba(${compR[0]},${compR[1]},${compR[2]},${isActive?.04:.015})`
+    C.lineWidth=1;C.stroke()
+
+    // label at end of bar
+    const lx=cx+Math.cos(barAngle)*(barEnd+12)
+    const ly=cy+Math.sin(barAngle)*(barEnd+12)
+    C.font=`${isActive?8:6}px monospace`;C.textAlign='center';C.textBaseline='middle'
+    C.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${isActive?.12:.04})`
+    C.globalAlpha=1;C.fillText(`${PRIMES[gi]}^${exp}`,lx,ly)
+
+    // gate ring at this exponent's radius
+    const gateR=maxR*(exp/36)*.95
+    C.beginPath();C.arc(cx,cy,gateR,barAngle-.15,barAngle+.15)
+    C.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${isActive?.1:.03})`
+    C.lineWidth=2+isActive*2;C.stroke()
+  })
+
+  // ═══ INTERFERENCE — complement halos between gate families ═══
+  for(let g=0;g<6;g++){
+    const b1=GATE_BANDS[g],b2=GATE_BANDS[g+1]
+    if(!b1.length||!b2.length)continue
+    // find overlapping radius zones
+    const r1max=maxR*b1[b1.length-1].r
+    const r2min=maxR*b2[0].r
+    if(r2min>r1max)continue
+    const midR=(r1max+r2min)/2
+    const rgb1=nmRGB(400+g*57),rgb2=nmRGB(400+(g+1)*57)
+    const compMid=[(255-rgb1[0]+255-rgb2[0])>>1,(255-rgb1[1]+255-rgb2[1])>>1,(255-rgb1[2]+255-rgb2[2])>>1]
+
+    C.beginPath();C.arc(cx,cy,midR,0,TAU)
+    C.strokeStyle=`rgba(${compMid[0]},${compMid[1]},${compMid[2]},${.005+Math.abs(Math.sin(t+g))*.008})`
+    C.lineWidth=Math.abs(r1max-r2min);C.globalAlpha=1;C.stroke()
+  }
+
+  // ═══ CENTER — digital root 9 ═══
+  const centerR=maxR*.018
+  C.beginPath();C.arc(cx,cy,centerR+2,0,TAU)
+  const centerGlow=C.createRadialGradient(cx,cy,0,cx,cy,centerR*4)
+  centerGlow.addColorStop(0,`rgba(${activeRGB[0]},${activeRGB[1]},${activeRGB[2]},.08)`)
+  centerGlow.addColorStop(1,'rgba(0,0,0,0)')
+  C.fillStyle=centerGlow;C.fill()
+
+  C.beginPath();C.arc(cx,cy,centerR,0,TAU)
+  C.fillStyle='rgba(0,0,0,.98)';C.fill()
+
+  // 9 in center (digital root)
+  C.font='8px monospace';C.textAlign='center';C.textBaseline='middle'
+  C.fillStyle=`rgba(${activeRGB[0]},${activeRGB[1]},${activeRGB[2]},.15)`
+  C.globalAlpha=1;C.fillText('9',cx,cy)
+
+  // ═══ INFO ═══
+  C.font='5px monospace';C.textAlign='center';C.globalAlpha=.03
+  C.fillStyle=`rgba(${activeRGB[0]},${activeRGB[1]},${activeRGB[2]},.5)`
+  C.fillText('KONOMI 127 · M₇ · bloom [5,19,7,17,36,14,29] · 119 digits · digital root 9 · click for sound',cx,H-8)
+  C.fillText(`active: ${PRIMES[activeGate]}^${BLOOM127[activeGate]} · ${['ROOT','VAGUS','GATE','HEART','VOICE','LENS','CROWN'][activeGate]}`,cx,H-18)
+  // the number itself (tiny, across top)
+  C.font='4px monospace';C.globalAlpha=.02
+  C.fillText(DIGITS.join(''),cx,10)
+  C.globalAlpha=1
+}
+loop()
+</script>
+</body></html>
