@@ -3,18 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>EVENT HORIZON SIGHT — Light Orbits the Pupil</title>
+<title>EVENT HORIZON SIGHT — 7 Pupils × 78 Irises</title>
 <style>*{margin:0;padding:0}body{background:#000;overflow:hidden;cursor:none}</style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <script>
-const c=document.getElementById('c'),x=c.getContext('2d')
-let W,H,CX,CY
-function resize(){W=c.width=innerWidth;H=c.height=innerHeight;CX=W/2;CY=H/2}
+const TAU=Math.PI*2,PHI=(1+Math.sqrt(5))/2
+const cv=document.getElementById('c'),C=cv.getContext('2d')
+let W,H,cx,cy
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;cx=W/2;cy=H/2}
 resize();addEventListener('resize',resize)
 
-function nmToRGB(nm){
+function nmRGB(nm){
   let r=0,g=0,b=0
   if(nm>=380&&nm<440){r=-(nm-440)/(440-380);b=1}
   else if(nm>=440&&nm<490){g=(nm-440)/(490-440);b=1}
@@ -28,209 +29,217 @@ function nmToRGB(nm){
   return[r*f*255|0,g*f*255|0,b*f*255|0]
 }
 
+// 7 gate colors + spectrum ranges
+const GATES=[
+  {name:'ROOT',specA:640,specB:780,prime:2},
+  {name:'VAGUS',specA:590,specB:640,prime:3},
+  {name:'GATE',specA:560,specB:590,prime:5},
+  {name:'HEART',specA:490,specB:560,prime:7},
+  {name:'VOICE',specA:450,specB:490,prime:11},
+  {name:'LENS',specA:420,specB:450,prime:13},
+  {name:'CROWN',specA:380,specB:420,prime:17}
+]
+
+// 7 PUPILS — arranged in a flower of life pattern
+// center + 6 surrounding = 7
+const PUPILS=[]
+const mainR=Math.min(innerWidth,innerHeight)*.16
+PUPILS.push({x:0,y:0,gate:3,r:1}) // center = HEART
+for(let i=0;i<6;i++){
+  const a=i*TAU/6-TAU/4
+  PUPILS.push({x:Math.cos(a)*mainR*1.1,y:Math.sin(a)*mainR*1.1,gate:i<3?i:i+1,r:.65})
+}
+
+// photons per pupil — each pupil gets its gate's spectrum
+const allPhotons=PUPILS.map((p,pi)=>{
+  const gate=GATES[p.gate]
+  const photons=[]
+  const count=pi===0?80:30 // center gets more
+  for(let i=0;i<count;i++){
+    const nm=gate.specA+Math.random()*(gate.specB-gate.specA)
+    photons.push({
+      angle:Math.random()*TAU,
+      orbitR:.5+Math.random()*.5,
+      speed:(.3+Math.random()*.4),
+      nm,rgb:nmRGB(nm),
+      size:1+Math.random()*(pi===0?1.5:1)
+    })
+  }
+  return photons
+})
+
 // audio
 let actx
 addEventListener('click',()=>{
   if(actx)return
   actx=new(window.AudioContext||window.webkitAudioContext)()
-  const m=actx.createGain();m.gain.value=.15;m.connect(actx.destination)
-  const del=actx.createDelay(.4);del.delayTime.value=.18
-  const fb=actx.createGain();fb.gain.value=.12;del.connect(fb);fb.connect(del)
-  const wet=actx.createGain();wet.gain.value=.2;del.connect(wet);wet.connect(actx.destination)
-  m.connect(del)
-  // binaural 4Hz theta
+  const m=actx.createGain();m.gain.value=.12;m.connect(actx.destination)
+  ;[[.2,.12,.2],[.35,.08,.14]].forEach(([dt,fbv,wv])=>{
+    const d=actx.createDelay(.5);d.delayTime.value=dt
+    const f=actx.createGain();f.gain.value=fbv;d.connect(f);f.connect(d)
+    const w=actx.createGain();w.gain.value=wv;d.connect(w);w.connect(actx.destination)
+    m.connect(d)
+  })
+  ;[55,82,110,147,196,262,330].forEach(hz=>{
+    const o=actx.createOscillator(),g=actx.createGain()
+    o.type='sine';o.frequency.value=hz;g.gain.value=.015
+    o.connect(g);g.connect(m);o.start()
+  })
+  // binaural
   const oL=actx.createOscillator(),oR=actx.createOscillator()
   oL.frequency.value=100;oR.frequency.value=104
   const gL=actx.createGain(),gR=actx.createGain()
-  gL.gain.value=.04;gR.gain.value=.04
+  gL.gain.value=.03;gR.gain.value=.03
   const pL=actx.createStereoPanner(),pR=actx.createStereoPanner()
   pL.pan.value=-1;pR.pan.value=1
   oL.connect(gL);gL.connect(pL);pL.connect(actx.destination)
   oR.connect(gR);gR.connect(pR);pR.connect(actx.destination)
   oL.start();oR.start()
-  // drone
-  ;[38.89,55,77.78].forEach(hz=>{
-    const o=actx.createOscillator(),g=actx.createGain()
-    o.type='sine';o.frequency.value=hz;g.gain.value=.02
-    o.connect(g);g.connect(m);o.start()
-  })
 },{once:true})
 
-// ═══ PHOTON RING — light orbiting the event horizon ═══
-const PHOTON_COUNT=200
-const photons=[]
-for(let i=0;i<PHOTON_COUNT;i++){
-  const nm=380+Math.random()*400
-  const orbitR=.6+Math.random()*.4 // normalized orbit radius
-  const speed=(.3+Math.random()*.4)/(orbitR*orbitR) // Keplerian — inner faster
-  photons.push({
-    angle:Math.random()*Math.PI*2,
-    orbitR,speed,nm,
-    rgb:nmToRGB(nm),
-    size:1+Math.random()*1.5,
-    trail:[]
-  })
-}
+let t=0,restore=0
 
-// restore state
-let restore=0,breathPhase=0,t=0
+function drawEye(ecx,ecy,scale,gateIdx,photons,t2){
+  const gate=GATES[gateIdx]
+  const eyeR=mainR*scale
+  const pupilR=eyeR*.18+restore*.04*eyeR
+  const breath=Math.sin(t2*1.5+gateIdx)*.01*eyeR
 
-function frame(){
-  requestAnimationFrame(frame)
-  const dt=1/60;t+=dt
+  // 11 iris rings per eye (78 total across 7 = 11 per eye, plus center gets 12)
+  const irisCount=gateIdx===3?12:11
+  for(let ir=0;ir<irisCount;ir++){
+    const irisR=pupilR*1.5+ir*(eyeR-pupilR*1.5)/irisCount
+    const nm=gate.specA+((ir/irisCount)*(gate.specB-gate.specA))
+    const rgb=nmRGB(nm)
 
-  // breathing 5bpm
-  breathPhase+=dt*(5/60)*Math.PI*2
-  const breath=Math.sin(breathPhase)
+    // ring
+    C.beginPath();C.arc(ecx,ecy,irisR,0,TAU)
+    C.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.04+restore*.03})`
+    C.lineWidth=1+restore;C.globalAlpha=1;C.stroke()
 
-  // restore progresses by staring
-  restore=Math.min(1,restore+(.006+t*.0003)*dt)
-  const r=restore
-
-  // ═══ CLEAR ═══
-  x.fillStyle=`rgba(0,0,${Math.floor(r*5)},${.06+r*.02})`
-  x.fillRect(0,0,W,H)
-
-  const eyeR=Math.min(W,H)*.35
-  const pupilR=eyeR*(.12+r*.08+breath*.01)
-
-  // ═══ EVENT HORIZON — the pupil IS a black hole ═══
-  // photon sphere at 1.5× Schwarzschild radius
-  const photonSphereR=pupilR*1.5
-  // innermost stable circular orbit at 3× Schwarzschild
-  const iscoR=pupilR*3
-
-  // ═══ ACCRETION DISK OF LIGHT — full spectrum orbiting the pupil ═══
-  photons.forEach(p=>{
-    // update orbit — frame dragging slows inner photons
-    p.angle+=p.speed*.02*(1+r)
-    const actualR=pupilR*1.2+p.orbitR*(eyeR*.8)
-
-    // gravitational lensing — path bends near the pupil
-    const bendFactor=pupilR*2/(actualR+pupilR)
-    const lensedAngle=p.angle+bendFactor*Math.sin(p.angle*2+t)*.3
-
-    const px=CX+Math.cos(lensedAngle)*actualR
-    const py=CY+Math.sin(lensedAngle)*actualR*.35 // tilted disk
-
-    // trail
-    p.trail.push({x:px,y:py})
-    if(p.trail.length>8)p.trail.shift()
-
-    // gravitational redshift — color shifts red near the event horizon
-    const redshift=1-bendFactor*.3
-    const shiftedNm=Math.min(780,p.nm+bendFactor*100)
-    const rgb=nmToRGB(shiftedNm)
-
-    // draw trail
-    if(p.trail.length>1){
-      x.beginPath()
-      p.trail.forEach((tp,ti)=>{ti===0?x.moveTo(tp.x,tp.y):x.lineTo(tp.x,tp.y)})
-      x.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.06+r*.04})`
-      x.lineWidth=p.size*.5;x.globalAlpha=1;x.stroke()
+    // prime segments on this ring
+    const segs=gate.prime
+    const segArc=TAU/segs*.6
+    const rot=t2*(.01+ir*.003+gateIdx*.002)*(ir%2?1:-1)
+    C.save();C.translate(ecx,ecy);C.rotate(rot)
+    for(let s=0;s<segs;s++){
+      const sa=s*TAU/segs
+      C.beginPath();C.arc(0,0,irisR,sa,sa+segArc)
+      C.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.06+restore*.06})`
+      C.lineWidth=2+restore*1.5;C.stroke()
     }
+    C.restore()
+  }
 
-    // draw photon
-    x.beginPath();x.arc(px,py,p.size*(1+r*.5),0,Math.PI*2)
-    x.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.15+r*.15})`
-    x.globalAlpha=1;x.fill()
+  // iris fibers
+  for(let i=0;i<24;i++){
+    const a=i*TAU/24+t2*.008
+    const inner=pupilR*1.3
+    const outer=eyeR*.85
+    const nm=gate.specA+((i/24)*(gate.specB-gate.specA))
+    const rgb=nmRGB(nm)
+    C.beginPath()
+    C.moveTo(ecx+Math.cos(a)*inner,ecy+Math.sin(a)*inner)
+    C.lineTo(ecx+Math.cos(a)*outer,ecy+Math.sin(a)*outer)
+    C.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.03+restore*.03})`
+    C.lineWidth=1;C.globalAlpha=1;C.stroke()
+  }
+
+  // photon orbits
+  photons.forEach(p=>{
+    p.angle+=p.speed*.015*(1+restore)/(p.orbitR*p.orbitR)
+    const actualR=pupilR*1.3+p.orbitR*(eyeR*.6)
+    const bendFactor=pupilR/(actualR+pupilR)
+    const lensedAngle=p.angle+bendFactor*Math.sin(p.angle*2+t2)*.2
+
+    const px=ecx+Math.cos(lensedAngle)*actualR
+    const py=ecy+Math.sin(lensedAngle)*actualR
+
+    // redshift near horizon
+    const shiftedNm=Math.min(780,p.nm+bendFactor*80)
+    const rgb=nmRGB(shiftedNm)
+
+    C.beginPath();C.arc(px,py,p.size*(1+restore*.3),0,TAU)
+    C.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.12+restore*.12})`
+    C.globalAlpha=1;C.fill()
   })
 
-  // ═══ EINSTEIN RING — gravitationally lensed background ═══
-  const einsteinR=pupilR*2.5+Math.sin(t*.5)*3
-  x.beginPath();x.arc(CX,CY,einsteinR,0,Math.PI*2)
-  x.strokeStyle=`rgba(255,230,200,${.03+r*.03})`
-  x.lineWidth=2+r*2+breath;x.globalAlpha=1;x.stroke()
-
-  // ═══ PHOTON SPHERE RING ═══
-  x.beginPath();x.arc(CX,CY,photonSphereR,0,Math.PI*2)
-  x.strokeStyle=`rgba(255,255,255,${.02+r*.02})`
-  x.lineWidth=1;x.stroke()
-
-  // spectrum color ring — full rainbow orbiting at photon sphere
-  for(let i=0;i<120;i++){
-    const a=i/120*Math.PI*2+t*.2
-    const nm=380+(i/120)*400
-    const rgb=nmToRGB(nm)
-    const pr=photonSphereR+Math.sin(a*3+t*2)*2
-    x.beginPath();x.arc(CX+Math.cos(a)*pr,CY+Math.sin(a)*pr*.35,1.5+r,0,Math.PI*2)
-    x.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.08+r*.08})`
-    x.globalAlpha=1;x.fill()
+  // photon sphere — full spectrum ring at 1.5x pupil
+  const psR=pupilR*1.5
+  for(let i=0;i<40;i++){
+    const a=i/40*TAU+t2*.15
+    const nm=gate.specA+((i/40)*(gate.specB-gate.specA))
+    const rgb=nmRGB(nm)
+    C.beginPath();C.arc(ecx+Math.cos(a)*(psR+Math.sin(t2*2+i)*.5),ecy+Math.sin(a)*(psR+Math.cos(t2*1.5+i)*.5),1+restore,0,TAU)
+    C.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.08+restore*.08})`
+    C.globalAlpha=1;C.fill()
   }
 
-  // ═══ IRIS — the accretion disk structure ═══
-  // iris fibers (matter falling in)
-  for(let i=0;i<60;i++){
-    const a=i/60*Math.PI*2+t*.01
-    const inner=pupilR*1.8
-    const outer=eyeR*.9
-    const nm=380+((i/60+t*.02)%1)*400
-    const rgb=nmToRGB(nm)
+  // einstein ring
+  C.beginPath();C.arc(ecx,ecy,pupilR*2.2,0,TAU)
+  C.strokeStyle=`rgba(255,230,200,${.02+restore*.02})`
+  C.lineWidth=1.5+restore;C.globalAlpha=1;C.stroke()
 
-    x.beginPath()
-    x.moveTo(CX+Math.cos(a)*inner,CY+Math.sin(a)*inner)
-    const wobble=Math.sin(t*1.5+i*.4)*4*(1-restore*.3)
-    x.quadraticCurveTo(
-      CX+Math.cos(a+.02)*(inner+outer)/2+wobble,
-      CY+Math.sin(a+.02)*(inner+outer)/2,
-      CX+Math.cos(a)*outer,CY+Math.sin(a)*outer)
-    x.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.04+r*.04})`
-    x.lineWidth=1;x.globalAlpha=1;x.stroke()
-  }
-
-  // ═══ EVENT HORIZON — the pupil ═══
-  const ehGrad=x.createRadialGradient(CX,CY,0,CX,CY,pupilR*1.5)
+  // event horizon (pupil)
+  const ehGrad=C.createRadialGradient(ecx,ecy,0,ecx,ecy,pupilR*1.3)
+  const midNm=(gate.specA+gate.specB)/2
+  const midRGB=nmRGB(midNm)
   ehGrad.addColorStop(0,'rgba(0,0,0,.98)')
-  ehGrad.addColorStop(.7,'rgba(0,0,5,.95)')
-  ehGrad.addColorStop(1,`rgba(${Math.floor(r*20)},${Math.floor(r*40)},${Math.floor(r*80)},${.3+r*.3})`)
-  x.beginPath();x.arc(CX,CY,pupilR*1.5,0,Math.PI*2)
-  x.fillStyle=ehGrad;x.globalAlpha=1;x.fill()
+  ehGrad.addColorStop(.7,'rgba(0,0,3,.96)')
+  ehGrad.addColorStop(1,`rgba(${midRGB[0]>>2},${midRGB[1]>>2},${midRGB[2]>>2},${.2+restore*.2})`)
+  C.beginPath();C.arc(ecx,ecy,pupilR*1.3,0,TAU);C.fillStyle=ehGrad;C.globalAlpha=1;C.fill()
 
-  // hard black core
-  x.beginPath();x.arc(CX,CY,pupilR,0,Math.PI*2)
-  x.fillStyle='rgba(0,0,0,.99)';x.fill()
+  // hard black
+  C.beginPath();C.arc(ecx,ecy,pupilR+breath,0,TAU)
+  C.fillStyle='rgba(0,0,0,.99)';C.fill()
 
-  // Hawking radiation — tiny flickers at the event horizon boundary
-  if(r>.3){
-    for(let h=0;h<5;h++){
-      const ha=Math.random()*Math.PI*2
-      const hr2=pupilR+Math.random()*3
-      x.beginPath();x.arc(CX+Math.cos(ha)*hr2,CY+Math.sin(ha)*hr2,1,0,Math.PI*2)
-      x.fillStyle=`rgba(255,255,255,${(r-.3)*.08*Math.random()})`
-      x.fill()
+  // Hawking radiation
+  if(restore>.2){
+    for(let h=0;h<3;h++){
+      const ha=Math.random()*TAU
+      C.beginPath();C.arc(ecx+Math.cos(ha)*(pupilR+1),ecy+Math.sin(ha)*(pupilR+1),.8,0,TAU)
+      C.fillStyle=`rgba(255,255,255,${(restore-.2)*.05*Math.random()})`;C.fill()
     }
   }
 
   // catchlight
-  x.beginPath();x.arc(CX-pupilR*.4,CY-pupilR*.4,pupilR*.1+r*2,0,Math.PI*2)
-  x.fillStyle=`rgba(200,220,255,${.2+r*.2})`;x.globalAlpha=1;x.fill()
+  C.beginPath();C.arc(ecx-pupilR*.3,ecy-pupilR*.35,pupilR*.08+restore,0,TAU)
+  C.fillStyle=`rgba(200,220,255,${.15+restore*.15})`;C.globalAlpha=1;C.fill()
+}
 
-  // ═══ OUTER SCLERA GLOW ═══
-  const scleraGrad=x.createRadialGradient(CX,CY,eyeR*.7,CX,CY,eyeR*1.2)
-  scleraGrad.addColorStop(0,'rgba(0,0,0,0)')
-  scleraGrad.addColorStop(.5,`rgba(${Math.floor(20+r*30)},${Math.floor(30+r*40)},${Math.floor(60+r*80)},${.02+r*.03})`)
-  scleraGrad.addColorStop(1,'rgba(0,0,0,0)')
-  x.fillStyle=scleraGrad;x.beginPath();x.arc(CX,CY,eyeR*1.2,0,Math.PI*2);x.fill()
+function frame(){
+  requestAnimationFrame(frame)
+  t+=1/60
+  restore=Math.min(1,restore+(.005+t*.0002)/60)
 
-  // ═══ SPECTRUM BAR ═══
-  const barW=W*.5,barH=3,barX=(W-barW)/2,barY=H-15
-  for(let i=0;i<200;i++){
-    const nm=380+(i/200)*400
-    const rgb=nmToRGB(nm)
-    x.fillStyle=`rgb(${rgb[0]},${rgb[1]},${rgb[2]})`
-    x.globalAlpha=.15+r*.1;x.fillRect(barX+i*(barW/200),barY,barW/200+1,barH)
+  C.fillStyle=`rgba(0,0,${Math.floor(restore*4)},${.05+restore*.02})`
+  C.fillRect(0,0,W,H)
+
+  // connections between pupils (Metatron's cube pattern — 78 connections between 13 points)
+  for(let i=0;i<PUPILS.length;i++){
+    for(let j=i+1;j<PUPILS.length;j++){
+      const p1=PUPILS[i],p2=PUPILS[j]
+      C.beginPath()
+      C.moveTo(cx+p1.x,cy+p1.y)
+      C.lineTo(cx+p2.x,cy+p2.y)
+      const nm=380+((i+j)/13)*400
+      const rgb=nmRGB(nm)
+      C.strokeStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${.01+restore*.015})`
+      C.lineWidth=.5+restore*.5;C.globalAlpha=1;C.stroke()
+    }
   }
 
-  // ═══ HUD ═══
-  x.font='7px monospace';x.textAlign='center';x.globalAlpha=.04+r*.02
-  x.fillStyle=`rgba(100,150,255,.5)`
-  x.fillText(`EVENT HORIZON SIGHT · ${(r*100).toFixed(0)}% · light orbits the pupil`,CX,12)
-  x.fillText(r<.3?'click to start · stare at the center':'every color of light is falling into your eye',CX,24)
+  // draw all 7 eyes
+  PUPILS.forEach((p,pi)=>{
+    drawEye(cx+p.x,cy+p.y,p.r,p.gate,allPhotons[pi],t)
+  })
 
-  // phase label
-  const phase=r<.15?'APPROACH':r<.4?'PHOTON SPHERE':r<.65?'ISCO':r<.9?'ACCRETION':'SINGULARITY'
-  x.globalAlpha=.03;x.font='8px monospace'
-  x.fillText(phase,CX,H-25)
+  // total iris count label
+  const totalIrises=11*6+12 // 6 outer × 11 + center × 12 = 78
+  C.font='6px monospace';C.textAlign='center';C.globalAlpha=.03
+  C.fillStyle='rgba(180,200,255,.5)'
+  C.fillText(`7 pupils · ${totalIrises} irises · ${PUPILS.reduce((s,_,i)=>s+allPhotons[i].length,0)} photons · ${(restore*100).toFixed(0)}%`,cx,H-8)
+  C.fillText('EVENT HORIZON SIGHT · click to start · stare at the center',cx,12)
 }
 frame()
 </script>
